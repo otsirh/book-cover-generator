@@ -2,13 +2,14 @@ import { createCover, listStyles, palettes, randomSeed } from '../src/index.js';
 import { svgToDataUrl, downloadCover, copyText } from '../src/browser.js';
 
 /** @typedef {'paperback' | 'ebook' | 'square'} Format */
-/** @typedef {{ button: HTMLButtonElement, frame: HTMLElement, img: HTMLImageElement, visible: boolean, dirty: boolean }} Tile */
+/** @typedef {{ button: HTMLButtonElement, img: HTMLImageElement, visible: boolean, dirty: boolean }} Tile */
 
 /** @type {Record<Format, [number, number]>} */
 const FORMATS = { paperback: [600, 900], ebook: [600, 960], square: [600, 600] };
 const SCALES = [1, 2, 3, 4];
 const STYLES = listStyles();
 const STYLE_IDS = new Set(STYLES.map((s) => s.id));
+/** @type {Set<string>} */
 const PALETTE_IDS = new Set(palettes.map((p) => p.id));
 
 /** @param {string} id */
@@ -47,17 +48,20 @@ let current;
 
 /* --------------------------------------------------------------- URL state */
 
+/** Clip to `max` characters (code points), matching the inputs' maxlength. */
+const clip = (/** @type {string} */ str, /** @type {number} */ max) => Array.from(str).slice(0, max).join('');
+
 function readHash() {
   const q = new URLSearchParams(location.hash.slice(1));
-  if (q.has('title')) state.title = q.get('title') ?? '';
-  if (q.has('author')) state.author = q.get('author') ?? '';
+  if (q.has('title')) state.title = clip(q.get('title') ?? '', 200);
+  if (q.has('author')) state.author = clip(q.get('author') ?? '', 120);
   const style = q.get('style');
   if (style && STYLE_IDS.has(style)) state.style = style;
   const palette = q.get('palette');
   if (palette && (palette === 'auto' || PALETTE_IDS.has(palette))) state.palette = palette;
-  if (q.has('seed')) state.seed = (q.get('seed') ?? '').trim();
+  if (q.has('seed')) state.seed = clip((q.get('seed') ?? '').trim(), 40);
   const format = q.get('format');
-  if (format && format in FORMATS) state.format = /** @type {Format} */ (format);
+  if (format && Object.hasOwn(FORMATS, format)) state.format = /** @type {Format} */ (format);
 }
 
 /** @type {ReturnType<typeof setTimeout> | undefined} */
@@ -114,11 +118,11 @@ function buildControls() {
     state.scale = Number(value(e));
   });
   swatches.addEventListener('click', (e) => {
-    const b = /** @type {HTMLElement} */ (e.target).closest('[data-palette]');
+    const b = /** @type {HTMLElement} */ (e.target).closest('button[data-palette]');
     if (b instanceof HTMLElement && b.dataset.palette) update({ palette: b.dataset.palette });
   });
   $('format').addEventListener('click', (e) => {
-    const b = /** @type {HTMLElement} */ (e.target).closest('[data-format]');
+    const b = /** @type {HTMLElement} */ (e.target).closest('button[data-format]');
     if (b instanceof HTMLElement && b.dataset.format) update({ format: /** @type {Format} */ (b.dataset.format) });
   });
 
@@ -169,6 +173,8 @@ function randomizeAll() {
 }
 
 function syncControls() {
+  // Drives the preview and thumbnail aspect ratio in CSS (see site/boot.js).
+  document.documentElement.dataset.coverFormat = state.format;
   const input = (/** @type {string} */ id) => /** @type {HTMLInputElement} */ ($(id));
   if (input('title').value !== state.title) input('title').value = state.title;
   if (input('author').value !== state.author) input('author').value = state.author;
@@ -211,13 +217,18 @@ function renderPreview() {
   const img = /** @type {HTMLImageElement} */ ($('preview'));
   img.src = svgToDataUrl(current.svg);
   img.alt = `Cover preview: “${state.title.trim() || 'Untitled'}”${state.author.trim() ? ` by ${state.author.trim()}` : ''}, ${style?.name} style`;
-  $('book').style.aspectRatio = `${current.width} / ${current.height}`;
+  const paletteName = `${palette?.name ?? 'Custom'}${state.palette === 'auto' ? ' (auto)' : ''}`;
   $('meta').replaceChildren(
     h('strong', {}, style?.name ?? current.style),
-    ` · ${palette?.name ?? 'Custom'}${state.palette === 'auto' ? ' (auto)' : ''} · `,
+    ` · ${paletteName} · `,
     ...(state.seed ? ['seed ', h('code', {}, state.seed)] : ['seed from title + author']),
   );
+  // Screen readers hear about style and palette changes, not every keystroke.
+  const announcement = `Style: ${style?.name ?? current.style}. Palette: ${paletteName}.`;
+  if (lastAnnouncement && announcement !== lastAnnouncement) $('announce').textContent = announcement;
+  lastAnnouncement = announcement;
 }
+let lastAnnouncement = '';
 
 /* ----------------------------------------------------------------- gallery */
 
@@ -256,18 +267,14 @@ function buildGallery() {
       const top = $('book').getBoundingClientRect().top;
       if (top < 0 || top > innerHeight * 0.6) window.scrollTo({ top: 0, behavior: 'smooth' });
     });
-    tiles.set(s.id, { button, frame, img, visible: false, dirty: true });
+    tiles.set(s.id, { button, img, visible: false, dirty: true });
     observer.observe(button);
     grid.append(button);
   }
 }
 
 function invalidateGallery() {
-  const ratio = FORMATS[state.format].join(' / ');
-  for (const tile of tiles.values()) {
-    tile.dirty = true;
-    tile.frame.style.aspectRatio = ratio;
-  }
+  for (const tile of tiles.values()) tile.dirty = true;
   scheduleGallery();
 }
 

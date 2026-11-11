@@ -31,6 +31,7 @@
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
     <link rel="manifest" href="manifest.webmanifest" />
 
+    <script src="site/boot.js"></script>
     <link rel="stylesheet" href="site/style.css" />
     <link rel="modulepreload" href="site/app.js" />
     <link rel="modulepreload" href="src/index.js" />
@@ -140,7 +141,8 @@
         <figure class="book" id="book">
           <img id="preview" alt="Cover preview" width="600" height="900" />
         </figure>
-        <p class="meta" id="meta" aria-live="polite"></p>
+        <p class="meta" id="meta"></p>
+        <p class="visually-hidden" id="announce" aria-live="polite"></p>
         <div class="actions">
           <button type="button" id="copy-svg">Copy SVG</button>
           <div class="download" role="group" aria-labelledby="download-label">

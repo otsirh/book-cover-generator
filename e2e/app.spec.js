@@ -68,6 +68,29 @@ test('an empty seed in a shared link stays "from title"', async ({ page }) => {
   await expect(page.locator('#meta')).toContainText('seed from title');
 });
 
+test('a hostile format in a shared link falls back safely', async ({ page }) => {
+  await page.goto('/#format=constructor&seed=x');
+  await expect(page.locator('#preview')).toHaveAttribute('src', /^data:image\/svg\+xml/);
+  await expect(page.locator('[data-format="paperback"]')).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('a shared square link has the right shape', async ({ page }) => {
+  await page.goto('/#format=square&seed=x');
+  expect(await page.evaluate(() => document.documentElement.dataset.coverFormat)).toBe('square');
+  // offsetWidth/Height ignore the decorative 3D tilt.
+  const [w, hgt] = await page.locator('#book').evaluate((el) => [el.offsetWidth, el.offsetHeight]);
+  expect(Math.abs(w - hgt)).toBeLessThanOrEqual(1);
+});
+
+test('screen readers hear style changes but not typing', async ({ page }) => {
+  await page.goto('/#style=minimal&palette=mint&seed=a');
+  await expect(page.locator('#preview')).toHaveAttribute('src', /^data:image\/svg\+xml/);
+  await page.locator('#title').fill('Something else');
+  await expect(page.locator('#announce')).toHaveText('');
+  await page.locator('#style').selectOption('noir');
+  await expect(page.locator('#announce')).toHaveText('Style: Noir. Palette: Mint.');
+});
+
 test('editing the URL hash updates the design', async ({ page }) => {
   await page.goto('/#style=swiss&seed=one');
   await expect(page.locator('#style')).toHaveValue('swiss');
@@ -187,6 +210,16 @@ test('unknown pages get the 404 page', async ({ page }) => {
   await expect(page.locator('h1')).toContainText('shelf');
   await page.locator('a.primary').click();
   await expect(page.locator('#preview')).toHaveAttribute('src', /^data:image\/svg\+xml/);
+});
+
+test('long values in a shared link are clipped and never overflow @mobile', async ({ page }) => {
+  await page.goto(`/#seed=${'x'.repeat(300)}&title=${'T'.repeat(500)}`);
+  await expect(page.locator('#seed')).toHaveValue('x'.repeat(40));
+  await expect(page.locator('#title')).toHaveValue('T'.repeat(200));
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
 });
 
 test('fits a phone screen without sideways scrolling @mobile', async ({ page }) => {

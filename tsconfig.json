@@ -14,5 +14,5 @@
     "noFallthroughCasesInSwitch": true,
     "skipLibCheck": true
   },
-  "include": ["src", "bin", "scripts", "test-d"]
+  "include": ["src", "bin", "site", "scripts", "test-d"]
 }
