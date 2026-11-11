@@ -3,3 +3,6 @@ node_modules/
 *.log
 dist/
 .wrangler/
+coverage/
+playwright-report/
+test-results/

@@ -1,13 +1,42 @@
 {
   "name": "book-cover-generator",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Generate SVG book covers from a title and an author. 27 styles, 20 palettes, seeded randomizer, zero dependencies.",
-  "type": "module",
-  "main": "./src/index.js",
-  "exports": {
-    ".": "./src/index.js",
-    "./browser": "./src/browser.js"
+  "keywords": [
+    "book",
+    "cover",
+    "book-cover",
+    "svg",
+    "generator",
+    "generative-art",
+    "placeholder",
+    "typescript"
+  ],
+  "homepage": "https://covers.otsirh.dev/",
+  "bugs": {
+    "url": "https://github.com/otsirh/book-cover-generator/issues"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/otsirh/book-cover-generator.git"
+  },
+  "license": "MIT",
+  "author": "otsirh (https://github.com/otsirh)",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.js"
+    },
+    "./browser": {
+      "types": "./src/browser.d.ts",
+      "default": "./src/browser.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
   "bin": {
     "book-cover": "./bin/book-cover.js"
   },
@@ -15,26 +44,43 @@
     "src",
     "bin"
   ],
-  "scripts": {
-    "test": "node --test",
-    "build": "node scripts/build.js",
-    "deploy": "npx --yes wrangler@4.160.1 deploy"
-  },
-  "keywords": [
-    "book",
-    "cover",
-    "svg",
-    "generator",
-    "generative-art",
-    "placeholder"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/otsirh/book-cover-generator.git"
-  },
-  "homepage": "https://covers.otsirh.dev/",
-  "license": "MIT",
   "engines": {
     "node": ">=18.3"
+  },
+  "scripts": {
+    "dev": "node scripts/serve.js 4173",
+    "build": "node scripts/build.js",
+    "lint": "eslint .",
+    "lint:package": "publint --strict && attw --pack . --profile esm-only",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --test",
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-include=src/**/*.js --test-coverage-exclude=src/browser.js --test-coverage-lines=99 --test-coverage-branches=95 --test-coverage-functions=98",
+    "test:e2e": "playwright test",
+    "check": "npm run lint && npm run format:check && npm run typecheck && npm run lint:package && npm test",
+    "assets": "node scripts/generate-assets.js",
+    "deploy": "npm run check && npm run test:e2e && wrangler deploy"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "0.18.5",
+    "@axe-core/playwright": "4.14.0",
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.65.0",
+    "@types/node": "26.6.6",
+    "eslint": "10.14.0",
+    "globals": "17.14.0",
+    "prettier": "3.10.0",
+    "publint": "0.3.25",
+    "typescript": "7.0.2",
+    "wrangler": "4.160.1"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "workerd@1.20261110.1": true,
+    "fsevents": false
+  },
+  "overrides": {
+    "minimatch": "11.0.8"
   }
 }

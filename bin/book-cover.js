@@ -35,7 +35,7 @@ try {
     },
   });
 } catch (err) {
-  console.error(err.message + '\n\n' + HELP);
+  console.error((err instanceof Error ? err.message : String(err)) + '\n\n' + HELP);
   process.exit(1);
 }
 
@@ -71,11 +71,13 @@ try {
   });
   if (values.out) {
     writeFileSync(values.out, cover.svg);
-    console.error(`Wrote ${values.out} (style: ${cover.style}, palette: ${cover.palette}, ${cover.width}x${cover.height})`);
+    console.error(
+      `Wrote ${values.out} (style: ${cover.style}, palette: ${cover.palette}, ${cover.width}x${cover.height})`,
+    );
   } else {
     process.stdout.write(cover.svg + '\n');
   }
 } catch (err) {
-  console.error(err.message);
+  console.error(err instanceof Error ? err.message : String(err));
   process.exit(1);
 }

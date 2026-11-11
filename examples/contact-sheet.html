@@ -1,43 +1,67 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Contact Sheet</title>
-<style>
-  body { margin: 0; padding: 16px; background: #ddd; font: 12px system-ui, sans-serif; }
-  .grid { display: grid; grid-template-columns: repeat(var(--cols, 6), 1fr); gap: 10px; }
-  figure { margin: 0; }
-  img { width: 100%; display: block; box-shadow: 0 2px 6px rgb(0 0 0 / .25); }
-  figcaption { padding: 3px 0 6px; color: #333; }
-</style>
-</head>
-<body>
-<div class="grid" id="grid"></div>
-<script type="module">
-  // Renders a grid of covers. Query params:
-  //   styles=a,b  palettes=x,y  w=600 h=900  cols=6  title=..  author=..  seeds=s1,s2
-  import { createCover, styles, palettes } from '../src/index.js';
-  const q = new URLSearchParams(location.search);
-  const list = (k, d) => (q.get(k) ? q.get(k).split(',') : d);
-  const sts = list('styles', styles);
-  const pals = list('palettes', ['random']);
-  const seeds = list('seeds', ['a1']);
-  const titles = list('titles', [q.get('title') || 'The Lighthouse Keeper']);
-  const author = q.get('author') ?? 'Mara Ellison';
-  const w = +(q.get('w') || 600), h = +(q.get('h') || 900);
-  document.getElementById('grid').style.setProperty('--cols', q.get('cols') || 6);
-  const grid = document.getElementById('grid');
-  for (const style of sts) for (const palette of pals) for (const seed of seeds) for (const title of titles) {
-    const c = createCover({ title, author, style, palette, seed, width: w, height: h });
-    const fig = document.createElement('figure');
-    const img = new Image();
-    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(c.svg);
-    const cap = document.createElement('figcaption');
-    cap.textContent = `${c.style} · ${c.palette} · ${c.seed}`;
-    fig.append(img, cap);
-    grid.append(fig);
-  }
-</script>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Contact Sheet</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 16px;
+        background: #ddd;
+        font:
+          12px system-ui,
+          sans-serif;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(var(--cols, 6), 1fr);
+        gap: 10px;
+      }
+      figure {
+        margin: 0;
+      }
+      img {
+        width: 100%;
+        display: block;
+        box-shadow: 0 2px 6px rgb(0 0 0 / 0.25);
+      }
+      figcaption {
+        padding: 3px 0 6px;
+        color: #333;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid" id="grid"></div>
+    <script type="module">
+      // Renders a grid of covers. Query params:
+      //   styles=a,b  palettes=x,y  w=600 h=900  cols=6  title=..  author=..  seeds=s1,s2
+      import { createCover, styles, palettes } from '../src/index.js';
+      const q = new URLSearchParams(location.search);
+      const list = (k, d) => (q.get(k) ? q.get(k).split(',') : d);
+      const sts = list('styles', styles);
+      const pals = list('palettes', ['random']);
+      const seeds = list('seeds', ['a1']);
+      const titles = list('titles', [q.get('title') || 'The Lighthouse Keeper']);
+      const author = q.get('author') ?? 'Mara Ellison';
+      const w = +(q.get('w') || 600),
+        h = +(q.get('h') || 900);
+      document.getElementById('grid').style.setProperty('--cols', q.get('cols') || 6);
+      const grid = document.getElementById('grid');
+      for (const style of sts)
+        for (const palette of pals)
+          for (const seed of seeds)
+            for (const title of titles) {
+              const c = createCover({ title, author, style, palette, seed, width: w, height: h });
+              const fig = document.createElement('figure');
+              const img = new Image();
+              img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(c.svg);
+              const cap = document.createElement('figcaption');
+              cap.textContent = `${c.style} · ${c.palette} · ${c.seed}`;
+              fig.append(img, cap);
+              grid.append(fig);
+            }
+    </script>
+  </body>
 </html>

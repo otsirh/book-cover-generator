@@ -25,7 +25,10 @@ function assertWellFormed(svg, label) {
 const titles = [
   ['The Lighthouse Keeper', 'Mara Ellison'],
   ['A', ''],
-  ['An Extraordinarily Long Title About the Secret History of Absolutely Everything', 'Someone With A Rather Long Name'],
+  [
+    'An Extraordinarily Long Title About the Secret History of Absolutely Everything',
+    'Someone With A Rather Long Name',
+  ],
   ['Под игото', 'Иван Вазов'],
   ['Fish & Chips <Deluxe> "Edition"', "O'Brien & Sons"],
 ];
@@ -33,7 +36,11 @@ const titles = [
 test('every style renders well-formed SVG for every palette and size', () => {
   for (const style of styles) {
     for (const palette of palettes) {
-      for (const [width, height] of [[600, 900], [600, 600], [1600, 2560]]) {
+      for (const [width, height] of [
+        [600, 900],
+        [600, 600],
+        [1600, 2560],
+      ]) {
         for (const [title, author] of titles) {
           const label = `${style}/${palette.id}/${width}x${height}/${title.slice(0, 12)}`;
           const { svg } = createCover({ title, author, style, palette: palette.id, width, height });
@@ -120,6 +127,7 @@ test('control characters and lone surrogates never reach the SVG', () => {
     const { svg } = createCover({ title: 'Soft\u000Bbreak\u0000 \uD83D', author: 'Form\u000Cfeed', style });
     assertWellFormed(svg, style);
     assert.doesNotThrow(() => encodeURIComponent(svg), style);
+    // eslint-disable-next-line no-control-regex -- asserting no control characters remain
     assert.ok(!/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(svg), `${style}: control character in output`);
   }
 });

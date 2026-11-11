@@ -1,10 +1,24 @@
-import { n, rect, circle, line, path, pathD, mix, readable, clamp, escapeXml, radialGradient, linearGradient } from '../core.js';
+import {
+  n,
+  rect,
+  circle,
+  line,
+  path,
+  pathD,
+  mix,
+  readable,
+  clamp,
+  escapeXml,
+  radialGradient,
+  linearGradient,
+} from '../core.js';
 import { FONTS, fitText, drawText, textBottom, graphemes } from '../text.js';
 
 export const classic = {
   id: 'classic',
   name: 'Classic Paperback',
   description: 'Three horizontal bands, like a mid-century paperback.',
+  /** @param {import('../index.js').StyleContext} c */
   render(c) {
     const { W, H, u, m, rng, p } = c;
     const band = rng.pick(p.accents);
@@ -17,7 +31,16 @@ export const classic = {
     let s = rect(0, 0, W, H, band) + rect(0, b1, W, b2 - b1, cream);
     s += rect(0, b1 + 9 * u, W, 1.2 * u, band) + rect(0, b2 - 10.2 * u, W, 1.2 * u, band);
 
-    const a = fitText(c.author, { font: FONTS.humanist, weight: 400, upper: true, letterSpacing: 0.24, maxWidth: W - m * 2.4, maxHeight: b1 * 0.4, maxSize: W * 0.04, maxLines: 2 });
+    const a = fitText(c.author, {
+      font: FONTS.humanist,
+      weight: 400,
+      upper: true,
+      letterSpacing: 0.24,
+      maxWidth: W - m * 2.4,
+      maxHeight: b1 * 0.4,
+      maxSize: W * 0.04,
+      maxLines: 2,
+    });
     s += drawText(a, { x: W / 2, y: (b1 - a.height) / 2 + m * 0.2, anchor: 'middle', fill: onBand });
 
     const pad = m * 0.9;
@@ -57,6 +80,7 @@ export const artdeco = {
   name: 'Art Deco',
   description: 'Gilded frame, sunburst fan and stepped ornaments.',
   prefer: 'dark',
+  /** @param {import('../index.js').StyleContext} c */
   render(c) {
     const { W, H, u, m, rng, p } = c;
     const bg = p.night;
@@ -75,7 +99,14 @@ export const artdeco = {
     for (let i = 0; i < rays; i += 2) {
       const a0 = Math.PI + (i / rays) * Math.PI;
       const a1 = Math.PI + ((i + 1) / rays) * Math.PI;
-      fan += pathD([[fx, fy], [fx + R * Math.cos(a0), fy + R * Math.sin(a0)], [fx + R * Math.cos(a1), fy + R * Math.sin(a1)]], true);
+      fan += pathD(
+        [
+          [fx, fy],
+          [fx + R * Math.cos(a0), fy + R * Math.sin(a0)],
+          [fx + R * Math.cos(a1), fy + R * Math.sin(a1)],
+        ],
+        true,
+      );
     }
     s += path(fan, gold, 'opacity="0.2"');
     for (const k of [0.36, 0.62, 1]) {
@@ -100,7 +131,16 @@ export const artdeco = {
     // text
     const font = rng.pick([FONTS.didone, FONTS.condensed]);
     const titleColor = rng.bool(0.5) ? gold : light;
-    const a = fitText(c.author, { font: FONTS.geometric, weight: 400, upper: true, letterSpacing: 0.32, maxWidth: W - m * 3, maxHeight: W * 0.08, maxSize: W * 0.028, maxLines: 2 });
+    const a = fitText(c.author, {
+      font: FONTS.geometric,
+      weight: 400,
+      upper: true,
+      letterSpacing: 0.32,
+      maxWidth: W - m * 3,
+      maxHeight: W * 0.08,
+      maxSize: W * 0.028,
+      maxLines: 2,
+    });
     const regionTop = topY + 34 * u + m * 0.4;
     const regionBottom = fy - R - m * 0.5;
     const divider = 26 * u;
@@ -121,8 +161,21 @@ export const artdeco = {
     s += drawText(t, { x: W / 2, y, anchor: 'middle', fill: titleColor });
     y += t.height + m * 0.6;
     const dy = y + 6 * u;
-    s += line(W / 2 - W * 0.16, dy, W / 2 - 10 * u, dy, gold, 1.2 * u) + line(W / 2 + 10 * u, dy, W / 2 + W * 0.16, dy, gold, 1.2 * u);
-    s += path(pathD([[W / 2, dy - 6 * u], [W / 2 + 6 * u, dy], [W / 2, dy + 6 * u], [W / 2 - 6 * u, dy]], true), gold);
+    s +=
+      line(W / 2 - W * 0.16, dy, W / 2 - 10 * u, dy, gold, 1.2 * u) +
+      line(W / 2 + 10 * u, dy, W / 2 + W * 0.16, dy, gold, 1.2 * u);
+    s += path(
+      pathD(
+        [
+          [W / 2, dy - 6 * u],
+          [W / 2 + 6 * u, dy],
+          [W / 2, dy + 6 * u],
+          [W / 2 - 6 * u, dy],
+        ],
+        true,
+      ),
+      gold,
+    );
     s += drawText(a, { x: W / 2, y: y + divider, anchor: 'middle', fill: light });
     return s;
   },
@@ -145,6 +198,7 @@ export const typewriter = {
   name: 'Typewriter',
   description: 'A typed manuscript page with a rubber stamp.',
   prefer: 'light',
+  /** @param {import('../index.js').StyleContext} c */
   render(c) {
     const { W, H, u, m, rng, p } = c;
     const paper = mix(p.paper, '#f4ead4', 0.45);
@@ -155,7 +209,14 @@ export const typewriter = {
     s += `<filter id="${ids.tex}" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="${+(0.9 / u).toFixed(3)}" numOctaves="3" stitchTiles="stitch"/><feColorMatrix type="matrix" values="0 0 0 0 0.3 0 0 0 0 0.25 0 0 0 0 0.15 1.4 0 0 0 -0.5"/></filter>`;
     s += `<filter id="${ids.rough}"><feTurbulence type="fractalNoise" baseFrequency="${+(0.06 / u).toFixed(3)}" numOctaves="2"/><feDisplacementMap in="SourceGraphic" scale="${n(5 * u)}"/></filter>`;
     s += `<filter id="${ids.stain}"><feTurbulence type="turbulence" baseFrequency="${+(0.03 / u).toFixed(3)}" numOctaves="2"/><feDisplacementMap in="SourceGraphic" scale="${n(9 * u)}"/></filter>`;
-    s += radialGradient(ids.vig, [[0.55, '#000000', 0], [1, '#3a2a10', 0.22]], { r: 0.75 });
+    s += radialGradient(
+      ids.vig,
+      [
+        [0.55, '#000000', 0],
+        [1, '#3a2a10', 0.22],
+      ],
+      { r: 0.75 },
+    );
     s += '</defs>';
     s += rect(0, 0, W, H, paper);
     s += `<rect width="${W}" height="${H}" filter="url(#${ids.tex})" opacity="0.18"/>`;
@@ -170,16 +231,43 @@ export const typewriter = {
 
     const x = m * 1.5;
     const maxW = W - m * 3;
-    const t = fitText(c.title, { font: FONTS.mono, weight: 700, upper: true, maxWidth: maxW, maxHeight: H * 0.34, maxSize: W * 0.095, minSize: W * 0.03, lineHeight: 1.35, maxLines: 6, balance: false });
+    const t = fitText(c.title, {
+      font: FONTS.mono,
+      weight: 700,
+      upper: true,
+      maxWidth: maxW,
+      maxHeight: H * 0.34,
+      maxSize: W * 0.095,
+      minSize: W * 0.03,
+      lineHeight: 1.35,
+      maxLines: 6,
+      balance: false,
+    });
     let y = H * 0.22;
     t.lines.forEach((ln, i) => {
       s += typedLine(ln, x, y + t.size * t.cap + i * t.size * t.lineHeight, t.size, rng, ink);
     });
     y = textBottom(t, y) + 8 * u;
     const uw = Math.max(...t.lines.map((ln) => graphemes(ln).length)) * t.size * 0.6;
-    s += line(x, y, x + uw, y, ink, 1.6 * u, 'stroke-dasharray="' + n(t.size * 0.5) + ' ' + n(t.size * 0.1) + '" opacity="0.85"');
+    s += line(
+      x,
+      y,
+      x + uw,
+      y,
+      ink,
+      1.6 * u,
+      'stroke-dasharray="' + n(t.size * 0.5) + ' ' + n(t.size * 0.1) + '" opacity="0.85"',
+    );
     if (c.author.trim()) {
-      const a = fitText(`by ${c.author}`, { font: FONTS.mono, weight: 400, maxWidth: maxW, maxHeight: W * 0.1, maxSize: W * 0.045, maxLines: 2, balance: false });
+      const a = fitText(`by ${c.author}`, {
+        font: FONTS.mono,
+        weight: 400,
+        maxWidth: maxW,
+        maxHeight: W * 0.1,
+        maxSize: W * 0.045,
+        maxLines: 2,
+        balance: false,
+      });
       y += m * 0.9;
       a.lines.forEach((ln, i) => {
         s += typedLine(ln, x, y + a.size * a.cap + i * a.size * a.lineHeight, a.size, rng, ink);
@@ -190,15 +278,37 @@ export const typewriter = {
 
     // stamp
     const word = rng.pick(STAMPS);
-    const st = fitText(word, { font: FONTS.condensed, weight: 700, upper: true, letterSpacing: 0.12, maxWidth: W * 0.56, maxSize: W * 0.078, maxLines: 1 });
+    const st = fitText(word, {
+      font: FONTS.condensed,
+      weight: 700,
+      upper: true,
+      letterSpacing: 0.12,
+      maxWidth: W * 0.56,
+      maxSize: W * 0.078,
+      maxLines: 1,
+    });
     const sp = st.size * 0.45;
     const sw = st.width + sp * 2;
     const shh = st.height + sp * 2;
     const scx = W * rng.float(0.5, 0.64);
     const scy = H * rng.float(0.66, 0.76);
     const ang = rng.float(-16, -6);
-    let stamp = rect(scx - sw / 2, scy - shh / 2, sw, shh, 'none', `stroke="${stampColor}" stroke-width="${n(4 * u)}" rx="${n(4 * u)}"`);
-    stamp += rect(scx - sw / 2 + 6 * u, scy - shh / 2 + 6 * u, sw - 12 * u, shh - 12 * u, 'none', `stroke="${stampColor}" stroke-width="${n(1.5 * u)}" rx="${n(2 * u)}"`);
+    let stamp = rect(
+      scx - sw / 2,
+      scy - shh / 2,
+      sw,
+      shh,
+      'none',
+      `stroke="${stampColor}" stroke-width="${n(4 * u)}" rx="${n(4 * u)}"`,
+    );
+    stamp += rect(
+      scx - sw / 2 + 6 * u,
+      scy - shh / 2 + 6 * u,
+      sw - 12 * u,
+      shh - 12 * u,
+      'none',
+      `stroke="${stampColor}" stroke-width="${n(1.5 * u)}" rx="${n(2 * u)}"`,
+    );
     stamp += drawText(st, { x: scx, y: scy - st.height / 2, anchor: 'middle', fill: stampColor });
     s += `<g transform="rotate(${n(ang)} ${n(scx)} ${n(scy)})" filter="url(#${ids.rough})" opacity="0.82">${stamp}</g>`;
     return s;
@@ -209,6 +319,7 @@ export const sunburst = {
   id: 'sunburst',
   name: 'Sunburst',
   description: 'Vintage poster rays over a title banner.',
+  /** @param {import('../index.js').StyleContext} c */
   render(c) {
     const { W, H, u, m, rng, p } = c;
     const [c1, c2] = rng.shuffle(p.accents);
@@ -221,7 +332,14 @@ export const sunburst = {
     for (let i = 0; i < rays; i += 2) {
       const a0 = off + (i / rays) * Math.PI * 2;
       const a1 = off + ((i + 1) / rays) * Math.PI * 2;
-      wedges += pathD([[cx, cy], [cx + R * Math.cos(a0), cy + R * Math.sin(a0)], [cx + R * Math.cos(a1), cy + R * Math.sin(a1)]], true);
+      wedges += pathD(
+        [
+          [cx, cy],
+          [cx + R * Math.cos(a0), cy + R * Math.sin(a0)],
+          [cx + R * Math.cos(a1), cy + R * Math.sin(a1)],
+        ],
+        true,
+      );
     }
     let s = rect(0, 0, W, H, mix(c1, p.bg, 0.35));
     s += path(wedges, c1);
@@ -241,12 +359,26 @@ export const sunburst = {
       lineHeight: 1.04,
       maxLines: 4,
     });
-    const a = fitText(c.author, { font: FONTS.serif, italic: true, maxWidth: innerW, maxHeight: W * 0.1, maxSize: W * 0.04, maxLines: 2 });
+    const a = fitText(c.author, {
+      font: FONTS.serif,
+      italic: true,
+      maxWidth: innerW,
+      maxHeight: W * 0.1,
+      maxSize: W * 0.04,
+      maxLines: 2,
+    });
     const gap = a.lines.length ? m * 0.55 : 0;
     const bandH = pad * 2 + t.height + gap + a.height + 10 * u;
     const by = clamp(cy + sr * 1.18 + m * 0.6, m, H - m - bandH);
     s += rect(m, by, W - m * 2, bandH, p.bg);
-    s += rect(m + 5 * u, by + 5 * u, W - m * 2 - 10 * u, bandH - 10 * u, 'none', `stroke="${p.ink}" stroke-width="${n(1.5 * u)}"`);
+    s += rect(
+      m + 5 * u,
+      by + 5 * u,
+      W - m * 2 - 10 * u,
+      bandH - 10 * u,
+      'none',
+      `stroke="${p.ink}" stroke-width="${n(1.5 * u)}"`,
+    );
     s += drawText(t, { x: W / 2, y: by + pad + 5 * u, anchor: 'middle', fill: p.ink });
     s += drawText(a, { x: W / 2, y: by + pad + 5 * u + t.height + gap, anchor: 'middle', fill: p.ink });
     return s;
@@ -257,6 +389,7 @@ export const typographic = {
   id: 'typographic',
   name: 'Big Letter',
   description: 'A giant initial cropped by the cover edge.',
+  /** @param {import('../index.js').StyleContext} c */
   render(c) {
     const { W, H, u, m, rng, p } = c;
     const letter = (Array.from(c.title.trim())[0] || 'A').toUpperCase();
@@ -282,7 +415,16 @@ export const typographic = {
     const ruleY = baseline + m * 0.5;
     s += rect(m, ruleY, W - m * 2, 1.2 * u, p.ink);
 
-    const a = fitText(c.author, { font: FONTS.sans, weight: 500, upper: true, letterSpacing: 0.2, maxWidth: W - m * 2, maxHeight: W * 0.08, maxSize: W * 0.03, maxLines: 2 });
+    const a = fitText(c.author, {
+      font: FONTS.sans,
+      weight: 500,
+      upper: true,
+      letterSpacing: 0.2,
+      maxWidth: W - m * 2,
+      maxHeight: W * 0.08,
+      maxSize: W * 0.03,
+      maxLines: 2,
+    });
     const aY = H - m * 1.2 - a.height;
     const tTop = ruleY + m * 0.7;
     const tfont = rng.pick([FONTS.serif, FONTS.sans, FONTS.garamond]);
@@ -303,7 +445,8 @@ export const typographic = {
 
 function memphisShape(type, x, y, s, color, rot, u) {
   const tr = `transform="rotate(${n(rot)} ${n(x)} ${n(y)})"`;
-  const stroke = (w) => `fill="none" stroke="${color}" stroke-width="${n(w * u)}" stroke-linecap="round" stroke-linejoin="round"`;
+  const stroke = (w) =>
+    `fill="none" stroke="${color}" stroke-width="${n(w * u)}" stroke-linecap="round" stroke-linejoin="round"`;
   switch (type) {
     case 'squiggle': {
       const pts = [];
@@ -311,14 +454,22 @@ function memphisShape(type, x, y, s, color, rot, u) {
       return `<path d="${pathD(pts)}" ${stroke(5)} ${tr}/>`;
     }
     case 'triangle':
-      return `<path d="${pathD([[x, y - s * 0.6], [x + s * 0.6, y + s * 0.45], [x - s * 0.6, y + s * 0.45]], true)}" ${stroke(4)} ${tr}/>`;
+      return `<path d="${pathD(
+        [
+          [x, y - s * 0.6],
+          [x + s * 0.6, y + s * 0.45],
+          [x - s * 0.6, y + s * 0.45],
+        ],
+        true,
+      )}" ${stroke(4)} ${tr}/>`;
     case 'circle':
       return circle(x, y, s * 0.45, color);
     case 'ring':
       return circle(x, y, s * 0.42, 'none', `stroke="${color}" stroke-width="${n(4 * u)}"`);
     case 'dots': {
       let o = '';
-      for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) o += circle(x + (i - 1) * s * 0.3, y + (j - 1) * s * 0.3, s * 0.06, color);
+      for (let i = 0; i < 3; i++)
+        for (let j = 0; j < 3; j++) o += circle(x + (i - 1) * s * 0.3, y + (j - 1) * s * 0.3, s * 0.06, color);
       return `<g ${tr}>${o}</g>`;
     }
     case 'half':
@@ -329,7 +480,8 @@ function memphisShape(type, x, y, s, color, rot, u) {
       return `<g ${tr}>${rect(x - s * 0.35, y - s * 0.08, s * 0.7, s * 0.16, color)}${rect(x - s * 0.08, y - s * 0.35, s * 0.16, s * 0.7, color)}</g>`;
     default: {
       let o = '';
-      for (let i = 0; i < 4; i++) o += line(x - s * 0.5, y + (i - 1.5) * s * 0.22, x + s * 0.5, y + (i - 1.5) * s * 0.22, color, 3 * u);
+      for (let i = 0; i < 4; i++)
+        o += line(x - s * 0.5, y + (i - 1.5) * s * 0.22, x + s * 0.5, y + (i - 1.5) * s * 0.22, color, 3 * u);
       return `<g ${tr}>${o}</g>`;
     }
   }
@@ -340,6 +492,7 @@ export const memphis = {
   name: 'Memphis',
   description: 'Playful eighties confetti of squiggles and shapes.',
   prefer: 'light',
+  /** @param {import('../index.js').StyleContext} c */
   render(c) {
     const { W, H, u, m, rng, p } = c;
     const colors = [...p.accents, p.ink];
@@ -352,14 +505,40 @@ export const memphis = {
         if (rng.bool(0.25)) continue;
         const x = ((i + rng.float(0.15, 0.85)) / gc) * W;
         const y = ((j + rng.float(0.15, 0.85)) / gr) * H;
-        s += memphisShape(rng.pick(types), x, y, Math.min(W, H) * rng.float(0.07, 0.12), rng.pick(colors), rng.float(0, 360), u);
+        s += memphisShape(
+          rng.pick(types),
+          x,
+          y,
+          Math.min(W, H) * rng.float(0.07, 0.12),
+          rng.pick(colors),
+          rng.float(0, 360),
+          u,
+        );
       }
     }
     const pad = m * 0.9;
     const boxW = W - m * 2.6;
     const innerW = boxW - pad * 2;
-    const t = fitText(c.title, { font: FONTS.geometric, weight: 800, upper: true, maxWidth: innerW, maxHeight: H * 0.3, maxSize: W * 0.1, lineHeight: 1.02, maxLines: 5 });
-    const a = fitText(c.author, { font: FONTS.geometric, weight: 500, upper: true, letterSpacing: 0.12, maxWidth: innerW, maxHeight: W * 0.08, maxSize: W * 0.032, maxLines: 2 });
+    const t = fitText(c.title, {
+      font: FONTS.geometric,
+      weight: 800,
+      upper: true,
+      maxWidth: innerW,
+      maxHeight: H * 0.3,
+      maxSize: W * 0.1,
+      lineHeight: 1.02,
+      maxLines: 5,
+    });
+    const a = fitText(c.author, {
+      font: FONTS.geometric,
+      weight: 500,
+      upper: true,
+      letterSpacing: 0.12,
+      maxWidth: innerW,
+      maxHeight: W * 0.08,
+      maxSize: W * 0.032,
+      maxLines: 2,
+    });
     const gap = a.lines.length ? m * 0.7 : 0;
     const boxH = pad * 2 + t.height + gap + a.height;
     const bx = (W - boxW) / 2;
@@ -370,7 +549,14 @@ export const memphis = {
     s += drawText(t, { x: bx + pad, y: by + pad, fill: p.ink });
     if (a.lines.length) {
       const ay = by + pad + t.height + gap;
-      s += rect(bx + pad - 4 * u, ay + a.height - a.size * 0.25, Math.min(a.width + 8 * u, innerW), a.size * 0.45, p.accents[2], 'opacity="0.8"');
+      s += rect(
+        bx + pad - 4 * u,
+        ay + a.height - a.size * 0.25,
+        Math.min(a.width + 8 * u, innerW),
+        a.size * 0.45,
+        p.accents[2],
+        'opacity="0.8"',
+      );
       s += drawText(a, { x: bx + pad, y: ay, fill: p.ink });
     }
     return s;
@@ -382,6 +568,7 @@ export const noir = {
   name: 'Noir',
   description: 'Venetian-blind shadows and a hard-boiled title.',
   prefer: 'dark',
+  /** @param {import('../index.js').StyleContext} c */
   render(c) {
     const { W, H, u, m, rng, p } = c;
     const bg = mix(p.night, '#000000', 0.35);
@@ -389,13 +576,35 @@ export const noir = {
     const accent = readable(bg, p.accents);
     const ids = { pool: c.id('pool'), fade: c.id('fade'), mask: c.id('mask') };
     let s = '<defs>';
-    s += radialGradient(ids.pool, [[0, mix(bg, light, 0.16)], [1, bg]], { cx: 0.7, cy: 0.25, r: 0.7 });
-    s += linearGradient(ids.fade, [[0, '#ffffff'], [0.55, '#ffffff', 0.6], [1, '#ffffff', 0]], { x1: 1, y1: 0, x2: 0, y2: 1 });
+    s += radialGradient(
+      ids.pool,
+      [
+        [0, mix(bg, light, 0.16)],
+        [1, bg],
+      ],
+      { cx: 0.7, cy: 0.25, r: 0.7 },
+    );
+    s += linearGradient(
+      ids.fade,
+      [
+        [0, '#ffffff'],
+        [0.55, '#ffffff', 0.6],
+        [1, '#ffffff', 0],
+      ],
+      { x1: 1, y1: 0, x2: 0, y2: 1 },
+    );
     s += `<mask id="${ids.mask}">${rect(0, 0, W, H, `url(#${ids.fade})`)}</mask>`;
     s += '</defs>';
     s += rect(0, 0, W, H, `url(#${ids.pool})`);
 
-    if (rng.bool(0.55)) s += circle(W * rng.float(0.6, 0.8), H * rng.float(0.18, 0.3), Math.min(W, H) * rng.float(0.12, 0.17), accent, 'opacity="0.9"');
+    if (rng.bool(0.55))
+      s += circle(
+        W * rng.float(0.6, 0.8),
+        H * rng.float(0.18, 0.3),
+        Math.min(W, H) * rng.float(0.12, 0.17),
+        accent,
+        'opacity="0.9"',
+      );
     else s += rect(W - m * 1.6, H * 0.08, 8 * u, H * 0.45, accent);
 
     const ang = rng.float(-26, -14);
@@ -404,7 +613,16 @@ export const noir = {
     for (let y = -H * 0.3; y < H * 1.3; y += sp) bars += rect(-W * 0.3, y, W * 1.6, sp * 0.48, light);
     s += `<g mask="url(#${ids.mask})"><g transform="rotate(${n(ang)} ${n(W / 2)} ${n(H / 2)})" opacity="0.13">${bars}</g></g>`;
 
-    const a = fitText(c.author, { font: FONTS.condensed, weight: 600, upper: true, letterSpacing: 0.3, maxWidth: W - m * 2, maxHeight: W * 0.08, maxSize: W * 0.034, maxLines: 2 });
+    const a = fitText(c.author, {
+      font: FONTS.condensed,
+      weight: 600,
+      upper: true,
+      letterSpacing: 0.3,
+      maxWidth: W - m * 2,
+      maxHeight: W * 0.08,
+      maxSize: W * 0.034,
+      maxLines: 2,
+    });
     const aY = H - m * 1.3 - a.height;
     const font = rng.pick([FONTS.display, FONTS.condensed]);
     const t = fitText(c.title, {

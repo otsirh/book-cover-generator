@@ -57,13 +57,26 @@ export const isHex = (v) => typeof v === 'string' && HEX_RE.test(v.trim());
 
 export function hexToRgb(hex) {
   let h = hex.trim().slice(1);
-  if (h.length === 3) h = h.split('').map((ch) => ch + ch).join('');
+  if (h.length === 3)
+    h = h
+      .split('')
+      .map((ch) => ch + ch)
+      .join('');
   const v = parseInt(h, 16);
   return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
 }
 
 export function rgbToHex(rgb) {
-  return '#' + rgb.map((v) => Math.round(clamp(v, 0, 255)).toString(16).padStart(2, '0')).join('');
+  return (
+    '#' +
+    rgb
+      .map((v) =>
+        Math.round(clamp(v, 0, 255))
+          .toString(16)
+          .padStart(2, '0'),
+      )
+      .join('')
+  );
 }
 
 /** Linear blend between two hex colours. */
@@ -154,7 +167,9 @@ export function ridge(rng, segments = 64, roughness = 0.55) {
 export const n = (v) => Math.round(v * 10) / 10;
 
 // Characters that are illegal in XML 1.0, plus unpaired UTF-16 surrogates.
-const INVALID_XML = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
+const INVALID_XML =
+  // eslint-disable-next-line no-control-regex -- matching control characters is the point
+  /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
 
 export const stripInvalidXml = (str) => String(str).replace(INVALID_XML, '');
 
@@ -216,14 +231,25 @@ export function blurFilter(id, std) {
 /** Vertical/linear gradient definition. stops: [[offset 0..1, colour, opacity?], ...] */
 export function linearGradient(id, stops, { x1 = 0, y1 = 0, x2 = 0, y2 = 1 } = {}) {
   const s = stops
-    .map(([o, col, op]) => `<stop offset="${+o.toFixed(3)}" stop-color="${col}"${op != null ? ` stop-opacity="${op}"` : ''}/>`)
+    .map(
+      ([o, col, op]) =>
+        `<stop offset="${+o.toFixed(3)}" stop-color="${col}"${op != null ? ` stop-opacity="${op}"` : ''}/>`,
+    )
     .join('');
   return `<linearGradient id="${id}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}">${s}</linearGradient>`;
 }
 
+/**
+ * @param {string} id
+ * @param {ReadonlyArray<readonly [number, string, number?]>} stops
+ * @param {{ cx?: number, cy?: number, r?: number, fx?: number, fy?: number }} [geometry]
+ */
 export function radialGradient(id, stops, { cx = 0.5, cy = 0.5, r = 0.5, fx, fy } = {}) {
   const s = stops
-    .map(([o, col, op]) => `<stop offset="${+o.toFixed(3)}" stop-color="${col}"${op != null ? ` stop-opacity="${op}"` : ''}/>`)
+    .map(
+      ([o, col, op]) =>
+        `<stop offset="${+o.toFixed(3)}" stop-color="${col}"${op != null ? ` stop-opacity="${op}"` : ''}/>`,
+    )
     .join('');
   const f = fx != null ? ` fx="${fx}" fy="${fy}"` : '';
   return `<radialGradient id="${id}" cx="${cx}" cy="${cy}" r="${r}"${f}>${s}</radialGradient>`;

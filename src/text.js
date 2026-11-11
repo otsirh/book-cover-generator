@@ -52,6 +52,7 @@ function canvasContext() {
   return ctx2d;
 }
 
+/** @type {((text: string, size: number, font: { family: string, weight: number, italic: boolean }) => number) | null} */
 let customMeasure = null;
 /**
  * Override text measurement. `fn(text, sizePx, { family, weight, italic })` must
@@ -117,7 +118,8 @@ let segmenter;
 /** Split a string into user-perceived characters (grapheme clusters). */
 export function graphemes(str) {
   if (segmenter === undefined) {
-    segmenter = typeof Intl !== 'undefined' && Intl.Segmenter ? new Intl.Segmenter('en', { granularity: 'grapheme' }) : null;
+    segmenter =
+      typeof Intl !== 'undefined' && Intl.Segmenter ? new Intl.Segmenter('en', { granularity: 'grapheme' }) : null;
   }
   return segmenter ? Array.from(segmenter.segment(str), (s) => s.segment) : [...str];
 }
@@ -195,10 +197,13 @@ export function fitText(text, opts) {
   const maxWidth = Math.max(1, opts.maxWidth);
   const maxHeight = opts.maxHeight ?? Infinity;
   const maxSize = opts.maxSize;
-  if (!Number.isFinite(maxSize) || maxSize <= 0) throw new TypeError('fitText: `maxSize` must be a positive number of pixels');
+  if (!Number.isFinite(maxSize) || maxSize <= 0)
+    throw new TypeError('fitText: `maxSize` must be a positive number of pixels');
   const minSize = Math.min(maxSize, opts.minSize ?? Math.max(6, maxSize * 0.22));
 
-  let str = String(text ?? '').replace(/\s+/g, ' ').trim();
+  let str = String(text ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
   if (opts.upper) str = str.toUpperCase();
   const base = { ...spec, lineHeight, cap };
   if (!str) return { ...base, lines: [], size: 0, width: 0, height: 0 };

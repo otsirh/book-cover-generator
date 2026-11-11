@@ -32,6 +32,7 @@ export async function rasterize(svg, { type = 'image/png', scale = 1, quality = 
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Canvas 2D is not available');
   if (background || type === 'image/jpeg') {
     ctx.fillStyle = background || '#ffffff';
     ctx.fillRect(0, 0, w, h);
@@ -57,7 +58,7 @@ export function downloadBlob(blob, filename) {
 /**
  * Download a cover in the given format.
  * @param {string} svg
- * @param {'svg'|'png'|'jpeg'|'webp'} format
+ * @param {'svg'|'png'|'jpeg'|'jpg'|'webp'} [format='svg']
  * @param {string} [basename='cover']
  * @param {{ scale?: number, quality?: number }} [opts]
  */

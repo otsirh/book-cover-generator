@@ -24,6 +24,7 @@ export const styles = listStyles().map((s) => s.id);
 /**
  * Register a custom style. `style.render(ctx)` must return SVG markup (without
  * the outer <svg>). See README for the shape of `ctx`.
+ * @param {import('./index.js').CoverStyle} style
  */
 export function registerStyle(style) {
   if (!style || !style.id || typeof style.render !== 'function') {
@@ -72,6 +73,7 @@ function resolvePalette(palette, rng, style) {
 
 /** Collapse control characters and whitespace; drop anything illegal in XML. */
 function cleanText(value) {
+  // eslint-disable-next-line no-control-regex -- matching control characters is the point
   return stripInvalidXml(String(value ?? '').replace(/[\u0000-\u001F\u007F-\u009F]/g, ' '))
     .replace(/\s+/g, ' ')
     .trim();
@@ -86,15 +88,8 @@ function dimension(value, fallback, name) {
 /**
  * Generate a cover and return it together with the resolved choices.
  *
- * @param {object} options
- * @param {string} options.title
- * @param {string} [options.author]
- * @param {string} [options.style]   style id, or 'random' (default)
- * @param {string|object} [options.palette] palette id, custom palette object, or 'random' (default)
- * @param {string|number} [options.seed] defaults to a hash of title + author
- * @param {number} [options.width=600]   px, 50–10000
- * @param {number} [options.height=900]  px, 50–10000
- * @returns {{ svg: string, style: string, palette: string, seed: string, width: number, height: number }}
+ * @param {import('./index.js').CoverOptions} [options]
+ * @returns {import('./index.js').Cover}
  */
 export function createCover(options = {}) {
   const title = cleanText(options.title) || 'Untitled';
@@ -105,11 +100,14 @@ export function createCover(options = {}) {
 
   const styleId = resolveStyle(options.style, createRng(`${seed}|style`));
   const style = registry.get(styleId);
+  if (!style) throw new Error(`Unknown style "${styleId}"`);
   const palette = resolvePalette(options.palette, createRng(`${seed}|palette`), style);
-  const [paper, night] = luminance(palette.bg) >= luminance(palette.ink) ? [palette.bg, palette.ink] : [palette.ink, palette.bg];
+  const [paper, night] =
+    luminance(palette.bg) >= luminance(palette.ink) ? [palette.bg, palette.ink] : [palette.ink, palette.bg];
 
   const uid = 'bc' + hashString(JSON.stringify([title, author, seed, styleId, palette, W, H])).toString(36);
   const short = Math.min(W, H);
+  /** @type {import('./index.js').StyleContext} */
   const ctx = {
     title,
     author,
@@ -130,7 +128,10 @@ export function createCover(options = {}) {
   return { svg, style: styleId, palette: palette.id, seed, width: W, height: H };
 }
 
-/** Generate a cover and return the SVG markup string. */
+/**
+ * Generate a cover and return the SVG markup string.
+ * @param {import('./index.js').CoverOptions} [options]
+ */
 export function generateCover(options = {}) {
   return createCover(options).svg;
 }

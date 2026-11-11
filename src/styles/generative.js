@@ -21,6 +21,7 @@ export const aurora = {
   id: 'aurora',
   name: 'Aurora',
   description: 'Soft blurred colour fields with film grain.',
+  /** @param {import('../index.js').StyleContext} c */
   render(c) {
     const { W, H, u, m, rng, p } = c;
     const blur = c.id('blur');
@@ -34,14 +35,36 @@ export const aurora = {
     for (let i = 0; i < count; i++) {
       const col = cols[i % cols.length];
       const op = col === p.ink ? 0.35 : rng.float(0.7, 1);
-      blobs += circle(rng.float(-0.1, 1.1) * W, rng.float(-0.05, 1.05) * H, Math.min(W, H) * rng.float(0.28, 0.5), col, `opacity="${op.toFixed(2)}"`);
+      blobs += circle(
+        rng.float(-0.1, 1.1) * W,
+        rng.float(-0.05, 1.05) * H,
+        Math.min(W, H) * rng.float(0.28, 0.5),
+        col,
+        `opacity="${op.toFixed(2)}"`,
+      );
     }
     s += `<g filter="url(#${blur})">${blobs}</g>${g.layer}`;
 
     const layout = rng.pick(['bottom', 'center', 'top']);
     const font = rng.pick([FONTS.sans, FONTS.serif, FONTS.didone]);
-    const a = fitText(c.author, { font: FONTS.sans, weight: 500, upper: true, letterSpacing: 0.25, maxWidth: W - m * 2, maxHeight: W * 0.08, maxSize: W * 0.03, maxLines: 2 });
-    const tAttrs = { maxWidth: W - m * 2.2, maxSize: W * 0.13, lineHeight: 1.04, maxLines: 5, font, weight: font === FONTS.sans ? 300 : 400 };
+    const a = fitText(c.author, {
+      font: FONTS.sans,
+      weight: 500,
+      upper: true,
+      letterSpacing: 0.25,
+      maxWidth: W - m * 2,
+      maxHeight: W * 0.08,
+      maxSize: W * 0.03,
+      maxLines: 2,
+    });
+    const tAttrs = {
+      maxWidth: W - m * 2.2,
+      maxSize: W * 0.13,
+      lineHeight: 1.04,
+      maxLines: 5,
+      font,
+      weight: font === FONTS.sans ? 300 : 400,
+    };
     const shadow = `filter="url(#${sh})"`;
     if (layout === 'center') {
       const t = fitText(c.title, { ...tAttrs, maxHeight: H * 0.45 });
@@ -62,6 +85,7 @@ export const halftone = {
   id: 'halftone',
   name: 'Halftone',
   description: 'Risograph-style overlapping dot screens.',
+  /** @param {import('../index.js').StyleContext} c */
   render(c) {
     const { W, H, m, rng, p } = c;
     const cols = rng.int(22, 30);
@@ -80,7 +104,8 @@ export const halftone = {
       const ang = rng.float(0, Math.PI * 2);
       const freq = rng.float(2, 5);
       if (kind === 'radial') return (x, y) => 1 - Math.hypot(x - cx, y - cy) / R;
-      if (kind === 'linear') return (x, y) => 0.5 + (((x - W / 2) * Math.cos(ang) + (y - H / 2) * Math.sin(ang)) / W) * 1.1;
+      if (kind === 'linear')
+        return (x, y) => 0.5 + (((x - W / 2) * Math.cos(ang) + (y - H / 2) * Math.sin(ang)) / W) * 1.1;
       return (x, y) => 0.5 + 0.5 * Math.sin((x / W) * freq * Math.PI + Math.sin((y / H) * freq * 2) * 1.5);
     };
 
@@ -101,7 +126,14 @@ export const halftone = {
       s += l ? `<g style="mix-blend-mode:${blend}">${dots}</g>` : dots;
     }
 
-    const a = fitText(c.author, { font: FONTS.sans, weight: 500, maxWidth: W - m * 2, maxHeight: W * 0.08, maxSize: W * 0.036, maxLines: 2 });
+    const a = fitText(c.author, {
+      font: FONTS.sans,
+      weight: 500,
+      maxWidth: W - m * 2,
+      maxHeight: W * 0.08,
+      maxSize: W * 0.036,
+      maxLines: 2,
+    });
     const aY = H - m * 1.2 - a.height;
     const top = fadeTop + m * 0.2;
     const font = rng.pick([FONTS.sans, FONTS.geometric, FONTS.display]);
@@ -126,12 +158,18 @@ const MS_SEGMENTS = {
   2: [['b', 'r']],
   3: [['l', 'r']],
   4: [['t', 'r']],
-  5: [['l', 't'], ['b', 'r']],
+  5: [
+    ['l', 't'],
+    ['b', 'r'],
+  ],
   6: [['t', 'b']],
   7: [['l', 't']],
   8: [['l', 't']],
   9: [['t', 'b']],
-  10: [['t', 'r'], ['l', 'b']],
+  10: [
+    ['t', 'r'],
+    ['l', 'b'],
+  ],
   11: [['t', 'r']],
   12: [['l', 'r']],
   13: [['b', 'r']],
@@ -177,7 +215,8 @@ function contours(values, cols, rows, res, level) {
   });
   const used = new Uint8Array(segs.length);
   const out = [];
-  const extend = (chain, key) => {
+  const extend = (chain, start) => {
+    let key = start;
     for (;;) {
       const next = (adj.get(key) || []).find((idx) => !used[idx]);
       if (next == null) return;
@@ -203,6 +242,7 @@ export const topographic = {
   id: 'topographic',
   name: 'Topographic',
   description: 'Contour lines from a generated terrain map.',
+  /** @param {import('../index.js').StyleContext} c */
   render(c) {
     const { W, H, u, m, rng, p } = c;
     const noise = makeNoise2D(rng);
@@ -241,8 +281,25 @@ export const topographic = {
     const pad = m * 0.75;
     const panelW = W - m * 2;
     const innerW = panelW - pad * 2;
-    const t = fitText(c.title, { font: FONTS.condensed, weight: 700, upper: true, letterSpacing: 0.03, maxWidth: innerW, maxHeight: H * 0.24, maxSize: W * 0.1, lineHeight: 1.0, maxLines: 4 });
-    const a = fitText(c.author, { font: FONTS.mono, weight: 400, maxWidth: innerW, maxHeight: W * 0.08, maxSize: W * 0.03, maxLines: 2 });
+    const t = fitText(c.title, {
+      font: FONTS.condensed,
+      weight: 700,
+      upper: true,
+      letterSpacing: 0.03,
+      maxWidth: innerW,
+      maxHeight: H * 0.24,
+      maxSize: W * 0.1,
+      lineHeight: 1.0,
+      maxLines: 4,
+    });
+    const a = fitText(c.author, {
+      font: FONTS.mono,
+      weight: 400,
+      maxWidth: innerW,
+      maxHeight: W * 0.08,
+      maxSize: W * 0.03,
+      maxLines: 2,
+    });
     const gap = a.lines.length ? m * 0.6 : 0;
     const panelH = pad * 2 + t.height + gap + a.height;
     const top = rng.bool(0.5);
@@ -258,6 +315,7 @@ export const mosaic = {
   id: 'mosaic',
   name: 'Mosaic',
   description: 'Truchet and quarter-circle tiles.',
+  /** @param {import('../index.js').StyleContext} c */
   render(c) {
     const { W, H, u, m, rng, p } = c;
     const cols = rng.int(5, 8);
@@ -284,16 +342,56 @@ export const mosaic = {
         const front = others.length ? rng.pick(others) : p.bg;
         s += rect(x, y, size + 0.5, size + 0.5, back);
         const kind = family === 'mixed' ? rng.pick(['quarters', 'triangles', 'half', 'circle']) : family;
-        if (kind === 'quarters') s += path(`M${n(x)} ${n(y + size)}L${n(x)} ${n(y)}A${n(size)} ${n(size)} 0 0 1 ${n(x + size)} ${n(y + size)}Z`, front, rot);
-        else if (kind === 'triangles') s += path(pathD([[x, y], [x + size, y + size], [x, y + size]], true), front, rot);
-        else if (kind === 'half') s += path(`M${n(x)} ${n(y + size)}A${n(size / 2)} ${n(size / 2)} 0 0 1 ${n(x + size)} ${n(y + size)}Z`, front, rot);
+        if (kind === 'quarters')
+          s += path(
+            `M${n(x)} ${n(y + size)}L${n(x)} ${n(y)}A${n(size)} ${n(size)} 0 0 1 ${n(x + size)} ${n(y + size)}Z`,
+            front,
+            rot,
+          );
+        else if (kind === 'triangles')
+          s += path(
+            pathD(
+              [
+                [x, y],
+                [x + size, y + size],
+                [x, y + size],
+              ],
+              true,
+            ),
+            front,
+            rot,
+          );
+        else if (kind === 'half')
+          s += path(
+            `M${n(x)} ${n(y + size)}A${n(size / 2)} ${n(size / 2)} 0 0 1 ${n(x + size)} ${n(y + size)}Z`,
+            front,
+            rot,
+          );
         else s += circle(x + size / 2, y + size / 2, size * 0.36, front);
       }
     }
 
     const pad = m * 0.8;
-    const t = fitText(c.title, { font: FONTS.geometric, weight: 700, upper: true, maxWidth: W - m * 2, maxHeight: H * 0.24, maxSize: W * 0.1, lineHeight: 1.02, maxLines: 4 });
-    const a = fitText(c.author, { font: FONTS.geometric, weight: 400, upper: true, letterSpacing: 0.2, maxWidth: W - m * 2, maxHeight: W * 0.08, maxSize: W * 0.03, maxLines: 2 });
+    const t = fitText(c.title, {
+      font: FONTS.geometric,
+      weight: 700,
+      upper: true,
+      maxWidth: W - m * 2,
+      maxHeight: H * 0.24,
+      maxSize: W * 0.1,
+      lineHeight: 1.02,
+      maxLines: 4,
+    });
+    const a = fitText(c.author, {
+      font: FONTS.geometric,
+      weight: 400,
+      upper: true,
+      letterSpacing: 0.2,
+      maxWidth: W - m * 2,
+      maxHeight: W * 0.08,
+      maxSize: W * 0.03,
+      maxLines: 2,
+    });
     const gap = a.lines.length ? m * 0.6 : 0;
     const bandH = pad * 2 + t.height + gap + a.height;
     const by = clamp(H * rng.pick([0.62, 0.5, 0.36]) - bandH / 2, m, H - m - bandH);
@@ -309,6 +407,7 @@ export const lowpoly = {
   id: 'lowpoly',
   name: 'Low Poly',
   description: 'Faceted triangles with a gradient sweep.',
+  /** @param {import('../index.js').StyleContext} c */
   render(c) {
     const { W, H, u, m, rng, p } = c;
     const cols = rng.int(6, 9);
@@ -354,13 +453,34 @@ export const lowpoly = {
     }
     const shade = c.id('shade');
     const night = mix(p.night, '#000000', 0.3);
-    s = `<defs>${linearGradient(shade, [[0, night, 0], [0.45, night, 0.55], [1, night, 0.92]])}</defs>${s}`;
+    s = `<defs>${linearGradient(shade, [
+      [0, night, 0],
+      [0.45, night, 0.55],
+      [1, night, 0.92],
+    ])}</defs>${s}`;
     s += rect(0, H * 0.4, W, H * 0.6, `url(#${shade})`);
 
     const light = '#ffffff';
-    const a = fitText(c.author, { font: FONTS.sans, weight: 500, upper: true, letterSpacing: 0.22, maxWidth: W - m * 2, maxHeight: W * 0.08, maxSize: W * 0.03, maxLines: 2 });
+    const a = fitText(c.author, {
+      font: FONTS.sans,
+      weight: 500,
+      upper: true,
+      letterSpacing: 0.22,
+      maxWidth: W - m * 2,
+      maxHeight: W * 0.08,
+      maxSize: W * 0.03,
+      maxLines: 2,
+    });
     const aY = H - m * 1.2 - a.height;
-    const t = fitText(c.title, { font: FONTS.sans, weight: 700, maxWidth: W - m * 2, maxHeight: H * 0.3, maxSize: W * 0.12, lineHeight: 1.0, maxLines: 4 });
+    const t = fitText(c.title, {
+      font: FONTS.sans,
+      weight: 700,
+      maxWidth: W - m * 2,
+      maxHeight: H * 0.3,
+      maxSize: W * 0.12,
+      lineHeight: 1.0,
+      maxLines: 4,
+    });
     const tY = aY - m * 0.8 - t.height;
     s += drawText(t, { x: m, y: tY, fill: light });
     s += rect(m, tY - m * 0.6, W * 0.12, 4 * u, light);
@@ -373,6 +493,7 @@ export const flowfield = {
   id: 'flowfield',
   name: 'Flow Field',
   description: 'Strands following a noise vector field.',
+  /** @param {import('../index.js').StyleContext} c */
   render(c) {
     const { W, H, u, m, rng, p } = c;
     const noise = makeNoise2D(rng);
@@ -403,8 +524,25 @@ export const flowfield = {
 
     const pad = m;
     const font = rng.pick([FONTS.serif, FONTS.didone, FONTS.sans]);
-    const t = fitText(c.title, { font, weight: font === FONTS.sans ? 700 : 400, maxWidth: W - pad * 2, maxHeight: H * 0.22, maxSize: W * 0.1, lineHeight: 1.05, maxLines: 4 });
-    const a = fitText(c.author, { font: FONTS.sans, weight: 500, upper: true, letterSpacing: 0.2, maxWidth: W - pad * 2, maxHeight: W * 0.08, maxSize: W * 0.03, maxLines: 2 });
+    const t = fitText(c.title, {
+      font,
+      weight: font === FONTS.sans ? 700 : 400,
+      maxWidth: W - pad * 2,
+      maxHeight: H * 0.22,
+      maxSize: W * 0.1,
+      lineHeight: 1.05,
+      maxLines: 4,
+    });
+    const a = fitText(c.author, {
+      font: FONTS.sans,
+      weight: 500,
+      upper: true,
+      letterSpacing: 0.2,
+      maxWidth: W - pad * 2,
+      maxHeight: W * 0.08,
+      maxSize: W * 0.03,
+      maxLines: 2,
+    });
     const gap = a.lines.length ? m * 0.7 : 0;
     const panelH = pad * 1.8 + textBottom(t, 0) + gap + a.height;
     const top = rng.bool(0.4);
@@ -417,4 +555,3 @@ export const flowfield = {
     return s;
   },
 };
-

@@ -30,15 +30,20 @@ export const landscape = {
   id: 'landscape',
   name: 'Landscape',
   description: 'Layered mountain ranges under a low sun.',
+  /** @param {import('../index.js').StyleContext} c */
   render(c) {
-    const { W, H, u, m, rng, p } = c;
+    const { W, H, m, rng, p } = c;
     const [sunC, , farC] = rng.shuffle(p.accents);
     const skyTop = p.dark ? p.bg : mix(p.bg, p.accents[1], 0.1);
     const horizon = mix(skyTop, sunC, 0.45);
     const dark = p.dark ? mix(p.bg, '#000000', 0.45) : mix(p.ink, farC, 0.3);
     const sky = c.id('sky');
 
-    let s = `<defs>${linearGradient(sky, [[0, skyTop], [0.5, mix(skyTop, horizon, 0.55)], [0.75, horizon]])}</defs>`;
+    let s = `<defs>${linearGradient(sky, [
+      [0, skyTop],
+      [0.5, mix(skyTop, horizon, 0.55)],
+      [0.75, horizon],
+    ])}</defs>`;
     s += rect(0, 0, W, H, `url(#${sky})`);
     if (p.dark) s += starfield(c, 70, H * 0.45, p.ink);
 
@@ -75,7 +80,16 @@ export const landscape = {
       maxLines: 4,
     });
     s += drawText(t, { x: W / 2, y: top, anchor: 'middle', fill: inkOn(skyTop, p) });
-    const a = fitText(c.author, { font: FONTS.sans, weight: 500, upper: true, letterSpacing: 0.25, maxWidth: W - m * 2, maxHeight: W * 0.08, maxSize: W * 0.03, maxLines: 2 });
+    const a = fitText(c.author, {
+      font: FONTS.sans,
+      weight: 500,
+      upper: true,
+      letterSpacing: 0.25,
+      maxWidth: W - m * 2,
+      maxHeight: W * 0.08,
+      maxSize: W * 0.03,
+      maxLines: 2,
+    });
     s += drawText(a, { x: W / 2, y: H - m * 1.1 - a.height, anchor: 'middle', fill: inkOn(front, p) });
     return s;
   },
@@ -85,8 +99,9 @@ export const waves = {
   id: 'waves',
   name: 'Waves',
   description: 'Stacked sine waves in blended tones.',
+  /** @param {import('../index.js').StyleContext} c */
   render(c) {
-    const { W, H, u, m, rng, p } = c;
+    const { W, H, m, rng, p } = c;
     const flip = rng.bool(0.35);
     const count = rng.int(5, 9);
     const start = H * rng.float(0.46, 0.56);
@@ -117,7 +132,16 @@ export const waves = {
     const free = start - A * 1.4 - m * 0.6;
     const regionTop = flip ? H - free : m * 1.4;
     const regionBottom = flip ? H - m * 1.4 : free;
-    const a = fitText(c.author, { font: FONTS.sans, weight: 500, upper: true, letterSpacing: 0.22, maxWidth: W - m * 2, maxHeight: W * 0.08, maxSize: W * 0.03, maxLines: 2 });
+    const a = fitText(c.author, {
+      font: FONTS.sans,
+      weight: 500,
+      upper: true,
+      letterSpacing: 0.22,
+      maxWidth: W - m * 2,
+      maxHeight: W * 0.08,
+      maxSize: W * 0.03,
+      maxLines: 2,
+    });
     const font = rng.pick([FONTS.serif, FONTS.garamond, FONTS.sans]);
     const t = fitText(c.title, {
       font,
@@ -141,6 +165,7 @@ export const constellation = {
   name: 'Constellation',
   description: 'Night sky with a crescent moon and a star chart.',
   prefer: 'dark',
+  /** @param {import('../index.js').StyleContext} c */
   render(c) {
     const { W, H, u, m, rng, p } = c;
     const accent = rng.pick(p.accents);
@@ -154,7 +179,10 @@ export const constellation = {
     const mx = W * rng.float(0.18, 0.82);
     const my = H * rng.float(0.09, 0.15);
     let s = '<defs>';
-    s += linearGradient(sky, [[0, mix(night, '#000000', 0.3)], [1, mix(night, accent, 0.28)]]);
+    s += linearGradient(sky, [
+      [0, mix(night, '#000000', 0.3)],
+      [1, mix(night, accent, 0.28)],
+    ]);
     s += `<mask id="${moonMask}">${circle(mx, my, mr, '#ffffff')}${circle(mx + mr * 0.42, my - mr * 0.22, mr * 0.9, '#000000')}</mask>`;
     s += blurFilter(glow, 3 * u);
     s += '</defs>';
@@ -176,7 +204,8 @@ export const constellation = {
       const last = order[order.length - 1];
       let bi = 0;
       rest.forEach((q, i) => {
-        if (Math.hypot(q[0] - last[0], q[1] - last[1]) < Math.hypot(rest[bi][0] - last[0], rest[bi][1] - last[1])) bi = i;
+        if (Math.hypot(q[0] - last[0], q[1] - last[1]) < Math.hypot(rest[bi][0] - last[0], rest[bi][1] - last[1]))
+          bi = i;
       });
       order.push(rest.splice(bi, 1)[0]);
     }
@@ -195,7 +224,16 @@ export const constellation = {
       s += circle(x, y, 2.6 * u, light);
     }
 
-    const a = fitText(c.author, { font: FONTS.sans, weight: 400, upper: true, letterSpacing: 0.3, maxWidth: W - m * 2, maxHeight: W * 0.08, maxSize: W * 0.028, maxLines: 2 });
+    const a = fitText(c.author, {
+      font: FONTS.sans,
+      weight: 400,
+      upper: true,
+      letterSpacing: 0.3,
+      maxWidth: W - m * 2,
+      maxHeight: W * 0.08,
+      maxSize: W * 0.028,
+      maxLines: 2,
+    });
     const aY = H - m * 1.2 - a.height;
     const top = H * 0.64;
     const font = rng.pick([FONTS.serif, FONTS.didone, FONTS.garamond]);
@@ -220,6 +258,7 @@ export const orbit = {
   name: 'Orbit',
   description: 'A planet with tilted orbits and moons.',
   prefer: 'dark',
+  /** @param {import('../index.js').StyleContext} c */
   render(c) {
     const { W, H, u, m, rng, p } = c;
     const night = p.night;
@@ -245,8 +284,23 @@ export const orbit = {
     const planet = c.id('planet');
     const halo = c.id('halo');
     let s = '<defs>';
-    s += radialGradient(planet, [[0, mix(pc, '#ffffff', 0.45)], [0.55, pc], [1, mix(pc, '#000000', 0.55)]], { fx: 0.35, fy: 0.3, r: 0.6 });
-    s += radialGradient(halo, [[0, mix(night, pc, 0.35)], [1, night]], { r: 0.6, cy: 0.33 });
+    s += radialGradient(
+      planet,
+      [
+        [0, mix(pc, '#ffffff', 0.45)],
+        [0.55, pc],
+        [1, mix(pc, '#000000', 0.55)],
+      ],
+      { fx: 0.35, fy: 0.3, r: 0.6 },
+    );
+    s += radialGradient(
+      halo,
+      [
+        [0, mix(night, pc, 0.35)],
+        [1, night],
+      ],
+      { r: 0.6, cy: 0.33 },
+    );
     s += '</defs>';
     s += rect(0, 0, W, H, `url(#${halo})`);
     s += starfield(c, 90, H, light);
@@ -270,7 +324,16 @@ export const orbit = {
     s += circle(cx, cy, R, `url(#${planet})`);
     if (ringed) s += `<path d="${front}" ${ringAttrs} ${rot}/>`;
 
-    const a = fitText(c.author, { font: FONTS.geometric, weight: 400, upper: true, letterSpacing: 0.3, maxWidth: W - m * 2, maxHeight: W * 0.08, maxSize: W * 0.028, maxLines: 2 });
+    const a = fitText(c.author, {
+      font: FONTS.geometric,
+      weight: 400,
+      upper: true,
+      letterSpacing: 0.3,
+      maxWidth: W - m * 2,
+      maxHeight: W * 0.08,
+      maxSize: W * 0.028,
+      maxLines: 2,
+    });
     const aY = H - m * 1.2 - a.height;
     const top = H * 0.66;
     const t = fitText(c.title, {
@@ -295,6 +358,7 @@ export const retro = {
   name: 'Retro Sun',
   description: 'Eighties sunset over a neon perspective grid.',
   prefer: 'dark',
+  /** @param {import('../index.js').StyleContext} c */
   render(c) {
     const { W, H, u, m, rng, p } = c;
     const sorted = [...p.accents].sort((a, b) => luminance(b) - luminance(a));
@@ -306,10 +370,30 @@ export const retro = {
     const cx = W / 2;
     const cy = horizon - R * 0.25;
 
-    const ids = { sky: c.id('sky'), sun: c.id('sun'), stripes: c.id('stripes'), glow: c.id('glow'), clip: c.id('clip'), chrome: c.id('chrome'), sh: c.id('sh') };
-    let defs = linearGradient(ids.sky, [[0, mix(night, '#000000', 0.35)], [0.7, mix(night, lo, 0.35)], [1, mix(night, lo, 0.6)]]);
-    defs += linearGradient(ids.sun, [[0, hi], [1, lo]]);
-    defs += linearGradient(ids.chrome, [[0, '#ffffff'], [0.48, mix(light, hi, 0.35)], [0.52, hi], [1, mix(hi, lo, 0.6)]]);
+    const ids = {
+      sky: c.id('sky'),
+      sun: c.id('sun'),
+      stripes: c.id('stripes'),
+      glow: c.id('glow'),
+      clip: c.id('clip'),
+      chrome: c.id('chrome'),
+      sh: c.id('sh'),
+    };
+    let defs = linearGradient(ids.sky, [
+      [0, mix(night, '#000000', 0.35)],
+      [0.7, mix(night, lo, 0.35)],
+      [1, mix(night, lo, 0.6)],
+    ]);
+    defs += linearGradient(ids.sun, [
+      [0, hi],
+      [1, lo],
+    ]);
+    defs += linearGradient(ids.chrome, [
+      [0, '#ffffff'],
+      [0.48, mix(light, hi, 0.35)],
+      [0.52, hi],
+      [1, mix(hi, lo, 0.6)],
+    ]);
     let bands = rect(cx - R, cy - R, R * 2, R * 2, '#ffffff');
     for (let k = 0; k < 7; k++) {
       const y = cy - R * 0.12 + k * R * 0.17;
@@ -358,8 +442,23 @@ export const retro = {
       lineHeight: 1.02,
       maxLines: 4,
     });
-    s += drawText(t, { x: W / 2, y: top, anchor: 'middle', fill: `url(#${ids.chrome})`, attrs: `filter="url(#${ids.sh})"` });
-    const a = fitText(c.author, { font: FONTS.geometric, weight: 500, upper: true, letterSpacing: 0.3, maxWidth: W - m * 2, maxHeight: W * 0.08, maxSize: W * 0.03, maxLines: 2 });
+    s += drawText(t, {
+      x: W / 2,
+      y: top,
+      anchor: 'middle',
+      fill: `url(#${ids.chrome})`,
+      attrs: `filter="url(#${ids.sh})"`,
+    });
+    const a = fitText(c.author, {
+      font: FONTS.geometric,
+      weight: 500,
+      upper: true,
+      letterSpacing: 0.3,
+      maxWidth: W - m * 2,
+      maxHeight: W * 0.08,
+      maxSize: W * 0.03,
+      maxLines: 2,
+    });
     const aY = H - m * 1.1 - a.height;
     if (a.lines.length) s += rect(0, aY - m * 0.45, W, a.height + m * 0.9, floor, 'opacity="0.75"');
     s += drawText(a, { x: W / 2, y: aY, anchor: 'middle', fill: light });
@@ -371,6 +470,7 @@ export const shelf = {
   id: 'shelf',
   name: 'Bookshelf',
   description: 'A row of book spines on a shelf.',
+  /** @param {import('../index.js').StyleContext} c */
   render(c) {
     const { W, H, u, m, rng, p } = c;
     const shelfY = H * rng.float(0.56, 0.62);
@@ -379,7 +479,13 @@ export const shelf = {
     const right = W - m * 0.8;
     const lean = rng.bool(0.6);
     const stop = lean ? right - W * 0.26 : right;
-    const colors = [...p.accents, mix(p.accents[0], p.ink, 0.35), mix(p.accents[1], p.bg, 0.3), mix(p.accents[2], p.ink, 0.2), p.ink];
+    const colors = [
+      ...p.accents,
+      mix(p.accents[0], p.ink, 0.35),
+      mix(p.accents[1], p.bg, 0.3),
+      mix(p.accents[2], p.ink, 0.2),
+      p.ink,
+    ];
 
     const spine = (x, w, h, col) => {
       const top = shelfY - h;
@@ -392,7 +498,8 @@ export const shelf = {
       } else if (kind === 1) {
         o += rect(x + w * 0.22, top + h * 0.28, w * 0.56, h * 0.3, deco, 'opacity="0.8"');
       } else if (kind === 2) {
-        for (let k = 0; k < 3; k++) o += rect(x + w * 0.3, top + h * (0.2 + k * 0.08), w * 0.4, h * 0.025, deco, 'opacity="0.6"');
+        for (let k = 0; k < 3; k++)
+          o += rect(x + w * 0.3, top + h * (0.2 + k * 0.08), w * 0.4, h * 0.025, deco, 'opacity="0.6"');
       } else {
         o += circle(x + w / 2, top + h * 0.2, w * 0.22, deco, 'opacity="0.7"');
       }
@@ -426,7 +533,16 @@ export const shelf = {
     s += rect(0, shelfY + plankH, W, plankH * 0.9, p.ink, 'opacity="0.12"');
     s += rect(0, shelfY, W, plankH, p.ink);
 
-    const a = fitText(c.author, { font: FONTS.humanist, weight: 400, upper: true, letterSpacing: 0.28, maxWidth: W - m * 2, maxHeight: W * 0.08, maxSize: W * 0.032, maxLines: 2 });
+    const a = fitText(c.author, {
+      font: FONTS.humanist,
+      weight: 400,
+      upper: true,
+      letterSpacing: 0.28,
+      maxWidth: W - m * 2,
+      maxHeight: W * 0.08,
+      maxSize: W * 0.032,
+      maxLines: 2,
+    });
     s += drawText(a, { x: W / 2, y: m * 1.3, anchor: 'middle', fill: p.ink });
     const tTop = shelfY + plankH + m * 0.9;
     const font = rng.pick([FONTS.serif, FONTS.humanist, FONTS.garamond]);

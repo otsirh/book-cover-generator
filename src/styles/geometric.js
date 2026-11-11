@@ -5,9 +5,10 @@ export const minimal = {
   id: 'minimal',
   name: 'Minimal',
   description: 'Quiet typography with a single accent rule.',
+  /** @param {import('../index.js').StyleContext} c */
   render(c) {
     const { W, H, u, m, rng, p } = c;
-    const align = rng.pick(['middle', 'middle', 'start']);
+    const align = /** @type {'middle' | 'start'} */ (rng.pick(['middle', 'middle', 'start']));
     const pad = m * 1.4;
     const x = align === 'middle' ? W / 2 : pad;
     const maxWidth = W - pad * 2;
@@ -17,7 +18,14 @@ export const minimal = {
 
     let s = rect(0, 0, W, H, p.bg);
     if (rng.bool(0.5)) {
-      s += rect(m * 0.6, m * 0.6, W - m * 1.2, H - m * 1.2, 'none', `stroke="${p.ink}" stroke-opacity="0.3" stroke-width="${n(1.5 * u)}"`);
+      s += rect(
+        m * 0.6,
+        m * 0.6,
+        W - m * 1.2,
+        H - m * 1.2,
+        'none',
+        `stroke="${p.ink}" stroke-opacity="0.3" stroke-width="${n(1.5 * u)}"`,
+      );
     }
     const t = fitText(c.title, {
       font,
@@ -53,6 +61,7 @@ export const swiss = {
   id: 'swiss',
   name: 'Swiss',
   description: 'International-style grid: colour block, circle and tight sans.',
+  /** @param {import('../index.js').StyleContext} c */
   render(c) {
     const { W, H, u, m, rng, p } = c;
     const [blockColor, circleColor] = rng.shuffle([...p.accents, p.ink]);
@@ -77,9 +86,21 @@ export const swiss = {
 
     const ruleY = H - m * 2.4;
     s += rect(m, ruleY, W - m * 2, 1.5 * u, p.ink);
-    const a = fitText(c.author, { font: FONTS.sans, weight: 500, maxWidth: W * 0.6, maxHeight: W * 0.08, maxSize: W * 0.036, maxLines: 2 });
+    const a = fitText(c.author, {
+      font: FONTS.sans,
+      weight: 500,
+      maxWidth: W * 0.6,
+      maxHeight: W * 0.08,
+      maxSize: W * 0.036,
+      maxLines: 2,
+    });
     s += drawText(a, { x: m, y: ruleY + m * 0.55, fill: p.ink });
-    const no = fitText(`No. ${rng.int(1, 99)}`, { font: FONTS.sans, weight: 400, maxWidth: W * 0.25, maxSize: W * 0.03 });
+    const no = fitText(`No. ${rng.int(1, 99)}`, {
+      font: FONTS.sans,
+      weight: 400,
+      maxWidth: W * 0.25,
+      maxSize: W * 0.03,
+    });
     s += drawText(no, { x: W - m, y: ruleY + m * 0.55, anchor: 'end', fill: p.ink, opacity: 0.7 });
     return s;
   },
@@ -97,11 +118,30 @@ function bauhausShape(type, x, y, size, color, rot) {
     case 'ring':
       return circle(cx, cy, size * 0.31, 'none', `stroke="${color}" stroke-width="${n(size * 0.14)}"`);
     case 'half':
-      return path(`M${n(x)} ${n(y + size)}A${n(size / 2)} ${n(size / 2)} 0 0 1 ${n(x + size)} ${n(y + size)}Z`, color, tr);
+      return path(
+        `M${n(x)} ${n(y + size)}A${n(size / 2)} ${n(size / 2)} 0 0 1 ${n(x + size)} ${n(y + size)}Z`,
+        color,
+        tr,
+      );
     case 'quarter':
-      return path(`M${n(x)} ${n(y + size)}L${n(x)} ${n(y)}A${n(size)} ${n(size)} 0 0 1 ${n(x + size)} ${n(y + size)}Z`, color, tr);
+      return path(
+        `M${n(x)} ${n(y + size)}L${n(x)} ${n(y)}A${n(size)} ${n(size)} 0 0 1 ${n(x + size)} ${n(y + size)}Z`,
+        color,
+        tr,
+      );
     case 'triangle':
-      return path(pathD([[x, y + size], [x + size, y + size], [x, y]], true), color, tr);
+      return path(
+        pathD(
+          [
+            [x, y + size],
+            [x + size, y + size],
+            [x, y],
+          ],
+          true,
+        ),
+        color,
+        tr,
+      );
     case 'square':
       return rect(x + size * 0.18, y + size * 0.18, size * 0.64, size * 0.64, color, tr);
     case 'bars': {
@@ -119,6 +159,7 @@ export const bauhaus = {
   name: 'Bauhaus',
   description: 'A grid of primary geometric shapes.',
   prefer: 'light',
+  /** @param {import('../index.js').StyleContext} c */
   render(c) {
     const { W, H, m, rng, p } = c;
     const cols = W / H > 0.9 ? 4 : 3;
@@ -133,6 +174,7 @@ export const bauhaus = {
       for (let col = 0; col < cols; col++) {
         const x = m + col * cell;
         const y = m + row * cell;
+        /** @type {string | null} */
         let cellBg = null;
         if (rng.bool(0.4)) {
           cellBg = rng.pick(colors);
@@ -179,6 +221,7 @@ export const stripes = {
   id: 'stripes',
   name: 'Stripes',
   description: 'Bold stripes behind a framed title plate.',
+  /** @param {import('../index.js').StyleContext} c */
   render(c) {
     const { W, H, u, m, rng, p } = c;
     const angle = rng.pick([0, 90, 45, -45, 30, -30, 60]);
@@ -192,7 +235,8 @@ export const stripes = {
     let i = 0;
     while (x < diag / 2) {
       const w = mode === 'varied' ? base * rng.float(0.35, 2.4) : base;
-      const col = mode === 'varied' ? rng.pick(colors) : colors[Math.floor(i / (mode === 'gapped' ? 2 : 1)) % colors.length];
+      const col =
+        mode === 'varied' ? rng.pick(colors) : colors[Math.floor(i / (mode === 'gapped' ? 2 : 1)) % colors.length];
       if (mode !== 'gapped' || i % 2 === 0) bars += rect(W / 2 + x, H / 2 - diag / 2, w + 0.6 * u, diag, col);
       x += w;
       i++;
@@ -229,7 +273,14 @@ export const stripes = {
     const plateH = pad * 2 + tBottom + gap + a.height;
     const py = clamp(H * rng.pick([0.5, 0.58, 0.42]) - plateH / 2, m, H - m - plateH);
     s += rect(m, py, plateW, plateH, p.bg);
-    s += rect(m + 6 * u, py + 6 * u, plateW - 12 * u, plateH - 12 * u, 'none', `stroke="${p.ink}" stroke-width="${n(1.5 * u)}"`);
+    s += rect(
+      m + 6 * u,
+      py + 6 * u,
+      plateW - 12 * u,
+      plateH - 12 * u,
+      'none',
+      `stroke="${p.ink}" stroke-width="${n(1.5 * u)}"`,
+    );
     s += drawText(t, { x: W / 2, y: py + pad, anchor: 'middle', fill: p.ink });
     s += drawText(a, { x: W / 2, y: py + pad + tBottom + gap, anchor: 'middle', fill: p.ink });
     return s;
@@ -240,6 +291,7 @@ export const concentric = {
   id: 'concentric',
   name: 'Concentric',
   description: 'Rings, targets and tunnels.',
+  /** @param {import('../index.js').StyleContext} c */
   render(c) {
     const { W, H, u, m, rng, p } = c;
     const cx = W * rng.float(0.3, 0.7);
@@ -256,7 +308,13 @@ export const concentric = {
       const t = i / count;
       const r = maxR * (1 - t);
       if (mode === 'lines') {
-        s += circle(cx, cy, r, 'none', `stroke="${i % 4 === 0 ? c2 : c1}" stroke-width="${n(u * (i % 4 === 0 ? 3 : 1.4))}"`);
+        s += circle(
+          cx,
+          cy,
+          r,
+          'none',
+          `stroke="${i % 4 === 0 ? c2 : c1}" stroke-width="${n(u * (i % 4 === 0 ? 3 : 1.4))}"`,
+        );
       } else if (mode === 'tunnel') {
         const ox = cx + Math.cos(ang) * drift * i;
         const oy = cy + Math.sin(ang) * drift * i;
@@ -267,7 +325,16 @@ export const concentric = {
       }
     }
 
-    const a = fitText(c.author, { font: FONTS.sans, weight: 500, upper: true, letterSpacing: 0.2, maxWidth: W - m * 2, maxHeight: W * 0.08, maxSize: W * 0.03, maxLines: 2 });
+    const a = fitText(c.author, {
+      font: FONTS.sans,
+      weight: 500,
+      upper: true,
+      letterSpacing: 0.2,
+      maxWidth: W - m * 2,
+      maxHeight: W * 0.08,
+      maxSize: W * 0.03,
+      maxLines: 2,
+    });
     const aY = H - m * 1.2 - a.height;
     const top = cy + maxR + m * 0.8;
     const font = rng.pick([FONTS.serif, FONTS.sans, FONTS.condensed]);
@@ -290,11 +357,32 @@ export const concentric = {
 function splitShape(kind, cx, cy, r, fill) {
   switch (kind) {
     case 'diamond':
-      return path(pathD([[cx, cy - r], [cx + r, cy], [cx, cy + r], [cx - r, cy]], true), fill);
+      return path(
+        pathD(
+          [
+            [cx, cy - r],
+            [cx + r, cy],
+            [cx, cy + r],
+            [cx - r, cy],
+          ],
+          true,
+        ),
+        fill,
+      );
     case 'square':
       return rect(cx - r * 0.85, cy - r * 0.85, r * 1.7, r * 1.7, fill);
     case 'triangle':
-      return path(pathD([[cx, cy - r], [cx + r * 1.05, cy + r * 0.8], [cx - r * 1.05, cy + r * 0.8]], true), fill);
+      return path(
+        pathD(
+          [
+            [cx, cy - r],
+            [cx + r * 1.05, cy + r * 0.8],
+            [cx - r * 1.05, cy + r * 0.8],
+          ],
+          true,
+        ),
+        fill,
+      );
     default:
       return circle(cx, cy, r, fill);
   }
@@ -304,6 +392,7 @@ export const split = {
   id: 'split',
   name: 'Split',
   description: 'Two-tone field with an inverted shape on the seam.',
+  /** @param {import('../index.js').StyleContext} c */
   render(c) {
     const { W, H, m, rng, p } = c;
     const splitY = H * rng.float(0.5, 0.6);
@@ -330,7 +419,14 @@ export const split = {
       maxLines: 5,
     });
     s += drawText(t, { x: m, y: m * 1.2, fill: inkOn(A, p) });
-    const a = fitText(c.author, { font: FONTS.sans, weight: 500, maxWidth: W - m * 2, maxHeight: W * 0.1, maxSize: W * 0.042, maxLines: 2 });
+    const a = fitText(c.author, {
+      font: FONTS.sans,
+      weight: 500,
+      maxWidth: W - m * 2,
+      maxHeight: W * 0.1,
+      maxSize: W * 0.042,
+      maxLines: 2,
+    });
     s += drawText(a, { x: W - m, y: H - m * 1.2 - a.height, anchor: 'end', fill: p.ink });
     return s;
   },
@@ -340,6 +436,7 @@ export const blocks = {
   id: 'blocks',
   name: 'Blocks',
   description: 'Neo-plastic grid of primary colour blocks.',
+  /** @param {import('../index.js').StyleContext} c */
   render(c) {
     const { W, H, u, m, rng, p } = c;
     const lw = u * rng.float(6, 11);
@@ -387,7 +484,14 @@ export const blocks = {
 
     const pad = m * 0.8;
     const innerW = W - lw - pad * 2;
-    const a = fitText(c.author, { font: FONTS.sans, weight: 500, maxWidth: innerW, maxHeight: W * 0.08, maxSize: W * 0.036, maxLines: 2 });
+    const a = fitText(c.author, {
+      font: FONTS.sans,
+      weight: 500,
+      maxWidth: innerW,
+      maxHeight: W * 0.08,
+      maxSize: W * 0.036,
+      maxLines: 2,
+    });
     const tTop = textRect.y + lw / 2 + pad;
     const aY = textRect.y + textRect.h - lw / 2 - pad - a.height;
     const t = fitText(c.title, {
@@ -409,6 +513,7 @@ export const pixel = {
   id: 'pixel',
   name: 'Pixel',
   description: 'A mirrored pixel emblem derived from the seed.',
+  /** @param {import('../index.js').StyleContext} c */
   render(c) {
     const { W, H, m, rng, p } = c;
     const cols = rng.pick([5, 7, 9]);
@@ -439,11 +544,21 @@ export const pixel = {
       const px = gx + x * cell;
       const py = gy + y * cell;
       if (kind === 'dot') s += circle(px + cell / 2, py + cell / 2, cell * 0.42, col);
-      else if (kind === 'round') s += rect(px + cell * 0.06, py + cell * 0.06, cell * 0.88, cell * 0.88, col, `rx="${n(cell * 0.24)}"`);
+      else if (kind === 'round')
+        s += rect(px + cell * 0.06, py + cell * 0.06, cell * 0.88, cell * 0.88, col, `rx="${n(cell * 0.24)}"`);
       else s += rect(px, py, cell + 0.4, cell + 0.4, col);
     }
 
-    const a = fitText(c.author, { font: FONTS.mono, weight: 400, upper: true, letterSpacing: 0.08, maxWidth: W - m * 2, maxHeight: W * 0.08, maxSize: W * 0.032, maxLines: 2 });
+    const a = fitText(c.author, {
+      font: FONTS.mono,
+      weight: 400,
+      upper: true,
+      letterSpacing: 0.08,
+      maxWidth: W - m * 2,
+      maxHeight: W * 0.08,
+      maxSize: W * 0.032,
+      maxLines: 2,
+    });
     const aY = H - m * 1.2 - a.height;
     const top = gy + size + tile + m * 0.9;
     const font = rng.pick([FONTS.mono, FONTS.geometric]);
