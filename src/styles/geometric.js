@@ -7,7 +7,7 @@ export const minimal = {
   description: 'Quiet typography with a single accent rule.',
   /** @param {import('../index.js').StyleContext} c */
   render(c) {
-    const { W, H, u, m, rng, p } = c;
+    const { W, H, S, u, m, rng, p } = c;
     const align = /** @type {'middle' | 'start'} */ (rng.pick(['middle', 'middle', 'start']));
     const pad = m * 1.4;
     const x = align === 'middle' ? W / 2 : pad;
@@ -32,7 +32,7 @@ export const minimal = {
       weight: font === FONTS.sans ? 300 : 400,
       maxWidth,
       maxHeight: H * 0.38,
-      maxSize: W * 0.12,
+      maxSize: S * 0.12,
       lineHeight: 1.12,
       maxLines: 6,
     });
@@ -48,8 +48,8 @@ export const minimal = {
       upper: true,
       letterSpacing: 0.22,
       maxWidth,
-      maxHeight: W * 0.09,
-      maxSize: W * 0.03,
+      maxHeight: S * 0.09,
+      maxSize: S * 0.03,
       maxLines: 2,
     });
     s += drawText(a, { x, y: H - pad - a.height, anchor: align, fill: p.ink, opacity: 0.85 });
@@ -63,7 +63,7 @@ export const swiss = {
   description: 'International-style grid: colour block, circle and tight sans.',
   /** @param {import('../index.js').StyleContext} c */
   render(c) {
-    const { W, H, u, m, rng, p } = c;
+    const { W, H, S, u, m, rng, p } = c;
     const [blockColor, circleColor] = rng.shuffle([...p.accents, p.ink]);
     const blockH = H * rng.float(0.5, 0.6);
     const r = Math.min(W * rng.float(0.22, 0.32), blockH * 0.4);
@@ -77,7 +77,7 @@ export const swiss = {
       weight: 700,
       maxWidth: W - m * 2,
       maxHeight: blockH - r - m * 2.4,
-      maxSize: W * 0.15,
+      maxSize: S * 0.15,
       letterSpacing: -0.015,
       lineHeight: 0.98,
       maxLines: 6,
@@ -90,8 +90,8 @@ export const swiss = {
       font: FONTS.sans,
       weight: 500,
       maxWidth: W * 0.6,
-      maxHeight: W * 0.08,
-      maxSize: W * 0.036,
+      maxHeight: S * 0.08,
+      maxSize: S * 0.036,
       maxLines: 2,
     });
     s += drawText(a, { x: m, y: ruleY + m * 0.55, fill: p.ink });
@@ -99,7 +99,7 @@ export const swiss = {
       font: FONTS.sans,
       weight: 400,
       maxWidth: W * 0.25,
-      maxSize: W * 0.03,
+      maxSize: S * 0.03,
     });
     s += drawText(no, { x: W - m, y: ruleY + m * 0.55, anchor: 'end', fill: p.ink, opacity: 0.7 });
     return s;
@@ -161,11 +161,13 @@ export const bauhaus = {
   prefer: 'light',
   /** @param {import('../index.js').StyleContext} c */
   render(c) {
-    const { W, H, m, rng, p } = c;
-    const cols = W / H > 0.9 ? 4 : 3;
+    const { W, H, S, m, rng, p } = c;
     const gw = W - m * 2;
-    const cell = gw / cols;
-    const rows = Math.max(1, Math.floor((H * 0.62 - m) / cell));
+    // Square cells: 3 across a tall cover (4 on squarer ones), never taller than the grid area.
+    const gridH = H * 0.62 - m;
+    const cell = Math.min(gw / (W / H > 0.9 ? 4 : 3), gridH);
+    const cols = Math.max(1, Math.floor(gw / cell + 1e-6));
+    const rows = Math.max(1, Math.floor(gridH / cell + 1e-6));
     const colors = [...p.accents, p.ink];
     const shapes = ['circle', 'half', 'half', 'quarter', 'quarter', 'triangle', 'square', 'ring', 'bars', 'dot'];
 
@@ -193,9 +195,9 @@ export const bauhaus = {
       weight: 500,
       upper: true,
       letterSpacing: 0.14,
-      maxWidth: gw - W * 0.06 - m * 0.5,
-      maxHeight: W * 0.08,
-      maxSize: W * 0.032,
+      maxWidth: gw - S * 0.06 - m * 0.5,
+      maxHeight: S * 0.08,
+      maxSize: S * 0.032,
       maxLines: 2,
     });
     const aY = H - m - a.height;
@@ -206,13 +208,13 @@ export const bauhaus = {
       upper: true,
       maxWidth: gw,
       maxHeight: aY - m * 0.7 - tTop,
-      maxSize: W * 0.11,
+      maxSize: S * 0.11,
       lineHeight: 1.02,
       maxLines: 4,
     });
     s += drawText(t, { x: m, y: tTop, fill: p.ink });
     s += drawText(a, { x: m, y: aY, fill: p.ink });
-    s += rect(W - m - W * 0.06, aY + a.height - W * 0.06 + 1, W * 0.06, W * 0.06, p.accents[0]);
+    s += rect(W - m - S * 0.06, aY + a.height - S * 0.06 + 1, S * 0.06, S * 0.06, p.accents[0]);
     return s;
   },
 };
@@ -223,7 +225,7 @@ export const stripes = {
   description: 'Bold stripes behind a framed title plate.',
   /** @param {import('../index.js').StyleContext} c */
   render(c) {
-    const { W, H, u, m, rng, p } = c;
+    const { W, H, S, u, m, rng, p } = c;
     const angle = rng.pick([0, 90, 45, -45, 30, -30, 60]);
     const colors = rng.shuffle([...p.accents, p.ink]).slice(0, rng.int(2, 3));
     const mode = rng.pick(['even', 'varied', 'gapped']);
@@ -254,7 +256,7 @@ export const stripes = {
       upper: font === FONTS.geometric,
       maxWidth: innerW,
       maxHeight: H * 0.3,
-      maxSize: W * 0.1,
+      maxSize: S * 0.1,
       lineHeight: 1.08,
       maxLines: 5,
     });
@@ -264,8 +266,8 @@ export const stripes = {
       upper: true,
       letterSpacing: 0.18,
       maxWidth: innerW,
-      maxHeight: W * 0.08,
-      maxSize: W * 0.03,
+      maxHeight: S * 0.08,
+      maxSize: S * 0.03,
       maxLines: 2,
     });
     const gap = a.lines.length ? m * 0.75 : 0;
@@ -293,7 +295,7 @@ export const concentric = {
   description: 'Rings, targets and tunnels.',
   /** @param {import('../index.js').StyleContext} c */
   render(c) {
-    const { W, H, u, m, rng, p } = c;
+    const { W, H, S, u, m, rng, p } = c;
     const cx = W * rng.float(0.3, 0.7);
     const cy = H * rng.float(0.27, 0.36);
     const maxR = Math.min(W * rng.float(0.36, 0.5), H * 0.6 - cy);
@@ -331,8 +333,8 @@ export const concentric = {
       upper: true,
       letterSpacing: 0.2,
       maxWidth: W - m * 2,
-      maxHeight: W * 0.08,
-      maxSize: W * 0.03,
+      maxHeight: S * 0.08,
+      maxSize: S * 0.03,
       maxLines: 2,
     });
     const aY = H - m * 1.2 - a.height;
@@ -344,7 +346,7 @@ export const concentric = {
       upper: font === FONTS.condensed,
       maxWidth: W - m * 2,
       maxHeight: aY - m * 0.8 - top,
-      maxSize: W * 0.1,
+      maxSize: S * 0.1,
       lineHeight: 1.06,
       maxLines: 4,
     });
@@ -394,7 +396,7 @@ export const split = {
   description: 'Two-tone field with an inverted shape on the seam.',
   /** @param {import('../index.js').StyleContext} c */
   render(c) {
-    const { W, H, m, rng, p } = c;
+    const { W, H, S, m, rng, p } = c;
     const splitY = H * rng.float(0.5, 0.6);
     const A = rng.pick([...p.accents, p.ink]);
     const B = p.bg;
@@ -414,7 +416,7 @@ export const split = {
       weight: 700,
       maxWidth: W - m * 2,
       maxHeight: splitY - r - m * 2,
-      maxSize: W * 0.12,
+      maxSize: S * 0.12,
       lineHeight: 1.0,
       maxLines: 5,
     });
@@ -423,8 +425,8 @@ export const split = {
       font: FONTS.sans,
       weight: 500,
       maxWidth: W - m * 2,
-      maxHeight: W * 0.1,
-      maxSize: W * 0.042,
+      maxHeight: S * 0.1,
+      maxSize: S * 0.042,
       maxLines: 2,
     });
     s += drawText(a, { x: W - m, y: H - m * 1.2 - a.height, anchor: 'end', fill: p.ink });
@@ -438,7 +440,7 @@ export const blocks = {
   description: 'Neo-plastic grid of primary colour blocks.',
   /** @param {import('../index.js').StyleContext} c */
   render(c) {
-    const { W, H, u, m, rng, p } = c;
+    const { W, H, S, u, m, rng, p } = c;
     const lw = u * rng.float(6, 11);
     const textH = H * rng.float(0.3, 0.36);
     const textTop = rng.bool(0.5);
@@ -488,8 +490,8 @@ export const blocks = {
       font: FONTS.sans,
       weight: 500,
       maxWidth: innerW,
-      maxHeight: W * 0.08,
-      maxSize: W * 0.036,
+      maxHeight: S * 0.08,
+      maxSize: S * 0.036,
       maxLines: 2,
     });
     const tTop = textRect.y + lw / 2 + pad;
@@ -499,7 +501,7 @@ export const blocks = {
       weight: 700,
       maxWidth: innerW,
       maxHeight: aY - tTop - pad * 0.6,
-      maxSize: W * 0.11,
+      maxSize: S * 0.11,
       lineHeight: 1.0,
       maxLines: 4,
     });
@@ -515,7 +517,7 @@ export const pixel = {
   description: 'A mirrored pixel emblem derived from the seed.',
   /** @param {import('../index.js').StyleContext} c */
   render(c) {
-    const { W, H, m, rng, p } = c;
+    const { W, H, S, m, rng, p } = c;
     const cols = rng.pick([5, 7, 9]);
     const half = Math.ceil(cols / 2);
     const size = Math.min(W - m * 3.4, H * 0.46);
@@ -555,8 +557,8 @@ export const pixel = {
       upper: true,
       letterSpacing: 0.08,
       maxWidth: W - m * 2,
-      maxHeight: W * 0.08,
-      maxSize: W * 0.032,
+      maxHeight: S * 0.08,
+      maxSize: S * 0.032,
       maxLines: 2,
     });
     const aY = H - m * 1.2 - a.height;
@@ -568,7 +570,7 @@ export const pixel = {
       upper: font === FONTS.geometric,
       maxWidth: W - m * 2,
       maxHeight: aY - m * 0.7 - top,
-      maxSize: W * 0.09,
+      maxSize: S * 0.09,
       lineHeight: 1.1,
       maxLines: 4,
     });

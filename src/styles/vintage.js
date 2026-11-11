@@ -12,7 +12,7 @@ import {
   radialGradient,
   linearGradient,
 } from '../core.js';
-import { FONTS, fitText, drawText, textBottom, graphemes } from '../text.js';
+import { FONTS, fitText, drawText, textBottom, graphemes, measureText } from '../text.js';
 
 export const classic = {
   id: 'classic',
@@ -20,7 +20,7 @@ export const classic = {
   description: 'Three horizontal bands, like a mid-century paperback.',
   /** @param {import('../index.js').StyleContext} c */
   render(c) {
-    const { W, H, u, m, rng, p } = c;
+    const { W, H, S, u, m, rng, p } = c;
     const band = rng.pick(p.accents);
     const cream = mix(p.paper, '#ffffff', 0.2);
     const ink = p.night;
@@ -38,7 +38,7 @@ export const classic = {
       letterSpacing: 0.24,
       maxWidth: W - m * 2.4,
       maxHeight: b1 * 0.4,
-      maxSize: W * 0.04,
+      maxSize: S * 0.04,
       maxLines: 2,
     });
     s += drawText(a, { x: W / 2, y: (b1 - a.height) / 2 + m * 0.2, anchor: 'middle', fill: onBand });
@@ -49,7 +49,7 @@ export const classic = {
       font,
       maxWidth: W - m * 2.4,
       maxHeight: b2 - b1 - pad * 2 - 20 * u,
-      maxSize: W * 0.1,
+      maxSize: S * 0.1,
       lineHeight: 1.14,
       maxLines: 5,
     });
@@ -58,7 +58,7 @@ export const classic = {
     const er = Math.min(W * 0.07, (H - b2) * 0.28);
     const ey = (b2 + H) / 2;
     s += circle(W / 2, ey, er, cream, `stroke="${ink}" stroke-width="${n(1.5 * u)}"`);
-    const initial = (Array.from(c.title.trim())[0] || '').toUpperCase();
+    const initial = (graphemes(c.title.trim())[0] || '').toUpperCase();
     if (initial) {
       s += `<text x="${n(W / 2)}" y="${n(ey + er * 0.38)}" font-family="${FONTS.serif.family}" font-size="${n(er * 1.1)}" text-anchor="middle" fill="${band}">${escapeXml(initial)}</text>`;
     }
@@ -82,7 +82,7 @@ export const artdeco = {
   prefer: 'dark',
   /** @param {import('../index.js').StyleContext} c */
   render(c) {
-    const { W, H, u, m, rng, p } = c;
+    const { W, H, S, u, m, rng, p } = c;
     const bg = p.night;
     const light = p.paper;
     const gold = readable(bg, p.accents);
@@ -137,8 +137,8 @@ export const artdeco = {
       upper: true,
       letterSpacing: 0.32,
       maxWidth: W - m * 3,
-      maxHeight: W * 0.08,
-      maxSize: W * 0.028,
+      maxHeight: S * 0.08,
+      maxSize: S * 0.028,
       maxLines: 2,
     });
     const regionTop = topY + 34 * u + m * 0.4;
@@ -152,7 +152,7 @@ export const artdeco = {
       letterSpacing: 0.08,
       maxWidth: W - m * 3,
       maxHeight: regionBottom - regionTop - authorBlock - m * 0.6,
-      maxSize: W * 0.1,
+      maxSize: S * 0.1,
       lineHeight: 1.12,
       maxLines: 5,
     });
@@ -183,14 +183,24 @@ export const artdeco = {
 
 const STAMPS = ['MANUSCRIPT', 'FIRST DRAFT', 'ADVANCE COPY', 'UNCORRECTED PROOF', 'FILE COPY', 'APPROVED'];
 
-function typedLine(str, x, y, size, rng, color) {
+/**
+ * Type a line character by character, each slightly off its baseline and ink level.
+ * Characters advance by their measured width, so wide (e.g. CJK) glyphs don't overlap.
+ * @param {string} str @param {number} x @param {number} y @param {number} size @param {number} weight
+ * @param {import('../core.js').Rng} rng @param {string} color
+ */
+function typedLine(str, x, y, size, weight, rng, color) {
+  const spec = { font: FONTS.mono, weight };
   let o = '';
-  graphemes(str).forEach((ch, i) => {
-    if (ch === ' ') return;
-    const op = rng.float(0.72, 1).toFixed(2);
-    o += `<tspan x="${n(x + i * size * 0.6 + rng.float(-0.4, 0.4))}" y="${n(y + rng.float(-0.6, 0.6))}" fill-opacity="${op}">${escapeXml(ch)}</tspan>`;
-  });
-  return `<text font-family="${FONTS.mono.family}" font-size="${n(size)}" font-weight="700" fill="${color}">${o}</text>`;
+  let cx = x;
+  for (const ch of graphemes(str)) {
+    if (ch !== ' ') {
+      const op = rng.float(0.72, 1).toFixed(2);
+      o += `<tspan x="${n(cx + rng.float(-0.4, 0.4))}" y="${n(y + rng.float(-0.6, 0.6))}" fill-opacity="${op}">${escapeXml(ch)}</tspan>`;
+    }
+    cx += measureText(ch, size, spec);
+  }
+  return `<text font-family="${FONTS.mono.family}" font-size="${n(size)}" font-weight="${weight}" fill="${color}">${o}</text>`;
 }
 
 export const typewriter = {
@@ -200,7 +210,7 @@ export const typewriter = {
   prefer: 'light',
   /** @param {import('../index.js').StyleContext} c */
   render(c) {
-    const { W, H, u, m, rng, p } = c;
+    const { W, H, S, u, m, rng, p } = c;
     const paper = mix(p.paper, '#f4ead4', 0.45);
     const ink = mix(p.night, '#222222', 0.4);
     const stampColor = readable(paper, p.accents);
@@ -237,18 +247,18 @@ export const typewriter = {
       upper: true,
       maxWidth: maxW,
       maxHeight: H * 0.34,
-      maxSize: W * 0.095,
-      minSize: W * 0.03,
+      maxSize: S * 0.095,
+      minSize: S * 0.03,
       lineHeight: 1.35,
       maxLines: 6,
       balance: false,
     });
     let y = H * 0.22;
     t.lines.forEach((ln, i) => {
-      s += typedLine(ln, x, y + t.size * t.cap + i * t.size * t.lineHeight, t.size, rng, ink);
+      s += typedLine(ln, x, y + t.size * t.cap + i * t.size * t.lineHeight, t.size, 700, rng, ink);
     });
     y = textBottom(t, y) + 8 * u;
-    const uw = Math.max(...t.lines.map((ln) => graphemes(ln).length)) * t.size * 0.6;
+    const uw = Math.max(...t.lines.map((ln) => measureText(ln, t.size, { font: FONTS.mono, weight: 700 })));
     s += line(
       x,
       y,
@@ -263,17 +273,17 @@ export const typewriter = {
         font: FONTS.mono,
         weight: 400,
         maxWidth: maxW,
-        maxHeight: W * 0.1,
-        maxSize: W * 0.045,
+        maxHeight: S * 0.1,
+        maxSize: S * 0.045,
         maxLines: 2,
         balance: false,
       });
       y += m * 0.9;
       a.lines.forEach((ln, i) => {
-        s += typedLine(ln, x, y + a.size * a.cap + i * a.size * a.lineHeight, a.size, rng, ink);
+        s += typedLine(ln, x, y + a.size * a.cap + i * a.size * a.lineHeight, a.size, 400, rng, ink);
       });
     }
-    const pg = fitText('- 1 -', { font: FONTS.mono, maxWidth: W, maxSize: W * 0.028 });
+    const pg = fitText('- 1 -', { font: FONTS.mono, maxWidth: W, maxSize: S * 0.028 });
     s += drawText(pg, { x: W / 2, y: H - m * 1.3, anchor: 'middle', fill: ink, opacity: 0.7 });
 
     // stamp
@@ -284,7 +294,7 @@ export const typewriter = {
       upper: true,
       letterSpacing: 0.12,
       maxWidth: W * 0.56,
-      maxSize: W * 0.078,
+      maxSize: S * 0.078,
       maxLines: 1,
     });
     const sp = st.size * 0.45;
@@ -321,7 +331,7 @@ export const sunburst = {
   description: 'Vintage poster rays over a title banner.',
   /** @param {import('../index.js').StyleContext} c */
   render(c) {
-    const { W, H, u, m, rng, p } = c;
+    const { W, H, S, u, m, rng, p } = c;
     const [c1, c2] = rng.shuffle(p.accents);
     const cx = W / 2;
     const cy = H * rng.float(0.4, 0.52);
@@ -355,7 +365,7 @@ export const sunburst = {
       upper: font !== FONTS.serif,
       maxWidth: innerW,
       maxHeight: H * 0.24,
-      maxSize: W * 0.11,
+      maxSize: S * 0.11,
       lineHeight: 1.04,
       maxLines: 4,
     });
@@ -363,8 +373,8 @@ export const sunburst = {
       font: FONTS.serif,
       italic: true,
       maxWidth: innerW,
-      maxHeight: W * 0.1,
-      maxSize: W * 0.04,
+      maxHeight: S * 0.1,
+      maxSize: S * 0.04,
       maxLines: 2,
     });
     const gap = a.lines.length ? m * 0.55 : 0;
@@ -391,8 +401,8 @@ export const typographic = {
   description: 'A giant initial cropped by the cover edge.',
   /** @param {import('../index.js').StyleContext} c */
   render(c) {
-    const { W, H, u, m, rng, p } = c;
-    const letter = (Array.from(c.title.trim())[0] || 'A').toUpperCase();
+    const { W, H, S, u, m, rng, p } = c;
+    const letter = (graphemes(c.title.trim())[0] || 'A').toUpperCase();
     const font = rng.pick([FONTS.didone, FONTS.serif, FONTS.geometric, FONTS.display]);
     const weight = font === FONTS.geometric ? 700 : 400;
     const mode = rng.pick(['solid', 'outline', 'duo']);
@@ -421,8 +431,8 @@ export const typographic = {
       upper: true,
       letterSpacing: 0.2,
       maxWidth: W - m * 2,
-      maxHeight: W * 0.08,
-      maxSize: W * 0.03,
+      maxHeight: S * 0.08,
+      maxSize: S * 0.03,
       maxLines: 2,
     });
     const aY = H - m * 1.2 - a.height;
@@ -433,7 +443,7 @@ export const typographic = {
       weight: tfont === FONTS.sans ? 700 : 400,
       maxWidth: W - m * 2,
       maxHeight: aY - m * 0.7 - tTop,
-      maxSize: W * 0.085,
+      maxSize: S * 0.085,
       lineHeight: 1.08,
       maxLines: 4,
     });
@@ -494,7 +504,7 @@ export const memphis = {
   prefer: 'light',
   /** @param {import('../index.js').StyleContext} c */
   render(c) {
-    const { W, H, u, m, rng, p } = c;
+    const { W, H, S, u, m, rng, p } = c;
     const colors = [...p.accents, p.ink];
     const types = ['squiggle', 'squiggle', 'triangle', 'circle', 'ring', 'dots', 'half', 'confetti', 'cross', 'lines'];
     let s = rect(0, 0, W, H, p.bg);
@@ -525,7 +535,7 @@ export const memphis = {
       upper: true,
       maxWidth: innerW,
       maxHeight: H * 0.3,
-      maxSize: W * 0.1,
+      maxSize: S * 0.1,
       lineHeight: 1.02,
       maxLines: 5,
     });
@@ -535,8 +545,8 @@ export const memphis = {
       upper: true,
       letterSpacing: 0.12,
       maxWidth: innerW,
-      maxHeight: W * 0.08,
-      maxSize: W * 0.032,
+      maxHeight: S * 0.08,
+      maxSize: S * 0.032,
       maxLines: 2,
     });
     const gap = a.lines.length ? m * 0.7 : 0;
@@ -570,7 +580,7 @@ export const noir = {
   prefer: 'dark',
   /** @param {import('../index.js').StyleContext} c */
   render(c) {
-    const { W, H, u, m, rng, p } = c;
+    const { W, H, S, u, m, rng, p } = c;
     const bg = mix(p.night, '#000000', 0.35);
     const light = p.paper;
     const accent = readable(bg, p.accents);
@@ -619,8 +629,8 @@ export const noir = {
       upper: true,
       letterSpacing: 0.3,
       maxWidth: W - m * 2,
-      maxHeight: W * 0.08,
-      maxSize: W * 0.034,
+      maxHeight: S * 0.08,
+      maxSize: S * 0.034,
       maxLines: 2,
     });
     const aY = H - m * 1.3 - a.height;
@@ -631,7 +641,7 @@ export const noir = {
       upper: true,
       maxWidth: W - m * 2,
       maxHeight: H * 0.42,
-      maxSize: W * 0.17,
+      maxSize: S * 0.17,
       lineHeight: 0.95,
       maxLines: 5,
     });

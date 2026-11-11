@@ -3,7 +3,7 @@
 //   import { generateCover } from 'book-cover-generator';
 //   const svg = generateCover({ title: 'Dune', author: 'Frank Herbert', style: 'retro' });
 
-import { createRng, hashString, isHex, luminance, escapeXml, stripInvalidXml, clamp } from './core.js';
+import { createRng, hashString, isHex, luminance, escapeXml, stripInvalidXml } from './core.js';
 import { palettes } from './palettes.js';
 import { styleList } from './styles/index.js';
 
@@ -47,15 +47,20 @@ function resolveStyle(style, rng) {
   return style;
 }
 
+/** @param {any} p */
 function normalizePalette(p) {
-  const accents = (p.accents || []).filter(isHex);
-  if (!isHex(p.bg) || !isHex(p.ink) || !accents.length) {
-    throw new Error('A custom palette needs hex colours: { bg, ink, accents: [hex, ...] }');
+  const given = Array.isArray(p.accents) ? p.accents : [];
+  if (!isHex(p.bg) || !isHex(p.ink) || !given.length || !given.every(isHex)) {
+    throw new Error('A custom palette needs hex colours (#rgb or #rrggbb): { bg, ink, accents: [hex, ...] }');
   }
-  const given = accents.slice();
-  while (accents.length < 3) accents.push(given[accents.length % given.length]);
-  const dark = p.dark ?? luminance(p.bg) < luminance(p.ink);
-  return { id: p.id || 'custom', name: p.name || 'Custom', bg: p.bg, ink: p.ink, accents, dark };
+  /** @type {string[]} */
+  const accents = given.map((/** @type {string} */ c) => c.trim());
+  const count = accents.length;
+  while (accents.length < 3) accents.push(accents[accents.length % count]);
+  const bg = p.bg.trim();
+  const ink = p.ink.trim();
+  const dark = p.dark ?? luminance(bg) < luminance(ink);
+  return { id: p.id || 'custom', name: p.name || 'Custom', bg, ink, accents, dark };
 }
 
 function resolvePalette(palette, rng, style) {
@@ -79,10 +84,25 @@ function cleanText(value) {
     .trim();
 }
 
+/**
+ * @param {unknown} value
+ * @param {number} fallback
+ * @param {string} name
+ */
 function dimension(value, fallback, name) {
-  const v = value == null || value === '' ? fallback : Number(value);
-  if (!Number.isFinite(v) || v <= 0) throw new RangeError(`${name} must be a positive number, got ${String(value)}`);
-  return Math.round(clamp(v, 50, 10000));
+  if (value == null || value === '') {
+    if (fallback > 10000) {
+      throw new RangeError(
+        `${name} defaults to ${Math.round(fallback)} here, which is over 10000; pass ${name} explicitly`,
+      );
+    }
+    return Math.round(fallback);
+  }
+  const v = Number(value);
+  if (!Number.isFinite(v) || v < 50 || v > 10000) {
+    throw new RangeError(`${name} must be a number from 50 to 10000, got ${String(value)}`);
+  }
+  return Math.round(v);
 }
 
 /**
@@ -96,6 +116,9 @@ export function createCover(options = {}) {
   const author = cleanText(options.author);
   const W = dimension(options.width, 600, 'width');
   const H = dimension(options.height, W * 1.5, 'height');
+  if (W / H > 3 || H / W > 3) {
+    throw new RangeError(`The aspect ratio must be between 1:3 and 3:1, got ${W}×${H}`);
+  }
   const seed = options.seed == null || options.seed === '' ? `${title}␟${author}` : String(options.seed);
 
   const styleId = resolveStyle(options.style, createRng(`${seed}|style`));
@@ -113,6 +136,7 @@ export function createCover(options = {}) {
     author,
     W,
     H,
+    S: short,
     u: short / 600,
     m: short * 0.07,
     rng: createRng(`${seed}|${styleId}`),

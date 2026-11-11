@@ -115,11 +115,87 @@ test('width and height are respected', () => {
   assert.ok(svg.includes('viewBox="0 0 1600 2560"'));
 });
 
-test('invalid sizes throw instead of producing NaN or hanging', () => {
-  assert.throws(() => createCover({ title: 'x', width: '12abc' }), /width must be a positive number/);
-  assert.throws(() => createCover({ title: 'x', width: Infinity }), /width must be a positive number/);
-  assert.throws(() => createCover({ title: 'x', height: -5 }), /height must be a positive number/);
-  assert.equal(createCover({ title: 'x', width: 1e6 }).width, 10000);
+test('invalid sizes throw instead of producing NaN, hanging or changing shape', () => {
+  assert.throws(() => createCover({ title: 'x', width: '12abc' }), /width must be a number from 50 to 10000/);
+  assert.throws(() => createCover({ title: 'x', width: Infinity }), /width must be a number from 50 to 10000/);
+  assert.throws(() => createCover({ title: 'x', height: -5 }), /height must be a number from 50 to 10000/);
+  assert.throws(() => createCover({ title: 'x', width: 1e6 }), /width must be a number from 50 to 10000/);
+  assert.throws(
+    () => createCover({ title: 'x', width: 8000 }),
+    /height defaults to 12000 here.*pass height explicitly/,
+  );
+  assert.throws(
+    () => createCover({ title: 'x', width: 3000, height: 600 }),
+    /aspect ratio must be between 1:3 and 3:1/,
+  );
+  assert.throws(() => createCover({ title: 'x', width: 200, height: 10000 }), /aspect ratio/);
+  assert.deepEqual(
+    [
+      createCover({ title: 'x', width: 8000, height: 9000 }).width,
+      createCover({ title: 'x', width: 1800, height: 600 }).height,
+    ],
+    [8000, 600],
+  );
+});
+
+/**
+ * Vertical extent of every line of text: [top of capitals, bottom of descenders, font size].
+ * Tracks font-size through nested <g>/<text>/<tspan> elements.
+ * @param {string} svg
+ */
+function textLines(svg) {
+  /** @type {number[]} */
+  const sizes = [];
+  /** @type {[number, number, number][]} */
+  const out = [];
+  for (const m of svg.matchAll(/<(\/?)(g|text|tspan)\b([^>]*?)(\/?)>/g)) {
+    const [, closing, , attrs, selfClosing] = m;
+    if (closing) {
+      sizes.pop();
+      continue;
+    }
+    const size = Number(/font-size="([\d.]+)"/.exec(attrs)?.[1] ?? sizes.at(-1) ?? 0);
+    const y = /\by="(-?[\d.]+)"/.exec(attrs)?.[1];
+    if (y != null && size) out.push([Number(y) - size * 0.8, Number(y) + size * 0.3, size]);
+    if (!selfClosing) sizes.push(size);
+  }
+  return out;
+}
+
+test('every style keeps its text inside the cover, from 1:3 to 3:1', () => {
+  const shapes = [
+    [600, 900],
+    [600, 960],
+    [600, 600],
+    [900, 600],
+    [1800, 600],
+    [600, 1800],
+    [300, 900],
+  ];
+  const cases = [
+    ['It', 'A'],
+    ['The Lighthouse Keeper', 'Mara Ellison'],
+    [
+      'An Extraordinarily Long Title About the Secret History of Absolutely Everything',
+      'Someone With A Rather Long Name',
+    ],
+    ['ノルウェイの森と世界の終わり', '村上春樹'],
+  ];
+  for (const style of styles) {
+    for (const [width, height] of shapes) {
+      for (const [title, author] of cases) {
+        for (const seed of ['a', 'b']) {
+          const { svg } = createCover({ title, author, style, width, height, seed });
+          const short = Math.min(width, height);
+          for (const [top, bottom, size] of textLines(svg)) {
+            if (size > short * 0.5) continue; // a deliberately cropped giant letter
+            const where = `${style} ${width}x${height} seed ${seed} "${title.slice(0, 12)}": text at ${top.toFixed(0)}..${bottom.toFixed(0)}`;
+            assert.ok(top >= -1 && bottom <= height + 1, where);
+          }
+        }
+      }
+    }
+  }
 });
 
 test('control characters and lone surrogates never reach the SVG', () => {
@@ -147,4 +223,75 @@ test('fitText validates maxSize and never exceeds it', async () => {
   assert.throws(() => fitText('Hello', { font: FONTS.sans, maxWidth: 100 }), /maxSize/);
   const fit = fitText('An extraordinarily long title', { font: FONTS.sans, maxWidth: 40, maxHeight: 20, maxSize: 5 });
   assert.ok(fit.size <= 5, `size ${fit.size} exceeds maxSize`);
+});
+
+test('Chinese, Japanese and Thai titles wrap between words without overflowing', async () => {
+  const { fitText, measureText, FONTS } = await import('../src/index.js');
+  const box = { font: FONTS.serif, maxWidth: 480, maxHeight: 340, maxSize: 72, lineHeight: 1.1, maxLines: 6 };
+  for (const title of [
+    'ノルウェイの森と世界の終わり',
+    '中文書名天龍八部與射鵰英雄傳',
+    'ภาษาไทยเป็นภาษาที่ไม่มีช่องว่างระหว่างคำและยาวมาก',
+  ]) {
+    const fit = fitText(title, box);
+    assert.ok(fit.lines.length > 1, `${title} should wrap`);
+    assert.ok(fit.size >= 40, `${title} shrank to ${fit.size}`);
+    for (const line of fit.lines) assert.ok(measureText(line, fit.size, { font: FONTS.serif }) <= box.maxWidth, line);
+  }
+  const jp = fitText('東京、大阪」へ行く長い旅の物語', { ...box, maxWidth: 200 });
+  for (const line of jp.lines) assert.doesNotMatch(line, /^[、。」）]/, 'no line starts with closing punctuation');
+});
+
+test('wrapping never splits emoji or combining characters', async () => {
+  const { fitText, FONTS } = await import('../src/index.js');
+  const family = '👨\u200D👩\u200D👧\u200D👦';
+  const fit = fitText(family.repeat(8) + ' Cafe\u0301\u0301\u0301', {
+    font: FONTS.sans,
+    maxWidth: 50,
+    maxSize: 20,
+    minSize: 20,
+  });
+  for (const line of fit.lines) assert.doesNotMatch(line, /^[\u200D\p{M}]/u, JSON.stringify(line));
+});
+
+test('initial letters use the whole first character', () => {
+  const { svg } = createCover({ title: '🇫🇷 Paris', style: 'classic', seed: 'x' });
+  assert.match(svg, />🇫🇷<\/text>/);
+});
+
+test('svgUtils helpers handle every documented input', async () => {
+  const { svgUtils } = await import('../src/index.js');
+  const pts = svgUtils.ridge(svgUtils.createRng('r'), 10);
+  assert.equal(pts.length, 11);
+  assert.ok(pts.filter((v) => v !== 0).length >= 9, 'ridge is not flat for non-power-of-two segments');
+  assert.ok(Math.max(...pts.map(Math.abs)) <= 1);
+  assert.deepEqual(svgUtils.ridge(svgUtils.createRng('r'), 64), svgUtils.ridge(svgUtils.createRng('r'), 64));
+  const g = svgUtils.radialGradient('g', [[0, '#000']], { fx: 0.3 });
+  assert.match(g, /fx="0.3"/);
+  assert.doesNotMatch(g, /undefined|fy=/);
+});
+
+test('custom palettes reject non-hex colours and trim whitespace', () => {
+  assert.throws(
+    () => createCover({ title: 'x', palette: { bg: '#fff', ink: '#000', accents: ['red', '#00f'] } }),
+    /hex/,
+  );
+  const { svg } = createCover({
+    title: 'x',
+    style: 'minimal',
+    palette: { bg: ' #ffffff ', ink: '#000000', accents: ['#ff0000'] },
+  });
+  assert.match(svg, /fill="#ffffff"/);
+  assert.doesNotMatch(svg, /fill=" #/);
+});
+
+test('short hex colours, random seeds and style registration errors', async () => {
+  const { randomSeed } = await import('../src/index.js');
+  const { svg } = createCover({ title: 'x', style: 'swiss', palette: { bg: '#fff', ink: '#000', accents: ['#f00'] } });
+  assert.match(svg, /fill="#fff"/);
+  const seeds = new Set(Array.from({ length: 20 }, randomSeed));
+  assert.ok(seeds.size > 15);
+  for (const seed of seeds) assert.match(seed, /^[a-z0-9]{1,6}$/);
+  assert.throws(() => registerStyle(/** @type {any} */ ({ id: 'no-render' })), TypeError);
+  assert.throws(() => registerStyle(/** @type {any} */ (null)), TypeError);
 });

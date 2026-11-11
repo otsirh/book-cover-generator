@@ -23,7 +23,7 @@ export const aurora = {
   description: 'Soft blurred colour fields with film grain.',
   /** @param {import('../index.js').StyleContext} c */
   render(c) {
-    const { W, H, u, m, rng, p } = c;
+    const { W, H, S, u, m, rng, p } = c;
     const blur = c.id('blur');
     const sh = c.id('sh');
     const g = grain(c, { opacity: p.dark ? 0.16 : 0.14, light: p.dark });
@@ -53,13 +53,13 @@ export const aurora = {
       upper: true,
       letterSpacing: 0.25,
       maxWidth: W - m * 2,
-      maxHeight: W * 0.08,
-      maxSize: W * 0.03,
+      maxHeight: S * 0.08,
+      maxSize: S * 0.03,
       maxLines: 2,
     });
     const tAttrs = {
       maxWidth: W - m * 2.2,
-      maxSize: W * 0.13,
+      maxSize: S * 0.13,
       lineHeight: 1.04,
       maxLines: 5,
       font,
@@ -87,7 +87,7 @@ export const halftone = {
   description: 'Risograph-style overlapping dot screens.',
   /** @param {import('../index.js').StyleContext} c */
   render(c) {
-    const { W, H, m, rng, p } = c;
+    const { W, H, S, m, rng, p } = c;
     const cols = rng.int(22, 30);
     const step = W / cols;
     const rowH = step * 0.866;
@@ -130,8 +130,8 @@ export const halftone = {
       font: FONTS.sans,
       weight: 500,
       maxWidth: W - m * 2,
-      maxHeight: W * 0.08,
-      maxSize: W * 0.036,
+      maxHeight: S * 0.08,
+      maxSize: S * 0.036,
       maxLines: 2,
     });
     const aY = H - m * 1.2 - a.height;
@@ -143,7 +143,7 @@ export const halftone = {
       upper: font !== FONTS.sans,
       maxWidth: W - m * 2,
       maxHeight: aY - m * 0.7 - top,
-      maxSize: W * 0.13,
+      maxSize: S * 0.13,
       lineHeight: 0.98,
       maxLines: 4,
     });
@@ -244,7 +244,7 @@ export const topographic = {
   description: 'Contour lines from a generated terrain map.',
   /** @param {import('../index.js').StyleContext} c */
   render(c) {
-    const { W, H, u, m, rng, p } = c;
+    const { W, H, S, u, m, rng, p } = c;
     const noise = makeNoise2D(rng);
     const res = Math.min(W, H) / 64;
     const cols = Math.ceil(W / res);
@@ -288,7 +288,7 @@ export const topographic = {
       letterSpacing: 0.03,
       maxWidth: innerW,
       maxHeight: H * 0.24,
-      maxSize: W * 0.1,
+      maxSize: S * 0.1,
       lineHeight: 1.0,
       maxLines: 4,
     });
@@ -296,8 +296,8 @@ export const topographic = {
       font: FONTS.mono,
       weight: 400,
       maxWidth: innerW,
-      maxHeight: W * 0.08,
-      maxSize: W * 0.03,
+      maxHeight: S * 0.08,
+      maxSize: S * 0.03,
       maxLines: 2,
     });
     const gap = a.lines.length ? m * 0.6 : 0;
@@ -317,7 +317,7 @@ export const mosaic = {
   description: 'Truchet and quarter-circle tiles.',
   /** @param {import('../index.js').StyleContext} c */
   render(c) {
-    const { W, H, u, m, rng, p } = c;
+    const { W, H, S, u, m, rng, p } = c;
     const cols = rng.int(5, 8);
     const size = W / cols;
     const rows = Math.ceil(H / size);
@@ -378,7 +378,7 @@ export const mosaic = {
       upper: true,
       maxWidth: W - m * 2,
       maxHeight: H * 0.24,
-      maxSize: W * 0.1,
+      maxSize: S * 0.1,
       lineHeight: 1.02,
       maxLines: 4,
     });
@@ -388,8 +388,8 @@ export const mosaic = {
       upper: true,
       letterSpacing: 0.2,
       maxWidth: W - m * 2,
-      maxHeight: W * 0.08,
-      maxSize: W * 0.03,
+      maxHeight: S * 0.08,
+      maxSize: S * 0.03,
       maxLines: 2,
     });
     const gap = a.lines.length ? m * 0.6 : 0;
@@ -409,7 +409,7 @@ export const lowpoly = {
   description: 'Faceted triangles with a gradient sweep.',
   /** @param {import('../index.js').StyleContext} c */
   render(c) {
-    const { W, H, u, m, rng, p } = c;
+    const { W, H, S, u, m, rng, p } = c;
     const cols = rng.int(6, 9);
     const cw = W / cols;
     const rows = Math.max(2, Math.round(H / cw));
@@ -467,8 +467,8 @@ export const lowpoly = {
       upper: true,
       letterSpacing: 0.22,
       maxWidth: W - m * 2,
-      maxHeight: W * 0.08,
-      maxSize: W * 0.03,
+      maxHeight: S * 0.08,
+      maxSize: S * 0.03,
       maxLines: 2,
     });
     const aY = H - m * 1.2 - a.height;
@@ -477,7 +477,7 @@ export const lowpoly = {
       weight: 700,
       maxWidth: W - m * 2,
       maxHeight: H * 0.3,
-      maxSize: W * 0.12,
+      maxSize: S * 0.12,
       lineHeight: 1.0,
       maxLines: 4,
     });
@@ -495,7 +495,7 @@ export const flowfield = {
   description: 'Strands following a noise vector field.',
   /** @param {import('../index.js').StyleContext} c */
   render(c) {
-    const { W, H, u, m, rng, p } = c;
+    const { W, H, S, u, m, rng, p } = c;
     const noise = makeNoise2D(rng);
     const freq = rng.float(1.2, 2.6);
     const turns = rng.float(1.5, 3);
@@ -529,7 +529,7 @@ export const flowfield = {
       weight: font === FONTS.sans ? 700 : 400,
       maxWidth: W - pad * 2,
       maxHeight: H * 0.22,
-      maxSize: W * 0.1,
+      maxSize: S * 0.1,
       lineHeight: 1.05,
       maxLines: 4,
     });
@@ -539,8 +539,8 @@ export const flowfield = {
       upper: true,
       letterSpacing: 0.2,
       maxWidth: W - pad * 2,
-      maxHeight: W * 0.08,
-      maxSize: W * 0.03,
+      maxHeight: S * 0.08,
+      maxSize: S * 0.03,
       maxLines: 2,
     });
     const gap = a.lines.length ? m * 0.7 : 0;

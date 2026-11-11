@@ -144,21 +144,32 @@ export function fbm(noise, x, y, octaves = 4) {
 
 /** 1D midpoint-displacement ridge, values normalised to [-1, 1]. */
 export function ridge(rng, segments = 64, roughness = 0.55) {
-  const pts = new Array(segments + 1).fill(0);
+  // Midpoint displacement needs a power of two; build one, then resample.
+  const count = Math.max(1, Math.round(segments));
+  let size = 1;
+  while (size < count) size *= 2;
+  const pts = new Array(size + 1).fill(0);
   pts[0] = rng.float(-0.6, 0.6);
-  pts[segments] = rng.float(-0.6, 0.6);
-  let step = segments;
+  pts[size] = rng.float(-0.6, 0.6);
+  let step = size;
   let disp = 1;
   while (step > 1) {
     const half = step / 2;
-    for (let i = half; i < segments; i += step) {
+    for (let i = half; i < size; i += step) {
       pts[i] = (pts[i - half] + pts[i + half]) / 2 + rng.float(-disp, disp);
     }
     step = half;
     disp *= roughness;
   }
   const max = Math.max(...pts.map(Math.abs)) || 1;
-  return pts.map((v) => v / max);
+  /** @type {number[]} */
+  const out = [];
+  for (let i = 0; i <= count; i++) {
+    const t = (i / count) * size;
+    const i0 = Math.floor(t);
+    out.push(lerp(pts[i0], pts[Math.min(size, i0 + 1)], t - i0) / max);
+  }
+  return out;
 }
 
 /* --------------------------------------------------------------------- svg */
@@ -251,6 +262,6 @@ export function radialGradient(id, stops, { cx = 0.5, cy = 0.5, r = 0.5, fx, fy 
         `<stop offset="${+o.toFixed(3)}" stop-color="${col}"${op != null ? ` stop-opacity="${op}"` : ''}/>`,
     )
     .join('');
-  const f = fx != null ? ` fx="${fx}" fy="${fy}"` : '';
+  const f = (fx != null ? ` fx="${fx}"` : '') + (fy != null ? ` fy="${fy}"` : '');
   return `<radialGradient id="${id}" cx="${cx}" cy="${cy}" r="${r}"${f}>${s}</radialGradient>`;
 }

@@ -32,7 +32,7 @@ export const landscape = {
   description: 'Layered mountain ranges under a low sun.',
   /** @param {import('../index.js').StyleContext} c */
   render(c) {
-    const { W, H, m, rng, p } = c;
+    const { W, H, S, m, rng, p } = c;
     const [sunC, , farC] = rng.shuffle(p.accents);
     const skyTop = p.dark ? p.bg : mix(p.bg, p.accents[1], 0.1);
     const horizon = mix(skyTop, sunC, 0.45);
@@ -75,7 +75,7 @@ export const landscape = {
       letterSpacing: condensed ? 0.06 : 0,
       maxWidth: W - m * 2.4,
       maxHeight: Math.min(sunY - sunR, H * 0.39) - m * 0.9 - top,
-      maxSize: W * 0.11,
+      maxSize: S * 0.11,
       lineHeight: 1.08,
       maxLines: 4,
     });
@@ -86,8 +86,8 @@ export const landscape = {
       upper: true,
       letterSpacing: 0.25,
       maxWidth: W - m * 2,
-      maxHeight: W * 0.08,
-      maxSize: W * 0.03,
+      maxHeight: S * 0.08,
+      maxSize: S * 0.03,
       maxLines: 2,
     });
     s += drawText(a, { x: W / 2, y: H - m * 1.1 - a.height, anchor: 'middle', fill: inkOn(front, p) });
@@ -101,7 +101,7 @@ export const waves = {
   description: 'Stacked sine waves in blended tones.',
   /** @param {import('../index.js').StyleContext} c */
   render(c) {
-    const { W, H, m, rng, p } = c;
+    const { W, H, S, m, rng, p } = c;
     const flip = rng.bool(0.35);
     const count = rng.int(5, 9);
     const start = H * rng.float(0.46, 0.56);
@@ -138,8 +138,8 @@ export const waves = {
       upper: true,
       letterSpacing: 0.22,
       maxWidth: W - m * 2,
-      maxHeight: W * 0.08,
-      maxSize: W * 0.03,
+      maxHeight: S * 0.08,
+      maxSize: S * 0.03,
       maxLines: 2,
     });
     const font = rng.pick([FONTS.serif, FONTS.garamond, FONTS.sans]);
@@ -148,7 +148,7 @@ export const waves = {
       weight: font === FONTS.sans ? 300 : 400,
       maxWidth: W - m * 2.4,
       maxHeight: regionBottom - regionTop,
-      maxSize: W * 0.11,
+      maxSize: S * 0.11,
       lineHeight: 1.1,
       maxLines: 5,
     });
@@ -167,7 +167,7 @@ export const constellation = {
   prefer: 'dark',
   /** @param {import('../index.js').StyleContext} c */
   render(c) {
-    const { W, H, u, m, rng, p } = c;
+    const { W, H, S, u, m, rng, p } = c;
     const accent = rng.pick(p.accents);
     const sky = c.id('sky');
     const moonMask = c.id('moon');
@@ -230,8 +230,8 @@ export const constellation = {
       upper: true,
       letterSpacing: 0.3,
       maxWidth: W - m * 2,
-      maxHeight: W * 0.08,
-      maxSize: W * 0.028,
+      maxHeight: S * 0.08,
+      maxSize: S * 0.028,
       maxLines: 2,
     });
     const aY = H - m * 1.2 - a.height;
@@ -243,7 +243,7 @@ export const constellation = {
       letterSpacing: 0.1,
       maxWidth: W - m * 2.2,
       maxHeight: aY - m * 0.8 - top,
-      maxSize: W * 0.085,
+      maxSize: S * 0.085,
       lineHeight: 1.18,
       maxLines: 4,
     });
@@ -260,7 +260,7 @@ export const orbit = {
   prefer: 'dark',
   /** @param {import('../index.js').StyleContext} c */
   render(c) {
-    const { W, H, u, m, rng, p } = c;
+    const { W, H, S, u, m, rng, p } = c;
     const night = p.night;
     const light = p.paper;
     const [pc, rc, mc] = rng.shuffle(p.accents);
@@ -330,8 +330,8 @@ export const orbit = {
       upper: true,
       letterSpacing: 0.3,
       maxWidth: W - m * 2,
-      maxHeight: W * 0.08,
-      maxSize: W * 0.028,
+      maxHeight: S * 0.08,
+      maxSize: S * 0.028,
       maxLines: 2,
     });
     const aY = H - m * 1.2 - a.height;
@@ -343,7 +343,7 @@ export const orbit = {
       letterSpacing: 0.12,
       maxWidth: W - m * 2.2,
       maxHeight: aY - m * 0.8 - top,
-      maxSize: W * 0.08,
+      maxSize: S * 0.08,
       lineHeight: 1.2,
       maxLines: 4,
     });
@@ -360,7 +360,7 @@ export const retro = {
   prefer: 'dark',
   /** @param {import('../index.js').StyleContext} c */
   render(c) {
-    const { W, H, u, m, rng, p } = c;
+    const { W, H, S, u, m, rng, p } = c;
     const sorted = [...p.accents].sort((a, b) => luminance(b) - luminance(a));
     const [hi, mid, lo] = sorted;
     const night = p.night;
@@ -438,7 +438,7 @@ export const retro = {
       upper: true,
       maxWidth: W - m * 2,
       maxHeight: cy - R - m * 0.7 - top,
-      maxSize: W * 0.12,
+      maxSize: S * 0.12,
       lineHeight: 1.02,
       maxLines: 4,
     });
@@ -455,8 +455,8 @@ export const retro = {
       upper: true,
       letterSpacing: 0.3,
       maxWidth: W - m * 2,
-      maxHeight: W * 0.08,
-      maxSize: W * 0.03,
+      maxHeight: S * 0.08,
+      maxSize: S * 0.03,
       maxLines: 2,
     });
     const aY = H - m * 1.1 - a.height;
@@ -472,7 +472,7 @@ export const shelf = {
   description: 'A row of book spines on a shelf.',
   /** @param {import('../index.js').StyleContext} c */
   render(c) {
-    const { W, H, u, m, rng, p } = c;
+    const { W, H, S, u, m, rng, p } = c;
     const shelfY = H * rng.float(0.56, 0.62);
     const plankH = 12 * u;
     const left = m * 0.8;
@@ -539,8 +539,8 @@ export const shelf = {
       upper: true,
       letterSpacing: 0.28,
       maxWidth: W - m * 2,
-      maxHeight: W * 0.08,
-      maxSize: W * 0.032,
+      maxHeight: S * 0.08,
+      maxSize: S * 0.032,
       maxLines: 2,
     });
     s += drawText(a, { x: W / 2, y: m * 1.3, anchor: 'middle', fill: p.ink });
@@ -551,7 +551,7 @@ export const shelf = {
       weight: font === FONTS.humanist ? 600 : 400,
       maxWidth: W - m * 2.2,
       maxHeight: H - m * 1.3 - tTop,
-      maxSize: W * 0.1,
+      maxSize: S * 0.1,
       lineHeight: 1.1,
       maxLines: 4,
     });

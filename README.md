@@ -18,7 +18,7 @@ Generate book covers from a **title** and an **author**. 27 styles, 20 palettes,
 - **20 palettes** (10 light, 10 dark), or pass your own.
 - **Randomizer.** Every random choice comes from a seed, so the same seed always gives the same cover. If you don't pass a seed, it is derived from the title and author.
 - **Text fitting.** Titles wrap with balanced lines and shrink to fit their box, so very long titles still fit. Accents, emoji and non-Latin scripts are handled.
-- **Any size.** 2:3 paperback, 5:8 eBook, 1:1 audiobook, or any width × height from 50 to 10,000 px.
+- **Any size.** 2:3 paperback, 5:8 eBook, 1:1 audiobook, or any width × height from 50 to 10,000 px with an aspect ratio between 1:3 and 3:1.
 - **Export.** Copy the SVG, or download it as SVG, PNG or JPEG at up to 4× resolution.
 
 ## The web app
@@ -91,7 +91,7 @@ Same as `generateCover`, but also tells you which style and palette were chosen.
 | `style`   | `string`           | `'random'`             | a style id, see `styles`                       |
 | `palette` | `string \| object` | `'random'`             | a palette id, or `{ bg, ink, accents: [...] }` |
 | `seed`    | `string \| number` | hash of title + author | controls every random choice                   |
-| `width`   | `number`           | `600`                  | px, 50–10000                                   |
+| `width`   | `number`           | `600`                  | px, 50–10000; aspect ratio 1:3 to 3:1          |
 | `height`  | `number`           | `width × 1.5`          | px, 50–10000                                   |
 
 With `'random'`, the style and palette are picked from the seed, so you get the same result every time for the same seed. Some styles prefer dark or light palettes when they pick one themselves. Invalid options throw an error that says what's wrong.
@@ -139,6 +139,7 @@ generateCover({
 - `W`, `H`: the size of the cover
 - `u`: a scale unit (1 at a short side of 600px)
 - `m`: the suggested margin
+- `S`: the short side; base text sizes on it so wide covers work
 - `rng`: seeded random with `next`, `float`, `int`, `bool`, `pick`, `shuffle`
 - `p`: the palette, with `bg`, `ink`, `accents`, plus `paper` (lighter) and `night` (darker)
 - `id(name)`: makes ids that are unique per cover, for gradients and filters

@@ -65,22 +65,34 @@ export function setTextMeasurer(fn) {
 const NARROW = new Set("iljI.,:;!|'’`ı".split(''));
 const SEMI = new Set('frt()[]-/"“”'.split(''));
 const WIDE = new Set('mwMW@%&'.split(''));
+// Glyphs that are about 1em wide in any font: CJK, kana, Hangul, full-width forms, emoji.
+const FULL_WIDTH =
+  /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\u3000-\u303f\uff01-\uff60\uffe0-\uffe6]|\p{Extended_Pictographic}/u;
 
-/** Rough per-glyph widths (in em) for environments without a canvas, e.g. Node. */
+/** @param {string} ch */
+function latinWidth(ch) {
+  if (ch === ' ' || NARROW.has(ch)) return 0.28;
+  if (SEMI.has(ch)) return 0.38;
+  if (WIDE.has(ch)) return 0.88;
+  if (ch >= '0' && ch <= '9') return 0.56;
+  if (ch !== ch.toLowerCase()) return 0.7;
+  return 0.54;
+}
+
+/**
+ * Rough widths (in em) for environments without a canvas, e.g. Node.
+ * @param {string} text
+ * @param {{ font: { mono?: boolean, widthFactor?: number }, weight?: number }} spec
+ */
 function heuristicWidth(text, spec) {
-  if (spec.font.mono) return text.length * 0.6;
+  const factor = (spec.font.widthFactor || 1) * ((spec.weight || 400) >= 600 ? 1.07 : 1);
   let w = 0;
-  for (const ch of text) {
-    if (ch === ' ') w += 0.28;
-    else if (NARROW.has(ch)) w += 0.28;
-    else if (SEMI.has(ch)) w += 0.38;
-    else if (WIDE.has(ch)) w += 0.88;
-    else if (ch >= '0' && ch <= '9') w += 0.56;
-    else if (ch !== ch.toLowerCase()) w += 0.7;
-    else w += 0.54;
+  for (const g of graphemes(text)) {
+    if (FULL_WIDTH.test(g)) w += 1;
+    else if (spec.font.mono) w += 0.6;
+    else w += latinWidth(g[0]) * factor;
   }
-  const bold = (spec.weight || 400) >= 600 ? 1.07 : 1;
-  return w * (spec.font.widthFactor || 1) * bold;
+  return w;
 }
 
 const widthCache = new Map();
@@ -126,53 +138,122 @@ export function graphemes(str) {
 
 /* ----------------------------------------------------------------- fitting */
 
-function wrapGreedy(words, maxWidth, measure) {
+/** @typedef {{ text: string, space: boolean }} Token  A wrap unit; `space` means a space comes before it. */
+
+// Scripts written without spaces between words: lines may break between their words.
+const NO_SPACE =
+  /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}\p{Extended_Pictographic}]/u;
+// Never start a line with closing punctuation, or end one with opening punctuation.
+const NO_BREAK_BEFORE = /^[)\]}»›’”、。，．・：；！？‼⁇⁈⁉ーゝゞヽヾ々〉》」』】〕〗〙〛）］｝｠｡｣､･]/u;
+const NO_BREAK_AFTER = /[([{«‹‘“〈《「『【〔〖〘〚（［｛｟｢]$/u;
+
+/** @type {Intl.Segmenter | null | undefined} */
+let wordSegmenter;
+
+/**
+ * Split text into wrap units. Lines break at spaces, and between words of
+ * scripts that don't use spaces (Chinese, Japanese, Thai…).
+ * @param {string} str
+ * @returns {Token[]}
+ */
+function tokenize(str) {
+  if (wordSegmenter === undefined) {
+    wordSegmenter =
+      typeof Intl !== 'undefined' && Intl.Segmenter ? new Intl.Segmenter('en', { granularity: 'word' }) : null;
+  }
+  if (!wordSegmenter) return str.split(' ').map((text, i) => ({ text, space: i > 0 }));
+  /** @type {Token[]} */
+  const tokens = [];
+  let space = false;
+  for (const { segment } of wordSegmenter.segment(str)) {
+    if (segment.trim() === '') {
+      space = tokens.length > 0;
+      continue;
+    }
+    const prev = tokens.at(-1);
+    const breakable =
+      prev &&
+      (space ||
+        ((NO_SPACE.test(segment) || NO_SPACE.test(prev.text.slice(-2))) &&
+          !NO_BREAK_BEFORE.test(segment) &&
+          !NO_BREAK_AFTER.test(prev.text)));
+    if (!prev || breakable) tokens.push({ text: segment, space });
+    else prev.text += segment;
+    space = false;
+  }
+  return tokens;
+}
+
+/** @param {string} line @param {Token} token */
+const append = (line, token) => (line ? line + (token.space ? ' ' : '') + token.text : token.text);
+
+/**
+ * @param {Token[]} tokens
+ * @param {number} maxWidth
+ * @param {(s: string) => number} measure
+ */
+function wrapGreedy(tokens, maxWidth, measure) {
+  /** @type {string[]} */
   const lines = [];
   let cur = '';
-  for (const word of words) {
-    if (measure(word) > maxWidth) return null;
-    const cand = cur ? `${cur} ${word}` : word;
+  for (const token of tokens) {
+    if (measure(token.text) > maxWidth) return null;
+    const cand = append(cur, token);
     if (!cur || measure(cand) <= maxWidth) cur = cand;
     else {
       lines.push(cur);
-      cur = word;
+      cur = token.text;
     }
   }
   if (cur) lines.push(cur);
   return lines;
 }
 
-/** Re-wrap at the narrowest width that keeps the same line count (even rag). */
-function balance(words, count, maxWidth, measure) {
-  let lo = Math.max(...words.map(measure));
+/**
+ * Re-wrap at the narrowest width that keeps the same line count (even rag).
+ * @param {Token[]} tokens
+ * @param {number} count
+ * @param {number} maxWidth
+ * @param {(s: string) => number} measure
+ */
+function balance(tokens, count, maxWidth, measure) {
+  let lo = Math.max(...tokens.map((t) => measure(t.text)));
   let hi = maxWidth;
   for (let i = 0; i < 14; i++) {
     const mid = (lo + hi) / 2;
-    const lines = wrapGreedy(words, mid, measure);
+    const lines = wrapGreedy(tokens, mid, measure);
     if (lines && lines.length <= count) hi = mid;
     else lo = mid;
   }
-  return wrapGreedy(words, hi, measure);
+  return /** @type {string[]} */ (wrapGreedy(tokens, hi, measure));
 }
 
-/** Break words that are wider than the box, character by character. */
-function hardWrap(words, maxWidth, measure) {
+/**
+ * Break units that are wider than the box between visible characters.
+ * @param {Token[]} tokens
+ * @param {number} maxWidth
+ * @param {(s: string) => number} measure
+ */
+function hardWrap(tokens, maxWidth, measure) {
+  /** @type {Token[]} */
   const pieces = [];
-  for (const word of words) {
-    if (measure(word) <= maxWidth) {
-      pieces.push(word);
+  for (const token of tokens) {
+    if (measure(token.text) <= maxWidth) {
+      pieces.push(token);
       continue;
     }
     let cur = '';
-    for (const ch of word) {
-      if (cur && measure(cur + ch) > maxWidth) {
-        pieces.push(cur);
-        cur = ch;
-      } else cur += ch;
+    let space = token.space;
+    for (const g of graphemes(token.text)) {
+      if (cur && measure(cur + g) > maxWidth) {
+        pieces.push({ text: cur, space });
+        space = false;
+        cur = g;
+      } else cur += g;
     }
-    if (cur) pieces.push(cur);
+    if (cur) pieces.push({ text: cur, space });
   }
-  return wrapGreedy(pieces, maxWidth, measure) || pieces;
+  return wrapGreedy(pieces, maxWidth, measure) ?? pieces.map((piece) => piece.text);
 }
 
 const blockHeight = (count, size, lineHeight, cap) => (count ? size * (cap + (count - 1) * lineHeight) : 0);
@@ -208,7 +289,7 @@ export function fitText(text, opts) {
   const base = { ...spec, lineHeight, cap };
   if (!str) return { ...base, lines: [], size: 0, width: 0, height: 0 };
 
-  const words = str.split(' ');
+  const tokens = tokenize(str);
   const finish = (lines, size) => {
     const measure = (s) => measureText(s, size, spec);
     return {
@@ -223,9 +304,9 @@ export function fitText(text, opts) {
   let size = maxSize;
   for (let guard = 0; guard < 120; guard++) {
     const measure = (s) => measureText(s, size, spec);
-    let lines = wrapGreedy(words, maxWidth, measure);
+    let lines = wrapGreedy(tokens, maxWidth, measure);
     if (lines && lines.length <= maxLines && blockHeight(lines.length, size, lineHeight, cap) <= maxHeight) {
-      if (opts.balance !== false && lines.length > 1) lines = balance(words, lines.length, maxWidth, measure);
+      if (opts.balance !== false && lines.length > 1) lines = balance(tokens, lines.length, maxWidth, measure);
       return finish(lines, size);
     }
     if (size <= minSize) break;
@@ -235,7 +316,7 @@ export function fitText(text, opts) {
   // Fallback: smallest size, break long words, truncate with an ellipsis.
   size = minSize;
   const measure = (s) => measureText(s, size, spec);
-  let lines = hardWrap(words, maxWidth, measure);
+  let lines = hardWrap(tokens, maxWidth, measure);
   const fitCount = Math.max(1, Math.min(maxLines, Math.floor((maxHeight / size - cap) / lineHeight) + 1));
   if (lines.length > fitCount) {
     lines = lines.slice(0, fitCount);

@@ -67,7 +67,9 @@ export async function downloadCover(svg, format = 'svg', basename = 'cover', opt
   const ext = format === 'jpeg' || format === 'jpg' ? 'jpg' : format;
   const type = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`;
   const blob = await rasterize(svg, { type, ...opts });
-  return downloadBlob(blob, `${basename}.${ext}`);
+  // Browsers that can't encode a type (e.g. WebP in Safari) return PNG instead; name the file after what we got.
+  const actual = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' }[blob.type] ?? ext;
+  return downloadBlob(blob, `${basename}.${actual}`);
 }
 
 /** Copy text (e.g. SVG markup) to the clipboard, with a fallback for older browsers. */

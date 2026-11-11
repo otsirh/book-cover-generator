@@ -98,6 +98,8 @@ export interface StyleContext {
   readonly W: number;
   /** Cover height in px. */
   readonly H: number;
+  /** The short side in px: base text and decoration sizes on this, so wide covers work. */
+  readonly S: number;
   /** Scale unit: 1 when the short side is 600 px. */
   readonly u: number;
   /** Suggested margin in px. */

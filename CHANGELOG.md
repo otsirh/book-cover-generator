@@ -17,6 +17,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Changed
 
+- **Breaking for edge cases:** `width` and `height` outside 50–10000, and aspect ratios beyond 1:3 or 3:1, now throw a `RangeError` instead of being clamped silently. Non-hex accent colours in a custom palette throw too.
+- `StyleContext` has `S`, the short side in px.
 - The gallery renders thumbnails only when they are on screen, in small chunks, so typing stays smooth.
 - The page uses toggle buttons with `aria-pressed`, labelled groups, a skip link and descriptive preview alt text.
 - Upper-casing is locale-independent, so covers look the same in every browser language.
@@ -35,6 +37,13 @@ All notable changes to this project are documented here. The format follows [Kee
 - Bookshelf: the leaning book rests on its neighbour instead of dipping below the shelf.
 - Orbit: the number of orbits is uniformly distributed.
 - Typewriter: combining accents and Indic scripts stay attached to their letters.
+- Chinese, Japanese and Thai titles wrap between words (with Japanese line-break rules) instead of shrinking onto one line, and Node estimates their width correctly.
+- Long words break between whole characters, so emoji sequences and accents are never split; initial letters use the whole first character (e.g. a flag).
+- Typewriter spaces characters by their real width, so wide glyphs don't overlap.
+- Text sizes follow the cover's short side, so wide covers keep all text on the canvas; Bauhaus' grid fits wide covers.
+- Downloads are named after the format the browser actually produced (Safari can't encode WebP and returns PNG).
+- The R shortcut works on every keyboard layout.
+- `svgUtils.ridge` works for any number of segments; `radialGradient` no longer writes `fy="undefined"`.
 
 ### Security
 

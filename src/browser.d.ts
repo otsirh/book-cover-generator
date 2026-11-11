@@ -11,7 +11,7 @@ export interface RasterizeOptions {
   background?: string;
 }
 
-/** Render SVG markup to an image Blob. */
+/** Render SVG markup to an image Blob. Browsers that can't encode `type` return PNG; check `blob.type`. */
 export declare function rasterize(svg: string, opts?: RasterizeOptions): Promise<Blob>;
 /** Trigger a file download for a Blob. */
 export declare function downloadBlob(blob: Blob, filename: string): void;

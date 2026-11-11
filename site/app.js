@@ -149,7 +149,8 @@ function buildControls() {
   }
 
   document.addEventListener('keydown', (e) => {
-    if (e.key.toLowerCase() !== 'r' || e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
+    // `code` is the physical key, so this works on any keyboard layout.
+    if (e.code !== 'KeyR' || e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
     const target = /** @type {HTMLElement | null} */ (e.target);
     if (target?.closest('input, textarea, select, [contenteditable]')) return;
     e.preventDefault();
@@ -210,7 +211,8 @@ function options(extra = {}) {
   };
 }
 
-function renderPreview() {
+/** @param {boolean} [announce] Tell screen readers about a style or palette change. */
+function renderPreview(announce = true) {
   current = createCover(options());
   const style = STYLES.find((s) => s.id === current.style);
   const palette = palettes.find((p) => p.id === current.palette);
@@ -225,7 +227,7 @@ function renderPreview() {
   );
   // Screen readers hear about style and palette changes, not every keystroke.
   const announcement = `Style: ${style?.name ?? current.style}. Palette: ${paletteName}.`;
-  if (lastAnnouncement && announcement !== lastAnnouncement) $('announce').textContent = announcement;
+  if (announce && lastAnnouncement && announcement !== lastAnnouncement) $('announce').textContent = announcement;
   lastAnnouncement = announcement;
 }
 let lastAnnouncement = '';
@@ -311,7 +313,8 @@ function markGallery() {
 function update(patch, { gallery = 'now' } = {}) {
   Object.assign(state, patch);
   syncControls();
-  renderPreview();
+  // While typing, a palette picked from the title may change on every keystroke; don't announce that.
+  renderPreview(gallery !== 'debounce');
   writeHash();
   markGallery();
   if (gallery === 'now') {

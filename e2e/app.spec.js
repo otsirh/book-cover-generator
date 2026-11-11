@@ -91,6 +91,13 @@ test('screen readers hear style changes but not typing', async ({ page }) => {
   await expect(page.locator('#announce')).toHaveText('Style: Noir. Palette: Mint.');
 });
 
+test('typing never triggers announcements, even when the palette follows the title', async ({ page }) => {
+  await page.goto('/#style=minimal&palette=auto&seed=');
+  await expect(page.locator('#preview')).toHaveAttribute('src', /^data:image\/svg\+xml/);
+  await page.locator('#title').pressSequentially('A title that changes the palette', { delay: 5 });
+  await expect(page.locator('#announce')).toHaveText('');
+});
+
 test('editing the URL hash updates the design', async ({ page }) => {
   await page.goto('/#style=swiss&seed=one');
   await expect(page.locator('#style')).toHaveValue('swiss');
