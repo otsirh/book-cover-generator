@@ -35,6 +35,6 @@
   "homepage": "https://covers.otsirh.dev/",
   "license": "MIT",
   "engines": {
-    "node": ">=18"
+    "node": ">=18.3"
   }
 }

@@ -6,7 +6,7 @@ import {
   path,
   pathD,
   mix,
-  readable,
+  inkOn,
   luminance,
   ridge,
   linearGradient,
@@ -15,8 +15,6 @@ import {
   shadowFilter,
 } from '../core.js';
 import { FONTS, fitText, drawText } from '../text.js';
-
-const CANDIDATES = (p) => [p.ink, p.bg, '#ffffff', '#111111'];
 
 function starfield(c, count, maxY, color) {
   const { W, u, rng } = c;
@@ -76,9 +74,9 @@ export const landscape = {
       lineHeight: 1.08,
       maxLines: 4,
     });
-    s += drawText(t, { x: W / 2, y: top, anchor: 'middle', fill: readable(skyTop, CANDIDATES(p)) });
+    s += drawText(t, { x: W / 2, y: top, anchor: 'middle', fill: inkOn(skyTop, p) });
     const a = fitText(c.author, { font: FONTS.sans, weight: 500, upper: true, letterSpacing: 0.25, maxWidth: W - m * 2, maxHeight: W * 0.08, maxSize: W * 0.03, maxLines: 2 });
-    s += drawText(a, { x: W / 2, y: H - m * 1.1 - a.height, anchor: 'middle', fill: readable(front, CANDIDATES(p)) });
+    s += drawText(a, { x: W / 2, y: H - m * 1.1 - a.height, anchor: 'middle', fill: inkOn(front, p) });
     return s;
   },
 };
@@ -133,7 +131,7 @@ export const waves = {
     const tY = regionTop + (regionBottom - regionTop - t.height) / 2;
     s += drawText(t, { x: W / 2, y: tY, anchor: 'middle', fill: p.ink });
     const aY = flip ? m * 1.1 : H - m * 1.1 - a.height;
-    s += drawText(a, { x: W / 2, y: aY, anchor: 'middle', fill: readable(last, CANDIDATES(p)) });
+    s += drawText(a, { x: W / 2, y: aY, anchor: 'middle', fill: inkOn(last, p) });
     return s;
   },
 };
@@ -236,7 +234,8 @@ export const orbit = {
     const limit = H * 0.6 - cy;
     const step = W * rng.float(0.07, 0.09);
     const orbits = [];
-    for (let i = 0; i < rng.int(3, 6); i++) {
+    const orbitCount = rng.int(3, 6);
+    for (let i = 0; i < orbitCount; i++) {
       const rx = R * 1.9 + i * step;
       const ry = rx * squash;
       if (Math.hypot(rx * Math.sin(rad), ry * Math.cos(rad)) > limit) break;
@@ -362,7 +361,7 @@ export const retro = {
     s += drawText(t, { x: W / 2, y: top, anchor: 'middle', fill: `url(#${ids.chrome})`, attrs: `filter="url(#${ids.sh})"` });
     const a = fitText(c.author, { font: FONTS.geometric, weight: 500, upper: true, letterSpacing: 0.3, maxWidth: W - m * 2, maxHeight: W * 0.08, maxSize: W * 0.03, maxLines: 2 });
     const aY = H - m * 1.1 - a.height;
-    s += rect(0, aY - m * 0.45, W, a.height + m * 0.9, floor, 'opacity="0.75"');
+    if (a.lines.length) s += rect(0, aY - m * 0.45, W, a.height + m * 0.9, floor, 'opacity="0.75"');
     s += drawText(a, { x: W / 2, y: aY, anchor: 'middle', fill: light });
     return s;
   },
@@ -384,7 +383,7 @@ export const shelf = {
 
     const spine = (x, w, h, col) => {
       const top = shelfY - h;
-      const deco = readable(col, [p.bg, p.ink, '#ffffff', '#111111']);
+      const deco = inkOn(col, p);
       let o = rect(x, top, w, h, col);
       const kind = rng.int(0, 3);
       if (kind === 0) {
@@ -403,18 +402,25 @@ export const shelf = {
     let s = rect(0, 0, W, H, p.bg);
     let x = left;
     let books = '';
+    let lastRight = left;
+    let lastH = 0;
     while (x < stop - W * 0.04) {
       const w = Math.min(W * rng.float(0.045, 0.085), stop - x);
       const h = H * rng.float(0.2, 0.33);
       books += spine(x, w, h, rng.pick(colors));
+      lastRight = x + w;
+      lastH = h;
       x += w + u * rng.float(0, 2.5);
     }
-    if (lean) {
+    if (lean && lastH) {
+      // Pivot on the bottom-left corner and tip left until the book rests on its neighbour.
       const w = W * rng.float(0.05, 0.075);
       const h = H * rng.float(0.22, 0.28);
       const ang = rng.float(14, 22);
-      const bx = x + u * 2;
-      books += `<g transform="rotate(${n(ang)} ${n(bx)} ${n(shelfY)})">${spine(bx, w, h, rng.pick(colors))}</g>`;
+      const rad = (ang * Math.PI) / 180;
+      const contact = Math.min(lastH, h * Math.cos(rad));
+      const bx = lastRight + contact * Math.tan(rad);
+      books += `<g transform="rotate(${n(-ang)} ${n(bx)} ${n(shelfY)})">${spine(bx, w, h, rng.pick(colors))}</g>`;
     }
     s += books;
     s += rect(0, shelfY + plankH, W, plankH * 0.9, p.ink, 'opacity="0.12"');

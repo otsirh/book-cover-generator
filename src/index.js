@@ -3,7 +3,7 @@
 //   import { generateCover } from 'book-cover-generator';
 //   const svg = generateCover({ title: 'Dune', author: 'Frank Herbert', style: 'retro' });
 
-import { createRng, hashString, isHex, luminance, escapeXml } from './core.js';
+import { createRng, hashString, isHex, luminance, escapeXml, stripInvalidXml, clamp } from './core.js';
 import { palettes } from './palettes.js';
 import { styleList } from './styles/index.js';
 
@@ -51,7 +51,8 @@ function normalizePalette(p) {
   if (!isHex(p.bg) || !isHex(p.ink) || !accents.length) {
     throw new Error('A custom palette needs hex colours: { bg, ink, accents: [hex, ...] }');
   }
-  while (accents.length < 3) accents.push(accents[accents.length % accents.length]);
+  const given = accents.slice();
+  while (accents.length < 3) accents.push(given[accents.length % given.length]);
   const dark = p.dark ?? luminance(p.bg) < luminance(p.ink);
   return { id: p.id || 'custom', name: p.name || 'Custom', bg: p.bg, ink: p.ink, accents, dark };
 }
@@ -69,6 +70,19 @@ function resolvePalette(palette, rng, style) {
   return normalizePalette(found);
 }
 
+/** Collapse control characters and whitespace; drop anything illegal in XML. */
+function cleanText(value) {
+  return stripInvalidXml(String(value ?? '').replace(/[\u0000-\u001F\u007F-\u009F]/g, ' '))
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function dimension(value, fallback, name) {
+  const v = value == null || value === '' ? fallback : Number(value);
+  if (!Number.isFinite(v) || v <= 0) throw new RangeError(`${name} must be a positive number, got ${String(value)}`);
+  return Math.round(clamp(v, 50, 10000));
+}
+
 /**
  * Generate a cover and return it together with the resolved choices.
  *
@@ -78,15 +92,15 @@ function resolvePalette(palette, rng, style) {
  * @param {string} [options.style]   style id, or 'random' (default)
  * @param {string|object} [options.palette] palette id, custom palette object, or 'random' (default)
  * @param {string|number} [options.seed] defaults to a hash of title + author
- * @param {number} [options.width=600]
- * @param {number} [options.height=900]
+ * @param {number} [options.width=600]   px, 50–10000
+ * @param {number} [options.height=900]  px, 50–10000
  * @returns {{ svg: string, style: string, palette: string, seed: string, width: number, height: number }}
  */
 export function createCover(options = {}) {
-  const title = String(options.title ?? '').trim() || 'Untitled';
-  const author = String(options.author ?? '').trim();
-  const W = Math.max(50, Math.round(options.width ?? 600));
-  const H = Math.max(50, Math.round(options.height ?? Math.round(W * 1.5)));
+  const title = cleanText(options.title) || 'Untitled';
+  const author = cleanText(options.author);
+  const W = dimension(options.width, 600, 'width');
+  const H = dimension(options.height, W * 1.5, 'height');
   const seed = options.seed == null || options.seed === '' ? `${title}␟${author}` : String(options.seed);
 
   const styleId = resolveStyle(options.style, createRng(`${seed}|style`));

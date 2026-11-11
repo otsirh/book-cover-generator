@@ -27,12 +27,17 @@
   const author = q.get('author') ?? 'Mara Ellison';
   const w = +(q.get('w') || 600), h = +(q.get('h') || 900);
   document.getElementById('grid').style.setProperty('--cols', q.get('cols') || 6);
-  let html = '';
+  const grid = document.getElementById('grid');
   for (const style of sts) for (const palette of pals) for (const seed of seeds) for (const title of titles) {
     const c = createCover({ title, author, style, palette, seed, width: w, height: h });
-    html += `<figure><img src="data:image/svg+xml;charset=utf-8,${encodeURIComponent(c.svg)}"><figcaption>${c.style} · ${c.palette} · ${c.seed}</figcaption></figure>`;
+    const fig = document.createElement('figure');
+    const img = new Image();
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(c.svg);
+    const cap = document.createElement('figcaption');
+    cap.textContent = `${c.style} · ${c.palette} · ${c.seed}`;
+    fig.append(img, cap);
+    grid.append(fig);
   }
-  document.getElementById('grid').innerHTML = html;
 </script>
 </body>
 </html>

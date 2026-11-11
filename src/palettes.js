@@ -25,5 +25,3 @@ export const palettes = [
   { id: 'cobalt', name: 'Cobalt', bg: '#1f3fbf', ink: '#fbf7ef', accents: ['#ffcf3f', '#ff6b6b', '#9fd3ff'], dark: true },
   { id: 'teal', name: 'Teal', bg: '#0f6466', ink: '#f9f4e8', accents: ['#f0c808', '#f26157', '#d8e2dc'], dark: true },
 ];
-
-export const paletteIds = palettes.map((p) => p.id);

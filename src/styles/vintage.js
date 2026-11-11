@@ -1,5 +1,5 @@
 import { n, rect, circle, line, path, pathD, mix, readable, clamp, escapeXml, radialGradient, linearGradient } from '../core.js';
-import { FONTS, fitText, drawText, textBottom } from '../text.js';
+import { FONTS, fitText, drawText, textBottom, graphemes } from '../text.js';
 
 export const classic = {
   id: 'classic',
@@ -35,7 +35,7 @@ export const classic = {
     const er = Math.min(W * 0.07, (H - b2) * 0.28);
     const ey = (b2 + H) / 2;
     s += circle(W / 2, ey, er, cream, `stroke="${ink}" stroke-width="${n(1.5 * u)}"`);
-    const initial = (Array.from(c.title.trim())[0] || '').toLocaleUpperCase();
+    const initial = (Array.from(c.title.trim())[0] || '').toUpperCase();
     if (initial) {
       s += `<text x="${n(W / 2)}" y="${n(ey + er * 0.38)}" font-family="${FONTS.serif.family}" font-size="${n(er * 1.1)}" text-anchor="middle" fill="${band}">${escapeXml(initial)}</text>`;
     }
@@ -132,7 +132,7 @@ const STAMPS = ['MANUSCRIPT', 'FIRST DRAFT', 'ADVANCE COPY', 'UNCORRECTED PROOF'
 
 function typedLine(str, x, y, size, rng, color) {
   let o = '';
-  [...str].forEach((ch, i) => {
+  graphemes(str).forEach((ch, i) => {
     if (ch === ' ') return;
     const op = rng.float(0.72, 1).toFixed(2);
     o += `<tspan x="${n(x + i * size * 0.6 + rng.float(-0.4, 0.4))}" y="${n(y + rng.float(-0.6, 0.6))}" fill-opacity="${op}">${escapeXml(ch)}</tspan>`;
@@ -176,7 +176,7 @@ export const typewriter = {
       s += typedLine(ln, x, y + t.size * t.cap + i * t.size * t.lineHeight, t.size, rng, ink);
     });
     y = textBottom(t, y) + 8 * u;
-    const uw = Math.max(...t.lines.map((ln) => ln.length)) * t.size * 0.6;
+    const uw = Math.max(...t.lines.map((ln) => graphemes(ln).length)) * t.size * 0.6;
     s += line(x, y, x + uw, y, ink, 1.6 * u, 'stroke-dasharray="' + n(t.size * 0.5) + ' ' + n(t.size * 0.1) + '" opacity="0.85"');
     if (c.author.trim()) {
       const a = fitText(`by ${c.author}`, { font: FONTS.mono, weight: 400, maxWidth: maxW, maxHeight: W * 0.1, maxSize: W * 0.045, maxLines: 2, balance: false });
@@ -259,7 +259,7 @@ export const typographic = {
   description: 'A giant initial cropped by the cover edge.',
   render(c) {
     const { W, H, u, m, rng, p } = c;
-    const letter = (Array.from(c.title.trim())[0] || 'A').toLocaleUpperCase();
+    const letter = (Array.from(c.title.trim())[0] || 'A').toUpperCase();
     const font = rng.pick([FONTS.didone, FONTS.serif, FONTS.geometric, FONTS.display]);
     const weight = font === FONTS.geometric ? 700 : 400;
     const mode = rng.pick(['solid', 'outline', 'duo']);

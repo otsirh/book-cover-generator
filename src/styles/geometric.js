@@ -1,4 +1,4 @@
-import { n, rect, circle, path, pathD, readable, mix, clamp } from '../core.js';
+import { n, rect, circle, path, pathD, inkOn, mix, clamp } from '../core.js';
 import { FONTS, fitText, drawText, textBottom } from '../text.js';
 
 export const minimal = {
@@ -73,7 +73,7 @@ export const swiss = {
       lineHeight: 0.98,
       maxLines: 6,
     });
-    s += drawText(t, { x: m, y: m * 1.2, fill: readable(blockColor, [p.bg, p.ink, '#ffffff', '#111111']) });
+    s += drawText(t, { x: m, y: m * 1.2, fill: inkOn(blockColor, p) });
 
     const ruleY = H - m * 2.4;
     s += rect(m, ruleY, W - m * 2, 1.5 * u, p.ink);
@@ -139,7 +139,8 @@ export const bauhaus = {
           s += rect(x, y, cell + 0.5, cell + 0.5, cellBg);
         }
         if (rng.bool(0.1)) continue;
-        const color = rng.pick(colors.filter((col2) => col2 !== cellBg));
+        const choices = colors.filter((col2) => col2 !== cellBg);
+        const color = choices.length ? rng.pick(choices) : p.bg;
         s += bauhausShape(rng.pick(shapes), x, y, cell, color, rng.int(0, 3) * 90);
       }
     }
@@ -150,7 +151,7 @@ export const bauhaus = {
       weight: 500,
       upper: true,
       letterSpacing: 0.14,
-      maxWidth: gw,
+      maxWidth: gw - W * 0.06 - m * 0.5,
       maxHeight: W * 0.08,
       maxSize: W * 0.032,
       maxLines: 2,
@@ -328,7 +329,7 @@ export const split = {
       lineHeight: 1.0,
       maxLines: 5,
     });
-    s += drawText(t, { x: m, y: m * 1.2, fill: readable(A, [p.bg, p.ink, '#ffffff', '#111111']) });
+    s += drawText(t, { x: m, y: m * 1.2, fill: inkOn(A, p) });
     const a = fitText(c.author, { font: FONTS.sans, weight: 500, maxWidth: W - m * 2, maxHeight: W * 0.1, maxSize: W * 0.042, maxLines: 2 });
     s += drawText(a, { x: W - m, y: H - m * 1.2 - a.height, anchor: 'end', fill: p.ink });
     return s;
@@ -369,8 +370,8 @@ export const blocks = {
     };
     divide(art, 4);
 
-    const paper = p.dark ? p.ink : p.bg;
-    const lines = p.dark ? p.bg : p.ink;
+    const paper = p.paper;
+    const lines = p.night;
     const order = rng.shuffle(leaves.map((_, i) => i));
     const fills = new Array(leaves.length).fill(paper);
     order.forEach((idx, k) => {

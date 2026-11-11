@@ -92,6 +92,9 @@ export function readable(bg, candidates = ['#ffffff', '#111111']) {
   return candidates.reduce((best, c) => (contrast(bg, c) > contrast(bg, best) ? c : best));
 }
 
+/** Best text colour on `bg`: the palette's ink/background, or white/near-black. */
+export const inkOn = (bg, p) => readable(bg, [p.ink, p.bg, '#ffffff', '#111111']);
+
 /* ------------------------------------------------------------------- noise */
 
 /** Smooth 2D value noise in roughly [-1, 1]. */
@@ -150,8 +153,13 @@ export function ridge(rng, segments = 64, roughness = 0.55) {
 /** Round to one decimal place to keep the SVG compact. */
 export const n = (v) => Math.round(v * 10) / 10;
 
+// Characters that are illegal in XML 1.0, plus unpaired UTF-16 surrogates.
+const INVALID_XML = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
+
+export const stripInvalidXml = (str) => String(str).replace(INVALID_XML, '');
+
 export function escapeXml(str) {
-  return String(str)
+  return stripInvalidXml(str)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')

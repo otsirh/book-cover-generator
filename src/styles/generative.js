@@ -280,7 +280,8 @@ export const mosaic = {
           continue;
         }
         const back = rng.pick(colors);
-        const front = rng.pick(colors.filter((col) => col !== back));
+        const others = colors.filter((col) => col !== back);
+        const front = others.length ? rng.pick(others) : p.bg;
         s += rect(x, y, size + 0.5, size + 0.5, back);
         const kind = family === 'mixed' ? rng.pick(['quarters', 'triangles', 'half', 'circle']) : family;
         if (kind === 'quarters') s += path(`M${n(x)} ${n(y + size)}L${n(x)} ${n(y)}A${n(size)} ${n(size)} 0 0 1 ${n(x + size)} ${n(y + size)}Z`, front, rot);

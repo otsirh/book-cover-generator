@@ -30,7 +30,7 @@ function readHash() {
   if (q.has('author')) state.author = q.get('author');
   if (STYLES.some((s) => s.id === q.get('style'))) state.style = q.get('style');
   if (q.get('palette') === 'auto' || palettes.some((p) => p.id === q.get('palette'))) state.palette = q.get('palette');
-  if (q.get('seed')) state.seed = q.get('seed');
+  if (q.has('seed')) state.seed = q.get('seed').trim();
   if (FORMATS[q.get('format')]) state.format = q.get('format');
 }
 
@@ -73,7 +73,6 @@ function buildControls() {
     b.title = p.name;
     b.setAttribute('aria-label', p.name);
     b.style.background = `linear-gradient(90deg, ${p.bg} 0 46%, ${p.accents[0]} 46% 64%, ${p.accents[1]} 64% 82%, ${p.accents[2]} 82%)`;
-    b.style.setProperty('--ink', p.ink);
     sw.append(b);
   }
 
@@ -217,10 +216,16 @@ function update(patch, { gallery = true } = {}) {
   syncControls();
   renderPreview();
   writeHash();
-  clearTimeout(galleryTimer);
-  if (gallery === 'debounce') galleryTimer = setTimeout(renderGallery, 220);
-  else if (gallery) renderGallery();
-  else markGallery();
+  if (gallery === 'debounce') {
+    clearTimeout(galleryTimer);
+    galleryTimer = setTimeout(renderGallery, 220);
+  } else if (gallery) {
+    clearTimeout(galleryTimer);
+    renderGallery();
+  } else {
+    // A pending debounced render (if any) will pick up this change too.
+    markGallery();
+  }
 }
 
 /* ------------------------------------------------------------------ export */

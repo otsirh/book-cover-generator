@@ -82,6 +82,9 @@ function heuristicWidth(text, spec) {
   return w * (spec.font.widthFactor || 1) * bold;
 }
 
+const widthCache = new Map();
+let lastFont = '';
+
 /** Width in px of `text` rendered at `size` px with the given font spec. */
 export function measureText(text, size, spec) {
   let w;
@@ -91,13 +94,32 @@ export function measureText(text, size, spec) {
   } else {
     const c = canvasContext();
     if (c) {
-      c.font = `${spec.italic ? 'italic ' : ''}${weight} ${size}px ${spec.font.family}`;
-      w = c.measureText(text).width;
+      const font = `${spec.italic ? 'italic ' : ''}${weight} ${size}px ${spec.font.family}`;
+      const key = `${font}\u0000${text}`;
+      w = widthCache.get(key);
+      if (w === undefined) {
+        if (font !== lastFont) {
+          c.font = font;
+          lastFont = font;
+        }
+        w = c.measureText(text).width;
+        if (widthCache.size > 20000) widthCache.clear();
+        widthCache.set(key, w);
+      }
     } else {
       w = heuristicWidth(text, spec) * size;
     }
   }
   return w + (spec.letterSpacing || 0) * size * [...text].length;
+}
+
+let segmenter;
+/** Split a string into user-perceived characters (grapheme clusters). */
+export function graphemes(str) {
+  if (segmenter === undefined) {
+    segmenter = typeof Intl !== 'undefined' && Intl.Segmenter ? new Intl.Segmenter('en', { granularity: 'grapheme' }) : null;
+  }
+  return segmenter ? Array.from(segmenter.segment(str), (s) => s.segment) : [...str];
 }
 
 /* ----------------------------------------------------------------- fitting */
@@ -173,10 +195,11 @@ export function fitText(text, opts) {
   const maxWidth = Math.max(1, opts.maxWidth);
   const maxHeight = opts.maxHeight ?? Infinity;
   const maxSize = opts.maxSize;
-  const minSize = opts.minSize ?? Math.max(6, maxSize * 0.22);
+  if (!Number.isFinite(maxSize) || maxSize <= 0) throw new TypeError('fitText: `maxSize` must be a positive number of pixels');
+  const minSize = Math.min(maxSize, opts.minSize ?? Math.max(6, maxSize * 0.22));
 
   let str = String(text ?? '').replace(/\s+/g, ' ').trim();
-  if (opts.upper) str = str.toLocaleUpperCase();
+  if (opts.upper) str = str.toUpperCase();
   const base = { ...spec, lineHeight, cap };
   if (!str) return { ...base, lines: [], size: 0, width: 0, height: 0 };
 
@@ -211,9 +234,9 @@ export function fitText(text, opts) {
   const fitCount = Math.max(1, Math.min(maxLines, Math.floor((maxHeight / size - cap) / lineHeight) + 1));
   if (lines.length > fitCount) {
     lines = lines.slice(0, fitCount);
-    let last = lines[fitCount - 1];
-    while (last.length > 1 && measure(last + '…') > maxWidth) last = last.slice(0, -1);
-    lines[fitCount - 1] = last.trimEnd() + '…';
+    const chars = graphemes(lines[fitCount - 1]);
+    while (chars.length > 1 && measure(chars.join('') + '…') > maxWidth) chars.pop();
+    lines[fitCount - 1] = chars.join('').trimEnd() + '…';
   }
   return finish(lines, size);
 }

@@ -81,8 +81,8 @@ Same as `generateCover`, but also tells you which style and palette were chosen.
 | `style`   | `string`                   | `'random'`             | a style id, see `styles`                         |
 | `palette` | `string \| object`         | `'random'`             | a palette id, or `{ bg, ink, accents: [...] }`   |
 | `seed`    | `string \| number`         | hash of title + author | controls every random choice                     |
-| `width`   | `number`                   | `600`                  | px                                               |
-| `height`  | `number`                   | `width × 1.5`          | px                                               |
+| `width`   | `number`                   | `600`                  | px, 50–10000                                     |
+| `height`  | `number`                   | `width × 1.5`          | px, 50–10000                                     |
 
 With `'random'`, the style and palette are picked from the seed, so you get the same result every time for the same seed. Some styles prefer dark or light palettes when they pick one themselves.
 
@@ -144,7 +144,7 @@ registerStyle({
 ## Notes
 
 - **Fonts.** Covers only use system font stacks (Georgia, Helvetica, Futura, Didot, Impact, Courier and others, with fallbacks). This is because an SVG drawn into a canvas for PNG/JPEG export can't load web fonts. In the browser, text is measured with a canvas, so it fits exactly. In Node, widths are estimated.
-- **Deterministic.** The same options always give the same SVG.
+- **Deterministic.** The same options always give the same artwork. In Node the SVG is identical every time. In the browser, text is measured with the fonts installed on that computer, so line breaks can differ slightly between machines. Registering a custom style changes which style `style: 'random'` picks for a given seed.
 
 ## Development
 
@@ -154,7 +154,7 @@ python3 -m http.server      # then open http://localhost:8000
 npm run deploy              # build dist/ and deploy to Cloudflare
 ```
 
-Pushes to `main` are tested and then deployed to <https://covers.otsirh.dev> by GitHub Actions (`.github/workflows/deploy.yml`). Deploys need a `CLOUDFLARE_API_TOKEN` repository secret.
+GitHub Actions runs the tests on every push and pull request. The site is hosted on Cloudflare at <https://covers.otsirh.dev>, and `npm run deploy` publishes it using your local `wrangler login`.
 
 Open `examples/contact-sheet.html?palettes=noir,mint&seeds=a,b` to see many covers at once.
 

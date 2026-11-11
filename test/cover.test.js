@@ -107,3 +107,36 @@ test('width and height are respected', () => {
   assert.equal(height, 2560);
   assert.ok(svg.includes('viewBox="0 0 1600 2560"'));
 });
+
+test('invalid sizes throw instead of producing NaN or hanging', () => {
+  assert.throws(() => createCover({ title: 'x', width: '12abc' }), /width must be a positive number/);
+  assert.throws(() => createCover({ title: 'x', width: Infinity }), /width must be a positive number/);
+  assert.throws(() => createCover({ title: 'x', height: -5 }), /height must be a positive number/);
+  assert.equal(createCover({ title: 'x', width: 1e6 }).width, 10000);
+});
+
+test('control characters and lone surrogates never reach the SVG', () => {
+  for (const style of styles) {
+    const { svg } = createCover({ title: 'Soft\u000Bbreak\u0000 \uD83D', author: 'Form\u000Cfeed', style });
+    assertWellFormed(svg, style);
+    assert.doesNotThrow(() => encodeURIComponent(svg), style);
+    assert.ok(!/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(svg), `${style}: control character in output`);
+  }
+});
+
+test('palettes whose accents equal the ink colour still render', () => {
+  const palette = { bg: '#ffffff', ink: '#000000', accents: ['#000000'] };
+  for (const style of styles) {
+    for (const seed of ['s0', 's1', 's2', 's3']) {
+      const { svg } = createCover({ title: 'Mono', author: 'Chrome', style, seed, palette });
+      assert.ok(!svg.includes('undefined'), `${style}/${seed}: undefined in output`);
+    }
+  }
+});
+
+test('fitText validates maxSize and never exceeds it', async () => {
+  const { fitText, FONTS } = await import('../src/index.js');
+  assert.throws(() => fitText('Hello', { font: FONTS.sans, maxWidth: 100 }), /maxSize/);
+  const fit = fitText('An extraordinarily long title', { font: FONTS.sans, maxWidth: 40, maxHeight: 20, maxSize: 5 });
+  assert.ok(fit.size <= 5, `size ${fit.size} exceeds maxSize`);
+});
