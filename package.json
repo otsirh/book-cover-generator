@@ -1,6 +1,6 @@
 {
   "name": "book-cover-generator",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Generate SVG book covers from a title and an author. 27 styles, 20 palettes, seeded randomizer, zero dependencies.",
   "keywords": [
     "book",

@@ -4,8 +4,10 @@ import type { Palette, PaletteId } from './palettes.js';
 export type { Rng } from './core.js';
 export type { Palette, PaletteId } from './palettes.js';
 export type { FontSpec, FitOptions, TextFit, DrawOptions, TextSpec, TextMeasurer } from './text.js';
+export type { StackFit, TitleBlock, TitleBlockOptions } from './type.js';
 export { palettes } from './palettes.js';
 export { FONTS, fitText, drawText, measureText, setTextMeasurer } from './text.js';
+export { titleBlock, authorFit, fitStack, drawStack, splitLead } from './type.js';
 export * as svgUtils from './core.js';
 
 export type StyleId =
@@ -35,7 +37,16 @@ export type StyleId =
   | 'memphis'
   | 'noir'
   | 'typewriter'
-  | 'shelf';
+  | 'shelf'
+  | 'bigtype'
+  | 'thriller'
+  | 'botanical'
+  | 'engraved'
+  | 'papercut'
+  | 'silhouette'
+  | 'blueprint';
+
+export type StyleGroup = 'Typographic' | 'Geometric' | 'Pattern' | 'Scenic' | 'Vintage' | 'Genre';
 
 /** A palette you define yourself. All colours must be hex (`#rgb` or `#rrggbb`). */
 export interface CustomPalette {
@@ -48,9 +59,14 @@ export interface CustomPalette {
 }
 
 export interface CoverOptions {
-  /** Defaults to `'Untitled'`. */
+  /** Defaults to `'Untitled'`. Up to 300 characters are used. */
   title?: string;
+  /** Up to 200 characters are used. */
   author?: string;
+  /** A subtitle or tagline, set small under the title. Up to 300 characters are used. */
+  subtitle?: string;
+  /** Add a fine film-grain texture over the cover. Default `false`. */
+  texture?: boolean;
   /** A style id, a registered custom style, or `'random'` (default; picked from the seed). */
   style?: StyleId | 'random' | (string & {});
   /** A palette id, a custom palette, or `'random'` / `'auto'` (default; picked from the seed). */
@@ -78,6 +94,8 @@ export interface StyleInfo {
   id: string;
   name: string;
   description: string;
+  /** The family the style belongs to; `'Custom'` for registered styles without one. */
+  group: StyleGroup | (string & {});
 }
 
 /** A palette as seen by styles, with derived light/dark colours. */
@@ -94,6 +112,8 @@ export interface ResolvedPalette extends Palette {
 export interface StyleContext {
   readonly title: string;
   readonly author: string;
+  /** Empty when there is no subtitle. */
+  readonly subtitle: string;
   /** Cover width in px. */
   readonly W: number;
   /** Cover height in px. */
@@ -115,6 +135,7 @@ export interface CoverStyle {
   id: string;
   name?: string;
   description?: string;
+  group?: StyleGroup | (string & {});
   /** Background preference when the palette is picked automatically. */
   prefer?: 'light' | 'dark';
   /** Return SVG markup without the outer `<svg>` element. */

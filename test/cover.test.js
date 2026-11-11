@@ -2,6 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createCover, generateCover, styles, palettes, registerStyle, listStyles } from '../src/index.js';
 
+// The built-in styles, captured before any test registers a custom one.
+const builtIn = [...styles];
+
 /** Minimal XML well-formedness check: balanced tags, no stray `<` or `&`. */
 function assertWellFormed(svg, label) {
   const stack = [];
@@ -13,7 +16,9 @@ function assertWellFormed(svg, label) {
     assert.ok(!between.includes('<'), `${label}: stray "<" near ${svg.slice(last, last + 60)}`);
     assert.ok(!/&(?!(amp|lt|gt|quot|apos);)/.test(between), `${label}: unescaped "&"`);
     last = tagRe.lastIndex;
-    const [, closing, name, , selfClosing] = m;
+    const [, closing, name, attrs, selfClosing] = m;
+    const names = [...attrs.matchAll(/([\w:-]+)="/g)].map((a) => a[1]);
+    assert.equal(new Set(names).size, names.length, `${label}: duplicate attribute in <${name}${attrs}>`);
     if (selfClosing) continue;
     if (closing) assert.equal(stack.pop(), name, `${label}: mismatched </${name}>`);
     else stack.push(name);
@@ -294,4 +299,52 @@ test('short hex colours, random seeds and style registration errors', async () =
   for (const seed of seeds) assert.match(seed, /^[a-z0-9]{1,6}$/);
   assert.throws(() => registerStyle(/** @type {any} */ ({ id: 'no-render' })), TypeError);
   assert.throws(() => registerStyle(/** @type {any} */ (null)), TypeError);
+});
+
+test('every style draws the subtitle on the cover', () => {
+  // Pixel draws short subtitles as pixel letters (shapes), checked separately below.
+  for (const style of builtIn.filter((id) => id !== 'pixel')) {
+    const { svg } = createCover({ title: 'Plain', author: 'Writer', subtitle: 'Zebra Quokka', style, seed: 'sub' });
+    const body = svg.replace(/<title>[\s\S]*?<\/title>/, '').replace(/aria-label="[^"]*"/, '');
+    const text = body
+      .replace(/<[^>]+>/g, '')
+      .replace(/\s+/g, '')
+      .toLowerCase();
+    assert.ok(text.includes('zebraquokka'), `${style} does not show the subtitle`);
+  }
+});
+
+test('Pixel draws the subtitle as pixel letters', () => {
+  const rects = (/** @type {string} */ subtitle) =>
+    (createCover({ title: 'Plain', subtitle, style: 'pixel', seed: 'sub' }).svg.match(/<rect /g) ?? []).length;
+  assert.ok(rects('Zebra Quokka') > rects('') + 20);
+});
+
+test('texture adds grain that works on light and dark covers', () => {
+  for (const style of builtIn) {
+    const { svg } = createCover({ title: 'Grain', style, texture: true, seed: 'g' });
+    assertWellFormed(svg, style);
+    assert.equal((svg.match(/<feTurbulence[^>]*seed="(3|11)"/g) ?? []).length, 2, style);
+  }
+  assert.doesNotMatch(createCover({ title: 'x', style: 'minimal' }).svg, /texture-dark/);
+});
+
+test('every style has a group, and every palette renders', () => {
+  for (const s of listStyles().filter((x) => builtIn.includes(x.id)))
+    assert.ok(['Typographic', 'Geometric', 'Pattern', 'Scenic', 'Vintage', 'Genre'].includes(s.group), s.id);
+  assert.equal(palettes.length, 28);
+  for (const p of palettes) assert.ok(createCover({ title: 'x', palette: p.id, style: 'swiss' }).svg.includes(p.bg));
+});
+
+test('very long inputs are capped and fast', () => {
+  const started = Date.now();
+  const { svg } = createCover({
+    title: 'lorem ipsum '.repeat(10000),
+    subtitle: 'x'.repeat(5000),
+    author: 'y'.repeat(5000),
+    style: 'minimal',
+  });
+  assert.ok(Date.now() - started < 2000);
+  const label = /aria-label="([^"]*)"/.exec(svg)?.[1] ?? '';
+  assert.ok(label.length < 900, `label is ${label.length} characters`);
 });

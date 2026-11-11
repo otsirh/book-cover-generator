@@ -212,12 +212,12 @@ export function pathD(points, close = false) {
 export const path = (d, fill, e = '') => `<path d="${d}" fill="${fill}"${extra(e)}/>`;
 
 /** Film-grain overlay. Returns { defs, layer }. */
-export function grain(c, { opacity = 0.12, light = false, freq = 0.75 } = {}) {
-  const id = c.id('grain');
+export function grain(c, { opacity = 0.12, light = false, freq = 0.75, id: name = 'grain', seed = 0 } = {}) {
+  const id = c.id(name);
   const v = light ? 1 : 0;
   const defs =
     `<filter id="${id}" x="0" y="0" width="100%" height="100%">` +
-    `<feTurbulence type="fractalNoise" baseFrequency="${+(freq / c.u).toFixed(3)}" numOctaves="3" stitchTiles="stitch"/>` +
+    `<feTurbulence type="fractalNoise" baseFrequency="${+(freq / c.u).toFixed(3)}" numOctaves="3" seed="${seed}" stitchTiles="stitch"/>` +
     `<feColorMatrix type="matrix" values="0 0 0 0 ${v} 0 0 0 0 ${v} 0 0 0 0 ${v} 1.6 0 0 0 -0.55"/></filter>`;
   const layer = `<rect width="${c.W}" height="${c.H}" filter="url(#${id})" opacity="${opacity}"/>`;
   return { defs, layer };

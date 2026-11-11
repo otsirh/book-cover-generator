@@ -191,8 +191,9 @@ const append = (line, token) => (line ? line + (token.space ? ' ' : '') + token.
  * @param {Token[]} tokens
  * @param {number} maxWidth
  * @param {(s: string) => number} measure
+ * @param {number} [maxLines]
  */
-function wrapGreedy(tokens, maxWidth, measure) {
+function wrapGreedy(tokens, maxWidth, measure, maxLines = Infinity) {
   /** @type {string[]} */
   const lines = [];
   let cur = '';
@@ -203,6 +204,8 @@ function wrapGreedy(tokens, maxWidth, measure) {
     else {
       lines.push(cur);
       cur = token.text;
+      // Already too many lines: the caller will shrink and retry, so stop early.
+      if (lines.length > maxLines) return lines;
     }
   }
   if (cur) lines.push(cur);
@@ -304,7 +307,7 @@ export function fitText(text, opts) {
   let size = maxSize;
   for (let guard = 0; guard < 120; guard++) {
     const measure = (s) => measureText(s, size, spec);
-    let lines = wrapGreedy(tokens, maxWidth, measure);
+    let lines = wrapGreedy(tokens, maxWidth, measure, maxLines);
     if (lines && lines.length <= maxLines && blockHeight(lines.length, size, lineHeight, cap) <= maxHeight) {
       if (opts.balance !== false && lines.length > 1) lines = balance(tokens, lines.length, maxWidth, measure);
       return finish(lines, size);
@@ -337,7 +340,7 @@ export function drawText(fit, { x, y, anchor = 'start', fill = '#000', opacity, 
   const ls = letterSpacing * size;
   // Trailing letter-spacing shifts centred/right-aligned text; compensate.
   const dx = anchor === 'middle' ? ls / 2 : anchor === 'end' ? ls : 0;
-  let a = `font-family="${font.family}" font-size="${n(size)}" fill="${fill}"`;
+  let a = `font-family="${escapeXml(font.family)}" font-size="${n(size)}" fill="${escapeXml(fill)}"`;
   if (weight && weight !== 400) a += ` font-weight="${weight}"`;
   if (italic) a += ' font-style="italic"';
   if (ls) a += ` letter-spacing="${n(ls)}"`;

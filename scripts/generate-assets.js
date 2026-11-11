@@ -1,4 +1,4 @@
-// Regenerates public/og.png and the PNG app icons in public/icons/.
+// Regenerates public/og.png, the PNG app icons in public/icons/ and docs/preview.png.
 //   npm run assets
 import { spawn } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
@@ -33,6 +33,12 @@ async function render(browser) {
   }
   await page.screenshot({ path: 'public/og.png' });
   console.log('public/og.png');
+
+  const montage = await browser.newPage({ viewport: { width: 1400, height: 700 }, deviceScaleFactor: 1 });
+  await montage.goto(`http://127.0.0.1:${PORT}/scripts/preview.html`);
+  await montage.waitForFunction(() => '__ready' in window);
+  await montage.screenshot({ path: 'docs/preview.png', fullPage: true });
+  console.log('docs/preview.png');
 }
 
 const server = spawn(process.execPath, ['scripts/serve.js', String(PORT), '.'], { stdio: 'ignore' });

@@ -6,7 +6,7 @@
     <title>Book Cover Generator: covers from a title and an author</title>
     <meta
       name="description"
-      content="Generate a book cover from a title and an author. 27 styles, 20 palettes and a seeded randomizer. Copy the SVG or download SVG, PNG or JPEG. Free and open source."
+      content="Type a title and an author, get a book cover. 34 styles, 28 palettes, a seeded randomizer, and free SVG, PNG or JPEG downloads. Open source."
     />
     <link rel="canonical" href="https://covers.otsirh.dev/" />
     <meta name="color-scheme" content="light dark" />
@@ -18,13 +18,13 @@
     <meta property="og:title" content="Book Cover Generator" />
     <meta
       property="og:description"
-      content="A book cover from a title and an author. 27 styles, 20 palettes, export to SVG, PNG or JPEG."
+      content="Type a title and an author, get a book cover. 34 styles, 28 palettes, SVG, PNG and JPEG."
     />
     <meta property="og:url" content="https://covers.otsirh.dev/" />
     <meta property="og:image" content="https://covers.otsirh.dev/og.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="A row of generated book covers in different styles" />
+    <meta property="og:image:alt" content="A fan of generated book covers in different styles" />
     <meta name="twitter:card" content="summary_large_image" />
 
     <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
@@ -38,16 +38,94 @@
     <link rel="modulepreload" href="src/browser.js" />
     <link rel="modulepreload" href="src/core.js" />
     <link rel="modulepreload" href="src/text.js" />
+    <link rel="modulepreload" href="src/type.js" />
     <link rel="modulepreload" href="src/palettes.js" />
     <link rel="modulepreload" href="src/styles/index.js" />
+    <link rel="modulepreload" href="src/styles/util.js" />
+    <link rel="modulepreload" href="src/styles/typographic.js" />
     <link rel="modulepreload" href="src/styles/geometric.js" />
+    <link rel="modulepreload" href="src/styles/pattern.js" />
     <link rel="modulepreload" href="src/styles/scenic.js" />
-    <link rel="modulepreload" href="src/styles/generative.js" />
     <link rel="modulepreload" href="src/styles/vintage.js" />
+    <link rel="modulepreload" href="src/styles/genre.js" />
     <script type="module" src="site/app.js"></script>
   </head>
   <body>
     <a class="skip-link" href="#controls">Skip to the generator</a>
+
+    <svg class="icon-sprite" aria-hidden="true" focusable="false">
+      <symbol id="i-dice" viewBox="0 0 24 24">
+        <rect x="3.5" y="3.5" width="17" height="17" rx="4" fill="none" stroke="currentColor" stroke-width="1.8" />
+        <circle cx="8.5" cy="8.5" r="1.6" fill="currentColor" />
+        <circle cx="15.5" cy="8.5" r="1.6" fill="currentColor" />
+        <circle cx="12" cy="12" r="1.6" fill="currentColor" />
+        <circle cx="8.5" cy="15.5" r="1.6" fill="currentColor" />
+        <circle cx="15.5" cy="15.5" r="1.6" fill="currentColor" />
+      </symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24">
+        <rect x="5" y="10.5" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.8" />
+        <path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" fill="none" stroke="currentColor" stroke-width="1.8" />
+      </symbol>
+      <symbol id="i-prev" viewBox="0 0 24 24">
+        <path
+          d="M14.5 6 8.5 12l6 6"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </symbol>
+      <symbol id="i-next" viewBox="0 0 24 24">
+        <path
+          d="m9.5 6 6 6-6 6"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </symbol>
+      <symbol id="i-undo" viewBox="0 0 24 24">
+        <path
+          d="M9 7 4.5 11.5 9 16M5 11.5h9.5a5 5 0 0 1 0 10H12"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.9"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </symbol>
+      <symbol id="i-redo" viewBox="0 0 24 24">
+        <path
+          d="M15 7l4.5 4.5L15 16M19 11.5H9.5a5 5 0 0 0 0 10H12"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.9"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </symbol>
+      <symbol id="i-star" viewBox="0 0 24 24">
+        <path
+          d="m12 3.6 2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8Z"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.7"
+          stroke-linejoin="round"
+        />
+      </symbol>
+      <symbol id="i-download" viewBox="0 0 24 24">
+        <path
+          d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19.5h14"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </symbol>
+    </svg>
 
     <header class="site-header">
       <a class="brand" href="./">
@@ -59,53 +137,97 @@
         <span>Book Cover Generator</span>
       </a>
       <nav aria-label="Main">
-        <a href="#gallery">Styles</a>
-        <a href="#usage">Use the library</a>
+        <a href="#styles">Styles</a>
+        <a href="#usage">Library</a>
         <a href="https://github.com/otsirh/book-cover-generator">GitHub</a>
       </nav>
     </header>
 
-    <main class="workbench">
-      <h1 class="visually-hidden">Book Cover Generator</h1>
+    <section class="intro">
+      <h1>Type a title. Get a cover.</h1>
+      <p>34 styles · 28 palettes · free SVG, PNG and JPEG downloads</p>
+    </section>
 
+    <main class="app">
       <form class="controls" id="controls" autocomplete="off" aria-label="Cover settings">
         <label class="field">
-          <span>Title</span>
+          <span class="label">Title</span>
           <input id="title" name="title" type="text" maxlength="200" enterkeyhint="done" />
         </label>
         <label class="field">
-          <span>Author</span>
+          <span class="label">Author</span>
           <input id="author" name="author" type="text" maxlength="120" enterkeyhint="done" />
+        </label>
+        <label class="field">
+          <span class="label">Subtitle or tagline <small>(optional)</small></span>
+          <input id="subtitle" name="subtitle" type="text" maxlength="160" enterkeyhint="done" placeholder="A Novel" />
         </label>
 
         <div class="field">
-          <label for="style">Style</label>
-          <div class="row">
-            <select id="style" name="style"></select>
-            <button type="button" class="icon-btn" id="dice-style" title="Random style" aria-label="Random style">
-              <span aria-hidden="true">⚄</span>
-            </button>
+          <div class="label-row">
+            <span class="label" id="style-label">Style</span>
+            <span class="tools">
+              <button
+                type="button"
+                class="icon-btn"
+                id="prev-style"
+                aria-label="Previous style"
+                title="Previous style (←)"
+              >
+                <svg aria-hidden="true"><use href="#i-prev" /></svg>
+              </button>
+              <button type="button" class="icon-btn" id="next-style" aria-label="Next style" title="Next style (→)">
+                <svg aria-hidden="true"><use href="#i-next" /></svg>
+              </button>
+              <button type="button" class="icon-btn" id="dice-style" aria-label="Random style" title="Random style">
+                <svg aria-hidden="true"><use href="#i-dice" /></svg>
+              </button>
+              <button
+                type="button"
+                class="icon-btn lock"
+                id="lock-style"
+                aria-pressed="false"
+                aria-label="Keep this style when randomizing"
+                title="Keep this style when randomizing"
+              >
+                <svg aria-hidden="true"><use href="#i-lock" /></svg>
+              </button>
+            </span>
           </div>
+          <a class="current-style" href="#styles" id="style-name" aria-describedby="style-label"></a>
         </div>
 
         <div class="field">
           <div class="label-row">
-            <span id="palette-label">Palette</span>
-            <button
-              type="button"
-              class="icon-btn small"
-              id="dice-palette"
-              title="Random palette"
-              aria-label="Random palette"
-            >
-              <span aria-hidden="true">⚄</span>
-            </button>
+            <span class="label" id="palette-label">Palette</span>
+            <span class="tools">
+              <button
+                type="button"
+                class="icon-btn"
+                id="dice-palette"
+                aria-label="Random palette"
+                title="Random palette ([ and ] step through)"
+              >
+                <svg aria-hidden="true"><use href="#i-dice" /></svg>
+              </button>
+              <button
+                type="button"
+                class="icon-btn lock"
+                id="lock-palette"
+                aria-pressed="false"
+                aria-label="Keep this palette when randomizing"
+                title="Keep this palette when randomizing"
+              >
+                <svg aria-hidden="true"><use href="#i-lock" /></svg>
+              </button>
+            </span>
           </div>
           <div class="swatches" id="swatches" role="group" aria-labelledby="palette-label"></div>
+          <p class="swatch-name" id="palette-name" aria-hidden="true"></p>
         </div>
 
         <div class="field">
-          <label for="seed">Seed <small>(same seed, same artwork)</small></label>
+          <label class="label" for="seed">Variation <small>(same variation, same artwork)</small></label>
           <div class="row">
             <input
               id="seed"
@@ -114,58 +236,118 @@
               maxlength="40"
               spellcheck="false"
               autocapitalize="off"
-              placeholder="empty = from title"
+              placeholder="from the title"
             />
-            <button type="button" class="icon-btn" id="dice-seed" title="New seed" aria-label="New seed">
-              <span aria-hidden="true">⚄</span>
+            <button
+              type="button"
+              class="icon-btn boxed"
+              id="dice-seed"
+              aria-label="New variation"
+              title="New variation"
+            >
+              <svg aria-hidden="true"><use href="#i-dice" /></svg>
             </button>
           </div>
         </div>
 
         <div class="field">
-          <span id="format-label">Format</span>
+          <span class="label" id="format-label">Format</span>
           <div class="segmented" id="format" role="group" aria-labelledby="format-label">
-            <button type="button" data-format="paperback" title="2:3, like a 6×9 in paperback">Paperback</button>
+            <button type="button" data-format="paperback" title="2:3, like a 6 × 9 in paperback">Paperback</button>
             <button type="button" data-format="ebook" title="5:8, Kindle and most eBook stores">eBook</button>
             <button type="button" data-format="square" title="1:1, audiobooks">Square</button>
           </div>
         </div>
 
-        <button type="button" class="primary randomize" id="randomize" aria-keyshortcuts="R">
-          <span aria-hidden="true">⚄</span> Randomize everything <kbd aria-hidden="true">R</kbd>
-        </button>
+        <label class="switch">
+          <input type="checkbox" id="texture" role="switch" />
+          <span class="switch-track" aria-hidden="true"></span>
+          <span>Paper texture</span>
+        </label>
+
+        <div class="randomize-row">
+          <button type="button" class="primary" id="randomize" aria-keyshortcuts="R">
+            <svg aria-hidden="true"><use href="#i-dice" /></svg> Randomize
+          </button>
+          <button
+            type="button"
+            class="icon-btn boxed"
+            id="undo"
+            aria-label="Undo"
+            title="Undo (Z)"
+            aria-keyshortcuts="Z"
+            disabled
+          >
+            <svg aria-hidden="true"><use href="#i-undo" /></svg>
+          </button>
+          <button
+            type="button"
+            class="icon-btn boxed"
+            id="redo"
+            aria-label="Redo"
+            title="Redo (Shift+Z)"
+            aria-keyshortcuts="Shift+Z"
+            disabled
+          >
+            <svg aria-hidden="true"><use href="#i-redo" /></svg>
+          </button>
+        </div>
+        <p class="hint">
+          <kbd>R</kbd> randomize · <kbd>←</kbd><kbd>→</kbd> style · <kbd>[</kbd><kbd>]</kbd> palette · <kbd>Z</kbd> undo
+        </p>
       </form>
 
       <section class="stage" aria-labelledby="preview-heading">
         <h2 id="preview-heading" class="visually-hidden">Preview</h2>
-        <figure class="book" id="book">
-          <img id="preview" alt="Cover preview" width="600" height="900" />
-        </figure>
+        <div class="preview-wrap">
+          <figure class="book" id="book">
+            <img id="preview" alt="Cover preview" width="600" height="900" />
+            <img id="preview-prev" class="prev" alt="" aria-hidden="true" width="600" height="900" />
+          </figure>
+        </div>
         <p class="meta" id="meta"></p>
         <p class="visually-hidden" id="announce" aria-live="polite"></p>
-        <div class="actions">
-          <button type="button" id="copy-svg">Copy SVG</button>
-          <div class="download" role="group" aria-labelledby="download-label">
-            <span id="download-label" class="download-label">Download</span>
-            <button type="button" id="dl-svg" aria-label="Download SVG">SVG</button>
-            <button type="button" id="dl-png" aria-label="Download PNG">PNG</button>
-            <button type="button" id="dl-jpeg" aria-label="Download JPEG">JPEG</button>
-          </div>
-          <label class="scale">
-            <span>Size</span>
-            <select id="scale" name="scale"></select>
-          </label>
-        </div>
-      </section>
-    </main>
 
-    <section class="gallery-section" id="gallery" aria-labelledby="gallery-heading">
-      <div class="section-head">
-        <h2 id="gallery-heading">All styles</h2>
-        <p>Your title and author in every style. Click one to use it.</p>
-      </div>
-      <div class="gallery" id="gallery-grid"></div>
-    </section>
+        <div class="export">
+          <button type="button" class="primary download" id="dl-png">
+            <svg aria-hidden="true"><use href="#i-download" /></svg>
+            <span>Download PNG <small id="png-size"></small></span>
+          </button>
+          <div class="secondary" role="group" aria-label="More export options">
+            <button type="button" id="dl-jpeg" aria-label="Download JPEG">JPEG</button>
+            <button type="button" id="dl-svg" aria-label="Download SVG">SVG</button>
+            <button type="button" id="copy-svg">Copy SVG</button>
+            <button type="button" id="copy-link">Copy link</button>
+            <button type="button" id="keep" aria-label="Keep this design">
+              <svg aria-hidden="true"><use href="#i-star" /></svg> Keep
+            </button>
+          </div>
+          <div class="size">
+            <span class="label" id="scale-label">Size</span>
+            <div class="segmented compact" id="scale" role="group" aria-labelledby="scale-label">
+              <button type="button" data-scale="1">1×</button>
+              <button type="button" data-scale="2">2×</button>
+              <button type="button" data-scale="3">3×</button>
+              <button type="button" data-scale="4">4×</button>
+            </div>
+          </div>
+          <p class="size-hint" id="size-hint"></p>
+        </div>
+
+        <section class="kept" id="kept" aria-labelledby="kept-heading" hidden>
+          <h2 id="kept-heading">Kept designs</h2>
+          <ul class="kept-list" id="kept-list"></ul>
+        </section>
+      </section>
+
+      <aside class="rail" id="styles" aria-labelledby="rail-heading">
+        <div class="rail-head">
+          <h2 id="rail-heading">Styles</h2>
+          <p id="rail-note"></p>
+        </div>
+        <div class="rail-body" id="rail"></div>
+      </aside>
+    </main>
 
     <section class="usage" id="usage" aria-labelledby="usage-heading">
       <div class="section-head">
@@ -190,11 +372,12 @@ document.body.innerHTML = svg;</code></pre>
           <h3>Node / bundlers</h3>
           <pre tabindex="0"><code>npm install "github:otsirh/book-cover-generator#semver:^1"
 
-import { createCover, styles } from 'book-cover-generator';
+import { createCover } from 'book-cover-generator';
 
 const { svg, style, palette, seed } = createCover({
   title: 'Dune Sea',
   author: 'A. Writer',
+  subtitle: 'A Novel',
   seed: 42,          // same seed → same art
   width: 1600, height: 2560,
 });</code></pre>
@@ -208,6 +391,15 @@ const { svg, style, palette, seed } = createCover({
         <a href="https://github.com/otsirh/book-cover-generator/blob/main/CHANGELOG.md">Changelog</a>
       </p>
     </footer>
+
+    <div class="mobile-bar" aria-hidden="true">
+      <button type="button" class="primary" id="m-randomize" tabindex="-1">
+        <svg aria-hidden="true"><use href="#i-dice" /></svg> Randomize
+      </button>
+      <button type="button" class="primary download" id="m-download" tabindex="-1">
+        <svg aria-hidden="true"><use href="#i-download" /></svg> PNG
+      </button>
+    </div>
 
     <noscript><p class="noscript">This generator needs JavaScript to draw covers.</p></noscript>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>

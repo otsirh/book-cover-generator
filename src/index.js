@@ -3,19 +3,20 @@
 //   import { generateCover } from 'book-cover-generator';
 //   const svg = generateCover({ title: 'Dune', author: 'Frank Herbert', style: 'retro' });
 
-import { createRng, hashString, isHex, luminance, escapeXml, stripInvalidXml } from './core.js';
+import { createRng, hashString, isHex, luminance, escapeXml, stripInvalidXml, grain } from './core.js';
 import { palettes } from './palettes.js';
 import { styleList } from './styles/index.js';
 
 export { palettes } from './palettes.js';
 export { FONTS, fitText, drawText, measureText, setTextMeasurer } from './text.js';
+export { titleBlock, authorFit, fitStack, drawStack, splitLead } from './type.js';
 export * as svgUtils from './core.js';
 
 const registry = new Map(styleList.map((s) => [s.id, s]));
 
-/** Metadata for every available style: [{ id, name, description }] */
+/** Metadata for every available style: [{ id, name, description, group }] */
 export function listStyles() {
-  return [...registry.values()].map(({ id, name, description }) => ({ id, name, description }));
+  return [...registry.values()].map(({ id, name, description, group }) => ({ id, name, description, group }));
 }
 
 /** Ids of every available style. */
@@ -30,7 +31,7 @@ export function registerStyle(style) {
   if (!style || !style.id || typeof style.render !== 'function') {
     throw new TypeError('registerStyle: a style needs an `id` and a `render(ctx)` function');
   }
-  registry.set(style.id, { name: style.id, description: '', ...style });
+  registry.set(style.id, { name: style.id, description: '', group: 'Custom', ...style });
   if (!styles.includes(style.id)) styles.push(style.id);
 }
 
@@ -76,12 +77,18 @@ function resolvePalette(palette, rng, style) {
   return normalizePalette(found);
 }
 
-/** Collapse control characters and whitespace; drop anything illegal in XML. */
-function cleanText(value) {
+/**
+ * Collapse control characters and whitespace, drop anything illegal in XML and
+ * cap the length (so huge inputs can't make layout slow).
+ * @param {unknown} value
+ * @param {number} max  maximum length in characters
+ */
+function cleanText(value, max) {
   // eslint-disable-next-line no-control-regex -- matching control characters is the point
-  return stripInvalidXml(String(value ?? '').replace(/[\u0000-\u001F\u007F-\u009F]/g, ' '))
+  const text = stripInvalidXml(String(value ?? '').replace(/[\u0000-\u001F\u007F-\u009F]/g, ' '))
     .replace(/\s+/g, ' ')
     .trim();
+  return text.length > max ? Array.from(text).slice(0, max).join('').trimEnd() : text;
 }
 
 /**
@@ -112,8 +119,9 @@ function dimension(value, fallback, name) {
  * @returns {import('./index.js').Cover}
  */
 export function createCover(options = {}) {
-  const title = cleanText(options.title) || 'Untitled';
-  const author = cleanText(options.author);
+  const title = cleanText(options.title, 300) || 'Untitled';
+  const author = cleanText(options.author, 200);
+  const subtitle = cleanText(options.subtitle, 300);
   const W = dimension(options.width, 600, 'width');
   const H = dimension(options.height, W * 1.5, 'height');
   if (W / H > 3 || H / W > 3) {
@@ -128,12 +136,15 @@ export function createCover(options = {}) {
   const [paper, night] =
     luminance(palette.bg) >= luminance(palette.ink) ? [palette.bg, palette.ink] : [palette.ink, palette.bg];
 
-  const uid = 'bc' + hashString(JSON.stringify([title, author, seed, styleId, palette, W, H])).toString(36);
+  const uid =
+    'bc' +
+    hashString(JSON.stringify([title, author, subtitle, seed, styleId, palette, W, H, !!options.texture])).toString(36);
   const short = Math.min(W, H);
   /** @type {import('./index.js').StyleContext} */
   const ctx = {
     title,
     author,
+    subtitle,
     W,
     H,
     S: short,
@@ -144,8 +155,15 @@ export function createCover(options = {}) {
     id: (name) => `${uid}-${name}`,
   };
 
-  const body = style.render(ctx);
-  const label = escapeXml(author ? `${title} by ${author}` : title);
+  let body = style.render(ctx);
+  if (options.texture) {
+    // Film grain over the whole cover. Styles paint their own backgrounds, so lay
+    // dark and light specks (from different noise) to show on any colour.
+    const dark = grain(ctx, { opacity: 0.1, id: 'texture-dark', seed: 3 });
+    const light = grain(ctx, { opacity: 0.08, light: true, id: 'texture-light', seed: 11 });
+    body += `<defs>${dark.defs}${light.defs}</defs>${dark.layer}${light.layer}`;
+  }
+  const label = escapeXml(`${title}${subtitle ? `: ${subtitle}` : ''}${author ? ` by ${author}` : ''}`);
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${label}">` +
     `<title>${label}</title>${body}</svg>`;

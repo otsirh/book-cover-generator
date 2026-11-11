@@ -97,7 +97,14 @@ const server = createServer(async (req, res) => {
     res.writeHead(400).end('Bad request');
     return;
   }
-  const hidden = urlPath.split('/').some((seg) => seg.startsWith('_') || seg === 'node_modules' || seg === '.git');
+  // Never serve dotfiles (except .well-known), underscore files or node_modules, whatever the case or separator.
+  const hidden = urlPath
+    .toLowerCase()
+    .split(/[\\/]/)
+    .some(
+      (seg) =>
+        (seg.startsWith('.') && seg !== '.well-known' && seg !== '..') || seg.startsWith('_') || seg === 'node_modules',
+    );
   let file = hidden ? null : await locate(urlPath);
   let status = 200;
   if (!file) {

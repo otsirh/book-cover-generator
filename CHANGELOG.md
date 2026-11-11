@@ -4,6 +4,49 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-12
+
+A redesign of the covers and the app, based on a design review.
+
+### Added
+
+- Seven styles: **Big Type**, **Thriller**, **Botanical**, **Engraved**, **Paper Cut**, **Silhouette** (city or forest) and **Blueprint**, for 34 in total, grouped into six families (`listStyles()` returns each style's `group`).
+- Eight palettes, for 28 in total: Mono, Clean, Riso, Pastel, Sage, Oxblood, Thriller and Dusk.
+- `subtitle` and `texture` options.
+- Typography helpers for custom styles: `titleBlock`, `authorFit`, `fitStack`, `drawStack` and `splitLead`, plus `StyleContext.subtitle`.
+- The app:
+  - a style rail with live thumbnails grouped by family;
+  - undo and redo, wired to the browser's Back and Forward buttons, with a burst of typing counting as one step;
+  - locks for style and palette;
+  - Keep, which saves designs to a tray;
+  - Copy link;
+  - a primary Download PNG button, a 1×–4× size picker and size hints for Kindle, print and audiobook covers;
+  - keyboard shortcuts for styles, palettes and undo;
+  - a visible headline;
+  - on phones, a preview pinned while you edit and a bottom action bar;
+  - a cross-fade between covers.
+
+### Changed
+
+- Every style now uses one typography system. Titles grow with the space (short titles are set large), "The", "A" and "An" become a small line above the title, some styles stack words edge to edge, and author names are bigger and bolder.
+- Styles follow the palette: Art Deco, Retro Sun, Constellation, Orbit and Noir have light variants, and Classic Paperback no longer turns every dark palette mustard.
+- Reworked styles:
+  - **Noir:** a lamp, a figure, and blind shadows over the title.
+  - **Memphis:** dense, with the title on a colour block.
+  - **Typewriter:** a manuscript title page.
+  - **Pixel:** an 8-bit scene with pixel lettering and scanlines.
+- Topographic and Flow Field set the title directly on the artwork; Big Letter uses two letters when the initial is narrow; Concentric chooses ring colours by contrast; Bauhaus gives up a row of shapes for long titles.
+- Palette swatches are small covers showing the background, ink and accents.
+
+### Fixed
+
+- Title blocks always stay inside their space, including descenders, the lead line and the subtitle.
+- Font names in SVG attributes are escaped, so custom fonts with quotes produce valid SVG.
+- Typewriter keeps Arabic and Hebrew titles joined and in the right direction.
+- Very long titles no longer slow layout (inputs are capped and wrapping stops early).
+- The texture grain is visible on light and dark covers.
+- The dev server never serves dotfiles, whatever the letter case, and browser tests use their own port.
+
 ## [1.1.0] - 2026-11-12
 
 ### Added
@@ -55,6 +98,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 - First release: 27 styles, 20 palettes, seeded randomizer, text fitting, CLI and the web app with SVG, PNG and JPEG export.
 
-[Unreleased]: https://github.com/otsirh/book-cover-generator/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/otsirh/book-cover-generator/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/otsirh/book-cover-generator/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/otsirh/book-cover-generator/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/otsirh/book-cover-generator/releases/tag/v1.0.0

@@ -64,6 +64,10 @@ export interface GrainOptions {
   opacity?: number;
   light?: boolean;
   freq?: number;
+  /** Filter id suffix, when a cover needs more than one grain filter. Default `'grain'`. */
+  id?: string;
+  /** Noise seed, so two grain layers don't line up. Default 0. */
+  seed?: number;
 }
 export declare function grain(
   c: { id(name: string): string; readonly u: number; readonly W: number; readonly H: number },

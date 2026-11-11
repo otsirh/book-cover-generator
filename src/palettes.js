@@ -13,6 +13,11 @@ export const palettes = [
   { id: 'citrus', name: 'Citrus', bg: '#fbf5e4', ink: '#1b2d2a', accents: ['#f28c28', '#2d6a4f', '#e9c46a'] },
   { id: 'mustard', name: 'Mustard', bg: '#e9b949', ink: '#1e1b18', accents: ['#b33f2a', '#2f4858', '#f6eedf'] },
   { id: 'tangerine', name: 'Tangerine', bg: '#ee7b3a', ink: '#1d1a17', accents: ['#fff2dc', '#2b3a67', '#f9d56e'] },
+  { id: 'mono', name: 'Mono', bg: '#f4f1ea', ink: '#111111', accents: ['#d7261e', '#3a3a3a', '#b9b4aa'] },
+  { id: 'clean', name: 'Clean', bg: '#ffffff', ink: '#14161a', accents: ['#2f49d1', '#14161a', '#c9ccd6'] },
+  { id: 'riso', name: 'Riso', bg: '#f3efe6', ink: '#1d2340', accents: ['#ff48b0', '#0078bf', '#ffe800'] },
+  { id: 'pastel', name: 'Pastel', bg: '#f6e9f0', ink: '#2b2350', accents: ['#a7d3c9', '#f3b8c6', '#3b2f73'] },
+  { id: 'sage', name: 'Sage', bg: '#dfe5d6', ink: '#23302a', accents: ['#7d9a7a', '#c96f4a', '#efe8d6'] },
   // dark
   {
     id: 'midnight',
@@ -52,4 +57,21 @@ export const palettes = [
     dark: true,
   },
   { id: 'teal', name: 'Teal', bg: '#0f6466', ink: '#f9f4e8', accents: ['#f0c808', '#f26157', '#d8e2dc'], dark: true },
+  {
+    id: 'oxblood',
+    name: 'Oxblood',
+    bg: '#4a0f17',
+    ink: '#f3e6d3',
+    accents: ['#d8b26e', '#e8d5b7', '#a8433d'],
+    dark: true,
+  },
+  {
+    id: 'thriller',
+    name: 'Thriller',
+    bg: '#0d0d0d',
+    ink: '#f2f2f2',
+    accents: ['#ffd200', '#e10600', '#bdbdbd'],
+    dark: true,
+  },
+  { id: 'dusk', name: 'Dusk', bg: '#2d1e3f', ink: '#fbe9d6', accents: ['#ff8a5b', '#ffd28a', '#9a7fd1'], dark: true },
 ];

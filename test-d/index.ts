@@ -11,7 +11,11 @@ import generateDefault, {
   drawText,
   FONTS,
   svgUtils,
+  titleBlock,
+  authorFit,
+  splitLead,
   type Cover,
+  type StyleGroup,
   type StyleContext,
   type StyleInfo,
 } from '../src/index.js';
@@ -31,6 +35,9 @@ const fromDefault: string = generateDefault();
 createCover({ palette: { bg: '#000', ink: '#fff', accents: ['#f00'] } });
 createCover({ style: 'random', palette: 'auto', seed: randomSeed() });
 createCover({ style: 'my-registered-style' });
+createCover({ title: 'T', subtitle: 'A Novel', texture: true, style: 'botanical', palette: 'riso' });
+// @ts-expect-error texture is a boolean
+createCover({ texture: 'yes' });
 
 // @ts-expect-error width must be a number
 createCover({ width: '600' });
@@ -41,16 +48,26 @@ createCover({ palette: { bg: '#000', ink: '#fff' } });
 
 const ids: string[] = styles;
 const info: StyleInfo[] = listStyles();
+const group: StyleGroup | (string & {}) = info[0].group;
+const lead: string = splitLead('The End').lead;
 const firstPalette: string = palettes[0].bg;
 
 registerStyle({
   id: 'plain',
   name: 'Plain',
+  group: 'Typographic',
   prefer: 'dark',
   render(c: StyleContext) {
     const t = fitText(c.title, { font: FONTS.serif, maxWidth: c.W - c.m * 2, maxSize: c.W * 0.1 });
     const r = c.rng.int(1, 3);
-    return svgUtils.rect(0, 0, c.W, c.H, c.p.night) + drawText(t, { x: c.m, y: c.m * r, fill: c.p.paper });
+    const block = titleBlock(c, { maxWidth: c.W - c.m * 2, maxHeight: c.H / 2, maxSize: c.S * 0.2, stack: true });
+    const a = authorFit(c, { maxSize: c.S * 0.05 });
+    return (
+      svgUtils.rect(0, 0, c.W, c.H, c.p.night) +
+      drawText(t, { x: c.m, y: c.m * r, fill: c.p.paper }) +
+      block.draw({ x: c.m, y: c.H / 2, fill: c.p.ink, lineFills: [c.p.accents[0]] }) +
+      drawText(a, { x: c.m, y: c.H - c.m, fill: c.subtitle ? c.p.ink : c.p.paper })
+    );
   },
 });
 // @ts-expect-error render is required
@@ -68,4 +85,4 @@ void copyText(svgToDataUrl(svg));
 // @ts-expect-error gif is not supported
 void downloadCover(svg, 'gif');
 
-export { fromDefault, ids, info, firstPalette, blob };
+export { fromDefault, ids, info, firstPalette, blob, group, lead };

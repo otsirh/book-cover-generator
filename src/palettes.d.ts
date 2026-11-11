@@ -9,6 +9,11 @@ export type PaletteId =
   | 'citrus'
   | 'mustard'
   | 'tangerine'
+  | 'mono'
+  | 'clean'
+  | 'riso'
+  | 'pastel'
+  | 'sage'
   | 'midnight'
   | 'noir'
   | 'forest'
@@ -18,7 +23,10 @@ export type PaletteId =
   | 'ink'
   | 'rust'
   | 'cobalt'
-  | 'teal';
+  | 'teal'
+  | 'oxblood'
+  | 'thriller'
+  | 'dusk';
 
 export interface Palette {
   readonly id: string;

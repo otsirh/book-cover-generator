@@ -3,10 +3,10 @@ import { createCover } from '../src/index.js';
 
 /** @type {[title: string, author: string, style: string, palette: string, seed: string, x: number, y: number, rotate: number][]} */
 const covers = [
-  ['Neon Tide', 'Kai Moreno', 'retro', 'synth', 's2', 30, 150, -8],
+  ['Neon Tide', 'Kai Moreno', 'thriller', 'thriller', 's2', 30, 150, -8],
   ['The Lighthouse Keeper', 'Mara Ellison', 'artdeco', 'midnight', 's1', 190, 95, -2],
-  ['Bright Machines', 'Yuki Tanaka', 'bauhaus', 'bauhaus', 's5', 350, 140, 4],
-  ['Small Gods of Winter', 'Ines Calder', 'constellation', 'deepsea', 's4', 500, 200, 9],
+  ['The Glass Orchard', 'Theo Vance', 'botanical', 'sage', 's3', 350, 140, 4],
+  ['Signal Lost', 'R. M. Price', 'bigtype', 'riso', 's4', 500, 200, 9],
 ];
 const loads = covers.map(([title, author, style, palette, seed, x, y, rot], i) => {
   const img = new Image();
