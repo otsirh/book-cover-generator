@@ -1,0 +1,51 @@
+body {
+  margin: 0;
+  width: 1200px;
+  height: 630px;
+  overflow: hidden;
+  background: #f5f2ec;
+  font-family: Georgia, serif;
+  display: flex;
+  align-items: center;
+}
+.text {
+  flex: 0 0 470px;
+  padding-left: 72px;
+  color: #1d1b18;
+}
+h1 {
+  font-size: 58px;
+  line-height: 1.02;
+  margin: 0 0 18px;
+  letter-spacing: -0.01em;
+}
+p {
+  font:
+    400 24px/1.4 'Helvetica Neue',
+    Helvetica,
+    Arial,
+    sans-serif;
+  color: #6d675e;
+  margin: 0 0 26px;
+}
+.url {
+  font:
+    600 22px 'Helvetica Neue',
+    Helvetica,
+    Arial,
+    sans-serif;
+  color: #c2410c;
+}
+.covers {
+  position: relative;
+  flex: 1;
+  height: 630px;
+}
+.covers img {
+  position: absolute;
+  width: 250px;
+  border-radius: 3px 6px 6px 3px;
+  box-shadow:
+    0 2px 4px rgb(0 0 0 / 0.15),
+    0 24px 40px -12px rgb(0 0 0 / 0.45);
+}

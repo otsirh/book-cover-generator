@@ -3,109 +3,178 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Book Cover Generator</title>
-    <meta name="description" content="Generate book covers from a title and an author. 27 styles, 20 palettes, export as SVG, PNG or JPEG." />
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='6' y='3' width='20' height='26' rx='2' fill='%23c2410c'/%3E%3Crect x='6' y='3' width='4' height='26' fill='%237c2d12'/%3E%3Crect x='13' y='9' width='9' height='2' fill='%23fff'/%3E%3C/svg%3E" />
+    <title>Book Cover Generator: covers from a title and an author</title>
+    <meta
+      name="description"
+      content="Generate a book cover from a title and an author. 27 styles, 20 palettes and a seeded randomizer. Copy the SVG or download SVG, PNG or JPEG. Free and open source."
+    />
+    <link rel="canonical" href="https://covers.otsirh.dev/" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#f5f2ec" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#141312" media="(prefers-color-scheme: dark)" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Book Cover Generator" />
+    <meta property="og:title" content="Book Cover Generator" />
+    <meta
+      property="og:description"
+      content="A book cover from a title and an author. 27 styles, 20 palettes, export to SVG, PNG or JPEG."
+    />
+    <meta property="og:url" content="https://covers.otsirh.dev/" />
+    <meta property="og:image" content="https://covers.otsirh.dev/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="A row of generated book covers in different styles" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <link rel="manifest" href="manifest.webmanifest" />
+
     <link rel="stylesheet" href="site/style.css" />
+    <link rel="modulepreload" href="site/app.js" />
+    <link rel="modulepreload" href="src/index.js" />
+    <link rel="modulepreload" href="src/browser.js" />
+    <link rel="modulepreload" href="src/core.js" />
+    <link rel="modulepreload" href="src/text.js" />
+    <link rel="modulepreload" href="src/palettes.js" />
+    <link rel="modulepreload" href="src/styles/index.js" />
+    <link rel="modulepreload" href="src/styles/geometric.js" />
+    <link rel="modulepreload" href="src/styles/scenic.js" />
+    <link rel="modulepreload" href="src/styles/generative.js" />
+    <link rel="modulepreload" href="src/styles/vintage.js" />
+    <script type="module" src="site/app.js"></script>
   </head>
   <body>
+    <a class="skip-link" href="#controls">Skip to the generator</a>
+
     <header class="site-header">
       <a class="brand" href="./">
-        <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="6" y="3" width="20" height="26" rx="2" fill="currentColor" /><rect x="6" y="3" width="4" height="26" fill="#000" opacity=".3" /><rect x="13" y="9" width="9" height="2" fill="#fff" /></svg>
+        <svg viewBox="0 0 32 32" aria-hidden="true">
+          <rect x="6" y="3" width="20" height="26" rx="2" fill="currentColor" />
+          <rect x="6" y="3" width="4" height="26" fill="#000" opacity=".3" />
+          <rect x="13" y="9" width="9" height="2" fill="#fff" />
+        </svg>
         <span>Book Cover Generator</span>
       </a>
-      <nav>
+      <nav aria-label="Main">
         <a href="#gallery">Styles</a>
         <a href="#usage">Use the library</a>
-        <a href="https://github.com/otsirh/book-cover-generator" rel="noopener">GitHub</a>
+        <a href="https://github.com/otsirh/book-cover-generator">GitHub</a>
       </nav>
     </header>
 
     <main class="workbench">
-      <form class="controls" id="controls" autocomplete="off" onsubmit="return false">
+      <h1 class="visually-hidden">Book Cover Generator</h1>
+
+      <form class="controls" id="controls" autocomplete="off" aria-label="Cover settings">
         <label class="field">
           <span>Title</span>
-          <input id="title" type="text" maxlength="200" />
+          <input id="title" name="title" type="text" maxlength="200" enterkeyhint="done" />
         </label>
         <label class="field">
           <span>Author</span>
-          <input id="author" type="text" maxlength="120" />
+          <input id="author" name="author" type="text" maxlength="120" enterkeyhint="done" />
         </label>
 
         <div class="field">
           <label for="style">Style</label>
           <div class="row">
-            <select id="style"></select>
-            <button type="button" class="icon-btn" id="dice-style" title="Random style" aria-label="Random style">⚄</button>
+            <select id="style" name="style"></select>
+            <button type="button" class="icon-btn" id="dice-style" title="Random style" aria-label="Random style">
+              <span aria-hidden="true">⚄</span>
+            </button>
           </div>
         </div>
 
         <div class="field">
           <div class="label-row">
-            <span>Palette</span>
-            <button type="button" class="icon-btn small" id="dice-palette" title="Random palette" aria-label="Random palette">⚄</button>
+            <span id="palette-label">Palette</span>
+            <button
+              type="button"
+              class="icon-btn small"
+              id="dice-palette"
+              title="Random palette"
+              aria-label="Random palette"
+            >
+              <span aria-hidden="true">⚄</span>
+            </button>
           </div>
-          <div class="swatches" id="swatches" role="radiogroup" aria-label="Palette"></div>
+          <div class="swatches" id="swatches" role="group" aria-labelledby="palette-label"></div>
         </div>
 
         <div class="field">
-          <label for="seed">Seed <small>— same seed, same artwork</small></label>
+          <label for="seed">Seed <small>(same seed, same artwork)</small></label>
           <div class="row">
-            <input id="seed" type="text" maxlength="40" spellcheck="false" placeholder="empty = from title" />
-            <button type="button" class="icon-btn" id="dice-seed" title="New seed" aria-label="New seed">⚄</button>
+            <input
+              id="seed"
+              name="seed"
+              type="text"
+              maxlength="40"
+              spellcheck="false"
+              autocapitalize="off"
+              placeholder="empty = from title"
+            />
+            <button type="button" class="icon-btn" id="dice-seed" title="New seed" aria-label="New seed">
+              <span aria-hidden="true">⚄</span>
+            </button>
           </div>
         </div>
 
         <div class="field">
-          <span>Format</span>
-          <div class="segmented" id="format" role="radiogroup" aria-label="Format">
-            <button type="button" data-format="paperback" role="radio" title="2:3 — 6×9 in paperback">Paperback</button>
-            <button type="button" data-format="ebook" role="radio" title="5:8 — Kindle / eBook">eBook</button>
-            <button type="button" data-format="square" role="radio" title="1:1 — audiobook">Square</button>
+          <span id="format-label">Format</span>
+          <div class="segmented" id="format" role="group" aria-labelledby="format-label">
+            <button type="button" data-format="paperback" title="2:3, like a 6×9 in paperback">Paperback</button>
+            <button type="button" data-format="ebook" title="5:8, Kindle and most eBook stores">eBook</button>
+            <button type="button" data-format="square" title="1:1, audiobooks">Square</button>
           </div>
         </div>
 
-        <button type="button" class="primary randomize" id="randomize">
-          <span aria-hidden="true">⚄</span> Randomize everything <kbd>R</kbd>
+        <button type="button" class="primary randomize" id="randomize" aria-keyshortcuts="R">
+          <span aria-hidden="true">⚄</span> Randomize everything <kbd aria-hidden="true">R</kbd>
         </button>
       </form>
 
-      <section class="stage" aria-label="Preview">
+      <section class="stage" aria-labelledby="preview-heading">
+        <h2 id="preview-heading" class="visually-hidden">Preview</h2>
         <figure class="book" id="book">
-          <img id="preview" alt="Generated book cover" />
+          <img id="preview" alt="Cover preview" width="600" height="900" />
         </figure>
-        <p class="meta" id="meta"></p>
+        <p class="meta" id="meta" aria-live="polite"></p>
         <div class="actions">
           <button type="button" id="copy-svg">Copy SVG</button>
-          <button type="button" id="dl-svg">SVG</button>
-          <button type="button" id="dl-png">PNG</button>
-          <button type="button" id="dl-jpeg">JPEG</button>
+          <div class="download" role="group" aria-labelledby="download-label">
+            <span id="download-label" class="download-label">Download</span>
+            <button type="button" id="dl-svg" aria-label="Download SVG">SVG</button>
+            <button type="button" id="dl-png" aria-label="Download PNG">PNG</button>
+            <button type="button" id="dl-jpeg" aria-label="Download JPEG">JPEG</button>
+          </div>
           <label class="scale">
-            <span>Raster size</span>
-            <select id="scale"></select>
+            <span>Size</span>
+            <select id="scale" name="scale"></select>
           </label>
         </div>
       </section>
     </main>
 
-    <section class="gallery-section" id="gallery">
+    <section class="gallery-section" id="gallery" aria-labelledby="gallery-heading">
       <div class="section-head">
-        <h2>All styles</h2>
+        <h2 id="gallery-heading">All styles</h2>
         <p>Your title and author in every style. Click one to use it.</p>
       </div>
       <div class="gallery" id="gallery-grid"></div>
     </section>
 
-    <section class="usage" id="usage">
+    <section class="usage" id="usage" aria-labelledby="usage-heading">
       <div class="section-head">
-        <h2>Use the library</h2>
-        <p>Zero dependencies, plain ES modules. Works in the browser and in Node.</p>
+        <h2 id="usage-heading">Use the library</h2>
+        <p>Zero dependencies, plain ES modules, TypeScript types included. Works in the browser and in Node.</p>
       </div>
       <div class="code-grid">
         <div>
           <h3>Browser (CDN)</h3>
-<pre><code>import { generateCover } from
-  'https://cdn.jsdelivr.net/gh/otsirh/book-cover-generator@main/src/index.js';
+          <pre tabindex="0"><code>import { generateCover } from
+  'https://cdn.jsdelivr.net/gh/otsirh/book-cover-generator@1/src/index.js';
 
 const svg = generateCover({
   title: 'The Lighthouse Keeper',
@@ -117,7 +186,7 @@ document.body.innerHTML = svg;</code></pre>
         </div>
         <div>
           <h3>Node / bundlers</h3>
-<pre><code>npm install github:otsirh/book-cover-generator
+          <pre tabindex="0"><code>npm install "github:otsirh/book-cover-generator#semver:^1"
 
 import { createCover, styles } from 'book-cover-generator';
 
@@ -132,10 +201,13 @@ const { svg, style, palette, seed } = createCover({
     </section>
 
     <footer class="site-footer">
-      <p>MIT licensed · <a href="https://github.com/otsirh/book-cover-generator">Source on GitHub</a></p>
+      <p>
+        MIT licensed · <a href="https://github.com/otsirh/book-cover-generator">Source on GitHub</a> ·
+        <a href="https://github.com/otsirh/book-cover-generator/blob/main/CHANGELOG.md">Changelog</a>
+      </p>
     </footer>
 
+    <noscript><p class="noscript">This generator needs JavaScript to draw covers.</p></noscript>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="site/app.js"></script>
   </body>
 </html>
