@@ -2,7 +2,7 @@
 
 Generate book covers from a **title** and an **author**. 27 styles, 20 palettes, a seeded randomizer, and export to **SVG, PNG or JPEG**. It has no dependencies and is written as plain ES modules, so it runs in the browser and in Node.
 
-**[▶ Open the generator](https://otsirh.github.io/book-cover-generator/)**
+**[▶ Open the generator](https://covers.otsirh.dev)**
 
 ![Sample covers](docs/preview.png)
 
@@ -17,7 +17,7 @@ Generate book covers from a **title** and an **author**. 27 styles, 20 palettes,
 
 ## The web app
 
-The page at <https://otsirh.github.io/book-cover-generator/> lets you type a title and author, then pick a style, a palette and a seed (or roll the dice for any of them). You can also press **R** to randomize everything. The page shows your book in every style at once, and the URL keeps your settings, so you can share a design by sharing the link.
+The page at <https://covers.otsirh.dev> lets you type a title and author, then pick a style, a palette and a seed (or roll the dice for any of them). You can also press **R** to randomize everything. The page shows your book in every style at once, and the URL keeps your settings, so you can share a design by sharing the link.
 
 ## Library usage
 
@@ -151,7 +151,10 @@ registerStyle({
 ```sh
 npm test                    # node --test
 python3 -m http.server      # then open http://localhost:8000
+npm run deploy              # build dist/ and deploy to Cloudflare
 ```
+
+Pushes to `main` are tested and then deployed to <https://covers.otsirh.dev> by GitHub Actions (`.github/workflows/deploy.yml`). Deploys need a `CLOUDFLARE_API_TOKEN` repository secret.
 
 Open `examples/contact-sheet.html?palettes=noir,mint&seeds=a,b` to see many covers at once.
 

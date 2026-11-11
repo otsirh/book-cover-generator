@@ -16,7 +16,9 @@
     "bin"
   ],
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "build": "node scripts/build.js",
+    "deploy": "npx --yes wrangler@4.160.1 deploy"
   },
   "keywords": [
     "book",
@@ -30,7 +32,7 @@
     "type": "git",
     "url": "git+https://github.com/otsirh/book-cover-generator.git"
   },
-  "homepage": "https://otsirh.github.io/book-cover-generator/",
+  "homepage": "https://covers.otsirh.dev/",
   "license": "MIT",
   "engines": {
     "node": ">=18"

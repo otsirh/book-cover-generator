@@ -1,0 +1,10 @@
+{
+  // Static site served by Cloudflare Workers (static assets only, no script).
+  // Deploy: npx wrangler deploy   (runs `npm run build` first)
+  "name": "book-cover-generator",
+  "account_id": "a52b39ef7a73da0cc3ba58fccc491a55",
+  "compatibility_date": "2026-11-01",
+  "build": { "command": "npm run build" },
+  "assets": { "directory": "./dist" },
+  "routes": [{ "pattern": "covers.otsirh.dev", "custom_domain": true }]
+}
