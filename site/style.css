@@ -419,6 +419,7 @@ kbd {
 }
 
 .meta {
+  min-height: 1.5em;
   margin: 4px 0 0;
   font-size: 13.5px;
   color: var(--muted);
