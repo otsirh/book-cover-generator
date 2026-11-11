@@ -1,0 +1,29 @@
+// Curated palettes. Every palette has a background, an ink colour with strong
+// contrast against it, and three accents. `dark` marks dark backgrounds.
+
+export const palettes = [
+  // light
+  { id: 'parchment', name: 'Parchment', bg: '#f2e8d5', ink: '#2b2320', accents: ['#b5432f', '#2e5c6e', '#d9a441'] },
+  { id: 'bauhaus', name: 'Bauhaus', bg: '#f0ebe0', ink: '#141414', accents: ['#d62828', '#1d4e89', '#f2b705'] },
+  { id: 'mint', name: 'Mint', bg: '#e4f1ea', ink: '#12332b', accents: ['#2a9d8f', '#e76f51', '#f4a261'] },
+  { id: 'blush', name: 'Blush', bg: '#f7e1dc', ink: '#3a1f2b', accents: ['#d1495b', '#00798c', '#edae49'] },
+  { id: 'sky', name: 'Sky', bg: '#e3edf7', ink: '#0f2741', accents: ['#3d7cc9', '#f2a65a', '#e05d5d'] },
+  { id: 'sand', name: 'Sand', bg: '#ede0c8', ink: '#3b2f2a', accents: ['#a0522d', '#6b8f71', '#d4a373'] },
+  { id: 'lilac', name: 'Lilac', bg: '#ebe4f4', ink: '#2a1f3d', accents: ['#7b5ea7', '#e09f3e', '#3a8a8c'] },
+  { id: 'citrus', name: 'Citrus', bg: '#fbf5e4', ink: '#1b2d2a', accents: ['#f28c28', '#2d6a4f', '#e9c46a'] },
+  { id: 'mustard', name: 'Mustard', bg: '#e9b949', ink: '#1e1b18', accents: ['#b33f2a', '#2f4858', '#f6eedf'] },
+  { id: 'tangerine', name: 'Tangerine', bg: '#ee7b3a', ink: '#1d1a17', accents: ['#fff2dc', '#2b3a67', '#f9d56e'] },
+  // dark
+  { id: 'midnight', name: 'Midnight', bg: '#0e1b2c', ink: '#f4ecd8', accents: ['#e2b04a', '#4f86c6', '#d1603d'], dark: true },
+  { id: 'noir', name: 'Noir', bg: '#121212', ink: '#f5f1e8', accents: ['#e63946', '#a8dadc', '#9a9a9a'], dark: true },
+  { id: 'forest', name: 'Forest', bg: '#13261f', ink: '#efe6d2', accents: ['#d9a441', '#6a994e', '#c8553d'], dark: true },
+  { id: 'wine', name: 'Wine', bg: '#2a0f1a', ink: '#f6e3d4', accents: ['#e07a5f', '#f2cc8f', '#81b29a'], dark: true },
+  { id: 'deepsea', name: 'Deep Sea', bg: '#06283d', ink: '#dff6ff', accents: ['#47b5ff', '#ffb84c', '#f16767'], dark: true },
+  { id: 'synth', name: 'Synth', bg: '#1a0b2e', ink: '#fdf0ff', accents: ['#ff3cac', '#2bd2ff', '#ffcc00'], dark: true },
+  { id: 'ink', name: 'Ink', bg: '#1c1c28', ink: '#ece6da', accents: ['#c9a227', '#8b5cf6', '#ef6f6c'], dark: true },
+  { id: 'rust', name: 'Rust', bg: '#3d1f14', ink: '#f7e7ce', accents: ['#e8a33d', '#d9572b', '#7aa095'], dark: true },
+  { id: 'cobalt', name: 'Cobalt', bg: '#1f3fbf', ink: '#fbf7ef', accents: ['#ffcf3f', '#ff6b6b', '#9fd3ff'], dark: true },
+  { id: 'teal', name: 'Teal', bg: '#0f6466', ink: '#f9f4e8', accents: ['#f0c808', '#f26157', '#d8e2dc'], dark: true },
+];
+
+export const paletteIds = palettes.map((p) => p.id);

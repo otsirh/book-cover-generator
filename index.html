@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Book Cover Generator</title>
+    <meta name="description" content="Generate book covers from a title and an author. 27 styles, 20 palettes, export as SVG, PNG or JPEG." />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='6' y='3' width='20' height='26' rx='2' fill='%23c2410c'/%3E%3Crect x='6' y='3' width='4' height='26' fill='%237c2d12'/%3E%3Crect x='13' y='9' width='9' height='2' fill='%23fff'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="site/style.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="./">
+        <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="6" y="3" width="20" height="26" rx="2" fill="currentColor" /><rect x="6" y="3" width="4" height="26" fill="#000" opacity=".3" /><rect x="13" y="9" width="9" height="2" fill="#fff" /></svg>
+        <span>Book Cover Generator</span>
+      </a>
+      <nav>
+        <a href="#gallery">Styles</a>
+        <a href="#usage">Use the library</a>
+        <a href="https://github.com/otsirh/book-cover-generator" rel="noopener">GitHub</a>
+      </nav>
+    </header>
+
+    <main class="workbench">
+      <form class="controls" id="controls" autocomplete="off" onsubmit="return false">
+        <label class="field">
+          <span>Title</span>
+          <input id="title" type="text" maxlength="200" />
+        </label>
+        <label class="field">
+          <span>Author</span>
+          <input id="author" type="text" maxlength="120" />
+        </label>
+
+        <div class="field">
+          <label for="style">Style</label>
+          <div class="row">
+            <select id="style"></select>
+            <button type="button" class="icon-btn" id="dice-style" title="Random style" aria-label="Random style">⚄</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="label-row">
+            <span>Palette</span>
+            <button type="button" class="icon-btn small" id="dice-palette" title="Random palette" aria-label="Random palette">⚄</button>
+          </div>
+          <div class="swatches" id="swatches" role="radiogroup" aria-label="Palette"></div>
+        </div>
+
+        <div class="field">
+          <label for="seed">Seed <small>— same seed, same artwork</small></label>
+          <div class="row">
+            <input id="seed" type="text" maxlength="40" spellcheck="false" placeholder="empty = from title" />
+            <button type="button" class="icon-btn" id="dice-seed" title="New seed" aria-label="New seed">⚄</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <span>Format</span>
+          <div class="segmented" id="format" role="radiogroup" aria-label="Format">
+            <button type="button" data-format="paperback" role="radio" title="2:3 — 6×9 in paperback">Paperback</button>
+            <button type="button" data-format="ebook" role="radio" title="5:8 — Kindle / eBook">eBook</button>
+            <button type="button" data-format="square" role="radio" title="1:1 — audiobook">Square</button>
+          </div>
+        </div>
+
+        <button type="button" class="primary randomize" id="randomize">
+          <span aria-hidden="true">⚄</span> Randomize everything <kbd>R</kbd>
+        </button>
+      </form>
+
+      <section class="stage" aria-label="Preview">
+        <figure class="book" id="book">
+          <img id="preview" alt="Generated book cover" />
+        </figure>
+        <p class="meta" id="meta"></p>
+        <div class="actions">
+          <button type="button" id="copy-svg">Copy SVG</button>
+          <button type="button" id="dl-svg">SVG</button>
+          <button type="button" id="dl-png">PNG</button>
+          <button type="button" id="dl-jpeg">JPEG</button>
+          <label class="scale">
+            <span>Raster size</span>
+            <select id="scale"></select>
+          </label>
+        </div>
+      </section>
+    </main>
+
+    <section class="gallery-section" id="gallery">
+      <div class="section-head">
+        <h2>All styles</h2>
+        <p>Your title and author in every style. Click one to use it.</p>
+      </div>
+      <div class="gallery" id="gallery-grid"></div>
+    </section>
+
+    <section class="usage" id="usage">
+      <div class="section-head">
+        <h2>Use the library</h2>
+        <p>Zero dependencies, plain ES modules. Works in the browser and in Node.</p>
+      </div>
+      <div class="code-grid">
+        <div>
+          <h3>Browser (CDN)</h3>
+<pre><code>import { generateCover } from
+  'https://cdn.jsdelivr.net/gh/otsirh/book-cover-generator@main/src/index.js';
+
+const svg = generateCover({
+  title: 'The Lighthouse Keeper',
+  author: 'Mara Ellison',
+  style: 'artdeco',   // or 'random'
+  palette: 'midnight' // or 'random'
+});
+document.body.innerHTML = svg;</code></pre>
+        </div>
+        <div>
+          <h3>Node / bundlers</h3>
+<pre><code>npm install github:otsirh/book-cover-generator
+
+import { createCover, styles } from 'book-cover-generator';
+
+const { svg, style, palette, seed } = createCover({
+  title: 'Dune Sea',
+  author: 'A. Writer',
+  seed: 42,          // same seed → same art
+  width: 1600, height: 2560,
+});</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <footer class="site-footer">
+      <p>MIT licensed · <a href="https://github.com/otsirh/book-cover-generator">Source on GitHub</a></p>
+    </footer>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="site/app.js"></script>
+  </body>
+</html>

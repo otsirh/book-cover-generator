@@ -1,0 +1,38 @@
+{
+  "name": "book-cover-generator",
+  "version": "1.0.0",
+  "description": "Generate SVG book covers from a title and an author. 27 styles, 20 palettes, seeded randomizer, zero dependencies.",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./browser": "./src/browser.js"
+  },
+  "bin": {
+    "book-cover": "./bin/book-cover.js"
+  },
+  "files": [
+    "src",
+    "bin"
+  ],
+  "scripts": {
+    "test": "node --test"
+  },
+  "keywords": [
+    "book",
+    "cover",
+    "svg",
+    "generator",
+    "generative-art",
+    "placeholder"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/otsirh/book-cover-generator.git"
+  },
+  "homepage": "https://otsirh.github.io/book-cover-generator/",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  }
+}
