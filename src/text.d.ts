@@ -76,6 +76,8 @@ export interface TextFit {
   letterSpacing: number;
   lineHeight: number;
   cap: number;
+  /** True when the text didn't fit even at the smallest size and was cut with an ellipsis. */
+  truncated: boolean;
 }
 
 export interface DrawOptions {

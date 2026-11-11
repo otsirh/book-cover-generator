@@ -16,7 +16,7 @@ import {
   shadowFilter,
   linearGradient,
 } from '../core.js';
-import { FONTS, fitText, drawText } from '../text.js';
+import { FONTS, fitText, drawText, textBottom } from '../text.js';
 import { titleBlock, authorFit } from '../type.js';
 import { strongAccents } from './util.js';
 
@@ -699,7 +699,8 @@ export const papercut = {
     // Back to front: the deepest layer is darkest; each layer in front has a bigger hole.
     let s = `<defs>${shadowFilter(shadow, u, { blur: 7, dy: 4, opacity: p.dark ? 0.6 : 0.35 })}</defs>`;
     s += rect(0, 0, W, H, mix(deep, p.night, 0.35));
-    const maxR = Math.min(S * 0.4, H * 0.5);
+    // The hole is sized so the title always gets the space below it, whatever the shape.
+    const maxR = Math.min(S * 0.4, Math.max(S * 0.12, (H * 0.6 - cy) / 1.12));
     let front = p.bg;
     for (let i = 0; i < layers; i++) {
       const t = i / (layers - 1);
@@ -912,28 +913,30 @@ export const pixel = {
     const title = c.title.toUpperCase();
     const ink = inkOn(skyTop, p);
     const box = { w: W - m * 2, h: horizon - m * 2.2 - sr * g * 1.6 };
-    const pfit = pixelable(title) ? fitPixelText(title, box.w, box.h, S * 0.022) : null;
-    if (pfit) {
-      const y = m * 1.3;
-      s += drawPixelText(pfit, W / 2 + g * 0.6, y + g * 0.6, 'middle', mix(skyTop, '#000000', 0.5));
-      s += drawPixelText(pfit, W / 2, y, 'middle', ink);
-      if (c.subtitle) {
-        const subY = y + pfit.height + g * 2.5;
-        const sub = c.subtitle.toUpperCase();
-        const sfit = pixelable(sub) ? fitPixelText(sub, box.w, S * 0.08, Math.max(1.5, pfit.q * 0.45)) : null;
-        if (sfit) s += drawPixelText(sfit, W / 2, subY, 'middle', ink);
-        else {
-          const st = fitText(c.subtitle, {
+    // The subtitle is fitted first so the title leaves room for it.
+    const subText = c.subtitle.toUpperCase();
+    const sfit = c.subtitle && pixelable(subText) ? fitPixelText(subText, box.w, S * 0.08, S * 0.008) : null;
+    const sText =
+      c.subtitle && !sfit
+        ? fitText(c.subtitle, {
             font: FONTS.mono,
             weight: 700,
             maxWidth: box.w,
             maxHeight: S * 0.08,
             maxSize: S * 0.032,
             maxLines: 2,
-          });
-          s += drawText(st, { x: W / 2, y: subY, anchor: 'middle', fill: ink });
-        }
-      }
+          })
+        : null;
+    const subH = sfit ? sfit.height : sText ? textBottom(sText, 0) : 0;
+    const reserve = subH ? subH + g * 2.5 : 0;
+    const pfit = pixelable(title) ? fitPixelText(title, box.w, box.h - reserve, S * 0.022) : null;
+    if (pfit) {
+      const y = m * 1.3;
+      s += drawPixelText(pfit, W / 2 + g * 0.6, y + g * 0.6, 'middle', mix(skyTop, '#000000', 0.5));
+      s += drawPixelText(pfit, W / 2, y, 'middle', ink);
+      const subY = y + pfit.height + g * 2.5;
+      if (sfit) s += drawPixelText(sfit, W / 2, subY, 'middle', ink);
+      else if (sText) s += drawText(sText, { x: W / 2, y: subY, anchor: 'middle', fill: ink });
     } else {
       const t = titleBlock(c, {
         font: FONTS.mono,

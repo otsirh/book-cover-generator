@@ -1,6 +1,7 @@
 // Renders a grid of covers. Query parameters (all optional, comma-separated lists):
 //   styles, palettes, seeds, titles, title, author, subtitle, w, h, cols, texture=1
 import { createCover, styles } from '../src/index.js';
+import { svgToDataUrl } from '../src/browser.js';
 
 const q = new URLSearchParams(location.search);
 /** @param {string} key @param {string[]} fallback */
@@ -28,7 +29,7 @@ for (const style of list('styles', styles)) {
         });
         const fig = document.createElement('figure');
         const img = new Image();
-        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(c.svg);
+        img.src = svgToDataUrl(c.svg);
         const cap = document.createElement('figcaption');
         cap.textContent = `${c.style} · ${c.palette} · ${c.seed}`;
         fig.append(img, cap);

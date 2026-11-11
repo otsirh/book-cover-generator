@@ -164,7 +164,27 @@ export const retro = {
     const dark = p.dark;
     const night = dark ? p.night : p.bg;
     const horizon = H * rng.float(0.56, 0.62);
-    const R = Math.min(S * rng.float(0.26, 0.34), horizon * 0.36);
+    const top = m * 1.2;
+    const fitTitle = (/** @type {number} */ r) =>
+      titleBlock(c, {
+        font: FONTS.geometric,
+        weight: 800,
+        italic: true,
+        upper: true,
+        maxWidth: W - m * 2,
+        maxHeight: horizon - r * 1.25 - m * 0.6 - top,
+        maxSize: S * 0.2,
+        lineHeight: 1.0,
+        maxLines: 4,
+        subtitleFont: FONTS.geometric,
+        subtitleUpper: true,
+        subtitleItalic: false,
+      });
+    // A smaller sun leaves more sky: shrink it until the title fits comfortably.
+    const R0 = Math.min(S * rng.float(0.26, 0.34), horizon * 0.36);
+    let R = R0;
+    let t = fitTitle(R);
+    while ((t.truncated || t.size < S * 0.06) && R > R0 * 0.5) t = fitTitle((R *= 0.85));
     const cx = W / 2;
     const cy = horizon - R * 0.25;
 
@@ -241,21 +261,6 @@ export const retro = {
     }
     s += `<g filter="url(#${ids.glow})" opacity="0.9">${grid}</g>`;
 
-    const top = m * 1.2;
-    const t = titleBlock(c, {
-      font: FONTS.geometric,
-      weight: 800,
-      italic: true,
-      upper: true,
-      maxWidth: W - m * 2,
-      maxHeight: cy - R - m * 0.6 - top,
-      maxSize: S * 0.2,
-      lineHeight: 1.0,
-      maxLines: 4,
-      subtitleFont: FONTS.geometric,
-      subtitleUpper: true,
-      subtitleItalic: false,
-    });
     s += t.draw({
       x: W / 2,
       y: top,

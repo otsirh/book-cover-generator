@@ -1,5 +1,6 @@
 // Draws the social preview (the page itself) and renders the app icons to PNG data URLs.
 import { createCover } from '../src/index.js';
+import { svgToDataUrl } from '../src/browser.js';
 
 /** @type {[title: string, author: string, style: string, palette: string, seed: string, x: number, y: number, rotate: number][]} */
 const covers = [
@@ -10,8 +11,7 @@ const covers = [
 ];
 const loads = covers.map(([title, author, style, palette, seed, x, y, rot], i) => {
   const img = new Image();
-  img.src =
-    'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(createCover({ title, author, style, palette, seed }).svg);
+  img.src = svgToDataUrl(createCover({ title, author, style, palette, seed }).svg);
   Object.assign(img.style, { left: `${x}px`, top: `${y}px`, transform: `rotate(${rot}deg)`, zIndex: String(i) });
   document.getElementById('covers')?.append(img);
   return img.decode();
@@ -38,7 +38,7 @@ const ICONS = {
 const pngs = {};
 for (const [name, [size, markup]] of Object.entries(ICONS)) {
   const img = new Image();
-  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(markup);
+  img.src = svgToDataUrl(markup);
   await img.decode();
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = size;

@@ -138,9 +138,23 @@ function toHash(d) {
 }
 
 // Every discrete change is a history entry, so Undo/Redo and the browser's
-// Back/Forward step through designs. A burst of typing is one entry.
+// Back/Forward step through designs. A burst of typing is one entry. The
+// position survives a reload: the entry's index is in history.state, and the
+// newest index in sessionStorage.
+const MAX_KEY = 'book-cover-generator:history-max';
 let historyIndex = 0;
 let historyMax = 0;
+
+/** Keys that a URL may leave out; navigating to such a URL resets them. */
+const OPTIONAL = { subtitle: '', texture: false };
+
+function saveHistoryMax() {
+  try {
+    sessionStorage.setItem(MAX_KEY, String(historyMax));
+  } catch {
+    // Storage blocked: Redo after a reload just starts fresh.
+  }
+}
 let typing = false;
 /** @type {ReturnType<typeof setTimeout> | undefined} */
 let typingTimer;
@@ -156,9 +170,18 @@ function flushReplace() {
 
 function commit() {
   flushReplace();
-  historyIndex += 1;
-  historyMax = historyIndex;
-  history.pushState({ i: historyIndex }, '', toHash(design));
+  // A discrete change ends any typing burst, so later keystrokes get their own step.
+  typing = false;
+  clearTimeout(typingTimer);
+  try {
+    history.pushState({ i: historyIndex + 1 }, '', toHash(design));
+    historyIndex += 1;
+    historyMax = historyIndex;
+    saveHistoryMax();
+  } catch {
+    // Browsers rate-limit history writes; update the current entry instead.
+    history.replaceState({ i: historyIndex }, '', toHash(design));
+  }
   syncHistoryButtons();
 }
 
@@ -190,9 +213,10 @@ window.addEventListener('popstate', (e) => {
     // An edited URL: make it the newest entry.
     historyMax += 1;
     historyIndex = historyMax;
+    saveHistoryMax();
     history.replaceState({ i: historyIndex }, '', location.hash);
   }
-  Object.assign(design, fromHash(location.hash));
+  Object.assign(design, OPTIONAL, fromHash(location.hash));
   render({ fade: true, announce: true });
   syncHistoryButtons();
 });
@@ -360,7 +384,7 @@ function buildControls() {
   $('randomize').addEventListener('click', randomizeAll);
   $('m-randomize').addEventListener('click', randomizeAll);
   $('undo').addEventListener('click', () => history.back());
-  $('redo').addEventListener('click', () => history.forward());
+  $('redo').addEventListener('click', redo);
 
   $('copy-svg').addEventListener('click', async () => {
     try {
@@ -408,14 +432,21 @@ function buildControls() {
     // `code` is the physical key, so the shortcuts work on any keyboard layout.
     if (e.code === 'KeyR' && !e.repeat) randomizeAll();
     else if (e.code === 'KeyZ' && !e.repeat) {
-      if (e.shiftKey) history.forward();
+      if (e.shiftKey) redo();
       else if (historyIndex > 0) history.back();
-    } else if (e.code === 'KeyY' && !e.repeat) history.forward();
-    else if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') stepStyle(e.code === 'ArrowLeft' ? -1 : 1);
-    else if (e.code === 'BracketLeft' || e.code === 'BracketRight') stepPalette(e.code === 'BracketLeft' ? -1 : 1);
-    else return;
+    } else if (e.code === 'KeyY' && !e.repeat) redo();
+    else if ((e.code === 'ArrowLeft' || e.code === 'ArrowRight') && !e.repeat)
+      stepStyle(e.code === 'ArrowLeft' ? -1 : 1);
+    else if ((e.code === 'BracketLeft' || e.code === 'BracketRight') && !e.repeat) {
+      stepPalette(e.code === 'BracketLeft' ? -1 : 1);
+    } else return;
     e.preventDefault();
   });
+}
+
+/** Redo only within this app's own history, never forward to another site. */
+function redo() {
+  if (historyIndex < historyMax) history.forward();
 }
 
 /** @param {number} dir */
@@ -671,7 +702,18 @@ function toast(msg) {
 /* -------------------------------------------------------------------- boot */
 
 Object.assign(design, fromHash(location.hash));
-history.replaceState({ i: 0 }, '', toHash(design));
+if (typeof history.state?.i === 'number') {
+  // A reload: carry on from the same place in the history.
+  historyIndex = history.state.i;
+  let stored = 0;
+  try {
+    stored = Number(sessionStorage.getItem(MAX_KEY)) || 0;
+  } catch {
+    // Storage blocked.
+  }
+  historyMax = Math.max(historyIndex, stored);
+}
+history.replaceState({ i: historyIndex }, '', toHash(design));
 buildControls();
 buildRail();
 render();

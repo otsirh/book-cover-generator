@@ -1,5 +1,6 @@
 // The cover montage at the top of the README (docs/preview.png).
 import { createCover } from '../src/index.js';
+import { svgToDataUrl } from '../src/browser.js';
 
 /** @type {[string, string, string, string, string, string?][]} */
 const covers = [
@@ -18,9 +19,7 @@ const covers = [
 ];
 const loads = covers.map(([title, author, style, palette, seed, subtitle]) => {
   const img = new Image();
-  img.src =
-    'data:image/svg+xml;charset=utf-8,' +
-    encodeURIComponent(createCover({ title, author, subtitle, style, palette, seed }).svg);
+  img.src = svgToDataUrl(createCover({ title, author, subtitle, style, palette, seed }).svg);
   document.body.append(img);
   return img.decode();
 });

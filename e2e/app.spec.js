@@ -130,6 +130,39 @@ test('undo, redo and the browser back button step through designs', async ({ pag
   await selected(page, 'minimal');
 });
 
+test('undo reverts the subtitle and the texture too', async ({ page }) => {
+  await page.goto('/#title=T&style=minimal&seed=u');
+  await page.locator('label.switch').click();
+  await expect(page.locator('#texture')).toBeChecked();
+  await page.locator('#undo').click();
+  await expect(page.locator('#texture')).not.toBeChecked();
+  expect(await svgOf(page, '#preview')).not.toContain('feTurbulence');
+  await page.locator('#subtitle').fill('Gone Soon');
+  await expect.poll(() => svgOf(page, '#preview')).toContain('Gone Soon');
+  await page.locator('#subtitle').blur();
+  await page.locator('#undo').click();
+  await expect(page.locator('#subtitle')).toHaveValue('');
+});
+
+test('history survives a reload, and redo never leaves the app', async ({ page }) => {
+  await page.goto('/#style=minimal&seed=r');
+  await page.locator('.tile[data-style="swiss"]').click();
+  await page.locator('.tile[data-style="bauhaus"]').click();
+  await page.reload();
+  await selected(page, 'bauhaus');
+  await expect(page.locator('#undo')).toBeEnabled();
+  await page.locator('#undo').click();
+  await selected(page, 'swiss');
+  await expect(page.locator('#redo')).toBeEnabled();
+  await page.locator('#redo').click();
+  await selected(page, 'bauhaus');
+  await expect(page.locator('#redo')).toBeDisabled();
+  await page.locator('body').press('Shift+KeyZ');
+  await page.locator('body').press('KeyY');
+  await selected(page, 'bauhaus');
+  expect(new URL(page.url()).pathname).toBe('/');
+});
+
 test('a burst of typing is one undo step', async ({ page }) => {
   await page.goto('/#title=Before&style=minimal&seed=t');
   await page.locator('#title').fill('');

@@ -8,6 +8,7 @@ import {
   mix,
   inkOn,
   readable,
+  hexToRgb,
   grain,
   blurFilter,
   linearGradient,
@@ -115,8 +116,8 @@ export const thriller = {
 
 /** How red a hex colour is (red channel minus the others). @param {string} hex */
 function redness(hex) {
-  const v = parseInt(hex.slice(1).padEnd(6, hex.slice(1)), 16);
-  return ((v >> 16) & 255) - (((v >> 8) & 255) + (v & 255)) / 2;
+  const [r, g, b] = hexToRgb(hex);
+  return r - (g + b) / 2;
 }
 
 /**
@@ -175,13 +176,14 @@ export const botanical = {
           d += `${i ? 'L' : 'M'}${n(x)} ${n(y)}`;
           if (i > 0 && i < n0) {
             const tangent = a0 + dir * (Math.PI / 2);
-            s += leaf(x, y, S * rng.float(0.05, 0.075), tangent - dir * 0.5 - (Math.PI / 2) * 0, i % 2 ? leafA : leafB);
+            s += leaf(x, y, S * rng.float(0.05, 0.075), tangent - dir * 0.5, i % 2 ? leafA : leafB);
             s += leaf(x, y, S * rng.float(0.04, 0.065), tangent + dir * 0.9, i % 2 ? leafB : leafA);
           }
         }
         s += `<path d="${d}" fill="none" stroke="${stem}" stroke-width="${n(2 * u)}" stroke-linecap="round"/>`;
       }
-      for (let i = 0; i < rng.int(3, 5); i++) {
+      const blooms = rng.int(3, 5);
+      for (let i = 0; i < blooms; i++) {
         const a0 = rng.float(0.15, 0.85) * Math.PI * 2;
         s += bloom(
           cx + Math.cos(a0) * R,
@@ -287,8 +289,29 @@ export const noir = {
     const ids = { cone: c.id('cone'), blur: c.id('blur') };
     const g = grain(c, { opacity: dark ? 0.2 : 0.14, light: dark });
     const lampX = W * rng.pick([0.2, 0.78]);
-    const lampY = H * 0.5;
     const groundY = H * 0.94;
+    const a = authorFit(c, { font: FONTS.condensed, weight: 700, letterSpacing: 0.26, maxSize: S * 0.044 });
+    const font = rng.pick([FONTS.display, FONTS.condensed]);
+    const stack = rng.bool(0.6);
+    const fitTitle = (/** @type {number} */ lamp) =>
+      titleBlock(c, {
+        font,
+        weight: 700,
+        upper: true,
+        stack,
+        maxWidth: W - m * 2,
+        // The author sits under the title, so the title leaves room for it above the lamp.
+        maxHeight: lamp - S * 0.1 - m * 1.6 - (a.lines.length ? a.height + m * 0.7 : 0),
+        maxSize: S * 0.26,
+        lineHeight: 0.94,
+        maxLines: 4,
+        subtitleFont: FONTS.condensed,
+        subtitleItalic: false,
+      });
+    // The lamp stands lower when a long title needs the room.
+    let lampY = H * 0.5;
+    let t = fitTitle(lampY);
+    while ((t.truncated || t.size < S * 0.06) && lampY < H * 0.64) t = fitTitle((lampY += H * 0.035));
 
     let s = `<defs>${linearGradient(ids.cone, [
       [0, light, 0.5],
@@ -332,19 +355,6 @@ export const noir = {
     const figure = FIGURE.map(([x, y]) => [fx + x * fw, groundY - fh + y * fh]);
     s += path(pathD(figure, true), dark ? '#000000' : mix(p.ink, '#000000', 0.4));
 
-    const t = titleBlock(c, {
-      font: rng.pick([FONTS.display, FONTS.condensed]),
-      weight: 700,
-      upper: true,
-      stack: rng.bool(0.6),
-      maxWidth: W - m * 2,
-      maxHeight: lampY - S * 0.1 - m * 1.6,
-      maxSize: S * 0.26,
-      lineHeight: 0.94,
-      maxLines: 4,
-      subtitleFont: FONTS.condensed,
-      subtitleItalic: false,
-    });
     const tY = m * 1.3;
     s += t.draw({ x: m, y: tY, fill: light });
     // Venetian-blind shadows fall across everything above the lamp, title included.
@@ -353,7 +363,6 @@ export const noir = {
     let bars = '';
     for (let y = -H * 0.3; y < H * 0.9; y += sp) bars += rect(-W * 0.3, y, W * 1.6, sp * 0.3, bg);
     s += `<g transform="rotate(${n(ang)} ${n(W / 2)} ${n(H / 3)})" opacity="0.38">${bars}</g>`;
-    const a = authorFit(c, { font: FONTS.condensed, weight: 700, letterSpacing: 0.26, maxSize: S * 0.044 });
     s += drawText(a, { x: m, y: tY + t.height + m * 0.7, fill: accent });
     s += g.layer;
     return s;

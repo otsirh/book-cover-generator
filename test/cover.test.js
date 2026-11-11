@@ -348,3 +348,49 @@ test('very long inputs are capped and fast', () => {
   const label = /aria-label="([^"]*)"/.exec(svg)?.[1] ?? '';
   assert.ok(label.length < 900, `label is ${label.length} characters`);
 });
+
+test('no style truncates an ordinary long title, in any common shape', () => {
+  const longTitles = [
+    'The Unbearable Lightness of Being',
+    'Do Androids Dream of Electric Sheep',
+    'One Hundred Years of Solitude',
+  ];
+  for (const style of builtIn) {
+    for (const [width, height] of [
+      [600, 900],
+      [600, 960],
+      [600, 600],
+      [900, 600],
+      [1500, 600],
+    ]) {
+      for (const title of longTitles) {
+        for (const subtitle of ['', 'A Novel']) {
+          const { svg } = createCover({
+            title,
+            subtitle,
+            author: 'Gabriel García Márquez',
+            style,
+            width,
+            height,
+            seed: 'long',
+          });
+          assert.ok(!svg.includes('…'), `${style} ${width}x${height} truncates "${title}"`);
+        }
+      }
+    }
+  }
+});
+
+test('Paper Cut gives the title room on square covers', () => {
+  const { svg } = createCover({
+    title: 'The Lighthouse Keeper',
+    author: 'Mara Ellison',
+    style: 'papercut',
+    width: 600,
+    height: 600,
+    seed: 'p',
+  });
+  const sizes = [...svg.matchAll(/font-size="([\d.]+)"/g)].map((m) => Number(m[1]));
+  const author = sizes.at(-1) ?? 0;
+  assert.ok(Math.max(...sizes) > author * 1.5, `title ${Math.max(...sizes)} vs author ${author}`);
+});

@@ -59,6 +59,8 @@ export interface TitleBlock {
   stacked: boolean;
   /** Number of title lines, not counting the lead or subtitle. */
   lines: number;
+  /** The title was cut with an ellipsis because it didn't fit. */
+  truncated: boolean;
   draw(o: {
     x: number;
     y: number;

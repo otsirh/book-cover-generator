@@ -208,7 +208,26 @@ export const blocks = {
   render(c) {
     const { W, H, S, u, m, rng, p } = c;
     const lw = u * rng.float(6, 11);
-    const textH = H * rng.float(0.32, 0.38);
+    const pad = m * 0.8;
+    const innerW = W - lw - pad * 2;
+    const font = rng.pick([FONTS.sans, FONTS.geometric]);
+    const a = authorFit(c, { upper: false, letterSpacing: 0, weight: 700, maxWidth: innerW, maxSize: S * 0.05 });
+    const fitTitle = (/** @type {number} */ cellH) =>
+      titleBlock(c, {
+        font,
+        weight: 800,
+        maxWidth: innerW,
+        maxHeight: cellH - lw - pad * 2.6 - a.height,
+        maxSize: S * 0.2,
+        lineHeight: 1.0,
+        maxLines: 4,
+        subtitleFont: FONTS.sans,
+        subtitleItalic: false,
+      });
+    // The text cell grows (and the art shrinks) until the title fits comfortably.
+    let textH = H * rng.float(0.32, 0.38);
+    let t = fitTitle(textH);
+    while ((t.truncated || t.size < S * 0.06) && textH < H * 0.56) t = fitTitle((textH += H * 0.04));
     const textTop = rng.bool(0.5);
     const textRect = textTop ? { x: 0, y: 0, w: W, h: textH } : { x: 0, y: H - textH, w: W, h: textH };
     const art = textTop ? { x: 0, y: textH, w: W, h: H - textH } : { x: 0, y: 0, w: W, h: H - textH };
@@ -252,22 +271,8 @@ export const blocks = {
     });
     s += rect(textRect.x + lw / 2, textRect.y + lw / 2, textRect.w - lw, textRect.h - lw, paper);
 
-    const pad = m * 0.8;
-    const innerW = W - lw - pad * 2;
-    const a = authorFit(c, { upper: false, letterSpacing: 0, weight: 700, maxWidth: innerW, maxSize: S * 0.05 });
     const tTop = textRect.y + lw / 2 + pad;
     const aY = textRect.y + textRect.h - lw / 2 - pad - a.height;
-    const t = titleBlock(c, {
-      font: rng.pick([FONTS.sans, FONTS.geometric]),
-      weight: 800,
-      maxWidth: innerW,
-      maxHeight: aY - tTop - pad * 0.6,
-      maxSize: S * 0.2,
-      lineHeight: 1.0,
-      maxLines: 4,
-      subtitleFont: FONTS.sans,
-      subtitleItalic: false,
-    });
     s += t.draw({ x: lw / 2 + pad, y: tTop, fill: lines });
     s += drawText(a, { x: lw / 2 + pad, y: aY, fill: lines });
     return s;

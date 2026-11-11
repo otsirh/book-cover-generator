@@ -1,4 +1,4 @@
-import { n, rect, circle, mix, inkOn } from '../core.js';
+import { n, rect, circle, mix, inkOn, escapeXml } from '../core.js';
 import { FONTS, fitText, drawText, graphemes, measureText } from '../text.js';
 import { titleBlock, authorFit } from '../type.js';
 import { strongAccents } from './util.js';
@@ -74,7 +74,7 @@ export const typographic = {
     const baseline = H * rng.float(0.6, 0.64);
     const lx = W * rng.float(0.44, 0.56);
     const attrs = `font-family="${font.family}" font-size="${n(size)}" text-anchor="middle"`;
-    const glyph = letters.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    const glyph = escapeXml(letters);
 
     let s = rect(0, 0, W, H, p.bg);
     if (mode === 'duo') {

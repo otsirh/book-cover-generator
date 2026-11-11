@@ -46,6 +46,9 @@ A redesign of the covers and the app, based on a design review.
 - Very long titles no longer slow layout (inputs are capped and wrapping stops early).
 - The texture grain is visible on light and dark covers.
 - The dev server never serves dotfiles, whatever the letter case, and browser tests use their own port.
+- Long titles are never cut off in any common shape: Retro Sun shrinks its sun, Blocks grows its text cell and Noir lowers its lamp when the title needs room (`TextFit` and `TitleBlock` report `truncated`).
+- Paper Cut leaves room for the title on square and wide covers; Pixel reserves space for the subtitle; Noir's author line no longer meets the lamp.
+- Undo and Back restore the subtitle and texture; history survives a reload; redo never navigates away from the app; holding an arrow key no longer floods the browser history.
 
 ## [1.1.0] - 2026-11-12
 

@@ -290,10 +290,10 @@ export function fitText(text, opts) {
     .trim();
   if (opts.upper) str = str.toUpperCase();
   const base = { ...spec, lineHeight, cap };
-  if (!str) return { ...base, lines: [], size: 0, width: 0, height: 0 };
+  if (!str) return { ...base, lines: [], size: 0, width: 0, height: 0, truncated: false };
 
   const tokens = tokenize(str);
-  const finish = (lines, size) => {
+  const finish = (lines, size, truncated = false) => {
     const measure = (s) => measureText(s, size, spec);
     return {
       ...base,
@@ -301,6 +301,7 @@ export function fitText(text, opts) {
       size,
       width: Math.max(...lines.map(measure)),
       height: blockHeight(lines.length, size, lineHeight, cap),
+      truncated,
     };
   };
 
@@ -321,13 +322,12 @@ export function fitText(text, opts) {
   const measure = (s) => measureText(s, size, spec);
   let lines = hardWrap(tokens, maxWidth, measure);
   const fitCount = Math.max(1, Math.min(maxLines, Math.floor((maxHeight / size - cap) / lineHeight) + 1));
-  if (lines.length > fitCount) {
-    lines = lines.slice(0, fitCount);
-    const chars = graphemes(lines[fitCount - 1]);
-    while (chars.length > 1 && measure(chars.join('') + '…') > maxWidth) chars.pop();
-    lines[fitCount - 1] = chars.join('').trimEnd() + '…';
-  }
-  return finish(lines, size);
+  if (lines.length <= fitCount) return finish(lines, size);
+  lines = lines.slice(0, fitCount);
+  const chars = graphemes(lines[fitCount - 1]);
+  while (chars.length > 1 && measure(chars.join('') + '…') > maxWidth) chars.pop();
+  lines[fitCount - 1] = chars.join('').trimEnd() + '…';
+  return finish(lines, size, true);
 }
 
 /**

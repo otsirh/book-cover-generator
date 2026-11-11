@@ -160,6 +160,7 @@ export function drawStack(fit, { x, y, anchor = 'start', fill = '#000', opacity,
  * @property {number} size     main title size (largest line for stacks)
  * @property {boolean} stacked  whether the title came out as a justified stack
  * @property {number} lines    number of title lines (excluding the lead and subtitle)
+ * @property {boolean} truncated  the title was cut with an ellipsis because it didn't fit
  * @property {(o: { x: number, y: number, anchor?: 'start' | 'middle' | 'end', fill: string, leadFill?: string, subtitleFill?: string, attrs?: string, lineFills?: (string | undefined)[] }) => string} draw
  */
 
@@ -275,6 +276,7 @@ export function titleBlock(c, o) {
     size: mainFit.size,
     stacked: 'kind' in mainFit,
     lines: mainFit.lines.length,
+    truncated: 'kind' in mainFit ? false : mainFit.truncated,
     draw({ x, y, anchor = 'start', fill, leadFill, subtitleFill, attrs, lineFills }) {
       let s = '';
       if (leadFit) s += drawText(leadFit, { x, y, anchor, fill: leadFill ?? fill, attrs });
@@ -284,7 +286,14 @@ export function titleBlock(c, o) {
           ? drawStack(mainFit, { x, y: my, anchor, fill, attrs, lineFills })
           : drawText(mainFit, { x, y: my, anchor, fill, attrs });
       if (L.sub?.lines.length) {
-        s += drawText(L.sub, { x, y: my + mainBottom + L.subGap, anchor, fill: subtitleFill ?? fill, opacity: 0.85 });
+        s += drawText(L.sub, {
+          x,
+          y: my + mainBottom + L.subGap,
+          anchor,
+          fill: subtitleFill ?? fill,
+          opacity: 0.85,
+          attrs,
+        });
       }
       return s;
     },
