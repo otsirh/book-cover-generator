@@ -1,0 +1,30 @@
+name: Bug report
+description: Something renders wrong, throws, or doesn't work.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you see, and what did you expect instead?
+    validations:
+      required: true
+  - type: input
+    id: link
+    attributes:
+      label: Link to the design
+      description: Copy the URL from covers.otsirh.dev. It contains the title, style, palette and seed.
+      placeholder: https://covers.otsirh.dev/#title=...
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps or code to reproduce
+      description: For the library, the `createCover(...)` options you used.
+      render: js
+  - type: input
+    id: env
+    attributes:
+      label: Browser / Node version and OS
+      placeholder: Safari 19 on macOS 26, or Node 24 on Ubuntu
+    validations:
+      required: true
