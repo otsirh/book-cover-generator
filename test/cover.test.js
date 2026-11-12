@@ -950,3 +950,10 @@ test('the helpers the built-in styles use are exported for custom styles', async
   }
   assert.equal(lib.TEXT_CONTRAST, 3);
 });
+
+test('version matches the package', async () => {
+  const { version } = await import('../src/index.js');
+  const { readFile } = await import('node:fs/promises');
+  const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+  assert.equal(version, pkg.version);
+});

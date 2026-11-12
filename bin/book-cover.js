@@ -20,14 +20,18 @@ Options:
       --size <WxH>      width and height at once, e.g. 1600x2560
       --lang <tag>      language of the text, e.g. ja or zh-Hant (default: inferred)
   -o, --out <file>      write SVG to a file instead of stdout
-      --json            print the choices (and the SVG, without --out) as JSON
+      --count <n>       write n variations (seeds 1…n, or <seed>-1…), named
+                        cover-1.svg… from --out (or put {n} or {seed} in it)
+      --json            print the choices (and the SVG, without --out) as JSON,
+                        one line per cover
       --list            list styles and palettes
       --help            show this help
 
 Examples:
   book-cover "The Lighthouse Keeper" "Mara Ellison" -s artdeco -o cover.svg
   book-cover "Neon Tide" "Kai Moreno" --style retro --palette synth --size 1600x2560 > cover.svg
-  book-cover "Bright Machines" --bg 0b132b --ink f8f9fa --accent ff6b6b,4ecdc4 --format ebook -o cover.svg`;
+  book-cover "Bright Machines" --bg 0b132b --ink f8f9fa --accent ff6b6b,4ecdc4 --format ebook -o cover.svg
+  book-cover "Salt and Static" "J. R. Okafor" --count 12 -o ideas/cover.svg`;
 
 /** Cover shapes, as in the web app: width to height. */
 const FORMATS = { paperback: [2, 3], ebook: [5, 8], square: [1, 1] };
@@ -51,6 +55,7 @@ try {
       size: { type: 'string' },
       lang: { type: 'string' },
       out: { type: 'string', short: 'o' },
+      count: { type: 'string' },
       json: { type: 'boolean' },
       list: { type: 'boolean' },
       help: { type: 'boolean' },
@@ -145,28 +150,58 @@ process.stdout.on('error', (err) => {
   throw err;
 });
 
+/** How many covers to write: --count, 1 by default. */
+function count() {
+  if (values.count === undefined) return 1;
+  const n = Number(values.count);
+  if (!/^\s*\d+\s*$/.test(values.count) || n < 1 || n > 1000) {
+    throw new RangeError(`--count must be a whole number from 1 to 1000, got "${values.count}"`);
+  }
+  if (n > 1 && !values.out) throw new Error('--count writes files: give --out, e.g. -o covers/cover.svg');
+  return n;
+}
+
+/**
+ * The file for cover `n` of `total`: --out itself for one cover, else with {n} and {seed}
+ * filled in, or "-n" before the extension.
+ * @param {string} out @param {number} n @param {number} total @param {string} seed
+ */
+function fileFor(out, n, total, seed) {
+  if (total === 1) return out;
+  if (/\{n\}|\{seed\}/.test(out)) return out.replaceAll('{n}', String(n)).replaceAll('{seed}', seed);
+  const dot = out.lastIndexOf('.');
+  const slash = Math.max(out.lastIndexOf('/'), out.lastIndexOf('\\'));
+  return dot > slash + 1 ? `${out.slice(0, dot)}-${n}${out.slice(dot)}` : `${out}-${n}`;
+}
+
 try {
-  const cover = createCover({
+  const total = count();
+  const options = {
     title: positionals[0],
     author: positionals[1] ?? '',
     subtitle: values.subtitle,
     texture: values.texture,
     style: values.style,
     palette: palette(),
-    seed: values.seed,
     lang: values.lang,
     ...dimensions(),
-  });
-  const { style, palette: paletteId, seed, width, height, lang } = cover;
-  const choices = { style, palette: paletteId, seed, width, height, lang };
-  if (values.out) {
-    writeFileSync(values.out, cover.svg);
-    if (values.json) process.stdout.write(JSON.stringify({ file: values.out, ...choices }) + '\n');
-    else console.error(`Wrote ${values.out} (style: ${style}, palette: ${paletteId}, ${width}x${height})`);
-  } else if (values.json) {
-    process.stdout.write(JSON.stringify({ ...choices, svg: cover.svg }) + '\n');
-  } else {
-    process.stdout.write(cover.svg + '\n');
+  };
+  for (let n = 1; n <= total; n++) {
+    // One cover: the seed given (or the title's). Several: seeds 1…n, or <seed>-1…<seed>-n.
+    const seed = total === 1 ? values.seed : values.seed ? `${values.seed}-${n}` : String(n);
+    const cover = createCover({ ...options, seed });
+    const { style, palette: paletteId, width, height, lang } = cover;
+    const choices = { style, palette: paletteId, seed: cover.seed, width, height, lang };
+    if (values.out) {
+      const file = fileFor(values.out, n, total, cover.seed);
+      writeFileSync(file, cover.svg);
+      if (values.json) process.stdout.write(JSON.stringify({ file, ...choices }) + '\n');
+      else console.error(`Wrote ${file} (style: ${style}, palette: ${paletteId}, ${width}x${height})`);
+    } else if (values.json) {
+      process.stdout.write(JSON.stringify({ ...choices, svg: cover.svg }) + '\n');
+    } else {
+      process.stdout.write(cover.svg + '\n');
+    }
   }
 } catch (err) {
   console.error(err instanceof Error ? err.message : String(err));

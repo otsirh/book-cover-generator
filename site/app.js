@@ -1,4 +1,4 @@
-import { createCover, listStyles, palettes, pickStyle, randomSeed } from '../src/index.js';
+import { createCover, listStyles, palettes, pickStyle, randomSeed, version } from '../src/index.js';
 import {
   svgToDataUrl,
   downloadCover,
@@ -164,31 +164,69 @@ let current;
 
 /* ------------------------------------------------------------ URL & history */
 
-/** Validate a design-like object (from the URL or storage); unknown values are dropped. @param {Record<string, unknown>} raw */
+// Line breaks become spaces: the single-line inputs would drop them, and the cover spaces them.
+const text = (/** @type {unknown} */ v) => (typeof v === 'string' ? v.replace(/[\r\n\u2028\u2029]+/g, ' ') : null);
+
+/**
+ * @typedef {object} Field
+ * @property {(v: unknown) => unknown} read  the value from a link or a stored design; undefined drops it
+ * @property {(v: any) => string} [write]    the value as a link writes it (default: as it is)
+ * @property {unknown} empty                 the value of a design that leaves it out (see complete())
+ * @property {boolean} [optional]            links may leave it out and still be whole designs
+ */
+
+/**
+ * Every field of a design, in the order links name them. A field added later is `optional`, so
+ * links made before it existed still open as whole designs (with its `empty` value).
+ * @type {Record<keyof Design, Field>}
+ */
+const FIELDS = {
+  title: { read: (v) => clipText(v, 200), empty: '' },
+  author: { read: (v) => clipText(v, 120), empty: '' },
+  // (Optional since 1.2.0: older links left it out when empty.)
+  subtitle: { read: (v) => clipText(v, 160), empty: '', optional: true },
+  style: { read: (v) => oneOf(text(v), STYLE_IDS.includes.bind(STYLE_IDS)), empty: '' },
+  palette: {
+    read: (v) => oneOf(text(v)?.toLowerCase(), (p) => PALETTE_IDS.has(p) || CUSTOM_PALETTE.test(p)),
+    empty: 'auto',
+  },
+  seed: { read: (v) => clipText(text(v)?.trim(), 40), empty: '' },
+  format: {
+    read: (v) =>
+      oneOf(text(v), (f) => {
+        const size = CUSTOM_SIZE.exec(f);
+        return !isCustomSize(f) || (size !== null && fits(Number(size[1]), Number(size[2])));
+      }),
+    empty: 'paperback',
+  },
+  // On or off; any other value (texture=yes) is dropped like other unknown values.
+  texture: {
+    read: (v) => (v === true || v === '1' ? true : v === false || v === '0' ? false : undefined),
+    write: (v) => (v ? '1' : '0'),
+    empty: false,
+    optional: true,
+  },
+};
+const KEYS = /** @type {(keyof Design)[]} */ (Object.keys(FIELDS));
+
+/** Text clipped to `max` (as the inputs' maxlength counts). @param {unknown} v @param {number} max */
+function clipText(v, max) {
+  const s = text(v);
+  return s == null ? undefined : clip(s, max);
+}
+
+/** The value if it passes `ok`, else undefined. @param {string | null | undefined} v @param {(v: string) => boolean} ok */
+const oneOf = (v, ok) => (v && ok(v) ? v : undefined);
+
+/** Validate a design-like object (from the URL, storage or a file); unknown values are dropped. @param {Record<string, unknown>} raw */
 function sanitize(raw) {
-  /** @type {Partial<Design>} */
+  /** @type {Record<string, unknown>} */
   const out = {};
-  // Line breaks become spaces: the single-line inputs would drop them, and the cover spaces them.
-  const str = (/** @type {unknown} */ v) => (typeof v === 'string' ? v.replace(/[\r\n\u2028\u2029]+/g, ' ') : null);
-  const title = str(raw.title);
-  if (title != null) out.title = clip(title, 200);
-  const author = str(raw.author);
-  if (author != null) out.author = clip(author, 120);
-  const subtitle = str(raw.subtitle);
-  if (subtitle != null) out.subtitle = clip(subtitle, 160);
-  const style = str(raw.style);
-  if (style && STYLE_IDS.includes(style)) out.style = style;
-  const palette = str(raw.palette)?.toLowerCase();
-  if (palette && (PALETTE_IDS.has(palette) || CUSTOM_PALETTE.test(palette))) out.palette = palette;
-  const seed = str(raw.seed);
-  if (seed != null) out.seed = clip(seed.trim(), 40);
-  const format = str(raw.format);
-  const size = format ? CUSTOM_SIZE.exec(format) : null;
-  if (format && (!isCustomSize(format) || (size && fits(Number(size[1]), Number(size[2]))))) out.format = format;
-  // On or off; any other value (texture=yes) is ignored like other unknown values.
-  if (raw.texture === true || raw.texture === '1') out.texture = true;
-  else if (raw.texture === false || raw.texture === '0') out.texture = false;
-  return out;
+  for (const key of KEYS) {
+    const value = Object.hasOwn(raw, key) ? FIELDS[key].read(raw[key]) : undefined;
+    if (value !== undefined) out[key] = value;
+  }
+  return /** @type {Partial<Design>} */ (out);
 }
 
 /** @param {string} hash */
@@ -203,14 +241,28 @@ function fromHash(hash) {
 /** @param {Design} d */
 function toHash(d) {
   // Every key, even when empty or off: a link is then the whole design, never mistaken for a
-  // hand-edited partial one (which changes only the keys it names).
-  const q = new URLSearchParams({ title: d.title, author: d.author, subtitle: d.subtitle });
-  q.set('style', d.style);
-  q.set('palette', d.palette);
-  q.set('seed', d.seed);
-  q.set('format', d.format);
-  q.set('texture', d.texture ? '1' : '0');
+  // hand-edited partial one (which changes only the keys it names). Last, the version that drew
+  // it: artwork can change between minor versions.
+  const q = new URLSearchParams();
+  for (const key of KEYS) q.set(key, FIELDS[key].write?.(d[key]) ?? String(d[key]));
+  q.set('v', version);
   return `#${q}`;
+}
+
+/** A version's major and minor number, or null. @param {string | null} v */
+function minorOf(v) {
+  const m = /^(\d+)\.(\d+)(?:\.\d+)?$/.exec(v ?? '');
+  return m ? Number(m[1]) * 1000 + Number(m[2]) : null;
+}
+
+/** Say so when a link was made with an earlier minor version, which may have drawn it differently. @param {string} hash */
+function noteVersion(hash) {
+  const made = new URLSearchParams(hash.replace(/^#/, '')).get('v');
+  const then = minorOf(made);
+  const now = minorOf(version);
+  if (then !== null && now !== null && then < now) {
+    toast(`Made with version ${made}: this version may draw it a little differently`);
+  }
 }
 
 // Every discrete change is a history entry, so Undo/Redo and the browser's
@@ -221,10 +273,12 @@ const MAX_KEY = 'book-cover-generator:history-max';
 let historyIndex = 0;
 let historyMax = 0;
 
-/** Keys that URLs from before 1.2.0 left out when empty or off; entries of ours without them have these values. */
-const OPTIONAL = { subtitle: '', texture: false };
+/** Fields links may leave out, with the values of a design that does (as entries of ours without them have). */
+const OPTIONAL = /** @type {Partial<Design>} */ (
+  Object.fromEntries(KEYS.filter((key) => FIELDS[key].optional).map((key) => [key, FIELDS[key].empty]))
+);
 /** The keys every link names; one that names them all is a whole design. */
-const WHOLE_KEYS = ['title', 'author', 'style', 'palette', 'seed', 'format'];
+const WHOLE_KEYS = KEYS.filter((key) => !FIELDS[key].optional);
 
 function saveHistoryMax() {
   try {
@@ -534,7 +588,9 @@ function arrive(e) {
     // (Judged by the keys the URL names: an unknown value is dropped, but the link is still whole,
     // and opens as it would in a new tab.)
     const named = new URLSearchParams(location.hash.slice(1));
-    Object.assign(design, WHOLE_KEYS.every((key) => named.has(key)) ? complete(linked) : linked);
+    const whole = WHOLE_KEYS.every((key) => named.has(key));
+    Object.assign(design, whole ? complete(linked) : linked);
+    if (whole) noteVersion(location.hash);
   }
   // Rewrite an edited URL so it always holds the whole design (for Copy link).
   if (!ours) stamp();
@@ -628,17 +684,9 @@ const options = (extra = {}) => optionsFor(design, extra);
  * @returns {Design}
  */
 function complete(partial) {
+  const empty = /** @type {Design} */ (Object.fromEntries(KEYS.map((key) => [key, FIELDS[key].empty])));
   /** @type {Design} */
-  const d = {
-    title: '',
-    author: '',
-    style: '',
-    palette: 'auto',
-    seed: '',
-    format: 'paperback',
-    ...OPTIONAL,
-    ...partial,
-  };
+  const d = { ...empty, ...partial };
   if (!partial.style) d.style = pickStyle({ ...d, style: 'random' });
   return d;
 }
@@ -944,6 +992,10 @@ function buildControls() {
   }
   const mobileDownload = /** @type {HTMLButtonElement} */ ($('m-download'));
   mobileDownload.addEventListener('click', () => exportAs('png', mobileDownload));
+  $('thumb-toggle').addEventListener('click', () => {
+    const on = $('book').classList.toggle('store-size');
+    $('thumb-toggle').setAttribute('aria-pressed', String(on));
+  });
   $('keep').addEventListener('click', keepDesign);
   $('kept-all').addEventListener('click', downloadKept);
   $('kept-export').addEventListener('click', exportKept);
@@ -1200,18 +1252,18 @@ function syncCustomColors(colors) {
 
 /** What a given export size is good for. @param {string} format @param {number} w @param {number} hgt */
 function sizeHint(format, w, hgt) {
+  // (Checked against KDP's and ACX's cover guidelines, November 2026.)
+  const kindle = 'Meets Kindle’s recommended 1600 × 2560 (KDP takes JPEG, not PNG).';
+  const audiobook = 'Meets the 2400 × 2400 audiobook minimum (as JPEG it stays under ACX’s 8 MB).';
   if (isCustomSize(format)) {
     const inches = (/** @type {number} */ px) => String(Math.round((px / DPI) * 100) / 100);
-    return `${inches(w)} × ${inches(hgt)} in at ${DPI} dpi.`;
+    const print = `${inches(w)} × ${inches(hgt)} in at ${DPI} dpi.`;
+    if (w * 2560 === hgt * 1600 && hgt >= 2560) return `${kindle} ${print}`;
+    if (w === hgt && w >= 2400) return audiobook;
+    return print;
   }
-  if (format === 'ebook') {
-    return hgt >= 2560
-      ? 'Meets Kindle’s recommended 1600 × 2560.'
-      : 'Kindle recommends 1600 × 2560: choose 3× or more.';
-  }
-  if (format === 'square') {
-    return w >= 2400 ? 'Meets the 2400 × 2400 audiobook minimum.' : 'Audiobook stores ask for 2400 × 2400: choose 4×.';
-  }
+  if (format === 'ebook') return hgt >= 2560 ? kindle : 'Kindle recommends 1600 × 2560: choose 3× or more.';
+  if (format === 'square') return w >= 2400 ? audiobook : 'Audiobook stores ask for 2400 × 2400: choose 4×.';
   return w >= 1800
     ? 'Enough for a 6 × 9 in front cover at 300 dpi.'
     : 'For a 6 × 9 in print cover at 300 dpi, choose 3× or more.';
@@ -1716,6 +1768,7 @@ function registerServiceWorker() {
 // A shared link opens the same cover every time (see complete()); with no link, the sample stays.
 const linked = fromHash(location.hash);
 if (Object.keys(linked).length) Object.assign(design, complete(linked));
+const linkedHash = location.hash;
 // A fragment that isn't a design (#usage, from a header link opened in a new tab) is a place on
 // the page. The URL is about to hold the design instead, so scroll there once the page is built.
 let anchor = /** @type {HTMLElement | null} */ (null);
@@ -1763,3 +1816,4 @@ render();
 renderKept();
 syncHistoryButtons();
 anchor?.scrollIntoView();
+if (Object.keys(linked).length) noteVersion(linkedHash);

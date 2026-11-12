@@ -1373,6 +1373,35 @@ test('a kept design shows the cover as it was kept, and says when this version d
   await expect(page.locator('#toast')).toContainText('draws it a little differently');
 });
 
+test('links name the version that made them, and an older one says it may look different', async ({ page }) => {
+  await page.goto('/#title=Now&style=minimal&seed=v');
+  await expect(page).toHaveURL(/texture=0&v=\d+\.\d+\.\d+$/);
+  await expect(page.locator('#toast')).not.toHaveClass(/show/);
+  await page.goto('about:blank');
+  await page.goto('/#title=Old&author=A&style=noir&palette=noir&seed=s&format=paperback&v=1.0.0');
+  await expect(page.locator('#toast')).toContainText('Made with version 1.0.0');
+  await selected(page, 'noir');
+  // Pasted into the open tab, too.
+  await page.evaluate(() => {
+    location.hash = 'title=Older&author=A&style=swiss&palette=noir&seed=s&format=paperback&v=0.9.0';
+  });
+  await selected(page, 'swiss');
+  await expect(page.locator('#toast')).toContainText('Made with version 0.9.0');
+});
+
+test('Store size shows the cover as small as a store lists it', async ({ page }) => {
+  await page.goto('/#title=Small&style=bigtype&seed=t');
+  await ready(page);
+  const toggle = page.locator('#thumb-toggle');
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  const height = () => page.locator('#book').evaluate((el) => /** @type {HTMLElement} */ (el).offsetHeight);
+  expect(await height()).toBe(120);
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  expect(await height()).toBeGreaterThan(200);
+});
+
 test('a Japanese title sets the language of the cover', async ({ page }) => {
   await page.goto(`/#title=${encodeURIComponent('ガラスの街')}&style=minimal&seed=j`);
   expect(await svgOf(page, '#preview')).toMatch(/^<svg [^>]* lang="ja"/);

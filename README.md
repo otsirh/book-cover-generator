@@ -37,7 +37,7 @@ On [covers.otsirh.dev](https://covers.otsirh.dev) you type a title and author, t
 - **a variation**, the seed behind the artwork: the strip under the preview shows six others to click;
 - **a format**: paperback, eBook, square, or **Custom** for any size in pixels, typed in or picked from common sizes (Kindle, print trim sizes at 300 dpi, audiobook, social posts).
 
-**Randomize** reshuffles everything, except what you've locked. Undo and redo step back and forth through your designs, and so do the browser's Back and Forward buttons. **Copy link** shares the exact design, because the URL holds every setting. The export panel tells you which size suits Kindle, print or audiobook covers.
+**Store size** shrinks the preview to the size a store lists covers at, to check the title still reads. **Randomize** reshuffles everything, except what you've locked. Undo and redo step back and forth through your designs, and so do the browser's Back and Forward buttons. **Copy link** shares the exact design, because the URL holds every setting. The export panel tells you which size suits Kindle, print or audiobook covers.
 
 **Keep** saves a design to a tray under the preview, together with the cover as it was drawn, so a later version of the app can't change it. **Download all** saves every kept design as a PNG in one ZIP file. **Export** saves the kept designs to a file, and **Import** adds them in another browser.
 
@@ -104,9 +104,11 @@ npx github:otsirh/book-cover-generator --list   # all styles and palettes
 npx github:otsirh/book-cover-generator "Bright Machines" --bg 0b132b --ink f8f9fa --accent ff6b6b,4ecdc4 --format ebook --width 1600 -o cover.svg
 # any size, and the choices as JSON (with the SVG, when there is no -o)
 npx github:otsirh/book-cover-generator "Neon Tide" --size 1800x2700 --json
+# twelve variations to choose from: ideas/cover-1.svg … ideas/cover-12.svg (seeds 1 to 12)
+npx github:otsirh/book-cover-generator "Salt and Static" --count 12 -o ideas/cover.svg
 ```
 
-Options: `-s/--style`, `-p/--palette`, `--bg`, `--ink`, `--accent`, `--subtitle`, `--texture`, `--seed`, `--format` (`paperback`, `ebook` or `square`), `--width`, `--height`, `--size`, `--lang`, `-o/--out`, `--json`, `--list`, `--help`.
+Options: `-s/--style`, `-p/--palette`, `--bg`, `--ink`, `--accent`, `--subtitle`, `--texture`, `--seed`, `--format` (`paperback`, `ebook` or `square`), `--width`, `--height`, `--size`, `--lang`, `-o/--out`, `--count`, `--json`, `--list`, `--help`.
 
 ## API
 
@@ -142,7 +144,9 @@ Titles and subtitles longer than 300 characters (authors: 200) are cut. With `'r
 - `palettes`: `[{ id, name, bg, ink, accents, dark? }]`
 - `randomSeed()`: a short random seed string
 - `pickStyle(options)`: the style id `createCover` would use for these options (resolving `'random'` from the seed), without drawing the cover
-- `registerStyle({ id, name, description, group, prefer, render(ctx) })`: add your own style (see below)
+- `registerStyle({ id, name, description, group, prefer, render(ctx) })`: add your own style (see below). Replacing a built-in style takes `registerStyle(style, { replace: true })`; `unregisterStyle(id)` removes a style or brings the built-in back
+- `registerPalette({ id, name, bg, ink, accents })`: add a palette to use by id, as `palette: 'brand'` (`{ replace: true }` for a built-in id); `unregisterPalette(id)` removes it. Registered styles and palettes can also be picked by `'random'`, so registering one changes what a seed gives
+- `version`: the library's version (artwork for a seed can change between minor versions)
 - `titleBlock`, `authorFit`: the typography the built-in styles use (a title with its lead line and subtitle, and the author line)
 - `fitText`, `drawText`, `fitStack`, `drawStack`, `splitLead`, `measureText`, `setTextMeasurer`, `FONTS`: lower-level text helpers (`fitText` can hyphenate one long word with `hyphenate: px`), and `baselineOf`, `textBottom`, `textGroupAttrs`, `markExtent` for styles that draw text themselves
 - `strongAccents`, `textColor`, `tintText`, `fitTitleWith`, `textPanel`, `TEXT_CONTRAST`: the colour and layout helpers the built-in styles use (accents that stand out, text colours that stay readable, giving up art for a longer title, a panel for title and author)

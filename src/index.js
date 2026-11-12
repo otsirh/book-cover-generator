@@ -24,6 +24,9 @@ export { titleBlock, authorFit, fitStack, drawStack, splitLead } from './type.js
 export { strongAccents, textColor, tintText, fitTitleWith, textPanel, TEXT_CONTRAST } from './styles/util.js';
 export * as svgUtils from './core.js';
 
+/** This version of the library (artwork for a seed can change between minor versions). */
+export const version = '1.3.0';
+
 /**
  * A registry entry: the style's details with defaults filled in, and a render that calls
  * the style's own method on the style itself (so class styles keep `this` and private fields).
@@ -39,7 +42,12 @@ const entryFor = (style) => ({
   render: (/** @type {import('./index.js').StyleContext} */ ctx) => style.render(ctx),
 });
 
-const registry = new Map(styleList.map((s) => [s.id, entryFor(s)]));
+const builtInStyles = new Map(styleList.map((s) => [s.id, entryFor(s)]));
+const registry = new Map(builtInStyles);
+/** The palettes, as this module changes them (registering adds to the list everyone sees). */
+const paletteList = /** @type {import('./palettes.js').Palette[]} */ (/** @type {unknown} */ (palettes));
+/** @type {Map<string, import('./palettes.js').Palette>} */
+const builtInPalettes = new Map(paletteList.map((p) => [p.id, p]));
 
 /** Metadata for every available style: [{ id, name, description, group }] */
 export function listStyles() {
@@ -51,15 +59,74 @@ export const styles = listStyles().map((s) => s.id);
 
 /**
  * Register a custom style. `style.render(ctx)` must return SVG markup (without
- * the outer <svg>). See README for the shape of `ctx`.
+ * the outer <svg>). See README for the shape of `ctx`. Replacing a built-in style
+ * takes `{ replace: true }`.
  * @param {import('./index.js').CoverStyle} style
+ * @param {{ replace?: boolean }} [options]
  */
-export function registerStyle(style) {
+export function registerStyle(style, { replace = false } = {}) {
   if (!style || !style.id || typeof style.render !== 'function') {
     throw new TypeError('registerStyle: a style needs an `id` and a `render(ctx)` function');
   }
+  if (style.id === 'random') throw new TypeError('registerStyle: "random" is not a style id, it picks one');
+  if (builtInStyles.has(style.id) && !replace) {
+    throw new Error(`registerStyle: "${style.id}" is a built-in style; pass { replace: true } to replace it`);
+  }
   registry.set(style.id, entryFor(style));
   if (!styles.includes(style.id)) styles.push(style.id);
+}
+
+/**
+ * Remove a registered style, or bring back the built-in style one replaced. Whether anything changed.
+ * @param {string} id
+ */
+export function unregisterStyle(id) {
+  const original = builtInStyles.get(id);
+  if (original) {
+    if (registry.get(id) === original) return false;
+    registry.set(id, original);
+    return true;
+  }
+  if (!registry.delete(id)) return false;
+  styles.splice(styles.indexOf(id), 1);
+  return true;
+}
+
+/** Palette ids that mean something else. */
+const RESERVED_PALETTES = new Set(['random', 'auto', 'custom']);
+
+/**
+ * Register a palette, so `palette: id` uses it (and `'random'` can pick it). Replacing a
+ * built-in palette takes `{ replace: true }`.
+ * @param {import('./index.js').CustomPalette & { id: string }} palette
+ * @param {{ replace?: boolean }} [options]
+ */
+export function registerPalette(palette, { replace = false } = {}) {
+  const id = palette && typeof palette.id === 'string' ? palette.id.trim() : '';
+  if (!id) throw new TypeError('registerPalette: a palette needs an `id`');
+  if (RESERVED_PALETTES.has(id)) throw new TypeError(`registerPalette: "${id}" is reserved`);
+  if (builtInPalettes.has(id) && !replace) {
+    throw new Error(`registerPalette: "${id}" is a built-in palette; pass { replace: true } to replace it`);
+  }
+  const { name, bg, ink, dark } = normalizePalette({ ...palette, id });
+  const entry = { id, name, bg, ink, accents: palette.accents.map((c) => c.trim()), dark };
+  const at = paletteList.findIndex((p) => p.id === id);
+  if (at === -1) paletteList.push(entry);
+  else paletteList[at] = entry;
+}
+
+/**
+ * Remove a registered palette, or bring back the built-in palette one replaced. Whether anything changed.
+ * @param {string} id
+ */
+export function unregisterPalette(id) {
+  const at = paletteList.findIndex((p) => p.id === id);
+  if (at === -1) return false;
+  const original = builtInPalettes.get(id);
+  if (paletteList[at] === original) return false;
+  if (original) paletteList[at] = original;
+  else paletteList.splice(at, 1);
+  return true;
 }
 
 /** A fresh random seed string, e.g. for a "randomize" button. */

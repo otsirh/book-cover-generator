@@ -40,4 +40,5 @@ export interface Palette {
   readonly dark?: boolean;
 }
 
-export declare const palettes: readonly (Palette & { readonly id: PaletteId })[];
+/** The built-in palettes, then any added with `registerPalette`. */
+export declare const palettes: readonly (Palette & { readonly id: PaletteId | (string & {}) })[];

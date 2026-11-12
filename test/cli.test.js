@@ -179,3 +179,38 @@ test('conflicting or incomplete options are reported', async () => {
     assert.match(stderr, /** @type {RegExp} */ (message));
   }
 });
+
+test('--count writes variations, named from --out', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'book-cover-'));
+  try {
+    const plain = await cli('Ideas', '--count', '3', '--json', '-o', join(dir, 'cover.svg'));
+    assert.equal(plain.code, 0);
+    const lines = plain.stdout
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line));
+    assert.deepEqual(
+      lines.map((l) => [l.file, l.seed]),
+      [1, 2, 3].map((n) => [join(dir, `cover-${n}.svg`), String(n)]),
+    );
+    for (const { file } of lines) assert.match(await readFile(file, 'utf8'), /^<svg/);
+    const named = await cli('Ideas', '--seed', 'x', '--count', '2', '-o', join(dir, '{seed}.svg'));
+    assert.equal(named.code, 0);
+    assert.match(named.stderr, /x-1\.svg[\s\S]*x-2\.svg/);
+    await stat(join(dir, 'x-2.svg'));
+    // The same seed again gives the same cover.
+    const again = await cli('Ideas', '--seed', 'x-2');
+    assert.equal(again.stdout.trim(), (await readFile(join(dir, 'x-2.svg'), 'utf8')).trim());
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+  for (const [args, message] of [
+    [['T', '--count', '3'], /give --out/],
+    [['T', '--count', '0', '-o', 'x.svg'], /from 1 to 1000/],
+    [['T', '--count', '2.5', '-o', 'x.svg'], /whole number/],
+  ]) {
+    const { code, stderr } = await cli(...args);
+    assert.equal(code, 1);
+    assert.match(stderr, message);
+  }
+});

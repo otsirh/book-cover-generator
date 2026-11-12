@@ -28,16 +28,21 @@ All notable changes to this project are documented here. The format follows [Kee
   - PNG and JPEG downloads record 300 dpi, so print software opens them at their print size;
   - **Download all** saves the kept designs as PNGs in one ZIP file, instead of one download each;
   - kept designs are stored with the cover as it was drawn, so a later version can't change them (opening one says when this version draws it differently). The tray holds 100 designs instead of 24, and **Export** and **Import** move them between browsers as a file;
-  - the app works offline once it has loaded (a service worker keeps its files).
+  - the app works offline once it has loaded (a service worker keeps its files);
+  - **Store size** shrinks the preview to a store listing's size, to check the title still reads;
+  - links name the version that made them (`v=1.4.0`), and opening one made with an earlier minor version says this one may draw it a little differently;
+  - the size notes say KDP takes JPEG for eBook covers and ACX caps audiobook covers at 8 MB.
 - `lang` option: the cover's language, set on the SVG so Chinese characters get that language's glyphs. Text with kana is marked Japanese and text with Hangul Korean unless you say otherwise; `createCover` reports it.
 - `Cover.body`: the markup inside the outer `<svg>`, to nest covers in another SVG.
 - The helpers the built-in styles use, for custom styles: `strongAccents`, `textColor`, `tintText`, `fitTitleWith`, `textPanel`, `TEXT_CONTRAST`, `baselineOf`, `textBottom`, `textGroupAttrs` and `markExtent`.
 - Browser helpers: `rasterize` takes an exact `width` and `height` and a `dpi`; `downloadCover` resolves to the file name it saved; `copyImage`, `canCopyImage`, `setDpi`, `zipFiles` and `extensionOf`.
-- CLI: your own colours (`--bg`, `--ink`, `--accent`), `--format`, `--size`, `--lang` and `--json`.
+- `registerPalette` and `unregisterPalette`, so a palette can be used by id; `unregisterStyle`; and `version`.
+- CLI: your own colours (`--bg`, `--ink`, `--accent`), `--format`, `--size`, `--lang`, `--json`, and `--count` to write many variations at once.
 - `TextFit.above` and `TextFit.below` (room for accents and marks), `StackFit` line `above`, and `baselineOf(fit, y, i)` for styles that draw a fit's lines themselves.
 
 ### Changed
 
+- `registerStyle` no longer replaces a built-in style unless you pass `{ replace: true }`, and refuses the id `'random'`.
 - The page's Content Security Policy allows one Trusted Types policy, `sw`, which only lets the page register its own service worker.
 
 ## [1.3.0] - 2026-11-12

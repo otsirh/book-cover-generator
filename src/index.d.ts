@@ -21,6 +21,9 @@ export { titleBlock, authorFit, fitStack, drawStack, splitLead } from './type.js
 export { strongAccents, textColor, tintText, fitTitleWith, textPanel, TEXT_CONTRAST } from './styles/util.js';
 export * as svgUtils from './core.js';
 
+/** This version of the library, such as `'1.4.0'`. Artwork for a seed can change between minor versions. */
+export declare const version: string;
+
 export type StyleId =
   | 'minimal'
   | 'swiss'
@@ -165,8 +168,24 @@ export interface CoverStyle {
 /** Ids of every available style (including registered custom styles). */
 export declare const styles: string[];
 export declare function listStyles(): StyleInfo[];
-/** Add a custom style. Registering a style changes which style `'random'` picks for a given seed. */
-export declare function registerStyle(style: CoverStyle): void;
+export interface RegisterOptions {
+  /** Allow replacing the built-in style (or palette) with the same id. */
+  replace?: boolean;
+}
+/**
+ * Add a custom style. Replacing a built-in one takes `{ replace: true }`. Registering a style
+ * changes which style `'random'` picks for a given seed.
+ */
+export declare function registerStyle(style: CoverStyle, options?: RegisterOptions): void;
+/** Remove a registered style, or bring back the built-in style one replaced. Whether anything changed. */
+export declare function unregisterStyle(id: string): boolean;
+/**
+ * Add a palette, used with `palette: id`. Replacing a built-in one takes `{ replace: true }`.
+ * Registering a palette changes which palette `'random'` picks for a given seed.
+ */
+export declare function registerPalette(palette: CustomPalette & { id: string }, options?: RegisterOptions): void;
+/** Remove a registered palette, or bring back the built-in palette one replaced. Whether anything changed. */
+export declare function unregisterPalette(id: string): boolean;
 /** A short random seed, e.g. for a "randomize" button. */
 export declare function randomSeed(): string;
 /** The style id `createCover` would use for these options (resolving `'random'` from the seed), without drawing. */

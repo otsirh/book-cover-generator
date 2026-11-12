@@ -33,6 +33,8 @@ npm run test:e2e   # browser tests (CI runs these too)
 
 The unit tests render every style with every palette at many sizes and shapes, check that the SVG is well-formed, that all text stays on the cover and that the subtitle is drawn, so most mistakes show up in `npm test`.
 
-## Deploying
+## Releasing and deploying
 
-Maintainers deploy with `npm run deploy`. It runs every check and the browser tests, then publishes `dist/` to Cloudflare with `wrangler`.
+To release, set the new version in `package.json` and in `version` in `src/index.js` (a unit test checks they match), date the `[Unreleased]` section of `CHANGELOG.md`, commit, and tag the commit `vX.Y.Z`. The README's install commands and the CDN link resolve those tags.
+
+Maintainers deploy with `npm run deploy`. It runs every check and the browser tests, then publishes `dist/` to Cloudflare with `wrangler`. The build gives the service worker (`public/sw.js`) a new release name whenever a file it keeps changes, so open apps pick up the new version.

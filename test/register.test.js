@@ -1,7 +1,16 @@
 // Registering a style changes the shared style list, so this runs in its own process.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createCover, styles, registerStyle, listStyles } from '../src/index.js';
+import {
+  createCover,
+  styles,
+  palettes,
+  registerStyle,
+  unregisterStyle,
+  registerPalette,
+  unregisterPalette,
+  listStyles,
+} from '../src/index.js';
 
 test('custom styles can be registered', () => {
   registerStyle({
@@ -47,4 +56,64 @@ test('a class style with private fields renders with itself as `this`', () => {
   registerStyle(style);
   assert.match(createCover({ title: 'x', style: 'test-private' }).svg, /fill="#abcdef"/);
   assert.equal(style.calls, 1, 'writes to `this` reach the instance');
+});
+
+test('a built-in style is replaced only when asked, and can be brought back', () => {
+  const plain = { id: 'minimal', render: () => '<rect width="1" height="1" fill="#abc123"/>' };
+  assert.throws(() => registerStyle(plain), /built-in style; pass \{ replace: true \}/);
+  assert.throws(() => registerStyle({ id: 'random', render: () => '' }), /picks one/);
+  const before = createCover({ title: 'x', style: 'minimal', seed: 's' }).svg;
+  const count = styles.length;
+  registerStyle(plain, { replace: true });
+  assert.match(createCover({ title: 'x', style: 'minimal', seed: 's' }).svg, /#abc123/);
+  assert.equal(styles.length, count, 'still one minimal');
+  assert.equal(unregisterStyle('minimal'), true);
+  assert.equal(createCover({ title: 'x', style: 'minimal', seed: 's' }).svg, before);
+  assert.equal(unregisterStyle('minimal'), false, 'the built-in stays');
+  assert.equal(unregisterStyle('no-such-style'), false);
+  registerStyle({ id: 'test-gone', render: () => '' });
+  assert.equal(unregisterStyle('test-gone'), true);
+  assert.ok(!styles.includes('test-gone'));
+  assert.ok(!listStyles().some((s) => s.id === 'test-gone'));
+  assert.throws(() => createCover({ style: 'test-gone' }), /Unknown style/);
+});
+
+test('palettes can be registered by id, and built-ins replaced only when asked', () => {
+  registerPalette({ id: 'brand', name: 'Brand', bg: ' #0b132b ', ink: '#f8f9fa', accents: ['#ff6b6b'] });
+  const cover = createCover({ title: 'x', style: 'minimal', palette: 'brand' });
+  assert.equal(cover.palette, 'brand');
+  assert.match(cover.svg, /#0b132b/);
+  const brand = palettes.find((p) => p.id === 'brand');
+  assert.deepEqual(brand, {
+    id: 'brand',
+    name: 'Brand',
+    bg: '#0b132b',
+    ink: '#f8f9fa',
+    accents: ['#ff6b6b'],
+    dark: true,
+  });
+  // 'random' can pick it, as it can any palette.
+  const seeds = Array.from({ length: 400 }, (_, i) => `seed-${i}`);
+  assert.ok(seeds.some((seed) => createCover({ title: 'x', style: 'minimal', seed }).palette === 'brand'));
+  assert.throws(() => registerPalette({ id: 'mint', bg: '#000', ink: '#fff', accents: ['#f00'] }), /built-in palette/);
+  for (const id of ['random', 'auto', 'custom', ' ']) {
+    assert.throws(() => registerPalette({ id, bg: '#000', ink: '#fff', accents: ['#f00'] }), TypeError);
+  }
+  assert.throws(() => registerPalette({ id: 'bad', bg: 'black', ink: '#fff', accents: ['#f00'] }), /hex/);
+  const mint = palettes.find((p) => p.id === 'mint');
+  registerPalette(
+    { id: 'mint', name: 'My mint', bg: '#00ff99', ink: '#000000', accents: ['#ff0000'] },
+    { replace: true },
+  );
+  assert.match(createCover({ title: 'x', style: 'minimal', palette: 'mint' }).svg, /#00ff99/);
+  assert.equal(palettes.filter((p) => p.id === 'mint').length, 1);
+  assert.equal(unregisterPalette('mint'), true);
+  assert.equal(
+    palettes.find((p) => p.id === 'mint'),
+    mint,
+  );
+  assert.equal(unregisterPalette('mint'), false);
+  assert.equal(unregisterPalette('brand'), true);
+  assert.throws(() => createCover({ palette: 'brand' }), /Unknown palette "brand"/);
+  assert.equal(unregisterPalette('brand'), false);
 });
