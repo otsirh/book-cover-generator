@@ -5,7 +5,7 @@
 
 import { createRng, hashString, isHex, luminance, escapeXml, stripInvalidXml, grain } from './core.js';
 import { palettes } from './palettes.js';
-import { BREAKING_SPACE, clipGraphemes } from './text.js';
+import { BREAKING_SPACE, FONTS, clipGraphemes } from './text.js';
 import { styleList } from './styles/index.js';
 
 export { palettes } from './palettes.js';
@@ -287,6 +287,29 @@ function dimension(value, fallback, name) {
   return Math.round(v);
 }
 
+/** Ways to set a title's letters: in capitals, or as typed. */
+const TITLE_CASES = ['upper', 'normal'];
+
+/**
+ * The title's font and case, if the options set them (else each style's own).
+ * @param {import('./index.js').CoverOptions} options
+ * @returns {{ font: import('./text.js').FontSpec | null, titleCase: 'upper' | 'normal' | null }}
+ */
+function typeOptions(options) {
+  const font = /** @type {unknown} */ (options.font);
+  const titleCase = /** @type {unknown} */ (options.titleCase);
+  if (font != null && font !== '' && !Object.hasOwn(FONTS, /** @type {string} */ (font))) {
+    throw new RangeError(`Unknown font "${String(font)}". Available: ${Object.keys(FONTS).join(', ')}`);
+  }
+  if (titleCase != null && titleCase !== '' && !TITLE_CASES.includes(/** @type {string} */ (titleCase))) {
+    throw new RangeError(`titleCase must be 'upper' or 'normal', got ${JSON.stringify(titleCase)}`);
+  }
+  return {
+    font: font ? FONTS[/** @type {keyof typeof FONTS} */ (font)] : null,
+    titleCase: titleCase ? /** @type {'upper' | 'normal'} */ (titleCase) : null,
+  };
+}
+
 /** A BCP 47 language tag, loosely: `ja`, `zh-Hant`, `pt-BR`, `sr-Latn-RS`. */
 const LANG_TAG = /^[a-z]{2,3}(?:-[a-z\d]{1,8})*$/i;
 const KANA = /[\p{Script=Hiragana}\p{Script=Katakana}]/u;
@@ -351,6 +374,7 @@ export function createCover(options = {}) {
     luminance(palette.bg) >= luminance(palette.ink) ? [palette.bg, palette.ink] : [palette.ink, palette.bg];
 
   const pins = pinnedVariants(options.variants, style);
+  const titleType = typeOptions(options);
   const uid =
     'bc' +
     hashString(
@@ -366,6 +390,7 @@ export function createCover(options = {}) {
         H,
         !!options.texture,
         ...(Object.keys(pins).length ? [pins] : []),
+        ...(titleType.font || titleType.titleCase ? [options.font ?? '', titleType.titleCase ?? ''] : []),
       ]),
     ).toString(36);
   /** The variants the style chose (or was given). @type {Record<string, string>} */
@@ -385,6 +410,8 @@ export function createCover(options = {}) {
     rng,
     p: { ...palette, paper, night },
     id: (name) => `${uid}-${name}`,
+    titleFont: titleType.font,
+    titleCase: titleType.titleCase,
     // The seed's pick is always drawn, so pinning a variant changes nothing drawn before it.
     choose: (name, values) => {
       const picked = rng.pick(values);

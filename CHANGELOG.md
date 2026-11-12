@@ -7,6 +7,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Added
 
 - **Style variants.** Eleven styles let you pin a choice the variation otherwise makes: Minimal's alignment, Big Letter's letter, Split's shape, Concentric's rings, Stripes' stripes and title, Mosaic's tiles, Silhouette's scene, Aurora's title, Botanical's flowers, Blueprint's drawing and Engraved's border. In the app they are buttons under the style (Auto, or a value; Auto outlines what the variation picked), kept in links as `variant=scene.forest`, and the variations strip keeps them. In the library: `createCover({ variants })`, `Cover.variants`, `variants` in `listStyles()`, and for custom styles a `variants` declaration and `ctx.choose(name, values)`. In the CLI: `--variant scene=forest`. Covers that pin nothing are drawn exactly as before.
+- **Title type.** `font` (any of the nine `FONTS`) and `titleCase` (`'upper'` or `'normal'`) set the title instead of the style's choice, in every style but Typewriter and Pixel, which draw their own lettering. Serifs set in a heavy style's weight are kept to bold, and tracking set for capitals is dropped for lower case. In the app: a font menu (each font shown in itself) and Auto / ABC / Abc under the style, kept across styles and in links (`font=didone&case=upper`). In the CLI: `--font` and `--case`.
 
 ### Changed
 

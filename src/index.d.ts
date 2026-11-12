@@ -1,5 +1,6 @@
 import type { Rng } from './core.js';
 import type { Palette, PaletteId } from './palettes.js';
+import type { FontSpec, FONTS } from './text.js';
 
 export type { Rng } from './core.js';
 export type { Palette, PaletteId } from './palettes.js';
@@ -110,6 +111,13 @@ export interface CoverOptions {
    * are ignored; a value it doesn't offer throws.
    */
   variants?: Readonly<Record<string, string>>;
+  /**
+   * The title's font, one of `FONTS` (`'didone'`, `'geometric'`…), instead of the style's. Styles
+   * that draw their own lettering (Typewriter, Pixel) keep theirs.
+   */
+  font?: keyof typeof FONTS | (string & {});
+  /** Set the title in capitals (`'upper'`) or as typed (`'normal'`) instead of as the style does. */
+  titleCase?: 'upper' | 'normal';
 }
 
 export interface Cover {
@@ -182,6 +190,10 @@ export interface StyleContext {
    * pins it (`createCover({ variants: { [name]: value } })`). Repeat a value to make it likelier.
    */
   choose<T extends string>(name: string, values: readonly T[]): T;
+  /** The title font the cover asks for (`createCover`'s `font`), or null; `titleBlock` follows it. */
+  readonly titleFont: FontSpec | null;
+  /** The title case the cover asks for (`titleCase`), or null; `titleBlock` follows it. */
+  readonly titleCase: 'upper' | 'normal' | null;
 }
 
 export interface CoverStyle {

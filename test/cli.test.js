@@ -254,3 +254,17 @@ test('--variant pins a style’s choice, and --list shows them', async () => {
     assert.match(stderr, message);
   }
 });
+
+test('--font and --case set the title', async () => {
+  const { stdout } = await cli('The Lighthouse Keeper', '-s', 'minimal', '--font', 'didone', '--case', 'upper');
+  assert.match(stdout, /font-family="Didot,/);
+  assert.match(stdout, />LIGHTHOUSE\b/);
+  for (const [args, message] of [
+    [['T', '--font', 'comic'], /Unknown font "comic"/],
+    [['T', '--case', 'lower'], /titleCase must be/],
+  ]) {
+    const { code, stderr } = await cli(...args);
+    assert.equal(code, 1);
+    assert.match(stderr, message);
+  }
+});

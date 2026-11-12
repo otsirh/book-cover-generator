@@ -7,6 +7,7 @@ import {
   version,
   formats,
   sizeLimits,
+  FONTS,
 } from '../src/index.js';
 import {
   svgToDataUrl,
@@ -30,6 +31,8 @@ import { hashString, contrast } from '../src/core.js';
  * @property {string} subtitle
  * @property {string} style
  * @property {string} variant   the style's choices pinned, as name.value pairs joined by '-' ('scene.forest')
+ * @property {string} font      the title's font (a FONTS key), or '' for the style's
+ * @property {string} case      the title 'upper', 'normal' (as typed), or '' as the style sets it
  * @property {string} palette   a palette id, 'auto', or your own colours ('custom-0b132b-f8f9fa-ff6b6b-…')
  * @property {string} seed      '' means "from the title"
  * @property {string} format    a preset, or a size in px ('1600x2560')
@@ -156,6 +159,8 @@ const design = {
   subtitle: '',
   style: pick(STARTERS),
   variant: '',
+  font: '',
+  case: '',
   palette: 'auto',
   seed: randomSeed(),
   format: 'paperback',
@@ -202,6 +207,14 @@ const FIELDS = {
   style: { read: (v) => oneOf(text(v), STYLE_IDS.includes.bind(STYLE_IDS)), empty: '' },
   // (Since 1.5.0.) Checked against the style when used: see pinsFor().
   variant: { read: (v) => oneOf(text(v), VARIANT.test.bind(VARIANT)), empty: '', optional: true, omitEmpty: true },
+  // (Since 1.5.0.)
+  font: { read: (v) => oneOf(text(v), (f) => Object.hasOwn(FONTS, f)), empty: '', optional: true, omitEmpty: true },
+  case: {
+    read: (v) => oneOf(text(v), (t) => t === 'upper' || t === 'normal'),
+    empty: '',
+    optional: true,
+    omitEmpty: true,
+  },
   palette: {
     read: (v) => oneOf(text(v)?.toLowerCase(), (p) => PALETTE_IDS.has(p) || CUSTOM_PALETTE.test(p)),
     empty: 'auto',
@@ -690,6 +703,8 @@ function optionsFor(d, extra = {}) {
     seed: d.seed,
     texture: d.texture,
     variants: pinsFor(d.variant, extra.style ?? d.style),
+    font: d.font || undefined,
+    titleCase: /** @type {'upper' | 'normal' | undefined} */ (d.case || undefined),
     width,
     height,
     ...extra,
@@ -988,6 +1003,17 @@ function buildControls() {
     else delete pins[name];
     update({ variant: variantOf(pins) });
   });
+  // Each font named in itself (where the browser draws menus with page styles).
+  const fontMenu = /** @type {HTMLSelectElement} */ ($('title-font'));
+  for (const option of fontMenu.options) {
+    const font = FONTS[/** @type {keyof typeof FONTS} */ (option.value)];
+    if (font) option.style.fontFamily = font.family;
+  }
+  fontMenu.addEventListener('change', () => update({ font: fontMenu.value }));
+  $('title-case').addEventListener('click', (e) => {
+    const b = /** @type {HTMLElement} */ (e.target).closest('button[data-case]');
+    if (b instanceof HTMLElement) update({ case: b.dataset.case ?? '' });
+  });
   $('prev-style').addEventListener('click', () => stepStyle(-1));
   $('next-style').addEventListener('click', () => stepStyle(1));
   $('dice-style').addEventListener('click', () => update({ style: pickOther(STYLE_IDS, design.style) }));
@@ -1249,6 +1275,11 @@ function syncControls() {
   }
   syncCustomColors(colors);
   syncVariants();
+  /** @type {HTMLSelectElement} */ ($('title-font')).value = design.font;
+  $('type-note').hidden = design.style !== 'typewriter' && design.style !== 'pixel';
+  for (const b of document.querySelectorAll('[data-case]')) {
+    b.setAttribute('aria-pressed', String(b.getAttribute('data-case') === design.case));
+  }
   const custom = isCustomSize(design.format);
   if (custom) ui.size = design.format;
   for (const b of document.querySelectorAll('[data-format]')) {

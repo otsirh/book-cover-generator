@@ -13,6 +13,9 @@ Options:
       --accent <hex>    and accents (repeat it, or separate them with commas)
       --variant <n=v>   pin one of the style's choices, e.g. scene=forest
                         (repeat it; --list shows each style's)
+      --font <name>     the title's font: serif, didone, garamond, sans,
+                        geometric, humanist, condensed, display or mono
+      --case <how>      the title in capitals (upper) or as typed (normal)
       --subtitle <text> a subtitle or tagline
       --texture         add a fine film-grain texture
       --seed <value>    seed for the artwork (default: title + author)
@@ -46,6 +49,8 @@ try {
       ink: { type: 'string' },
       accent: { type: 'string', multiple: true },
       variant: { type: 'string', multiple: true },
+      font: { type: 'string' },
+      case: { type: 'string' },
       subtitle: { type: 'string' },
       texture: { type: 'boolean' },
       seed: { type: 'string' },
@@ -210,6 +215,8 @@ try {
     palette: palette(),
     lang: values.lang,
     variants: variants(),
+    font: values.font,
+    titleCase: /** @type {'upper' | 'normal' | undefined} */ (values.case),
     ...dimensions(),
   };
   for (let n = 1; n <= total; n++) {

@@ -227,6 +227,34 @@
         </div>
 
         <div class="field">
+          <span class="label" id="type-label">Title type</span>
+          <div class="type-row">
+            <select id="title-font" aria-label="Title font" aria-describedby="type-label">
+              <option value="">The style’s font</option>
+              <option value="serif">Serif · Georgia</option>
+              <option value="didone">Didone · Didot, Bodoni</option>
+              <option value="garamond">Old style · Garamond</option>
+              <option value="sans">Sans · Helvetica</option>
+              <option value="geometric">Geometric · Futura</option>
+              <option value="humanist">Humanist · Gill Sans</option>
+              <option value="condensed">Condensed</option>
+              <option value="display">Heavy · Impact</option>
+              <option value="mono">Typewriter · Courier</option>
+            </select>
+            <div class="chips" id="title-case" role="group" aria-label="Title case">
+              <button type="button" class="chip" data-case="" title="As the style sets it">Auto</button>
+              <button type="button" class="chip" data-case="upper" title="In capitals" aria-label="ABC: capitals">
+                ABC
+              </button>
+              <button type="button" class="chip" data-case="normal" title="As typed" aria-label="Abc: as typed">
+                Abc
+              </button>
+            </div>
+          </div>
+          <p class="field-note" id="type-note" hidden>This style keeps its own lettering.</p>
+        </div>
+
+        <div class="field">
           <div class="label-row">
             <span class="label" id="palette-label">Palette</span>
             <span class="tools">

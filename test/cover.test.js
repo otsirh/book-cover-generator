@@ -1074,3 +1074,68 @@ test('variants a style lacks are ignored, and a value it lacks throws', () => {
   const pinned = createCover({ title: 'x', style: 'silhouette', seed: 's', variants: { scene: other } });
   assert.notEqual(/id="(bc[0-9a-z]+)-/.exec(free.svg)?.[1], /id="(bc[0-9a-z]+)-/.exec(pinned.svg)?.[1]);
 });
+
+test('a title font and case of your own, in every style', async () => {
+  const { FONTS } = await import('../src/index.js');
+  const drawing = (/** @type {string} */ svg) => svg.replace(/bc[0-9a-z]+-/g, 'id-');
+  for (const style of builtIn) {
+    for (const font of Object.keys(FONTS)) {
+      for (const titleCase of /** @type {const} */ ([undefined, 'upper', 'normal'])) {
+        for (const [width, height] of [
+          [600, 900],
+          [1800, 600],
+        ]) {
+          const label = `${style} ${font} ${titleCase} ${width}x${height}`;
+          const options = {
+            title: 'The Lighthouse Keeper',
+            author: 'Mara Ellison',
+            subtitle: 'A Novel',
+            style,
+            seed: 's',
+            width,
+            height,
+          };
+          const { svg } = createCover({ ...options, font, titleCase });
+          assertWellFormed(svg, label);
+          for (const [top, bottom, size] of textLines(svg)) {
+            if (size > Math.min(width, height) * 0.5) continue;
+            assert.ok(top >= -1 && bottom <= height + 1, `${label}: text at ${top}..${bottom}`);
+          }
+          // The title is never set smaller than its subtitle.
+          const sizes = textRuns(svg).map((r) => ({ text: r.text, size: r.size }));
+          const title = sizes.find((r) => /lighthouse|keeper/i.test(r.text));
+          const subtitle = sizes.find((r) => /a novel/i.test(r.text));
+          if (title && subtitle) assert.ok(title.size >= subtitle.size * 0.99, `${label}: title smaller than subtitle`);
+          if (style !== 'typewriter' && style !== 'pixel') {
+            assert.ok(
+              svg.includes(
+                FONTS[/** @type {keyof typeof FONTS} */ (font)].family.split(',')[0].replace(/'/g, '&apos;'),
+              ) || svg.includes(FONTS[/** @type {keyof typeof FONTS} */ (font)].family.split(',')[0]),
+              `${label}: font not used`,
+            );
+          }
+        }
+      }
+    }
+    // Upper case shows in capitals; normal keeps the case typed.
+    if (style !== 'typewriter' && style !== 'pixel') {
+      assert.match(
+        createCover({ title: 'The Lighthouse Keeper', style, seed: 's', titleCase: 'upper' }).svg,
+        /LIGHTHOUSE/,
+        style,
+      );
+      assert.match(
+        createCover({ title: 'The Lighthouse Keeper', style, seed: 's', titleCase: 'normal' }).svg,
+        /Lighthouse/,
+        style,
+      );
+    }
+    // Leaving them out draws the style's own.
+    assert.equal(
+      drawing(createCover({ title: 'x', style, seed: 's', font: '', titleCase: undefined }).svg),
+      drawing(createCover({ title: 'x', style, seed: 's' }).svg),
+    );
+  }
+  assert.throws(() => createCover({ font: 'comic' }), /Unknown font "comic"/);
+  assert.throws(() => createCover({ titleCase: /** @type {any} */ ('lower') }), /titleCase/);
+});

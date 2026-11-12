@@ -398,6 +398,20 @@ input::placeholder {
   border-color: var(--muted);
 }
 
+.type-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.type-row select {
+  flex: 1;
+}
+
+.type-row .chips {
+  flex-wrap: nowrap;
+}
+
 /* What the variation picked, while Auto is on. */
 .chip.picked {
   border-style: dashed;

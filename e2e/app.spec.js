@@ -1478,6 +1478,29 @@ test('a style’s variants can be pinned, links hold them, and another style sta
   await expect.poll(() => svgSoon(page, '#preview')).not.toBe(left);
 });
 
+test('a title font and case of your own: in the link, kept across styles, and in the rail', async ({ page }) => {
+  await page.goto('/#title=The+Lighthouse+Keeper&style=minimal&seed=t');
+  await expect(page.locator('[data-case=""]')).toHaveAttribute('aria-pressed', 'true');
+  await page.locator('#title-font').selectOption('didone');
+  await expect(page).toHaveURL(/style=minimal&font=didone&/);
+  await expect.poll(() => svgSoon(page, '#preview')).toContain('font-family="Didot,');
+  await page.locator('[data-case="upper"]').click();
+  await expect(page).toHaveURL(/font=didone&case=upper&/);
+  await expect.poll(() => svgSoon(page, '#preview')).toContain('LIGHTHOUSE');
+  // Another style keeps them, and so do the rail's thumbnails.
+  await page.locator('.tile[data-style="swiss"]').click();
+  await selected(page, 'swiss');
+  await expect(page).toHaveURL(/font=didone&case=upper/);
+  await expect.poll(() => svgSoon(page, '.tile[data-style="bigtype"] img')).toContain('font-family="Didot,');
+  await page.locator('#undo').click();
+  await page.locator('#undo').click();
+  await expect(page.locator('[data-case=""]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#title-font')).toHaveValue('didone');
+  // Styles with lettering of their own say so.
+  await page.locator('.tile[data-style="typewriter"]').click();
+  await expect(page.locator('#type-note')).toBeVisible();
+});
+
 test('a Japanese title sets the language of the cover', async ({ page }) => {
   await page.goto(`/#title=${encodeURIComponent('ガラスの街')}&style=minimal&seed=j`);
   expect(await svgOf(page, '#preview')).toMatch(/^<svg [^>]* lang="ja"/);
