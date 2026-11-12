@@ -1761,10 +1761,13 @@ function renderKept(list = loadKept()) {
   scheduleKept();
 }
 
+/** A cover's drawing, whatever its ids (which a version may name differently). @param {string} svg */
+const drawingOf = (svg) => svg.replace(/\bbc[0-9a-z]+-/g, 'bc-');
+
 /** Open a kept design, saying so when this version draws it differently from the kept SVG. @param {Kept} k */
 function openKept(k) {
   update({ ...k.design });
-  if (k.svg && createCover(optionsFor(k.design)).svg !== k.svg) {
+  if (k.svg && drawingOf(createCover(optionsFor(k.design)).svg) !== drawingOf(k.svg)) {
     toast('This version draws it a little differently. Download all saves it as kept.');
   }
 }

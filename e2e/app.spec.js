@@ -1437,6 +1437,27 @@ test('a kept design shows the cover as it was kept, and says when this version d
   await expect(page.locator('#toast')).toContainText('draws it a little differently');
 });
 
+test('a kept design drawn the same but for its ids opens without a warning', async ({ page }) => {
+  await page.goto('/#title=Kept&series=Book%20Two&badge=New&style=minimal&seed=k');
+  await ready(page);
+  await page.locator('#keep').click();
+  await expect(page.locator('.kept-open')).toHaveCount(1);
+  // As an older version kept it: the same drawing, its ids named another way.
+  await page.evaluate(() => {
+    const key = 'book-cover-generator:kept';
+    const list = JSON.parse(localStorage.getItem(key) ?? '[]');
+    list[0].svg = list[0].svg.replace(/\bbc[0-9a-z]+-/g, 'bcold1-');
+    localStorage.setItem(key, JSON.stringify(list));
+  });
+  await page.goto('about:blank');
+  await page.goto('/#title=Now&style=swiss&seed=n');
+  await ready(page);
+  await page.locator('.kept-open').click();
+  await selected(page, 'minimal');
+  await expect(page.locator('#title')).toHaveValue('Kept');
+  await expect(page.locator('#toast')).not.toHaveClass(/show/);
+});
+
 test('links name the version that made them, and an older one says it may look different', async ({ page }) => {
   await page.goto('/#title=Now&style=minimal&seed=v');
   await expect(page).toHaveURL(/texture=0&v=\d+\.\d+\.\d+$/);

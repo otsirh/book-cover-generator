@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-11-12
+
+A gallery of every style, the library on JSR, `<book-cover loading="lazy">`, and a sturdier MCP server. Covers are drawn as in 1.8.0 (some of their SVG ids are named differently).
+
 ### Added
 
 - **A gallery** of every style at [covers.otsirh.dev/gallery/](https://covers.otsirh.dev/gallery/), each drawn for a book of the genre it suits (by `<book-cover>`, in your browser) and opening the generator in it. It works offline, as the app does, even when it is the first page you open.
@@ -287,7 +291,8 @@ A redesign of the covers and the app, based on a design review.
 
 - First release: 27 styles, 20 palettes, seeded randomizer, text fitting, CLI and the web app with SVG, PNG and JPEG export.
 
-[Unreleased]: https://github.com/otsirh/book-cover-generator/compare/v1.8.0...HEAD
+[Unreleased]: https://github.com/otsirh/book-cover-generator/compare/v1.9.0...HEAD
+[1.9.0]: https://github.com/otsirh/book-cover-generator/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/otsirh/book-cover-generator/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/otsirh/book-cover-generator/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/otsirh/book-cover-generator/compare/v1.5.0...v1.6.0
