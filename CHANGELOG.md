@@ -4,12 +4,24 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-11-12
+
+Covers wherever you work: an MCP server for AI assistants, a `<book-cover>` element for any page, Deno and Bun, and signed releases. Covers are drawn as in 1.7.0.
+
 ### Added
 
 - **`<book-cover>`**, a custom element for any page: one script (`https://covers.otsirh.dev/src/element.js`, or `import 'book-cover-generator/element'`), then `<book-cover cover-title="Dune" author="Frank Herbert" cover-style="retro">`. Its attributes are the app's link parameters; it draws again when one changes.
 - **MCP server**, so AI assistants can make covers: `book-cover --mcp` speaks the Model Context Protocol over stdio (`claude mcp add book-covers -- npx -y book-cover-generator --mcp`), and the site at `https://covers.otsirh.dev/mcp` over HTTP. Its tools draw a cover or a mockup and answer with links to the image and to the app, and list the styles and palettes.
 - Deno and Bun: the library runs in both, and CI checks that Node, Deno and Bun draw the same covers byte for byte.
 - Each GitHub release carries the npm package and its build provenance, signed with Sigstore: check a download with `gh attestation verify book-cover-generator-X.Y.Z.tgz --repo otsirh/book-cover-generator`. (The package on npm has had provenance since 1.7.0.)
+
+### Changed
+
+- The CLI's `--format` takes a shape too (`--format 10x16 --width 1600`), and `--height` with a format, as the HTTP API reads them: the shape at that width or height.
+
+### Fixed
+
+- In Many covers, a book whose list gives it a larger size no longer fails to export on an iPhone or iPad: its scale keeps within the device's canvas, as the export's does.
 
 ## [1.7.0] - 2026-11-12
 
@@ -259,7 +271,8 @@ A redesign of the covers and the app, based on a design review.
 
 - First release: 27 styles, 20 palettes, seeded randomizer, text fitting, CLI and the web app with SVG, PNG and JPEG export.
 
-[Unreleased]: https://github.com/otsirh/book-cover-generator/compare/v1.7.0...HEAD
+[Unreleased]: https://github.com/otsirh/book-cover-generator/compare/v1.8.0...HEAD
+[1.8.0]: https://github.com/otsirh/book-cover-generator/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/otsirh/book-cover-generator/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/otsirh/book-cover-generator/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/otsirh/book-cover-generator/compare/v1.4.0...v1.5.0
