@@ -6,3 +6,6 @@ dist/
 coverage/
 playwright-report/
 test-results/
+
+# Claude Code settings for this machine only
+.claude/settings.local.json
