@@ -90,7 +90,13 @@ function cleanText(value, max) {
     .replace(/\s+/g, ' ')
     .trim();
   // Cut between visible characters, so an emoji or accented letter is never split.
-  return text.length > max ? graphemes(text).slice(0, max).join('').trimEnd() : text;
+  // (Trim cheaply first: no character is longer than 32 code units, so segmenting stays fast.)
+  return text.length > max
+    ? graphemes(text.slice(0, max * 32))
+        .slice(0, max)
+        .join('')
+        .trimEnd()
+    : text;
 }
 
 /**

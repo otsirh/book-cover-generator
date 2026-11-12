@@ -21,11 +21,13 @@ test.afterEach(async ({ page }, info) => {
   expect(expected).toEqual([]);
 });
 
-/** @param {Page} page @param {string} selector */
+/**
+ * The SVG an <img> shows, or '' while it has none yet (so it works inside expect.poll).
+ * @param {Page} page @param {string} selector
+ */
 async function svgOf(page, selector) {
   const src = (await page.locator(selector).getAttribute('src')) ?? '';
-  expect(src).toMatch(/^data:image\/svg\+xml/);
-  return decodeURIComponent(src.slice(src.indexOf(',') + 1));
+  return src.startsWith('data:image/svg+xml') ? decodeURIComponent(src.slice(src.indexOf(',') + 1)) : '';
 }
 
 /** @param {Page} page */
@@ -56,6 +58,8 @@ test('typing updates the preview, the rail and the URL', async ({ page }) => {
   await expect(page.locator('#preview')).toHaveAttribute('alt', /Salt and Static.*J\. R\. Okafor/);
   const tile = page.locator('.tile[data-style="swiss"]');
   await tile.scrollIntoViewIfNeeded();
+  // Thumbnails render lazily once visible; wait for it, then for the new title.
+  await expect(tile.locator('img')).toHaveAttribute('src', /^data:image\/svg\+xml/);
   await expect.poll(() => svgOf(page, '.tile[data-style="swiss"] img')).toContain('Salt and Static');
 });
 
