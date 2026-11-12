@@ -543,8 +543,13 @@ test("presses queued for a dropped step don't undo the toolbar's Back", async ({
       else real(delta);
     };
   });
-  await page.locator('#redo').click();
-  await page.locator('#redo').click();
+  // Both presses from the page, back to back: a click from the test waits for the page to hold
+  // still, which on a slow runner can take longer than the second a step is expected for.
+  await page.evaluate(() => {
+    const redo = /** @type {HTMLButtonElement} */ (document.getElementById('redo'));
+    redo.click();
+    redo.click();
+  });
   await page.waitForTimeout(1200);
   await page.goBack();
   await selected(page, 'minimal');
