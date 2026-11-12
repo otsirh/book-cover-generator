@@ -912,6 +912,7 @@ test('downloads SVG, PNG and JPEG at the chosen size', async ({ page }) => {
 });
 
 test('file names are cut between whole characters and never end in a separator', async ({ page }) => {
+  await page.goto('/#title=x&style=minimal&seed=f');
   for (const [title, name] of [
     ['ガラスの街', 'ガラスの街'],
     ['हिन्दी कहानी', 'हिन्दी-कहानी'],
@@ -919,11 +920,11 @@ test('file names are cut between whole characters and never end in a separator',
     ['a' + '𠮷'.repeat(70), 'a' + '𠮷'.repeat(59)],
     ['a'.repeat(59) + ' b', 'a'.repeat(59)],
   ]) {
-    await page.goto(`/#title=${encodeURIComponent(title)}&style=minimal&seed=f`);
+    // Typed into the open page (one load, not five: downloads are slow in WebKit).
+    await page.locator('#title').fill(title);
     const [download] = await Promise.all([page.waitForEvent('download'), page.locator('#dl-svg').click()]);
     // (Compared in NFC: WebKit on macOS reports file names decomposed.)
     expect(download.suggestedFilename().normalize('NFC')).toBe(`${name}-minimal.svg`);
-    await page.goto('about:blank');
   }
 });
 
