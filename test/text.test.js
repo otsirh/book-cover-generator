@@ -253,3 +253,25 @@ test('a custom measurer must be a function and return a width', () => {
     setTextMeasurer(null);
   }
 });
+
+test('line breaks in the text always break lines, and typed lines stay whole while they fit', () => {
+  const opts = { font: FONTS.serif, maxWidth: 400, maxSize: 80, maxHeight: 400 };
+  const typed = fitText('Salt and\nStatic', opts);
+  assert.deepEqual(typed.lines, ['Salt and', 'Static']);
+  // Every kind of line break, and blank lines, make one break.
+  for (const text of ['Salt and\r\nStatic', 'Salt and Static', 'Salt and\n\n \nStatic', '  Salt   and \n Static ']) {
+    assert.deepEqual(fitText(text, opts).lines, ['Salt and', 'Static'], JSON.stringify(text));
+  }
+  // A typed line too long to keep whole at a fair size wraps, but never across the break.
+  const long = fitText('A very long first line that cannot fit\nEnd', {
+    ...opts,
+    maxWidth: 200,
+    maxSize: 60,
+    minSize: 55,
+  });
+  assert.ok(long.lines.length > 2);
+  assert.equal(long.lines.at(-1), 'End');
+  assert.ok(!long.lines.some((line) => line.includes('fit End')));
+  // Capitals and stacks follow the lines too.
+  assert.deepEqual(fitText('Salt and\nStatic', { ...opts, upper: true }).lines, ['SALT AND', 'STATIC']);
+});

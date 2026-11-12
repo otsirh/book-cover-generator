@@ -5,7 +5,7 @@
 
 import { createRng, hashString, isHex, luminance, escapeXml, stripInvalidXml, grain } from './core.js';
 import { palettes } from './palettes.js';
-import { BREAKING_SPACE, FONTS, clipGraphemes } from './text.js';
+import { BREAKING_SPACE, FONTS, LINE_BREAK, clipGraphemes } from './text.js';
 import { styleList } from './styles/index.js';
 
 export { palettes } from './palettes.js';
@@ -250,17 +250,23 @@ function resolvePalette(palette, rng, style) {
   return normalizePalette(found);
 }
 
+// eslint-disable-next-line no-control-regex -- matching control characters is the point
+const CONTROL = /[\u0000-\u001F\u007F-\u009F]/g;
+
 /**
  * Collapse control characters and whitespace, drop anything illegal in XML and
  * cap the length (so huge inputs can't make layout slow).
  * @param {unknown} value
  * @param {number} max  maximum length in characters
+ * @param {{ breaks?: boolean }} [options]
  */
-function cleanText(value, max) {
-  // eslint-disable-next-line no-control-regex -- matching control characters is the point
-  const text = stripInvalidXml(String(value ?? '').replace(/[\u0000-\u001F\u007F-\u009F]/g, ' '))
-    .replace(BREAKING_SPACE, ' ')
-    .trim();
+function cleanText(value, max, { breaks = false } = {}) {
+  // With `breaks`, line breaks stay (as "\n", one between lines): the title's lines break there.
+  const text = String(value ?? '')
+    .split(breaks ? LINE_BREAK : /(?!)/)
+    .map((line) => stripInvalidXml(line.replace(CONTROL, ' ')).replace(BREAKING_SPACE, ' ').trim())
+    .filter(Boolean)
+    .join('\n');
   // Cut between visible characters (segmenting lazily), so an emoji or accented letter is never split.
   return text.length > max ? clipGraphemes(text, max).trimEnd() : text;
 }
@@ -337,9 +343,11 @@ function resolveLang(lang, text) {
  * @param {Pick<import('./index.js').CoverOptions, 'title' | 'author' | 'seed' | 'style'>} options
  */
 function resolveText(options) {
-  const title = cleanText(options.title, 300) || 'Untitled';
+  const title = cleanText(options.title, 300, { breaks: true }) || 'Untitled';
   const author = cleanText(options.author, 200);
-  const seed = options.seed == null || options.seed === '' ? `${title}␟${author}` : String(options.seed);
+  // (A line break in the title doesn't change the seed it makes: same words, same artwork.)
+  const seed =
+    options.seed == null || options.seed === '' ? `${title.replace(/\n/g, ' ')}␟${author}` : String(options.seed);
   return { title, author, seed, styleId: resolveStyle(options.style, createRng(`${seed}|style`)) };
 }
 
@@ -430,7 +438,9 @@ export function createCover(options = {}) {
     const light = grain(ctx, { opacity: 0.08, light: true, id: 'texture-light', seed: 11 });
     body += `<defs>${dark.defs}${light.defs}</defs>${dark.layer}${light.layer}`;
   }
-  const label = escapeXml(`${title}${subtitle ? `: ${subtitle}` : ''}${author ? ` by ${author}` : ''}`);
+  const label = escapeXml(
+    `${title.replace(/\n/g, ' ')}${subtitle ? `: ${subtitle}` : ''}${author ? ` by ${author}` : ''}`,
+  );
   // (Both spellings: `lang` is SVG 2's, `xml:lang` what older renderers read.)
   const langAttrs = lang ? ` lang="${lang}" xml:lang="${lang}"` : '';
   const svg =

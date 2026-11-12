@@ -152,7 +152,8 @@
       <form class="controls" id="controls" autocomplete="off" aria-label="Cover settings">
         <label class="field">
           <span class="label">Title</span>
-          <input id="title" name="title" type="text" maxlength="200" enterkeyhint="done" />
+          <textarea id="title" name="title" rows="2" maxlength="200" aria-describedby="title-hint"></textarea>
+          <small class="field-hint" id="title-hint">Enter starts a new line on the cover.</small>
         </label>
         <label class="field">
           <span class="label">Author</span>

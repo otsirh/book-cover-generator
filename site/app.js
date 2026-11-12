@@ -184,6 +184,10 @@ let current;
 
 // Line breaks become spaces: the single-line inputs would drop them, and the cover spaces them.
 const text = (/** @type {unknown} */ v) => (typeof v === 'string' ? v.replace(/[\r\n\u2028\u2029]+/g, ' ') : null);
+/** Text that may hold line breaks (the title, typed on several lines), each as "\n". @param {unknown} v */
+const lines = (v) => (typeof v === 'string' ? v.replace(/\r\n?|[\u2028\u2029]/g, '\n') : null);
+/** A title as one line, for labels and file names. @param {string} title */
+const oneLine = (title) => title.replace(/\s*\n\s*/g, ' ').trim();
 
 /**
  * @typedef {object} Field
@@ -200,7 +204,8 @@ const text = (/** @type {unknown} */ v) => (typeof v === 'string' ? v.replace(/[
  * @type {Record<keyof Design, Field>}
  */
 const FIELDS = {
-  title: { read: (v) => clipText(v, 200), empty: '' },
+  // (Line breaks kept since 1.5.0: the cover breaks the title there.)
+  title: { read: (v) => clipText(v, 200, lines), empty: '' },
   author: { read: (v) => clipText(v, 120), empty: '' },
   // (Optional since 1.2.0: older links left it out when empty.)
   subtitle: { read: (v) => clipText(v, 160), empty: '', optional: true },
@@ -238,9 +243,12 @@ const FIELDS = {
 };
 const KEYS = /** @type {(keyof Design)[]} */ (Object.keys(FIELDS));
 
-/** Text clipped to `max` (as the inputs' maxlength counts). @param {unknown} v @param {number} max */
-function clipText(v, max) {
-  const s = text(v);
+/**
+ * Text clipped to `max` (as the inputs' maxlength counts).
+ * @param {unknown} v @param {number} max @param {(v: unknown) => string | null} [read] how to read it
+ */
+function clipText(v, max, read = text) {
+  const s = read(v);
   return s == null ? undefined : clip(s, max);
 }
 
@@ -864,7 +872,7 @@ function renderPreview(fade, announce) {
     prev.classList.add('fading');
   }
   img.src = svgToDataUrl(current.svg);
-  const title = design.title.trim() || 'Untitled';
+  const title = oneLine(design.title) || 'Untitled';
   img.alt = `Cover preview: “${title}”${design.author.trim() ? ` by ${design.author.trim()}` : ''}, ${style?.name} style`;
   const paletteName = `${palette?.name ?? 'Custom'}${design.palette === 'auto' ? ' (auto)' : ''}`;
   $('meta').replaceChildren(
@@ -1644,7 +1652,7 @@ function renderKept(list = loadKept()) {
         : d.palette === 'auto'
           ? 'Auto'
           : (palettes.find((x) => x.id === d.palette)?.name ?? d.palette);
-      const label = `${d.title || 'Untitled'}, ${styleName}`;
+      const label = `${oneLine(d.title) || 'Untitled'}, ${styleName}`;
       const open = h(
         'button',
         {
@@ -1882,7 +1890,7 @@ async function shareCover() {
       const blob = await rasterize(current.svg, { scale, dpi: DPI });
       shared = { key, file: new File([blob], name, { type: 'image/png' }) };
     }
-    await navigator.share({ files: [shared.file], title: design.title.trim() || 'Book cover' });
+    await navigator.share({ files: [shared.file], title: oneLine(design.title) || 'Book cover' });
   } catch (err) {
     const why = err instanceof DOMException ? err.name : '';
     // The share sheet was closed.

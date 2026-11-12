@@ -855,16 +855,28 @@ test('a whole link with an unknown style opens the same cover in an open tab as 
   await selected(page, fresh);
 });
 
-test('line breaks in a shared link become spaces', async ({ page }) => {
+test('a title typed on two lines keeps its line break, in the field, the link and the cover', async ({ page }) => {
   await page.goto('/#title=Line%0ABreak&style=minimal&seed=n');
-  await expect(page.locator('#title')).toHaveValue('Line Break');
+  await expect(page.locator('#title')).toHaveValue('Line\nBreak');
   await page.locator('#title').focus();
   await page.locator('#title').evaluate((el) => {
-    const input = /** @type {HTMLInputElement} */ (el);
+    const input = /** @type {HTMLTextAreaElement} */ (el);
     input.setSelectionRange(input.value.length, input.value.length);
   });
   await page.keyboard.type('s');
-  await expect(page).toHaveURL(/title=Line\+Breaks/);
+  await expect(page).toHaveURL(/title=Line%0ABreaks/);
+  // Enter starts another line.
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('Again');
+  await expect(page.locator('#title')).toHaveValue('Line\nBreaks\nAgain');
+  await expect(page).toHaveURL(/title=Line%0ABreaks%0AAgain/);
+  await expect.poll(() => svgSoon(page, '#preview')).toContain('<title>Line Breaks Again</title>');
+  expect(await svgOf(page, '#preview')).toMatch(/>Line<\/text>/);
+  await expect(page.locator('#preview')).toHaveAttribute('alt', /“Line Breaks Again”/);
+  // Other fields still take one line.
+  await page.goto('about:blank');
+  await page.goto('/#title=T&author=A%0AB&style=minimal&seed=n');
+  await expect(page.locator('#author')).toHaveValue('A B');
 });
 
 test('a link from before 1.2.0 pasted into an open tab opens that design', async ({ page }) => {

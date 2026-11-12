@@ -798,34 +798,40 @@ const PIXEL_FONT = {
 };
 
 /** Whether every character can be drawn with the pixel font. @param {string} text */
-const pixelable = (text) => [...text].every((ch) => ch === ' ' || PIXEL_FONT[ch]);
+const pixelable = (text) => [...text].every((ch) => ch === ' ' || ch === '\n' || PIXEL_FONT[ch]);
 
 /**
  * Wrap `text` into lines of pixel glyphs and pick the largest pixel size that fits.
  * @param {string} text @param {number} maxWidth @param {number} maxHeight @param {number} maxQ
  */
 function fitPixelText(text, maxWidth, maxHeight, maxQ) {
-  const words = text.split(' ').filter(Boolean);
+  // Each line the text asks for (a title typed on two lines) starts a line of its own.
+  const paragraphs = text
+    .split('\n')
+    .map((row) => row.split(' ').filter(Boolean))
+    .filter((words) => words.length);
   const widthOf = (/** @type {string} */ s) => s.length * 6 - 1;
   for (let q = maxQ; q >= 1.5; q -= 0.5) {
     const perLine = Math.floor((maxWidth / q + 1) / 6);
     /** @type {string[]} */
     const lines = [];
-    let cur = '';
     let ok = true;
-    for (const w of words) {
-      if (w.length > perLine) {
-        ok = false;
-        break;
+    for (const words of paragraphs) {
+      let cur = '';
+      for (const w of words) {
+        if (w.length > perLine) {
+          ok = false;
+          break;
+        }
+        const cand = cur ? `${cur} ${w}` : w;
+        if (cand.length <= perLine) cur = cand;
+        else {
+          lines.push(cur);
+          cur = w;
+        }
       }
-      const cand = cur ? `${cur} ${w}` : w;
-      if (cand.length <= perLine) cur = cand;
-      else {
-        lines.push(cur);
-        cur = w;
-      }
+      if (cur) lines.push(cur);
     }
-    if (cur) lines.push(cur);
     const height = (lines.length * 10 - 3) * q;
     if (ok && height <= maxHeight) return { q, lines, height, width: Math.max(...lines.map(widthOf)) * q };
   }

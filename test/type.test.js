@@ -401,3 +401,9 @@ test('lines leave room for the next line’s accents and marks', () => {
   const y = Number(/ y="([\d.]+)"/.exec(drawStack(stack, { x: 0, y: 0 }))?.[1]);
   assert.ok(Math.abs(y - first.size * ((first.above ?? 0) + stack.cap)) < 0.1);
 });
+
+test('a stack keeps the lines a title was typed on', () => {
+  assert.deepEqual(stackLines('Salt and\nStatic'), ['Salt and', 'Static']);
+  assert.deepEqual(stackLines('Salt and Static'), ['Salt', 'and Static']);
+  assert.deepEqual(stackLines('A Map of\nQuiet  Places'), ['A Map of', 'Quiet Places']);
+});

@@ -332,7 +332,27 @@ export function clipGraphemes(str, max, { units = false } = {}) {
 
 /* ----------------------------------------------------------------- fitting */
 
-/** @typedef {{ text: string, space: boolean }} Token  A wrap unit; `space` means a space comes before it. */
+/** @typedef {{ text: string, space: boolean, hard?: boolean }} Token  A wrap unit; `space` means a space comes before it, `hard` a line break the text asks for. */
+
+/** A line break in the text itself (a title typed on two lines): lines always break there. */
+export const LINE_BREAK = /\r\n|[\r\n\u2028\u2029]/;
+
+/**
+ * Wrap units of text that may hold line breaks: each line is split as `tokenize` splits text,
+ * and the first unit after a break is marked `hard`.
+ * @param {string} str  lines joined by "\n", each with single spaces
+ * @returns {Token[]}
+ */
+function tokenizeLines(str) {
+  /** @type {Token[]} */
+  const tokens = [];
+  for (const line of str.split('\n')) {
+    const units = tokenize(line);
+    if (tokens.length && units.length) units[0] = { ...units[0], space: false, hard: true };
+    tokens.push(...units);
+  }
+  return tokens;
+}
 
 // Scripts written without spaces between words: lines may break between their words.
 const NO_SPACE =
@@ -416,7 +436,7 @@ function wrapGreedy(tokens, maxWidth, measure, maxLines = Infinity) {
   for (const token of tokens) {
     if (measure(token.text) > maxWidth) return null;
     const cand = append(cur, token);
-    if (!cur || measure(cand) <= maxWidth) cur = cand;
+    if (!cur || (!token.hard && measure(cand) <= maxWidth)) cur = cand;
     else {
       lines.push(cur);
       cur = token.text;
@@ -482,6 +502,8 @@ function hardWrap(tokens, maxWidth, measure) {
       pieces.push(token);
       continue;
     }
+    // (The first piece starts the line the text asks for, if it does.)
+    let hard = Boolean(token.hard);
     // Break the word into pieces that fit. Alphabetic words get a hyphen at each break,
     // placed after a vowel where one is close (INTERNATIO- → INTERNA-TIONAL…).
     const chars = graphemes(token.text);
@@ -500,8 +522,9 @@ function hardWrap(tokens, maxWidth, measure) {
           }
         }
       }
-      pieces.push({ text: piece(end), space });
+      pieces.push({ text: piece(end), space, hard });
       space = false;
+      hard = false;
       start = end;
     }
   }
@@ -644,9 +667,12 @@ export function fitText(text, opts) {
   checkBox('fitText', opts);
   const minSize = defaultMinSize(maxSize, opts.minSize);
 
+  // Line breaks in the text stay (the lines always break there); other whitespace is a space.
   let str = String(text ?? '')
-    .replace(BREAKING_SPACE, ' ')
-    .trim();
+    .split(LINE_BREAK)
+    .map((line) => line.replace(BREAKING_SPACE, ' ').trim())
+    .filter(Boolean)
+    .join('\n');
   if (opts.upper) str = str.toUpperCase();
   const base = { ...spec, lineHeight, cap, above: 0, below: DESCENT };
   if (!str) return { ...base, lines: [], size: 0, width: 0, height: 0, truncated: false };
@@ -674,7 +700,7 @@ export function fitText(text, opts) {
     return heightOf(lines, size, l) + (descent ? l.below * size : 0) <= maxHeight;
   };
 
-  const tokens = tokenize(str);
+  const tokens = tokenizeLines(str);
   // One long word that would come out smaller than `hyphenate` px: split it once, with a
   // hyphen near the middle, if that sets it clearly larger on two lines.
   if (opts.hyphenate && tokens.length === 1 && HYPHENABLE.test(str)) {
@@ -721,6 +747,20 @@ export function fitText(text, opts) {
       truncated,
     };
   };
+
+  // Text typed on several lines keeps those lines while they fit at a fair size: shrink rather
+  // than wrap inside one. (Else it wraps as usual, still breaking where it was typed to.)
+  if (tokens.some((token) => token.hard)) {
+    const typed = str.split('\n');
+    const perPx = Math.max(...typed.map((line) => measureText(line, REFERENCE, spec) / REFERENCE));
+    const l = layoutOf(typed);
+    const fit = Math.min(
+      maxSize,
+      maxWidth / perPx,
+      maxHeight / (l.above + cap + (typed.length - 1) * l.pitch + (descent ? l.below : 0)),
+    );
+    if (typed.length <= maxLines && fit >= minSize) return finish(typed, fit);
+  }
 
   // Shrink 5% at a time down to minSize (which is positive, so this ends however far apart the two are).
   let size = maxSize;

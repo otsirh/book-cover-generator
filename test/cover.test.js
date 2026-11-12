@@ -1139,3 +1139,44 @@ test('a title font and case of your own, in every style', async () => {
   assert.throws(() => createCover({ font: 'comic' }), /Unknown font "comic"/);
   assert.throws(() => createCover({ titleCase: /** @type {any} */ ('lower') }), /titleCase/);
 });
+
+test('a title typed on several lines is set on them, in every style, with the same artwork choices', () => {
+  for (const style of builtIn) {
+    for (const [width, height] of [
+      [600, 900],
+      [1800, 600],
+    ]) {
+      const label = `${style} ${width}x${height}`;
+      const two = createCover({
+        title: 'Salt and\nStatic',
+        author: 'J. R. Okafor',
+        subtitle: 'A Novel',
+        style,
+        width,
+        height,
+      });
+      const one = createCover({
+        title: 'Salt and Static',
+        author: 'J. R. Okafor',
+        subtitle: 'A Novel',
+        style,
+        width,
+        height,
+      });
+      // The seed made from the title ignores the break: same palette and choices.
+      assert.equal(two.palette, one.palette, label);
+      assert.deepEqual(two.variants, one.variants, label);
+      assertWellFormed(two.svg, label);
+      assert.match(two.svg, /<title>Salt and Static: A Novel by J\. R\. Okafor<\/title>/, label);
+      for (const [top, bottom, size] of textLines(two.svg)) {
+        if (size > Math.min(width, height) * 0.5) continue;
+        assert.ok(top >= -1 && bottom <= height + 1, `${label}: text at ${top}..${bottom}`);
+      }
+      // The break holds: no line runs from the first typed line into the second.
+      assert.ok(!textRuns(two.svg).some((r) => /and static/i.test(r.text)), `${label}: lines joined`);
+    }
+  }
+  // Breaks only in titles: the author and subtitle are one line of text each.
+  const { svg } = createCover({ title: 'T', author: 'A\nB', subtitle: 'C\nD', style: 'minimal' });
+  assert.match(svg, /<title>T: C D by A B<\/title>/);
+});

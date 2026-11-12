@@ -43,6 +43,13 @@ const SMALL_WORDS = new Set(['a', 'an', 'and', 'as', 'at', 'by', 'for', 'in', 'o
  * @param {string} text
  */
 export function stackLines(text) {
+  // Lines the text asks for (a title typed on two lines) are the stack's lines, as typed.
+  if (/\n/.test(text)) {
+    return text
+      .split('\n')
+      .map((line) => line.split(' ').filter(Boolean).join(' '))
+      .filter(Boolean);
+  }
   /** @type {string[]} */
   const lines = [];
   let pending = '';
@@ -217,7 +224,9 @@ export function titleBlock(c, o) {
   // Spacing set for capitals is too wide for lower case, and capitals set solid need a little.
   const letterSpacing = upper === !!o.upper ? (o.letterSpacing ?? 0) : upper ? Math.max(o.letterSpacing ?? 0, 0.03) : 0;
   const whole = (o.text ?? c.title).trim();
-  const split = o.lead === false ? { lead: '', main: whole } : splitLead(whole);
+  // A title typed on several lines is set on those lines: no lead line of its own, and room for all.
+  const typedLines = whole.split('\n').length;
+  const split = o.lead === false || typedLines > 1 ? { lead: '', main: whole } : splitLead(whole);
   // Only a lead of three letters or more gets its own small line: a lone "A" or "La" up there
   // reads as a stray mark, so short ones stay with the title.
   const { lead, main } = graphemes(split.lead).length >= 3 ? split : { lead: '', main: whole };
@@ -251,7 +260,7 @@ export function titleBlock(c, o) {
     maxWidth: o.maxWidth,
     maxSize: o.maxSize,
     minSize: o.minSize,
-    maxLines: o.maxLines ?? 5,
+    maxLines: Math.max(o.maxLines ?? 5, typedLines),
   };
 
   /** Visual bottom of a main-title fit, including descenders. @param {import('./text.js').TextFit | StackFit} f */
