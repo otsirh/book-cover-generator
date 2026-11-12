@@ -36,7 +36,10 @@ export type TextMeasurer = (
   font: { family: string; weight: number; italic: boolean },
 ) => number;
 
-/** Override text measurement (e.g. with a real font engine in Node). Pass `null` to restore the default. */
+/**
+ * Override text measurement (e.g. with a real font engine in Node). The measurer is called once per
+ * string and font at a reference size of 100 px, and other sizes are scaled from it. Pass `null` to restore the default.
+ */
 export declare function setTextMeasurer(fn: TextMeasurer | null): void;
 export declare function measureText(text: string, size: number, spec: TextSpec): number;
 /** Split a string into user-perceived characters. */

@@ -117,3 +117,8 @@ test('authorFit is readable by default and empty without an author', () => {
   assert.ok(a.size > 20);
   assert.equal(authorFit(ctx({ author: '' })).lines.length, 0);
 });
+
+test('titleBlock stays within even a very small budget', () => {
+  const block = titleBlock(ctx({ subtitle: 'And a subtitle' }), { maxWidth: 500, maxHeight: 12, maxSize: 100 });
+  assert.ok(block.height <= 12.5, `height ${block.height}`);
+});

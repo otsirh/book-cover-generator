@@ -172,6 +172,45 @@ test('a burst of typing is one undo step', async ({ page }) => {
   await expect(page.locator('#title')).toHaveValue('Before');
 });
 
+test('a click right after typing keeps both as separate undo steps', async ({ page }) => {
+  await page.goto('/#title=Before&style=minimal&seed=t');
+  await page.locator('#title').fill('');
+  await page.locator('#title').pressSequentially('After', { delay: 10 });
+  await page.locator('.tile[data-style="swiss"]').click();
+  await selected(page, 'swiss');
+  await page.locator('#undo').click();
+  await selected(page, 'minimal');
+  await expect(page.locator('#title')).toHaveValue('After');
+  await page.locator('#undo').click();
+  await expect(page.locator('#title')).toHaveValue('Before');
+  await page.locator('#redo').click();
+  await expect(page.locator('#title')).toHaveValue('After');
+});
+
+test('clicking the current choice adds no undo step', async ({ page }) => {
+  await page.goto('/#style=minimal&palette=mint&seed=n');
+  await page.locator('.tile[data-style="retro"]').click();
+  await page.locator('.tile[data-style="retro"]').click();
+  await page.locator('[data-palette="mint"]').click();
+  await page.locator('#undo').click();
+  await selected(page, 'minimal');
+});
+
+test('a partial share link opens the same cover every time', async ({ page }) => {
+  await page.goto('/#title=Dune&style=minimal');
+  await expect(page.locator('#author')).toHaveValue('');
+  await expect(page.locator('#seed')).toHaveValue('');
+  const first = await svgOf(page, '#preview');
+  await page.goto('about:blank');
+  await page.goto('/#title=Dune');
+  const style = await page.locator('.tile[aria-pressed="true"]').getAttribute('data-style');
+  await page.goto('about:blank');
+  await page.goto('/#title=Dune');
+  await expect(page.locator('.tile[aria-pressed="true"]')).toHaveAttribute('data-style', style ?? '');
+  await page.goto('/#title=Dune&style=minimal');
+  expect(await svgOf(page, '#preview')).toBe(first);
+});
+
 test('locks keep the style and palette when randomizing', async ({ page }) => {
   await page.goto('/#style=bauhaus&palette=riso&seed=fixed');
   await page.locator('#lock-style').click();

@@ -9,10 +9,22 @@ export function svgToBlob(svg) {
   return new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
 }
 
+/**
+ * The SVG's size: its width/height attributes (unitless or px), else its viewBox.
+ * @param {string} svg
+ * @returns {[number, number] | null}
+ */
 function svgSize(svg) {
-  const w = /<svg[^>]*\swidth="([\d.]+)"/.exec(svg);
-  const h = /<svg[^>]*\sheight="([\d.]+)"/.exec(svg);
-  return [w ? +w[1] : 600, h ? +h[1] : 900];
+  const tag = /<svg\b[^>]*>/i.exec(svg)?.[0] ?? '';
+  const attr = (/** @type {string} */ name) => {
+    const m = new RegExp(`\\s${name}="\\s*([\\d.]+)(px)?\\s*"`).exec(tag);
+    return m ? Number(m[1]) : NaN;
+  };
+  const w = attr('width');
+  const h = attr('height');
+  if (w > 0 && h > 0) return [w, h];
+  const box = /\sviewBox="\s*[-\d.]+[\s,]+[-\d.]+[\s,]+([\d.]+)[\s,]+([\d.]+)\s*"/.exec(tag);
+  return box && Number(box[1]) > 0 && Number(box[2]) > 0 ? [Number(box[1]), Number(box[2])] : null;
 }
 
 /**
@@ -21,11 +33,12 @@ function svgSize(svg) {
  * @param {{ type?: string, scale?: number, quality?: number, background?: string }} [opts]
  */
 export async function rasterize(svg, { type = 'image/png', scale = 1, quality = 0.92, background } = {}) {
-  const [sw, sh] = svgSize(svg);
   const img = new Image();
   img.decoding = 'async';
   img.src = svgToDataUrl(svg);
   await img.decode();
+  // Without a usable size in the markup, use the size the browser gives the image.
+  const [sw, sh] = svgSize(svg) ?? [img.naturalWidth || 300, img.naturalHeight || 150];
   const w = Math.round(sw * scale);
   const h = Math.round(sh * scale);
   const canvas = document.createElement('canvas');

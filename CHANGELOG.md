@@ -53,6 +53,11 @@ A redesign of the covers and the app, based on a design review.
 - Paper Cut measures its holes so the title never sits on them; Blueprint keeps its dimension callout above the title block; Silhouette's moon rises below the title.
 - Text measurement falls back to a DOM canvas when `OffscreenCanvas` has no 2D context, and measures each string once per font (widths scale with size).
 - The CLI accepts `--subtitle` and `--texture`.
+- Undo after typing keeps every keystroke, a click during typing becomes its own step, clicking the current choice adds no step, and history writes never break the page when the browser rate-limits them.
+- A partial share link (say, only a title) opens the same cover every time instead of filling in a random sample author.
+- Every style escapes font names in attributes; long inputs are cut between whole characters; letter-spacing is measured per visible character; text fitting honours even tiny height budgets and validates `minSize`.
+- `rasterize` reads SVG sizes with units or from the `viewBox`; the export toast reports the size actually exported; removing a kept design removes that exact design.
+- Measurements are cached for every backend (custom measurer, canvas and the Node estimate); `setTextMeasurer` is called once per string and font at 100 px.
 
 ## [1.1.0] - 2026-11-12
 

@@ -50,7 +50,7 @@ export const classic = {
     s += circle(W / 2, ey, er, panel, `stroke="${ink}" stroke-width="${n(1.5 * u)}"`);
     const initial = (graphemes(c.title.trim())[0] || '').toUpperCase();
     if (initial) {
-      s += `<text x="${n(W / 2)}" y="${n(ey + er * 0.38)}" font-family="${FONTS.serif.family}" font-size="${n(er * 1.1)}" text-anchor="middle" fill="${band}">${escapeXml(initial)}</text>`;
+      s += `<text x="${n(W / 2)}" y="${n(ey + er * 0.38)}" font-family="${escapeXml(FONTS.serif.family)}" font-size="${n(er * 1.1)}" text-anchor="middle" fill="${band}">${escapeXml(initial)}</text>`;
     }
     return s;
   },
@@ -254,7 +254,7 @@ function typedLine(str, x, y, size, weight, rng, color, anchor = 'start') {
   const width = measureText(str, size, spec);
   if (COMPLEX_SCRIPT.test(str)) {
     // Keep joining and direction intact: one run of text, no per-letter jitter.
-    return `<text x="${n(x)}" y="${n(y)}" font-family="${FONTS.mono.family}" font-size="${n(size)}" font-weight="${weight}" fill="${color}"${anchor === 'middle' ? ' text-anchor="middle"' : ''}>${escapeXml(str)}</text>`;
+    return `<text x="${n(x)}" y="${n(y)}" font-family="${escapeXml(FONTS.mono.family)}" font-size="${n(size)}" font-weight="${weight}" fill="${color}"${anchor === 'middle' ? ' text-anchor="middle"' : ''}>${escapeXml(str)}</text>`;
   }
   let o = '';
   let cx = anchor === 'middle' ? x - width / 2 : x;
@@ -265,7 +265,7 @@ function typedLine(str, x, y, size, weight, rng, color, anchor = 'start') {
     }
     cx += measureText(ch, size, spec);
   }
-  return `<text font-family="${FONTS.mono.family}" font-size="${n(size)}" font-weight="${weight}" fill="${color}">${o}</text>`;
+  return `<text font-family="${escapeXml(FONTS.mono.family)}" font-size="${n(size)}" font-weight="${weight}" fill="${color}">${o}</text>`;
 }
 
 export const typewriter = {

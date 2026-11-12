@@ -15,4 +15,4 @@ Include what is affected (the library, the CLI or the site), how to reproduce it
 - The library and CLI: for example, input that produces SVG which can run script, or input that hangs or crashes.
 - The site: for example, XSS, a header misconfiguration or a CSP bypass.
 
-The site has no accounts, no cookies and no server-side code, and it stores no data.
+The site has no accounts, no cookies and no server-side code. It keeps kept designs in the browser's `localStorage` and the undo position in `sessionStorage`; nothing is sent anywhere.

@@ -5,6 +5,7 @@
 
 import { createRng, hashString, isHex, luminance, escapeXml, stripInvalidXml, grain } from './core.js';
 import { palettes } from './palettes.js';
+import { graphemes } from './text.js';
 import { styleList } from './styles/index.js';
 
 export { palettes } from './palettes.js';
@@ -88,7 +89,8 @@ function cleanText(value, max) {
   const text = stripInvalidXml(String(value ?? '').replace(/[\u0000-\u001F\u007F-\u009F]/g, ' '))
     .replace(/\s+/g, ' ')
     .trim();
-  return text.length > max ? Array.from(text).slice(0, max).join('').trimEnd() : text;
+  // Cut between visible characters, so an emoji or accented letter is never split.
+  return text.length > max ? graphemes(text).slice(0, max).join('').trimEnd() : text;
 }
 
 /**

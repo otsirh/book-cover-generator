@@ -73,7 +73,7 @@ export const typographic = {
     const size = Math.min(fit, H * 0.85, S * 1.35);
     const baseline = H * rng.float(0.6, 0.64);
     const lx = W * rng.float(0.44, 0.56);
-    const attrs = `font-family="${font.family}" font-size="${n(size)}" text-anchor="middle"`;
+    const attrs = `font-family="${escapeXml(font.family)}" font-size="${n(size)}" text-anchor="middle"`;
     const glyph = escapeXml(letters);
 
     let s = rect(0, 0, W, H, p.bg);

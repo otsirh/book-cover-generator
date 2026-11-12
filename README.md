@@ -92,7 +92,7 @@ npx github:otsirh/book-cover-generator "The Lighthouse Keeper" "Mara Ellison" --
 npx github:otsirh/book-cover-generator --list   # all styles and palettes
 ```
 
-Options: `-s/--style`, `-p/--palette`, `--seed`, `--width`, `--height`, `-o/--out`, `--list`, `--help`.
+Options: `-s/--style`, `-p/--palette`, `--subtitle`, `--texture`, `--seed`, `--width`, `--height`, `-o/--out`, `--list`, `--help`.
 
 ## API
 

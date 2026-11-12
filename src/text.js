@@ -64,10 +64,13 @@ function canvasContext() {
 let customMeasure = null;
 /**
  * Override text measurement. `fn(text, sizePx, { family, weight, italic })` must
- * return the advance width in px. Pass `null` to restore the default.
+ * return the advance width in px. It is called once per string and font at a
+ * reference size of 100 px; other sizes are scaled from that. Pass `null` to
+ * restore the default.
  */
 export function setTextMeasurer(fn) {
   customMeasure = fn;
+  widthCache.clear();
 }
 
 const NARROW = new Set("iljI.,:;!|'’`ı".split(''));
@@ -106,38 +109,43 @@ function heuristicWidth(text, spec) {
 /** @type {Map<string, number>} */
 const widthCache = new Map();
 let lastFont = '';
+// Widths are measured once at this size and scaled: text width is linear in font size,
+// so shrinking a title to fit costs no extra measuring.
 const REFERENCE = 100;
+
+/**
+ * Advance width at the reference size, from the custom measurer, a canvas or the estimate.
+ * @param {string} text
+ * @param {{ font: { family: string, mono?: boolean, widthFactor?: number }, weight?: number, italic?: boolean }} spec
+ */
+function referenceWidth(text, spec) {
+  const weight = spec.weight || 400;
+  const font = `${spec.italic ? 'italic ' : ''}${weight} ${REFERENCE}px ${spec.font.family}`;
+  const key = `${font}\u0000${spec.font.mono ? 1 : 0}${spec.font.widthFactor ?? 1}\u0000${text}`;
+  const cached = widthCache.get(key);
+  if (cached !== undefined) return cached;
+  let w;
+  if (customMeasure) w = customMeasure(text, REFERENCE, { family: spec.font.family, weight, italic: !!spec.italic });
+  else {
+    const c = canvasContext();
+    if (c) {
+      if (font !== lastFont) {
+        c.font = font;
+        lastFont = font;
+      }
+      w = c.measureText(text).width;
+    } else w = heuristicWidth(text, spec) * REFERENCE;
+  }
+  if (widthCache.size > 20000) widthCache.clear();
+  widthCache.set(key, w);
+  return w;
+}
 
 /** Width in px of `text` rendered at `size` px with the given font spec. */
 export function measureText(text, size, spec) {
-  let w;
-  const weight = spec.weight || 400;
-  if (customMeasure) {
-    w = customMeasure(text, size, { family: spec.font.family, weight, italic: !!spec.italic });
-  } else {
-    const c = canvasContext();
-    if (c) {
-      // Measure once at a reference size and scale: text width is linear in font size,
-      // so shrinking a title to fit costs no extra canvas work.
-      const font = `${spec.italic ? 'italic ' : ''}${weight} ${REFERENCE}px ${spec.font.family}`;
-      const key = `${font}\u0000${text}`;
-      let ref = widthCache.get(key);
-      if (ref === undefined) {
-        if (font !== lastFont) {
-          c.font = font;
-          lastFont = font;
-        }
-        const measured = c.measureText(text).width;
-        if (widthCache.size > 20000) widthCache.clear();
-        widthCache.set(key, measured);
-        ref = measured;
-      }
-      w = (ref * size) / REFERENCE;
-    } else {
-      w = heuristicWidth(text, spec) * size;
-    }
-  }
-  return w + (spec.letterSpacing || 0) * size * [...text].length;
+  const w = (referenceWidth(text, spec) * size) / REFERENCE;
+  // SVG adds letter-spacing after every visible character (grapheme), not every code point.
+  return spec.letterSpacing ? w + spec.letterSpacing * size * graphemes(text).length : w;
 }
 
 let segmenter;
@@ -297,6 +305,9 @@ export function fitText(text, opts) {
   const maxSize = opts.maxSize;
   if (!Number.isFinite(maxSize) || maxSize <= 0)
     throw new TypeError('fitText: `maxSize` must be a positive number of pixels');
+  if (opts.minSize != null && (!Number.isFinite(opts.minSize) || opts.minSize <= 0)) {
+    throw new TypeError('fitText: `minSize` must be a positive number of pixels');
+  }
   const minSize = Math.min(maxSize, opts.minSize ?? Math.max(6, maxSize * 0.22));
 
   let str = String(text ?? '')
@@ -331,11 +342,13 @@ export function fitText(text, opts) {
     size = Math.max(minSize, size * 0.95);
   }
 
-  // Fallback: smallest size, break long words, truncate with an ellipsis.
-  size = minSize;
+  // Fallback: smallest size (or smaller, if even one line won't fit the height),
+  // break long words, truncate with an ellipsis.
+  if (maxHeight <= 0) return { ...base, lines: [], size: 0, width: 0, height: 0, truncated: true };
+  size = Math.min(minSize, maxHeight / cap);
   const measure = (s) => measureText(s, size, spec);
   let lines = hardWrap(tokens, maxWidth, measure);
-  const fitCount = Math.max(1, Math.min(maxLines, Math.floor((maxHeight / size - cap) / lineHeight) + 1));
+  const fitCount = Math.max(1, Math.min(maxLines, Math.floor((maxHeight / size - cap) / lineHeight + 1e-9) + 1));
   if (lines.length <= fitCount) return finish(lines, size);
   lines = lines.slice(0, fitCount);
   const chars = graphemes(lines[fitCount - 1]);

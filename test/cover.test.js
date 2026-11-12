@@ -411,3 +411,13 @@ test('Blueprint keeps its dimension callout clear of the title block', () => {
     }
   }
 });
+
+test('long inputs are cut between visible characters', () => {
+  const flag = '🇫🇷';
+  for (const pad of [298, 299, 300]) {
+    const { svg } = createCover({ title: 'a'.repeat(pad) + flag + flag, style: 'minimal' });
+    const label = /aria-label="([^"]*)"/.exec(svg)?.[1] ?? '';
+    const flags = label.match(/\p{Regional_Indicator}/gu) ?? [];
+    assert.equal(flags.length % 2, 0, `a lone regional indicator after ${pad} letters`);
+  }
+});

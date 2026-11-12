@@ -163,11 +163,25 @@ let typingTimer;
 /** @type {ReturnType<typeof setTimeout> | undefined} */
 let replaceTimer;
 
+/**
+ * Write to the history, ignoring the SecurityError browsers throw when pages
+ * update history too often (the design still updates; only that step is lost).
+ * @param {() => void} write
+ */
+function safely(write) {
+  try {
+    write();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function flushReplace() {
   if (replaceTimer === undefined) return;
   clearTimeout(replaceTimer);
   replaceTimer = undefined;
-  history.replaceState({ i: historyIndex }, '', toHash(design));
+  safely(() => history.replaceState({ i: historyIndex }, '', toHash(design)));
 }
 
 function commit() {
@@ -175,14 +189,13 @@ function commit() {
   // A discrete change ends any typing burst, so later keystrokes get their own step.
   typing = false;
   clearTimeout(typingTimer);
-  try {
-    history.pushState({ i: historyIndex + 1 }, '', toHash(design));
+  if (safely(() => history.pushState({ i: historyIndex + 1 }, '', toHash(design)))) {
     historyIndex += 1;
     historyMax = historyIndex;
     saveHistoryMax();
-  } catch {
-    // Browsers rate-limit history writes; update the current entry instead.
-    history.replaceState({ i: historyIndex }, '', toHash(design));
+  } else {
+    // Rate-limited: update the current entry instead (which may also be refused).
+    safely(() => history.replaceState({ i: historyIndex }, '', toHash(design)));
   }
   syncHistoryButtons();
 }
@@ -220,7 +233,7 @@ window.addEventListener('popstate', (e) => {
   }
   Object.assign(design, OPTIONAL, fromHash(location.hash));
   // Rewrite an edited URL so it always holds the whole design (for Copy link).
-  if (edited) history.replaceState({ i: historyIndex }, '', toHash(design));
+  if (edited) safely(() => history.replaceState({ i: historyIndex }, '', toHash(design)));
   render({ fade: true, announce: true });
   syncHistoryButtons();
 });
@@ -231,6 +244,10 @@ window.addEventListener('popstate', (e) => {
  * @param {'discrete' | 'typing'} [kind]
  */
 function update(patch, kind = 'discrete') {
+  const changed = Object.entries(patch).some(([key, value]) => design[/** @type {keyof Design} */ (key)] !== value);
+  if (!changed) return;
+  // Save the typing burst's last keystrokes to its own entry before a discrete change.
+  if (kind === 'discrete') flushReplace();
   Object.assign(design, patch);
   if (kind === 'typing') typed();
   else commit();
@@ -390,7 +407,7 @@ function buildControls() {
   }
   $('randomize').addEventListener('click', randomizeAll);
   $('m-randomize').addEventListener('click', randomizeAll);
-  $('undo').addEventListener('click', () => history.back());
+  $('undo').addEventListener('click', undo);
   $('redo').addEventListener('click', redo);
 
   $('copy-svg').addEventListener('click', async () => {
@@ -444,7 +461,7 @@ function buildControls() {
     if (plain && letter === 'r') randomizeAll();
     else if (plain && letter === 'z') {
       if (e.shiftKey) redo();
-      else if (historyIndex > 0) history.back();
+      else undo();
     } else if (plain && letter === 'y') redo();
     else if (plain && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) stepStyle(e.key === 'ArrowLeft' ? -1 : 1);
     // Brackets need AltGr or Option on many layouts, so modifiers are allowed for them.
@@ -454,8 +471,15 @@ function buildControls() {
   });
 }
 
+// Both save pending keystrokes to the current entry before moving through history.
+function undo() {
+  flushReplace();
+  if (historyIndex > 0) history.back();
+}
+
 /** Redo only within this app's own history, never forward to another site. */
 function redo() {
+  flushReplace();
   if (historyIndex < historyMax) history.forward();
 }
 
@@ -636,7 +660,7 @@ function renderKept() {
   const list = loadKept();
   $('kept').hidden = list.length === 0;
   $('kept-list').replaceChildren(
-    ...list.map((d, i) => {
+    ...list.map((d) => {
       const [width, height] = FORMATS[d.format];
       const { svg } = createCover({ ...d, palette: d.palette === 'auto' ? 'random' : d.palette, width, height });
       const label = `${d.title || 'Untitled'}, ${STYLES.find((s) => s.id === d.style)?.name ?? d.style}`;
@@ -652,9 +676,9 @@ function renderKept() {
         '×',
       );
       remove.addEventListener('click', () => {
-        const next = loadKept();
-        next.splice(i, 1);
-        saveKept(next);
+        // Remove this exact design (another tab may have changed the list since it was drawn).
+        const hash = toHash(d);
+        saveKept(loadKept().filter((k) => toHash(k) !== hash));
         renderKept();
       });
       return h('li', {}, open, remove);
@@ -683,12 +707,14 @@ function slug(str) {
  */
 async function exportAs(format, button) {
   const name = `${slug(design.title)}-${current.style}`;
+  // Capture what is being exported: the design may change while the PNG renders.
+  const [w, hgt] = FORMATS[design.format];
+  const scale = ui.scale;
   button.disabled = true;
   button.setAttribute('aria-busy', 'true');
   try {
-    await downloadCover(current.svg, format, name, { scale: ui.scale, quality: 0.93 });
-    const [w, hgt] = FORMATS[design.format];
-    toast(format === 'svg' ? 'Saved SVG' : `Saved ${format.toUpperCase()} · ${w * ui.scale} × ${hgt * ui.scale} px`);
+    await downloadCover(current.svg, format, name, { scale, quality: 0.93 });
+    toast(format === 'svg' ? 'Saved SVG' : `Saved ${format.toUpperCase()} · ${w * scale} × ${hgt * scale} px`);
   } catch (err) {
     console.error(err);
     toast('Export failed. Try SVG instead.');
@@ -711,7 +737,13 @@ function toast(msg) {
 
 /* -------------------------------------------------------------------- boot */
 
-Object.assign(design, fromHash(location.hash));
+// A shared link fills in what it leaves out with neutral, deterministic values
+// (not the random sample title), so it opens the same cover every time.
+const linked = fromHash(location.hash);
+if (Object.keys(linked).length) {
+  Object.assign(design, { title: '', author: '', palette: 'auto', seed: '', format: 'paperback' }, OPTIONAL, linked);
+  if (!linked.style) design.style = createCover({ ...options(), style: 'random' }).style;
+}
 if (typeof history.state?.i === 'number') {
   // Back on an entry of ours. After a reload the later entries are still there; after
   // coming back from another site they may have been replaced by it, so Redo starts

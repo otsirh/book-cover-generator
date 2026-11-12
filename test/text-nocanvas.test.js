@@ -13,5 +13,5 @@ Object.assign(globalThis, {
 const { measureText, FONTS } = await import('../src/text.js');
 
 test('falls back to the width estimate if a canvas cannot be created', () => {
-  assert.ok(measureText('abc', 10, { font: FONTS.mono }) === 18);
+  assert.ok(Math.abs(measureText('abc', 10, { font: FONTS.mono }) - 18) < 1e-9);
 });

@@ -9,6 +9,7 @@ import {
   inkOn,
   readable,
   hexToRgb,
+  escapeXml,
   grain,
   blurFilter,
   linearGradient,
@@ -383,7 +384,7 @@ function dimension(x1, y1, x2, y2, color, u, label) {
     line(x1, y1, x2, y2, color, u) +
     head(x2, y2, ang) +
     head(x1, y1, ang + Math.PI) +
-    `<text x="${n(mx)}" y="${n(my - 6 * u)}" font-family="${FONTS.mono.family}" font-size="${n(13 * u)}" fill="${color}" text-anchor="middle" transform="rotate(${n((ang * 180) / Math.PI)} ${n(mx)} ${n(my)})">${label}</text>`
+    `<text x="${n(mx)}" y="${n(my - 6 * u)}" font-family="${escapeXml(FONTS.mono.family)}" font-size="${n(13 * u)}" fill="${color}" text-anchor="middle" transform="rotate(${n((ang * 180) / Math.PI)} ${n(mx)} ${n(my)})">${label}</text>`
   );
 }
 
@@ -496,7 +497,7 @@ export const blueprint = {
     s += line(bx, by + blockH * 0.68, bx + bw, by + blockH * 0.68, ink, u);
     s += line(bx + bw * 0.68, by + blockH * 0.68, bx + bw * 0.68, by + blockH, ink, u);
     const label = (/** @type {string} */ text, /** @type {number} */ x, /** @type {number} */ y) =>
-      `<text x="${n(x)}" y="${n(y)}" font-family="${FONTS.mono.family}" font-size="${n(labelSize)}" fill="${ink}" opacity="0.7">${text}</text>`;
+      `<text x="${n(x)}" y="${n(y)}" font-family="${escapeXml(FONTS.mono.family)}" font-size="${n(labelSize)}" fill="${ink}" opacity="0.7">${text}</text>`;
     s += label('TITLE', bx + m * 0.4, by + labelRow * 0.7);
     s += label('AUTHOR', bx + m * 0.4, by + blockH * 0.68 + labelRow * 0.7);
     s += label(`SCALE 1:${rng.pick([2, 5, 10, 20])}`, bx + bw * 0.68 + m * 0.3, by + blockH * 0.68 + labelRow * 0.7);

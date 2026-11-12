@@ -42,7 +42,10 @@ test('a custom measurer overrides the canvas', () => {
   });
   try {
     assert.equal(measureText('xyz', 2, { font: FONTS.mono, weight: 600, italic: true }), 6);
-    assert.deepEqual(calls[0], ['xyz', 2, { family: FONTS.mono.family, weight: 600, italic: true }]);
+    // Called once at the 100 px reference size; other sizes are scaled.
+    assert.deepEqual(calls[0], ['xyz', 100, { family: FONTS.mono.family, weight: 600, italic: true }]);
+    assert.equal(measureText('xyz', 4, { font: FONTS.mono, weight: 600, italic: true }), 12);
+    assert.equal(calls.length, 1);
   } finally {
     setTextMeasurer(null);
   }
@@ -108,4 +111,23 @@ test('drawText renders anchors, spacing and escaping', () => {
   assert.match(svg, /opacity="0.5" data-x="1"/);
   assert.match(svg, /<text x="101" [^>]*>A &amp; B<\/text>/);
   assert.equal(drawText(fitText('  ', { maxWidth: 10, maxSize: 10 }), { x: 0, y: 0 }), '');
+});
+
+test('letter-spacing is added per visible character, not per code point', () => {
+  const family = '👨\u200D👩\u200D👧\u200D👦';
+  const plain = measureText(family, 10, { font: FONTS.sans });
+  assert.equal(measureText(family, 10, { font: FONTS.sans, letterSpacing: 0.5 }), plain + 0.5 * 10);
+});
+
+test('fitText honours tiny height budgets and validates minSize', () => {
+  const fit = fitText('A title that cannot possibly fit', {
+    font: FONTS.sans,
+    maxWidth: 40,
+    maxHeight: 12,
+    maxSize: 100,
+  });
+  assert.ok(fit.height <= 12 + 1e-9, `height ${fit.height}`);
+  assert.equal(fit.truncated, true);
+  assert.equal(fitText('Anything', { maxWidth: 500, maxHeight: 0, maxSize: 100 }).lines.length, 0);
+  assert.throws(() => fitText('x', { maxWidth: 10, maxSize: 20, minSize: 0 }), /minSize/);
 });
