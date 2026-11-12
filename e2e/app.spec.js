@@ -146,7 +146,7 @@ test('undo, redo and the browser back button step through designs', async ({ pag
 
 test('undo reverts the subtitle and the texture too', async ({ page }) => {
   await page.goto('/#title=T&style=minimal&seed=u');
-  await page.locator('label.switch').click();
+  await page.locator('label.switch:has(#texture)').click();
   await expect(page.locator('#texture')).toBeChecked();
   await page.locator('#undo').click();
   await expect(page.locator('#texture')).not.toBeChecked();
