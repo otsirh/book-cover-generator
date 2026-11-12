@@ -577,6 +577,37 @@ test('a write refused for an edited URL is not retried onto a later entry', asyn
   await selected(page, 'bauhaus');
 });
 
+test('a change made before an Undo lands comes after the Undo, not before it', async ({ page }) => {
+  await page.goto('/#title=T&style=minimal&seed=r');
+  for (const style of ['typographic', 'swiss']) {
+    await page.locator(`.tile[data-style="${style}"]`).click();
+    await selected(page, style);
+  }
+  // In one task, so the click comes before the Undo's popstate.
+  await page.evaluate(() => {
+    /** @type {HTMLElement} */ (document.querySelector('#undo')).click();
+    /** @type {HTMLElement} */ (document.querySelector('.tile[data-style="bauhaus"]')).click();
+  });
+  await selected(page, 'bauhaus');
+  await page.waitForTimeout(300);
+  await selected(page, 'bauhaus');
+  await expect(page.locator('#redo')).toBeDisabled();
+  await page.locator('#undo').click();
+  await selected(page, 'typographic');
+});
+
+test('a change made behind an Undo the browser drops is still applied', async ({ page }) => {
+  await page.goto('/#title=T&style=minimal&seed=q');
+  await page.locator('.tile[data-style="swiss"]').click();
+  await selected(page, 'swiss');
+  await page.evaluate(() => {
+    history.go = () => {};
+  });
+  await page.locator('#undo').click();
+  await page.locator('.tile[data-style="bauhaus"]').click();
+  await selected(page, 'bauhaus');
+});
+
 test('a quick double Undo steps twice and never leaves the app', async ({ page }) => {
   await page.goto('about:blank');
   await page.goto('/#title=T&style=minimal&seed=d');

@@ -175,10 +175,20 @@ let typingField = '';
  * @type {{ from: number, dir: number, at: number } | null}
  */
 let pending = null;
-/** Undo/Redo presses made while a step was in flight, net (-2: two more undos). */
-let queuedSteps = 0;
+/**
+ * Undo/Redo presses (-1, 1) and changes made while a step was in flight, applied in order once it
+ * lands: a change made then would otherwise be pushed after the entry the step is leaving.
+ * @type {(number | { patch: Partial<Design>, kind: 'discrete' | 'typing' })[]}
+ */
+let queued = [];
+/** @type {ReturnType<typeof setTimeout> | undefined} */
+let drainTimer;
 /** A step still expected (its popstate can be dropped by the browser: then, after a second, not). */
 const inFlight = () => pending !== null && performance.now() - pending.at < 1000;
+/** Forget queued Undo/Redo presses (not changes): they were for a step that never came. */
+const dropSteps = () => {
+  queued = queued.filter((item) => typeof item !== 'number');
+};
 /** @type {ReturnType<typeof setTimeout> | undefined} */
 let typingTimer;
 /** @type {ReturnType<typeof setTimeout> | undefined} */
@@ -378,6 +388,13 @@ document.addEventListener('visibilitychange', () => {
 });
 
 window.addEventListener('popstate', (e) => {
+  arrive(e);
+  // What came in while a step was in flight.
+  drain();
+});
+
+/** @param {PopStateEvent} e */
+function arrive(e) {
   // The entry being left can no longer be written: what it missed is lost.
   clearTimeout(replaceTimer);
   replaceTimer = undefined;
@@ -427,7 +444,7 @@ window.addEventListener('popstate', (e) => {
     }
   }
   // Presses queued for an Undo or Redo don't carry over to the browser's own navigation.
-  if (!dir) queuedSteps = 0;
+  if (!dir) dropSteps();
   if (linked && !remembered && !Object.keys(linked).length) {
     // A fragment that isn't a design (say #usage, typed to jump to the docs): keep the design.
     stamp();
@@ -456,20 +473,44 @@ window.addEventListener('popstate', (e) => {
   if (!ours) stamp();
   render({ fade: true, announce: true });
   syncHistoryButtons();
-  // Presses that came in while this step was in flight.
-  if (dir && queuedSteps) {
-    const next = Math.sign(queuedSteps);
-    queuedSteps -= next;
-    go(next);
-  }
-});
+}
 
 /**
- * Apply a change and re-render.
+ * Apply a change and re-render (after any Undo or Redo still in flight).
  * @param {Partial<Design>} patch
  * @param {'discrete' | 'typing'} [kind]
  */
 function update(patch, kind = 'discrete') {
+  queued.push({ patch, kind });
+  drain();
+}
+
+/** Apply queued presses and changes in order, until a step has to wait for its popstate. */
+function drain() {
+  clearTimeout(drainTimer);
+  while (queued.length && !inFlight()) {
+    const next = /** @type {(typeof queued)[number]} */ (queued.shift());
+    if (typeof next === 'number') go(next);
+    else apply(next.patch, next.kind);
+  }
+  // A step whose popstate never comes stops holding changes back after a second (and the presses
+  // queued behind it are dropped with it).
+  if (queued.length && pending) {
+    drainTimer = setTimeout(
+      () => {
+        dropSteps();
+        drain();
+      },
+      Math.ceil(pending.at + 1000 - performance.now()) + 1,
+    );
+  }
+}
+
+/**
+ * @param {Partial<Design>} patch
+ * @param {'discrete' | 'typing'} kind
+ */
+function apply(patch, kind) {
   const changed = Object.entries(patch).some(([key, value]) => design[/** @type {keyof Design} */ (key)] !== value);
   if (!changed) return;
   const field = kind === 'typing' ? Object.keys(patch).join() : '';
@@ -565,7 +606,7 @@ function render({ fade = false, announce = false } = {}) {
 const VARIANTS = 6;
 /** @type {{ button: HTMLElement, img: HTMLImageElement, seed: string }[]} */
 const variants = [];
-/** @type {typeof variants} */
+/** Variations still to draw, with their new seeds. @type {[(typeof variants)[number], string][]} */
 let variantQueue = [];
 let lastVariantsKey = '';
 /** @type {ReturnType<typeof setTimeout> | undefined} */
@@ -583,28 +624,29 @@ function buildVariations() {
   }
 }
 
-/** Seeds for the strip, derived from the current one: the same design always shows the same six. */
+/**
+ * Seeds for the strip, derived from the cover's (the library's, so a title typed with a stray
+ * space keeps them): the same design always shows the same six.
+ */
 function variantSeeds() {
-  const base = design.seed || `${design.title}\u241f${design.author}`;
-  return Array.from({ length: VARIANTS }, (_, k) => hashString(`${base}|${k}`).toString(36).slice(0, 6));
+  return Array.from({ length: VARIANTS }, (_, k) => hashString(`${current.seed}|${k}`).toString(36).slice(0, 6));
 }
 
-/** Draw the next queued variation thumbnail. */
+/** Draw the next queued variation, giving its button the seed it now shows. */
 const scheduleVariants = sliced(() => {
-  const variant = variantQueue.shift();
-  if (!variant) return false;
-  variant.img.src = svgToDataUrl(createCover(options({ seed: variant.seed })).svg);
+  const next = variantQueue.shift();
+  if (!next) return false;
+  const [variant, seed] = next;
+  variant.img.src = svgToDataUrl(createCover(options({ seed })).svg);
+  variant.seed = seed;
+  variant.button.setAttribute('aria-label', `Variation ${seed}`);
+  variant.button.title = `Variation ${seed}`;
   return true;
 });
 
 function renderVariations() {
-  variantSeeds().forEach((seed, k) => {
-    const variant = variants[k];
-    variant.seed = seed;
-    variant.button.setAttribute('aria-label', `Variation ${seed}`);
-    variant.button.title = `Variation ${seed}`;
-  });
-  variantQueue = [...variants];
+  const seeds = variantSeeds();
+  variantQueue = variants.map((variant, k) => [variant, seeds[k]]);
   scheduleVariants();
 }
 
@@ -847,10 +889,7 @@ function go(dir) {
   if (dir < 0 ? historyIndex > 0 : historyIndex < historyMax) {
     pending = { from: historyIndex, dir, at: performance.now() };
     history.go(dir);
-  } else {
-    pending = null;
-    queuedSteps = 0;
-  }
+  } else pending = null;
 }
 
 /**
@@ -862,11 +901,9 @@ function go(dir) {
 function step(dir) {
   flushReplace();
   // (A step whose popstate never came, after a second, no longer holds presses back.)
-  if (inFlight()) queuedSteps += dir;
-  else {
-    queuedSteps = 0;
-    go(dir);
-  }
+  if (!inFlight()) dropSteps();
+  queued.push(dir);
+  drain();
 }
 
 function undo() {

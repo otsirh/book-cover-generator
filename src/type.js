@@ -16,7 +16,11 @@ import {
   spacingShift,
   defaultMinSize,
   checkBox,
+  checkSizes,
   graphemes,
+  trackingFor,
+  descentOf,
+  markExtent,
 } from './text.js';
 
 // Leading articles (English, French, Spanish, Italian, German). "Die" is left out: "Die Hard".
@@ -62,8 +66,8 @@ export function stackLines(text) {
 /**
  * @typedef {object} StackFit
  * @property {'stack'} kind
- * @property {{ text: string, size: number, descent: number }[]} lines  descent is a fraction of the line's size
- * @property {number} height  cap height of the first line to the last baseline
+ * @property {{ text: string, size: number, descent: number, above: number }[]} lines  descent (below the baseline) and above (accents and marks above the cap height) are fractions of the line's size
+ * @property {number} height  top of the first line (its cap height, or its accents) to the last baseline
  * @property {number} descent room needed below the last baseline, in px
  * @property {number} width
  * @property {number} size    the largest line size
@@ -76,18 +80,6 @@ export function stackLines(text) {
  */
 
 /**
- * Room below a stack line for descenders, in em: a little for capitals and letters
- * without descenders, the full amount for g, p, y…, cedillas and ogoneks (ç ą), marks
- * below (ạ), lowercase Cyrillic and Greek (у р μ ρ), and scripts without case.
- * @param {string} line
- */
-function descentOf(line) {
-  const d = line.normalize('NFD');
-  if (/[gjpqyQ,;()ДЦЩдцщ]/.test(d) || /[\u0316-\u0333]/.test(d)) return 0.22;
-  return /[\p{Ll}\p{Lo}]/u.test(d.replace(/\p{Script=Latin}/gu, '')) ? 0.22 : 0.04;
-}
-
-/**
  * Justified stack: every line is sized to fill `maxWidth`, then the whole stack
  * is scaled down to fit `maxHeight`. Returns null when the text doesn't suit a
  * stack (one line, more than `maxLines`, or lines that would be too small).
@@ -96,20 +88,25 @@ function descentOf(line) {
  * @returns {StackFit | null}
  */
 export function fitStack(text, o) {
-  if (!Number.isFinite(o.maxSize) || o.maxSize <= 0)
-    throw new TypeError('fitStack: `maxSize` must be a positive number of pixels');
+  checkSizes('fitStack', o);
   checkBox('fitStack', o);
   const font = o.font ?? FONTS.sans;
-  const spec = { font, weight: o.weight ?? 700, italic: !!o.italic, letterSpacing: o.letterSpacing ?? 0 };
+  const spec = {
+    font,
+    weight: o.weight ?? 700,
+    italic: !!o.italic,
+    letterSpacing: trackingFor(text, o.letterSpacing ?? 0),
+  };
   const source = o.upper ? text.toUpperCase() : text;
   const lines = stackLines(source);
   if (lines.length < 2 || lines.length > (o.maxLines ?? 5)) return null;
   const cap = font.cap ?? 0.72;
   const gap = o.gap ?? 0.16;
   const desc = lines.map(descentOf);
+  const above = lines.map((line) => markExtent(line).above);
   let sizes = lines.map((line) => Math.min(o.maxSize, o.maxWidth / (measureText(line, 100, spec) / 100)));
   const heightOf = (/** @type {number[]} */ sz) =>
-    sz.reduce((h, size, i) => h + size * cap + (i ? size * gap + sz[i - 1] * desc[i - 1] : 0), 0);
+    sz.reduce((h, size, i) => h + size * (above[i] + cap) + (i ? size * gap + sz[i - 1] * desc[i - 1] : 0), 0);
   const maxHeight = o.maxHeight ?? Infinity;
   const h = heightOf(sizes) + sizes[sizes.length - 1] * desc[desc.length - 1];
   if (h > maxHeight) sizes = sizes.map((size) => (size * maxHeight) / h);
@@ -120,7 +117,7 @@ export function fitStack(text, o) {
   if (Math.max(...sizes) / Math.min(...sizes) > 3.2) return null;
   return {
     kind: 'stack',
-    lines: lines.map((line, i) => ({ text: line, size: sizes[i], descent: desc[i] })),
+    lines: lines.map((line, i) => ({ text: line, size: sizes[i], descent: desc[i], above: above[i] })),
     height: heightOf(sizes),
     descent: sizes[sizes.length - 1] * desc[desc.length - 1],
     width: Math.max(...lines.map((line, i) => measureText(line, sizes[i], spec))),
@@ -138,9 +135,9 @@ export function fitStack(text, o) {
 export function drawStack(fit, { x, y, anchor = 'start', fill = '#000', opacity, attrs = '', lineFills = [] }) {
   const a = textGroupAttrs({ font: fit.font, weight: fit.weight, italic: fit.italic, fill, anchor, opacity, attrs });
   let baseline = y;
-  const rows = fit.lines.map(({ text, size }, i) => {
+  const rows = fit.lines.map(({ text, size, above = 0 }, i) => {
     const prev = fit.lines[i - 1];
-    baseline += size * fit.cap + (prev ? size * fit.gap + prev.size * prev.descent : 0);
+    baseline += size * (above + fit.cap) + (prev ? size * fit.gap + prev.size * prev.descent : 0);
     const ls = fit.letterSpacing * size;
     const spacing = ls ? ` letter-spacing="${n(ls)}"` : '';
     const color = lineFills[i] ? ` fill="${escapeXml(lineFills[i] ?? '')}"` : '';

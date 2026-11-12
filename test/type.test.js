@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { splitLead, stackLines, fitStack, drawStack, titleBlock, authorFit } from '../src/type.js';
-import { FONTS, fitText } from '../src/text.js';
+import { FONTS, fitText, drawText, markExtent, defaultMinSize } from '../src/text.js';
 import { createRng } from '../src/core.js';
 
 /** A minimal style context. @param {Partial<import('../src/index.js').StyleContext>} [o] */
@@ -42,6 +42,9 @@ test('stackLines joins small words to the next word', () => {
 
 test('fitStack validates, rejects unsuitable text and fills the width', () => {
   assert.throws(() => fitStack('A B', /** @type {any} */ ({ maxWidth: 100 })), /maxSize/);
+  for (const minSize of [NaN, 0, -1]) {
+    assert.throws(() => fitStack('Big Bold Words', { maxWidth: 300, maxHeight: 5, maxSize: 100, minSize }), /minSize/);
+  }
   assert.equal(fitStack('Single', { maxWidth: 500, maxSize: 200 }), null);
   assert.equal(fitStack('one two three four five six', { maxWidth: 500, maxSize: 200 }), null);
   const fit = fitStack('Signal Lost', { font: FONTS.sans, maxWidth: 500, maxHeight: 400, maxSize: 300, upper: true });
@@ -294,4 +297,107 @@ test('a one-letter word stays with the next word when lines wrap', () => {
       fit.lines.join(' | '),
     );
   }
+});
+
+test('a run of one-letter words still wraps', () => {
+  const fit = fitText('A B C D E F G H I J K L M N O P', { maxWidth: 200, maxSize: 60 });
+  assert.ok(fit.lines.length > 1, fit.lines.join(' | '));
+  assert.equal(fit.size, 60);
+});
+
+test('spaced punctuation stays with its word when lines wrap', () => {
+  for (const title of ['« Le Petit Prince »', 'Where Is Everybody ?!', 'Le Mystère ( de la chambre jaune )']) {
+    for (const maxWidth of [150, 200, 250, 300]) {
+      const fit = fitText(title, { font: FONTS.serif, maxWidth, maxSize: 30, minSize: 30, maxLines: 8 });
+      for (const line of fit.lines) {
+        assert.doesNotMatch(line, /^[»?!)]/u, `${title}: ${fit.lines.join(' | ')}`);
+        assert.doesNotMatch(line, /[«(]$/u, `${title}: ${fit.lines.join(' | ')}`);
+      }
+    }
+  }
+});
+
+test('fitText shrinks until the text fits, however far maxSize is above minSize', () => {
+  const opts = { maxWidth: 40, maxHeight: 20, minSize: 0.5, maxLines: 3 };
+  const near = fitText('Hello world again', { ...opts, maxSize: 1000 });
+  const far = fitText('Hello world again', { ...opts, maxSize: 10000 });
+  assert.equal(far.truncated, false);
+  assert.ok(far.size > near.size * 0.9, `${far.size} vs ${near.size}`);
+});
+
+test('no-break spaces hold next to scripts written without spaces, too', () => {
+  // The words don't fit on one line at 20 px: they shrink rather than break at the no-break space.
+  const fit = fitText('東京\u00A0大阪', { maxWidth: 70, maxSize: 20, minSize: 10 });
+  assert.equal(fit.lines.length, 1, fit.lines.join(' | '));
+  const emoji = fitText('Je t’aime\u00A0❤️ pour toujours', { maxWidth: 95, maxSize: 20, minSize: 20, maxLines: 8 });
+  for (const line of emoji.lines) assert.doesNotMatch(line, /^❤️|\u00A0$/u, emoji.lines.join(' | '));
+});
+
+test('scripts whose letters join are set without letter-spacing', () => {
+  const opts = { maxWidth: 400, maxSize: 60, letterSpacing: 0.1 };
+  assert.equal(fitText('مدن الملح', opts).letterSpacing, 0);
+  assert.equal(fitText('Salt Cities', opts).letterSpacing, 0.1);
+  const stack = fitStack('مدن الملح الكبرى', { ...opts, maxHeight: 400, letterSpacing: -0.02 });
+  assert.ok(stack);
+  assert.equal(stack.letterSpacing, 0);
+});
+
+test('small text on a small cover can still shrink', () => {
+  assert.equal(defaultMinSize(5), 2.5);
+  assert.equal(defaultMinSize(20), 6);
+  assert.equal(defaultMinSize(100), 22);
+});
+
+test('accents on capitals and marks above the letters get room above the first line', () => {
+  assert.deepEqual(markExtent('Lighthouse'), { above: 0, below: 0 });
+  assert.ok(markExtent('ÉTÉ').above > 0.3);
+  assert.equal(markExtent('été').above, 0);
+  assert.ok(markExtent('ภาษาไทย').above >= 0.5 && markExtent('ภาษาไทย').below >= 0.5);
+  const opts = { font: FONTS.sans, maxWidth: 1000, maxSize: 100 };
+  const plain = fitText('ETE', opts);
+  const accented = fitText('ÉTÉ', opts);
+  assert.equal(plain.size, accented.size);
+  const extra = (accented.above ?? 0) * accented.size;
+  assert.ok(extra > 30);
+  assert.ok(Math.abs(accented.height - plain.height - extra) < 1e-9);
+  // The first baseline moves down by the same amount, so the accents start at y.
+  const baseline = (/** @type {string} */ svg) => Number(/ y="([\d.]+)"/.exec(svg)?.[1]);
+  assert.ok(
+    Math.abs(baseline(drawText(accented, { x: 0, y: 0 })) - baseline(drawText(plain, { x: 0, y: 0 })) - extra) < 0.1,
+  );
+  // A fit never grows past its box because of it.
+  const tight = fitText('ÉTÉ', { ...opts, maxHeight: 80 });
+  assert.ok(tight.height <= 80 + 1e-9, String(tight.height));
+});
+
+test('lines leave room for the next line’s accents and marks', () => {
+  for (const title of ['ŽÍT NEBO NEŽÍT', 'बहुत लंबी हिन्दी कहानी', 'ภาษาไทยที่มีวรรณยุกต์ ภาษาไทย']) {
+    const fit = fitText(title, {
+      font: FONTS.sans,
+      maxWidth: 260,
+      maxSize: 60,
+      minSize: 60,
+      lineHeight: 0.92,
+      maxLines: 6,
+    });
+    assert.ok(fit.lines.length > 1, fit.lines.join(' | '));
+    const later = Math.max(...fit.lines.slice(1).map((line) => markExtent(line).above));
+    assert.ok(fit.lineHeight >= fit.cap + later, `${title}: ${fit.lineHeight}`);
+  }
+  // Text without them keeps the line height it asked for.
+  const plain = fitText('ZIT NEBO NEZIT', {
+    font: FONTS.sans,
+    maxWidth: 260,
+    maxSize: 60,
+    minSize: 60,
+    lineHeight: 0.92,
+  });
+  assert.equal(plain.lineHeight, 0.92);
+  // Stacked lines too: the first line's accents fit inside the stack's height.
+  const stack = fitStack('Été Indien', { font: FONTS.sans, maxWidth: 500, maxHeight: 600, maxSize: 300, upper: true });
+  assert.ok(stack);
+  const [first] = stack.lines;
+  assert.ok((first.above ?? 0) > 0.3);
+  const y = Number(/ y="([\d.]+)"/.exec(drawStack(stack, { x: 0, y: 0 }))?.[1]);
+  assert.ok(Math.abs(y - first.size * ((first.above ?? 0) + stack.cap)) < 0.1);
 });

@@ -1,5 +1,5 @@
 import { n, rect, circle, mix, inkOn, escapeXml, contrast } from '../core.js';
-import { FONTS, fitText, drawText, measureText, textGroupAttrs } from '../text.js';
+import { FONTS, fitText, drawText, measureText, textGroupAttrs, markExtent } from '../text.js';
 import { titleBlock, authorFit, splitLead } from '../type.js';
 import { strongAccents, initialChars } from './util.js';
 
@@ -76,8 +76,10 @@ export const typographic = {
     const wide = S * rng.float(1.05, 1.3);
     const perPx = Math.max(0.01, measureText(letters, 100, { font }) / 100);
     const fit = pair ? (W * 0.95) / perPx : wide / Math.max(1, perPx * 0.95);
-    const size = Math.min(fit, H * 0.85, S * 1.35);
     const baseline = H * rng.float(0.6, 0.64);
+    // The top stays on the cover (accents too: an É cropped at the top reads as an E).
+    const top = (font.cap ?? 0.72) + markExtent(letters).above;
+    const size = Math.min(fit, H * 0.85, S * 1.35, (baseline - m * 0.4) / top);
     const gw = perPx * size;
     let lx = W * rng.float(0.44, 0.56);
     // Crop the glyph on one side at most: a letter cut on both sides stops reading as a letter.

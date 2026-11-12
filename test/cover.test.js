@@ -883,3 +883,25 @@ test('Noir and Blueprint set wide covers side by side, with a larger title', () 
     assert.ok(runs.length && runs.every((r) => r.size >= 500 * 0.09), `blueprint ${seed}: ${runs.map((r) => r.size)}`);
   }
 });
+
+test('titles on a tiny cover shrink to fit rather than being cut', () => {
+  const { svg } = createCover({
+    title: 'The Lighthouse Keeper',
+    author: 'Mara Ellison',
+    style: 'blueprint',
+    width: 50,
+    height: 75,
+  });
+  assert.doesNotMatch(svg, /…/);
+});
+
+test('the Big Letter initial keeps its accent on the cover', () => {
+  for (const seed of ['a', 'b', 'c', 'd', 'e']) {
+    const { svg } = createCover({ title: 'Île', style: 'typographic', seed });
+    const m = /<text x="[\d.-]+" y="([\d.-]+)" font-family="[^"]*" font-size="([\d.]+)"[^>]*>Î</.exec(svg);
+    assert.ok(m, svg.slice(0, 400));
+    const [y, size] = [Number(m[1]), Number(m[2])];
+    // Accents reach about 0.3 em above the cap height (≤ 0.72 em) in the fonts it uses.
+    assert.ok(y - size * (0.72 + 0.3) >= 0, `seed ${seed}: top at ${y - size * 1.02}`);
+  }
+});

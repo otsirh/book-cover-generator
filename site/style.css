@@ -404,6 +404,13 @@ input::placeholder {
   outline-offset: 2px;
 }
 
+/* Focus on the selected swatch: the focus ring goes outside the selection ring. */
+.swatch[aria-pressed='true']:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 4px;
+  box-shadow: 0 0 0 2px var(--text);
+}
+
 .swatch[aria-pressed='true']::after {
   content: '';
   position: absolute;
@@ -1234,7 +1241,8 @@ pre {
     height: 36vh;
   }
 
-  .meta {
+  .meta,
+  .variations-row {
     order: 2;
   }
 
@@ -1255,6 +1263,12 @@ pre {
 
   .rail {
     order: 6;
+  }
+
+  /* Jumps to the styles land below the pinned preview (36vh plus its padding), not under it. */
+  .rail,
+  .rail-group {
+    scroll-margin-top: calc(36vh + 32px);
   }
 
   .rail-grid {

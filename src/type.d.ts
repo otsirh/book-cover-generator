@@ -4,9 +4,12 @@ import type { StyleContext } from './index.js';
 /** A justified stack: every line spans the full width at its own size. */
 export interface StackFit {
   kind: 'stack';
-  /** `descent` is the room below each line for descenders, as a fraction of its size. */
-  lines: { text: string; size: number; descent: number }[];
-  /** Cap height of the first line to the last baseline. */
+  /**
+   * `descent` is the room below each line for descenders and marks, and `above` the room above
+   * its cap height for accents and marks, as fractions of its size.
+   */
+  lines: { text: string; size: number; descent: number; above?: number }[];
+  /** Top of the first line (its cap height, or its accents) to the last baseline. */
   height: number;
   /** Room needed below the last baseline, in px. */
   descent: number;
@@ -76,7 +79,7 @@ export interface TitleBlock {
   }): string;
 }
 
-/** Split a leading English article off a title. */
+/** Split a leading article (English, French, Spanish, Italian or German) off a title: "Les Misérables" → `{ lead: 'Les', main: 'Misérables' }`. */
 export declare function splitLead(title: string): { lead: string; main: string };
 /** Words grouped into lines for a stack; small words join the next word. */
 export declare function stackLines(text: string): string[];

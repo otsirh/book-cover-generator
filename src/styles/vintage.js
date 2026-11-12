@@ -12,7 +12,7 @@ import {
   radialGradient,
   contrast,
 } from '../core.js';
-import { FONTS, fitText, drawText, textBottom, graphemes, measureText, textGroupAttrs } from '../text.js';
+import { FONTS, fitText, drawText, textBottom, graphemes, measureText, textGroupAttrs, baselineOf } from '../text.js';
 import { titleBlock, authorFit } from '../type.js';
 import { strongAccents, flower, initialChars, textPanel, textColor } from './util.js';
 
@@ -380,7 +380,7 @@ export const typewriter = {
       textBottom(t, 0) + underline + (sub ? gap * 0.6 + textBottom(sub, 0) : 0) + (by ? gap + textBottom(by, 0) : 0);
     let y = H * 0.42 - blockH / 2;
     t.lines.forEach((ln, i) => {
-      s += typedLine(ln, W / 2, y + t.size * t.cap + i * t.size * t.lineHeight, t.size, 700, rng, ink, 'middle');
+      s += typedLine(ln, W / 2, baselineOf(t, y, i), t.size, 700, rng, ink, 'middle');
     });
     y = textBottom(t, y) + underline;
     const uw = t.width;
@@ -400,16 +400,7 @@ export const typewriter = {
       if (!fit) continue;
       y += space;
       fit.lines.forEach((ln, i) => {
-        s += typedLine(
-          ln,
-          W / 2,
-          y + fit.size * fit.cap + i * fit.size * fit.lineHeight,
-          fit.size,
-          400,
-          rng,
-          ink,
-          'middle',
-        );
+        s += typedLine(ln, W / 2, baselineOf(fit, y, i), fit.size, 400, rng, ink, 'middle');
       });
       y = textBottom(fit, y);
     }

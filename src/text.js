@@ -337,9 +337,21 @@ export function clipGraphemes(str, max, { units = false } = {}) {
 // Scripts written without spaces between words: lines may break between their words.
 const NO_SPACE =
   /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}\p{Emoji_Presentation}]|\uFE0F/u;
-// Never start a line with closing punctuation, or end one with opening punctuation.
-const NO_BREAK_BEFORE = /^[.,!?:;…%)\]}»›’”、。，．・：；！？‼⁇⁈⁉ーゝゞヽヾ々〉》」』】〕〗〙〛）］｝｠｡｣､･]/u;
-const NO_BREAK_AFTER = /[([{«‹‘“〈《「『【〔〖〘〚（［｛｟｢]$/u;
+// Never start a line with closing punctuation, or end one with opening punctuation; and never
+// break at a no-break space, even between words of scripts written without spaces.
+const NO_BREAK_BEFORE =
+  /^[\u00A0\u2007\u202F\uFEFF.,!?:;…%)\]}»›’”、。，．・：；！？‼⁇⁈⁉ーゝゞヽヾ々〉》」』】〕〗〙〛）］｝｠｡｣､･]/u;
+const NO_BREAK_AFTER = /[\u00A0\u2007\u202F\uFEFF([{«‹‘“〈《「『【〔〖〘〚（［｛｟｢]$/u;
+// Scripts whose letters join up: browsers don't letter-space them, so they are set untracked.
+const CURSIVE =
+  /[\p{Script=Arabic}\p{Script=Syriac}\p{Script=Nko}\p{Script=Mongolian}\p{Script=Mandaic}\p{Script=Adlam}\p{Script=Hanifi_Rohingya}]/u;
+
+/**
+ * The letter-spacing `text` is set with: none for scripts whose letters join (Arabic…), which
+ * browsers don't space, so measuring it would size the text for a width it never has.
+ * @param {string} text @param {number} spacing in em
+ */
+export const trackingFor = (text, spacing) => (spacing && CURSIVE.test(text) ? 0 : spacing);
 
 /** @type {Intl.Segmenter | null | undefined} */
 let wordSegmenter;
@@ -355,9 +367,12 @@ function tokenize(str) {
     wordSegmenter =
       typeof Intl !== 'undefined' && Intl.Segmenter ? new Intl.Segmenter('en', { granularity: 'word' }) : null;
   }
-  if (!wordSegmenter) return joinSingleLetters(str.split(' ').map((text, i) => ({ text, space: i > 0 })));
   /** @type {Token[]} */
   const tokens = [];
+  if (!wordSegmenter) {
+    for (const [i, word] of str.split(' ').entries()) addToken(tokens, word, i > 0);
+    return joinSingleLetters(tokens);
+  }
   let space = false;
   for (const { segment } of wordSegmenter.segment(str)) {
     // (Breaking whitespace is a single space by now; a no-break space joins its neighbours.)
@@ -366,17 +381,23 @@ function tokenize(str) {
       continue;
     }
     const prev = tokens.at(-1);
-    const breakable =
-      prev &&
-      (space ||
-        ((NO_SPACE.test(segment) || NO_SPACE.test(prev.text.slice(-2))) &&
-          !NO_BREAK_BEFORE.test(segment) &&
-          !NO_BREAK_AFTER.test(prev.text)));
-    if (!prev || breakable) tokens.push({ text: segment, space });
-    else prev.text += segment;
+    // Words with no space between them stay together, except in scripts written without spaces.
+    if (prev && !space && !NO_SPACE.test(segment) && !NO_SPACE.test(prev.text.slice(-2))) prev.text += segment;
+    else addToken(tokens, segment, space);
     space = false;
   }
   return joinSingleLetters(tokens);
+}
+
+/**
+ * Add a wrap unit, or join it to the last one when no line may break between them:
+ * before closing or after opening punctuation, even across a space (« Le Petit Prince », Quoi ?!).
+ * @param {Token[]} tokens @param {string} text @param {boolean} space
+ */
+function addToken(tokens, text, space) {
+  const prev = tokens.at(-1);
+  if (prev && (NO_BREAK_BEFORE.test(text) || NO_BREAK_AFTER.test(prev.text))) prev.text += (space ? ' ' : '') + text;
+  else tokens.push({ text, space });
 }
 
 /** @param {string} line @param {Token} token */
@@ -407,19 +428,25 @@ function wrapGreedy(tokens, maxWidth, measure, maxLines = Infinity) {
   return lines;
 }
 
+const SINGLE_LETTER = /^\p{L}$/u;
+
 /**
- * A one-letter word (и, в, a, y, o…) never ends a line, as typesetters keep it with the
- * word after it. Also used when there is no Intl.Segmenter.
+ * A one-letter word (и, в, a, y, o…) doesn't end a line, as typesetters keep it with the
+ * word after it. Not when that word is one letter too: a run of them (A B C D…) would
+ * otherwise become one unbreakable unit.
  * @param {Token[]} tokens
  */
 function joinSingleLetters(tokens) {
-  for (let i = tokens.length - 2; i >= 0; i--) {
-    if (tokens[i + 1].space && /^\p{L}$/u.test(tokens[i].text)) {
-      tokens[i].text += ` ${tokens[i + 1].text}`;
-      tokens.splice(i + 1, 1);
-    }
+  /** @type {Token[]} */
+  const out = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const [token, next] = [tokens[i], tokens[i + 1]];
+    if (next?.space && SINGLE_LETTER.test(token.text) && !SINGLE_LETTER.test(next.text)) {
+      out.push({ text: `${token.text} ${next.text}`, space: token.space });
+      i++;
+    } else out.push(token);
   }
-  return tokens;
+  return out;
 }
 
 /**
@@ -506,18 +533,90 @@ export function checkBox(fn, o) {
 }
 
 /**
+ * Reject a `maxSize` that isn't a positive number, and a `minSize` given as anything else.
+ * @param {string} fn @param {{ maxSize: number, minSize?: number }} o
+ */
+export function checkSizes(fn, o) {
+  if (!Number.isFinite(o.maxSize) || o.maxSize <= 0) {
+    throw new TypeError(`${fn}: \`maxSize\` must be a positive number of pixels`);
+  }
+  if (o.minSize != null && (!Number.isFinite(o.minSize) || o.minSize <= 0)) {
+    throw new TypeError(`${fn}: \`minSize\` must be a positive number of pixels`);
+  }
+}
+
+/**
  * The smallest size text shrinks to before wrapping harder: `minSize` if given,
- * else 22% of `maxSize` but at least 6 px (never above `maxSize`).
+ * else 22% of `maxSize` but at least 6 px, or half of `maxSize` when that is less
+ * (small text on a small cover can still shrink).
  * @param {number} maxSize @param {number} [minSize]
  */
-export const defaultMinSize = (maxSize, minSize) => Math.min(maxSize, minSize ?? Math.max(6, maxSize * 0.22));
+export const defaultMinSize = (maxSize, minSize) =>
+  Math.min(maxSize, minSize ?? Math.max(Math.min(6, maxSize / 2), maxSize * 0.22));
 
 /** Room below the last baseline for descenders, as a fraction of the size. */
 const DESCENT = 0.22;
 /** How far below `minSize` text may shrink so that a long word fits whole. */
 const WORD_FLOOR = 0.6;
+/** Clear space between one line's marks and the next line's, in em. */
+const MARK_GAP = 0.04;
 
-const blockHeight = (count, size, lineHeight, cap) => (count ? size * (cap + (count - 1) * lineHeight) : 0);
+// Scripts whose vowel and tone marks reach well above the cap height of Latin capitals and
+// below the baseline, with how far in em (measured in common fonts, with some to spare).
+/** @type {[RegExp, number, number][]} */
+const MARK_SCRIPTS = [
+  [/[\p{Script=Thai}\p{Script=Lao}\p{Script=Myanmar}\p{Script=Khmer}\p{Script=Tibetan}]/u, 0.5, 0.56],
+  [
+    /[\p{Script=Devanagari}\p{Script=Bengali}\p{Script=Gurmukhi}\p{Script=Gujarati}\p{Script=Oriya}\p{Script=Tamil}\p{Script=Telugu}\p{Script=Kannada}\p{Script=Malayalam}\p{Script=Sinhala}]/u,
+    0.34,
+    0.44,
+  ],
+  // Ideographs fill the em; Arabic letters and marks reach a little above capitals and well below.
+  [/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Bopomofo}]/u, 0.16, 0.16],
+  [/[\p{Script=Arabic}\p{Script=Syriac}\p{Script=Nko}\p{Script=Thaana}]/u, 0.16, 0.32],
+];
+// A capital with a mark on top once decomposed (É Å Ž İ Й Ё Ά): it reaches above the cap height.
+const ACCENTED_CAP =
+  /\p{Lu}\p{Mn}*[\u0300-\u0315\u031A\u031B\u033D-\u0344\u0346\u034A-\u034C\u0350-\u0352\u0357\u035B\u0363-\u036F]/u;
+/** How far an accent on a capital reaches above the cap height, in em. */
+const ACCENT = 0.34;
+
+/**
+ * How far marks reach past Latin capitals, in em: above the cap height (accents on capitals,
+ * É Å Й, and the vowel and tone marks of scripts like Thai and Devanagari) and below the
+ * baseline (the marks under letters in those scripts). Both are 0 for text without them.
+ * @param {string} text
+ */
+export function markExtent(text) {
+  let above = 0;
+  let below = 0;
+  for (const [script, up, down] of MARK_SCRIPTS) {
+    if (script.test(text)) {
+      above = Math.max(above, up);
+      below = Math.max(below, down);
+    }
+  }
+  if (above < ACCENT && ACCENTED_CAP.test(text.normalize('NFD'))) above = ACCENT;
+  return { above, below };
+}
+
+/**
+ * Room below a line for descenders, in em: a little for capitals and letters without
+ * descenders, the full amount for g, p, y…, cedillas and ogoneks (ç ą), marks below (ạ),
+ * lowercase Cyrillic and Greek (у р μ ρ) and scripts without case, and more for the
+ * marks under letters in scripts like Thai and Devanagari.
+ * @param {string} line
+ */
+export function descentOf(line) {
+  const d = line.normalize('NFD');
+  const letters =
+    /[gjpqyQ,;()ДЦЩдцщ]/.test(d) ||
+    /[\u0316-\u0333]/.test(d) ||
+    /[\p{Ll}\p{Lo}]/u.test(d.replace(/\p{Script=Latin}/gu, ''))
+      ? DESCENT
+      : 0.04;
+  return Math.max(letters, markExtent(line).below);
+}
 
 /**
  * Wrap and shrink `text` until it fits the box.
@@ -531,30 +630,49 @@ export function fitText(text, opts) {
     font,
     weight: opts.weight ?? 400,
     italic: !!opts.italic,
-    letterSpacing: opts.letterSpacing || 0,
+    letterSpacing: trackingFor(String(text ?? ''), opts.letterSpacing || 0),
   };
   const lineHeight = opts.lineHeight ?? 1.15;
   const cap = font.cap ?? 0.72;
   // With `descent`, the budget also covers the descenders below the last line.
-  const descent = opts.descent ? DESCENT : 0;
+  const descent = Boolean(opts.descent);
   const maxLines = opts.maxLines ?? 5;
   const maxWidth = Math.max(1, opts.maxWidth);
   const maxHeight = opts.maxHeight ?? Infinity;
   const maxSize = opts.maxSize;
-  if (!Number.isFinite(maxSize) || maxSize <= 0)
-    throw new TypeError('fitText: `maxSize` must be a positive number of pixels');
+  checkSizes('fitText', opts);
   checkBox('fitText', opts);
-  if (opts.minSize != null && (!Number.isFinite(opts.minSize) || opts.minSize <= 0)) {
-    throw new TypeError('fitText: `minSize` must be a positive number of pixels');
-  }
   const minSize = defaultMinSize(maxSize, opts.minSize);
 
   let str = String(text ?? '')
     .replace(BREAKING_SPACE, ' ')
     .trim();
   if (opts.upper) str = str.toUpperCase();
-  const base = { ...spec, lineHeight, cap };
+  const base = { ...spec, lineHeight, cap, above: 0, below: DESCENT };
   if (!str) return { ...base, lines: [], size: 0, width: 0, height: 0, truncated: false };
+
+  /**
+   * How lines sit, in em: the pitch between baselines (more than `lineHeight` where a line's
+   * accents or marks would reach the line above), and the room above the first line's cap
+   * height and below the last baseline for them.
+   * @param {string[]} lines
+   */
+  const layoutOf = (lines) => {
+    let pitch = lineHeight;
+    for (let i = 1; i < lines.length; i++) {
+      const { above } = markExtent(lines[i]);
+      if (above) pitch = Math.max(pitch, cap + above + descentOf(lines[i - 1]) + MARK_GAP);
+    }
+    const below = lines.length ? markExtent(lines[lines.length - 1]).below : 0;
+    return { pitch, above: lines.length ? markExtent(lines[0]).above : 0, below: Math.max(DESCENT, below) };
+  };
+  /** @param {string[]} lines @param {number} size @param {ReturnType<typeof layoutOf>} l */
+  const heightOf = (lines, size, l) => (lines.length ? size * (l.above + cap + (lines.length - 1) * l.pitch) : 0);
+  /** Whether lines fit the height at `size`. @param {string[]} lines @param {number} size */
+  const fitsHeight = (lines, size) => {
+    const l = layoutOf(lines);
+    return heightOf(lines, size, l) + (descent ? l.below * size : 0) <= maxHeight;
+  };
 
   const tokens = tokenize(str);
   // One long word that would come out smaller than `hyphenate` px: split it once, with a
@@ -573,39 +691,48 @@ export function fitText(text, opts) {
     const lines = [`${chars.slice(0, at).join('')}-`, chars.slice(at).join('')];
     // Widths scale with size, so the size that fits is a ratio.
     const perPx = Math.max(...lines.map((line) => measureText(line, REFERENCE, spec) / REFERENCE));
-    const size = Math.min(maxSize, maxWidth / perPx, maxHeight / (cap + lineHeight + descent));
+    const l = layoutOf(lines);
+    const size = Math.min(maxSize, maxWidth / perPx, maxHeight / (l.above + cap + l.pitch + (descent ? l.below : 0)));
     if (!(size > plain.size * 1.15)) return plain;
     return {
       ...base,
+      lineHeight: l.pitch,
+      above: l.above,
+      below: l.below,
       lines,
       size,
       width: Math.max(...lines.map((line) => measureText(line, size, spec))),
-      height: blockHeight(2, size, lineHeight, cap),
+      height: heightOf(lines, size, l),
       truncated: false,
     };
   }
   const finish = (lines, size, truncated = false) => {
     const measure = (s) => measureText(s, size, spec);
+    const l = layoutOf(lines);
     return {
       ...base,
+      lineHeight: l.pitch,
+      above: l.above,
+      below: l.below,
       lines,
       size,
       width: Math.max(...lines.map(measure)),
-      height: blockHeight(lines.length, size, lineHeight, cap),
+      height: heightOf(lines, size, l),
       truncated,
     };
   };
 
+  // Shrink 5% at a time down to minSize (which is positive, so this ends however far apart the two are).
   let size = maxSize;
-  for (let guard = 0; guard < 120; guard++) {
+  for (;;) {
     const measure = (s) => measureText(s, size, spec);
     let lines = wrapGreedy(tokens, maxWidth, measure, maxLines);
-    if (
-      lines &&
-      lines.length <= maxLines &&
-      blockHeight(lines.length, size, lineHeight, cap) + descent * size <= maxHeight
-    ) {
-      if (opts.balance !== false && lines.length > 1) lines = balance(tokens, lines.length, maxWidth, measure);
+    if (lines && lines.length <= maxLines && fitsHeight(lines, size)) {
+      if (opts.balance !== false && lines.length > 1) {
+        // (Balanced lines may put an accented capital at the start of another line: keep them only if they still fit.)
+        const even = balance(tokens, lines.length, maxWidth, measure);
+        if (fitsHeight(even, size)) lines = even;
+      }
       return finish(lines, size);
     }
     if (size <= minSize) break;
@@ -615,7 +742,11 @@ export function fitText(text, opts) {
   // Fallback: smallest size (or smaller, if even one line won't fit the height),
   // break long words, truncate with an ellipsis.
   if (maxHeight <= 0) return { ...base, lines: [], size: 0, width: 0, height: 0, truncated: true };
-  size = Math.min(minSize, maxHeight / (cap + descent));
+  // (Lines aren't known yet: allow for marks wherever the text has them.)
+  const marks = markExtent(str);
+  const depth = descent ? Math.max(DESCENT, marks.below) : 0;
+  const pitch = marks.above ? Math.max(lineHeight, cap + marks.above + descentOf(str) + MARK_GAP) : lineHeight;
+  size = Math.min(minSize, maxHeight / (marks.above + cap + depth));
   // A word wider than the box: shrink a little further (widths scale with size) rather than
   // break it mid-word, down to WORD_FLOOR of this size.
   const widest = Math.max(...tokens.map((token) => measureText(token.text, size, spec)));
@@ -625,11 +756,12 @@ export function fitText(text, opts) {
   let lines = hardWrap(tokens, maxWidth, measure);
   const fitCount = Math.max(
     1,
-    Math.min(maxLines, Math.floor((maxHeight / size - cap - descent) / lineHeight + 1e-9) + 1),
+    Math.min(maxLines, Math.floor((maxHeight / size - marks.above - cap - depth) / pitch + 1e-9) + 1),
   );
   if (lines.length <= fitCount) {
     const whole = lines.length > 1 && opts.balance !== false && wrapGreedy(tokens, maxWidth, measure);
-    return finish(whole ? balance(tokens, lines.length, maxWidth, measure) : lines, size);
+    const even = whole && balance(tokens, lines.length, maxWidth, measure);
+    return finish(even && fitsHeight(even, size) ? even : lines, size);
   }
   lines = lines.slice(0, fitCount);
   const chars = graphemes(lines[fitCount - 1]);
@@ -663,22 +795,29 @@ export function textGroupAttrs({ font, fill, size, weight, italic, letterSpacing
 export const spacingShift = (anchor, spacing) => (anchor === 'middle' ? spacing / 2 : anchor === 'end' ? spacing : 0);
 
 /**
+ * The baseline of line `i` of a fit whose block starts at `y` (the top of its first line:
+ * the cap height, or its accents and marks where they reach higher).
+ * @param {import('./text.js').TextFit} fit @param {number} y @param {number} i
+ */
+export const baselineOf = (fit, y, i) => y + fit.size * ((fit.above ?? 0) + fit.cap + i * fit.lineHeight);
+
+/**
  * Render a fit as SVG <text> elements.
- * `y` is the top of the block (cap height of the first line).
+ * `y` is the top of the block (see baselineOf).
  * @param {import('./text.js').TextFit} fit
  * @param {import('./text.js').DrawOptions} opts
  */
 export function drawText(fit, { x, y, anchor = 'start', fill = '#000', opacity, attrs = '' }) {
   if (!fit.lines.length) return '';
-  const { size, font, weight, italic, letterSpacing, lineHeight, cap } = fit;
+  const { size, font, weight, italic, letterSpacing } = fit;
   const ls = letterSpacing * size;
   const dx = spacingShift(anchor, ls);
   const a = textGroupAttrs({ font, size, weight, italic, letterSpacing: ls, fill, anchor, opacity, attrs });
   const rows = fit.lines
-    .map((ln, i) => `<text x="${n(x + dx)}" y="${n(y + size * cap + i * size * lineHeight)}">${escapeXml(ln)}</text>`)
+    .map((ln, i) => `<text x="${n(x + dx)}" y="${n(baselineOf(fit, y, i))}">${escapeXml(ln)}</text>`)
     .join('');
   return `<g ${a}>${rows}</g>`;
 }
 
-/** Visual bottom of a fit placed at `y`, including descenders. */
-export const textBottom = (fit, y) => (fit.lines.length ? y + fit.height + fit.size * DESCENT : y);
+/** Visual bottom of a fit placed at `y`, including descenders (and marks below). */
+export const textBottom = (fit, y) => (fit.lines.length ? y + fit.height + fit.size * (fit.below ?? DESCENT) : y);

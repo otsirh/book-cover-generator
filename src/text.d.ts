@@ -44,8 +44,12 @@ export declare function setTextMeasurer(fn: TextMeasurer | null): void;
 export declare function measureText(text: string, size: number, spec: TextSpec): number;
 /** Throw a TypeError if `maxWidth` is missing or `maxHeight` is NaN. */
 export declare function checkBox(fn: string, o: { maxWidth: number; maxHeight?: number }): void;
-/** The smallest size text shrinks to: `minSize`, else 22% of `maxSize` but at least 6 px. */
+/** Throw a TypeError if `maxSize` isn't a positive number, or `minSize` is given and isn't one. */
+export declare function checkSizes(fn: string, o: { maxSize: number; minSize?: number }): void;
+/** The smallest size text shrinks to: `minSize`, else 22% of `maxSize` but at least 6 px (or half of `maxSize`, if less). */
 export declare function defaultMinSize(maxSize: number, minSize?: number): number;
+/** The letter-spacing `text` is set with: none for scripts whose letters join (Arabic…), which browsers don't space. */
+export declare function trackingFor(text: string, spacing: number): number;
 /** Runs of whitespace a line may break at (every kind except the no-break spaces). */
 export declare const BREAKING_SPACE: RegExp;
 /** The start of a string, cut between user-perceived characters (`units`: count UTF-16 code units). */
@@ -65,7 +69,7 @@ export interface FitOptions {
   font?: FontSpec;
   weight?: number;
   italic?: boolean;
-  /** In em. */
+  /** In em. Ignored for scripts whose letters join (Arabic…), which browsers don't letter-space. */
   letterSpacing?: number;
   /** Multiple of the font size. */
   lineHeight?: number;
@@ -83,21 +87,26 @@ export interface TextFit {
   lines: string[];
   size: number;
   width: number;
-  /** From the cap height of the first line to the baseline of the last. */
+  /** From the top of the first line (its cap height, or its accents and marks where they reach higher) to the baseline of the last. */
   height: number;
   font: FontSpec;
   weight: number;
   italic: boolean;
   letterSpacing: number;
+  /** The pitch between baselines, as a multiple of the size: the requested line height, or more where a line's accents or marks would reach the line above. */
   lineHeight: number;
   cap: number;
+  /** Room above the first line's cap height for its accents and marks, as a fraction of the size. */
+  above?: number;
+  /** Room below the last baseline for descenders and marks, as a fraction of the size. */
+  below?: number;
   /** True when the text didn't fit even at the smallest size and was cut with an ellipsis. */
   truncated: boolean;
 }
 
 export interface DrawOptions {
   x: number;
-  /** Top of the text block (cap height of the first line). */
+  /** Top of the text block: the cap height of the first line, or its accents and marks where they reach higher. */
   y: number;
   anchor?: 'start' | 'middle' | 'end';
   fill?: string;
@@ -110,6 +119,12 @@ export interface DrawOptions {
 export declare function fitText(text: unknown, opts: FitOptions): TextFit;
 /** Render a fit as SVG `<text>` elements. */
 export declare function drawText(fit: TextFit, opts: DrawOptions): string;
+/** The baseline of line `i` of a fit drawn at `y`. */
+export declare function baselineOf(fit: TextFit, y: number, i: number): number;
+/** How far marks reach past Latin capitals, in em: above the cap height (É Å, Thai and Devanagari marks) and below the baseline. */
+export declare function markExtent(text: string): { above: number; below: number };
+/** Room below a line for descenders and marks, in em. */
+export declare function descentOf(line: string): number;
 /** Attributes shared by every line of a text block (escaped), for its wrapping `<g>`. */
 export declare function textGroupAttrs(o: {
   font: FontSpec;

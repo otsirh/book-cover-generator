@@ -4,6 +4,25 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Fixed
+
+- Accents on capitals (É Å Ž Й) and the marks of Devanagari, Bengali, Thai, Lao, Khmer, Myanmar and other scripts no longer run into the line above or off the top of the cover: text leaves room for them above its first line and between lines. Arabic and CJK get a little room too. Text without such marks is laid out exactly as before. Big Letter keeps an accented initial on the cover.
+- Arabic and other scripts whose letters join are set without letter-spacing. Browsers don't letter-space them, so tracked Arabic titles used to overflow or come out too small.
+- Spaced punctuation stays with its word when lines wrap, so French titles no longer leave a lone "»" or "?!" on a line. No-break spaces hold next to Chinese, Japanese, Thai and emoji too.
+- A run of one-letter words ("A B C D…") wraps instead of shrinking to fit on one line.
+- Small text on small covers can shrink below 6 px (to half its largest size), so titles on tiny covers are no longer cut with an ellipsis.
+- `fitText` keeps shrinking text until it fits, however far `maxSize` is above `minSize`, instead of jumping to `minSize`.
+- `fitStack` rejects an invalid `minSize`, as `fitText` does.
+- In the app:
+  - a change made before an Undo or Redo has landed now comes after it, instead of being replaced by it;
+  - the variations keep their seeds when only spaces in the title or author change, and a variation always applies the seed its thumbnail shows;
+  - on phones, the variations sit under the preview and the style family links no longer scroll their family under the pinned preview;
+  - the selected palette swatch shows keyboard focus.
+
+### Added
+
+- `TextFit.above` and `TextFit.below` (room for accents and marks), `StackFit` line `above`, and `baselineOf(fit, y, i)` for styles that draw a fit's lines themselves.
+
 ## [1.3.0] - 2026-11-12
 
 Cover art and app improvements from a second design review.
