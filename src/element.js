@@ -37,9 +37,13 @@ const ATTRIBUTES = /** @type {const} */ ({
 
 const CSS =
   ':host{display:inline-block;width:240px;vertical-align:top}:host([hidden]){display:none}' +
-  'img{display:block;width:100%;height:auto}' +
-  // (A lazy cover not drawn yet keeps a cover's place, so the ones below aren't all in view.)
-  ':host([loading=lazy]) img:not([src]){aspect-ratio:2/3}';
+  'img{display:block;width:100%;height:auto}';
+
+/** How an image of a cover is named: "Cover: Dune by Frank Herbert". @param {string} title @param {string} author */
+const altFor = (title, author) => {
+  const [t, a] = [title, author].map((s) => s.replace(/\s+/g, ' ').trim());
+  return t ? `Cover: ${t}${a ? ` by ${a}` : ''}` : '';
+};
 /** The element's styles as a constructed sheet: a page whose CSP allows no inline styles still applies it. */
 const sheet =
   typeof CSSStyleSheet !== 'undefined' && 'replaceSync' in CSSStyleSheet.prototype
@@ -54,7 +58,7 @@ const sheet =
 const Base = /** @type {typeof HTMLElement} */ (typeof HTMLElement === 'undefined' ? class {} : HTMLElement);
 
 export class BookCover extends Base {
-  static observedAttributes = [...Object.keys(ATTRIBUTES), 'texture'];
+  static observedAttributes = [...Object.keys(ATTRIBUTES), 'texture', 'loading'];
 
   /** The cover drawn last (null before the first, or after an error). @type {ReturnType<typeof createCover> | null} */
   cover = null;
@@ -102,12 +106,16 @@ export class BookCover extends Base {
   connectedCallback() {
     this.#ready = true;
     // loading="lazy", as on an image: drawn once it comes near the viewport.
-    if (this.getAttribute('loading') === 'lazy' && !this.cover && BookCover.#observer) {
+    if (this.#lazy() && !this.cover && BookCover.#observer) {
       this.#waiting = true;
-      // (Named already, from its attributes, for whoever reads the page before it is drawn.)
-      const title = (this.getAttribute('cover-title') ?? '').replace(/\s+/g, ' ').trim();
-      const author = (this.getAttribute('author') ?? '').trim();
-      this.#img.alt = title ? `Cover: ${title}${author ? ` by ${author}` : ''}` : '';
+      // Until it is drawn: named from its attributes, and the cover's own shape held for it.
+      this.#img.alt = altFor(this.getAttribute('cover-title') ?? '', this.getAttribute('author') ?? '');
+      try {
+        const { width = 600, height = width * 1.5 } = this.options();
+        this.#img.style.aspectRatio = `${width} / ${height}`;
+      } catch {
+        this.#img.style.aspectRatio = '2 / 3';
+      }
       BookCover.#observer.observe(this);
       return;
     }
@@ -119,7 +127,17 @@ export class BookCover extends Base {
     this.#waiting = false;
   }
 
-  attributeChangedCallback() {
+  /** Whether it waits to come near the viewport (loading="lazy", in any case, as on an image). */
+  #lazy() {
+    return (this.getAttribute('loading') ?? '').toLowerCase() === 'lazy';
+  }
+
+  attributeChangedCallback(/** @type {string} */ name) {
+    // A waiting cover no longer lazy is drawn at once, as an image is.
+    if (name === 'loading' && this.#waiting && !this.#lazy()) {
+      BookCover.#observer?.unobserve(this);
+      this.#waiting = false;
+    }
     // (Several attributes set at once draw once; an element upgraded on the page draws once, when
     // it connects.)
     if (!this.#ready || this.#waiting || this.#queued || !this.isConnected) return;
@@ -152,9 +170,8 @@ export class BookCover extends Base {
       this.#drawn = key;
       this.cover = createCover(options);
       this.#img.src = svgToDataUrl(this.cover.svg);
-      this.#img.alt = this.cover.author
-        ? `Cover: ${this.cover.title.replace(/\n/g, ' ')} by ${this.cover.author}`
-        : `Cover: ${this.cover.title.replace(/\n/g, ' ')}`;
+      this.#img.alt = altFor(this.cover.title, this.cover.author);
+      this.#img.style.aspectRatio = '';
       this.dispatchEvent(new CustomEvent('cover', { detail: this.cover }));
     } catch (err) {
       this.cover = null;

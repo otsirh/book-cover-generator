@@ -33,13 +33,21 @@ function chrome() {
     markup
       .replaceAll('href="./"', 'href="/"')
       .replace(/href="#/g, 'href="/#')
-      .replace('<a href="/gallery/">', '<a href="/gallery/" aria-current="page">');
-  return { header: forGallery(part('header', 'site-header')), footer: forGallery(part('footer', 'site-footer')) };
+      .replace('<a href="/gallery/" id="nav-gallery">', '<a href="/gallery/" aria-current="page">');
+  // The app's module preloads (its own script aside), so the covers' modules come at once.
+  const preloads = [...html.matchAll(/<link rel="modulepreload" href="(src\/[^"]+)" \/>/g)]
+    .map((m) => `    <link rel="modulepreload" href="/${m[1]}" />`)
+    .join('\n');
+  return {
+    header: forGallery(part('header', 'site-header')),
+    footer: forGallery(part('footer', 'site-footer')),
+    preloads,
+  };
 }
 
 /** The gallery page's HTML. */
 export function galleryHtml() {
-  const { header, footer } = chrome();
+  const { header, footer, preloads } = chrome();
   const styles = listStyles();
   const groups = [...new Set(styles.map((s) => s.group))];
   const genreName = Object.fromEntries(genres.map((g) => [g.id, g.name]));
@@ -53,7 +61,7 @@ export function galleryHtml() {
           const suits = s.genres.map((g) => genreName[g] ?? g).join(', ');
           return `
         <figure class="gallery-item">
-          <a href="/#${esc(link.toString())}" aria-label="${esc(`${s.name}: open it in the generator`)}">
+          <a href="/#${esc(link.toString())}" data-style="${esc(s.id)}" aria-label="${esc(`${s.name}: open it in the generator`)}">
             <book-cover loading="lazy" cover-title="${esc(title)}" author="Mara Ellison"${subtitle ? ` subtitle="${esc(subtitle)}"` : ''} cover-style="${esc(s.id)}" seed="gallery"></book-cover>
           </a>
           <figcaption><strong>${esc(s.name)}</strong> ${esc(s.description)}${suits ? ` <span class="gallery-genres">${esc(suits)}</span>` : ''}</figcaption>
@@ -79,7 +87,10 @@ export function galleryHtml() {
     <link rel="canonical" href="https://covers.otsirh.dev/gallery/" />
     <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/site/style.css" />
+    <link rel="modulepreload" href="/src/element.js" />
+${preloads}
     <script type="module" src="/src/element.js"></script>
+    <script type="module" src="/site/gallery.js"></script>
   </head>
   <body>
     ${header}
@@ -94,3 +105,6 @@ export function galleryHtml() {
 </html>
 `;
 }
+
+/** The pages the build writes, by path (the dev server answers them too). */
+export const PAGES = { '/gallery/': galleryHtml };

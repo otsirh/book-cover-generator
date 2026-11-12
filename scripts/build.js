@@ -2,7 +2,7 @@
 // (headers, 404 page, icons, manifest, service worker…) at the site root. Deployed by `npm run deploy`.
 import { cpSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { galleryHtml } from './gallery.js';
+import { PAGES } from './gallery.js';
 
 const SITE = ['index.html', 'site', 'src'];
 
@@ -14,9 +14,11 @@ rmSync('dist', { recursive: true, force: true });
 mkdirSync('dist');
 for (const entry of SITE) cpSync(entry, `dist/${entry}`, { recursive: true, filter });
 cpSync('public', 'dist', { recursive: true, filter });
-// The gallery page, from the styles as they are now.
-mkdirSync('dist/gallery');
-writeFileSync('dist/gallery/index.html', galleryHtml());
+// The pages made from the library as it is now (the gallery).
+for (const [path, make] of Object.entries(PAGES)) {
+  mkdirSync(`dist${path}`, { recursive: true });
+  writeFileSync(`dist${path}index.html`, make());
+}
 
 /** Every file under a folder of dist/, as a site path. @param {string} dir */
 const filesIn = (dir) =>

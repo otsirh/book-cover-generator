@@ -12,7 +12,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { extname, join, resolve, sep } from 'node:path';
 import { Readable } from 'node:stream';
 import worker from '../worker/index.js';
-import { galleryHtml } from './gallery.js';
+import { PAGES } from './gallery.js';
 
 const [portArg, ...rootArgs] = process.argv.slice(2);
 const port = Number(portArg ?? 4173);
@@ -137,10 +137,16 @@ async function handle(req, res) {
     );
   let file = hidden ? null : await locate(urlPath);
   let status = 200;
-  // The gallery the build writes, made here when the roots haven't one (the source tree).
+  // A page the build writes, made here when the roots haven't it (the source tree); without its
+  // slash, sent to it, as production does.
   /** @type {string | null} */
   let generated = null;
-  if (!file && (urlPath === '/gallery/' || urlPath === '/gallery')) generated = galleryHtml();
+  const page = PAGES[/** @type {keyof typeof PAGES} */ (urlPath)];
+  if (!file && Object.hasOwn(PAGES, `${urlPath}/`)) {
+    res.writeHead(307, { Location: `${urlPath}/` }).end();
+    return;
+  }
+  if (!file && page) generated = page();
   else if (!file) {
     status = 404;
     file = await locate('/404.html');

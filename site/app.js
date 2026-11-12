@@ -1009,6 +1009,11 @@ function buildControls() {
       toast('Could not access the clipboard');
     }
   });
+  // The Gallery link carries the design, so the gallery's links bring it back (site/gallery.js).
+  $('nav-gallery').addEventListener('click', () => {
+    flushReplace();
+    /** @type {HTMLAnchorElement} */ ($('nav-gallery')).href = `/gallery/${toHash(design)}`;
+  });
   $('copy-image-link').addEventListener('click', async () => {
     flushReplace();
     try {

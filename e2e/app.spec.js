@@ -1845,6 +1845,58 @@ for (const scheme of /** @type {const} */ (['light', 'dark'])) {
   });
 }
 
+test('your design goes to the gallery and comes back in the style you pick', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/#title=My%20Own%20Book&author=Me&style=minimal&seed=mine&palette=mint&format=paperback');
+  await ready(page);
+  await page.locator('#nav-gallery').click();
+  await expect(page).toHaveURL(/\/gallery\/#title=My\+Own\+Book&/);
+  await page.locator('a[data-style="crest"]').click();
+  await selected(page, 'crest');
+  await expect(page.locator('#title')).toHaveValue('My Own Book');
+  await expect(page.locator('#author')).toHaveValue('Me');
+});
+
+test('lazy covers hold their own shape, and draw at once when no longer lazy', async ({ page }) => {
+  await page.goto('/#title=Host&style=minimal&seed=h');
+  const shape = await page.evaluate(async () => {
+    await import('/src/element.js');
+    const spacer = document.createElement('div');
+    spacer.style.height = '5000px';
+    document.body.append(spacer);
+    const el = /** @type {any} */ (document.createElement('book-cover'));
+    el.setAttribute('loading', 'LAZY');
+    el.setAttribute('cover-title', 'Square');
+    el.setAttribute('format', 'square');
+    el.style.width = '200px';
+    document.body.append(el);
+    const img = el.shadowRoot.querySelector('img');
+    const before = {
+      src: img.getAttribute('src'),
+      height: Math.round(img.getBoundingClientRect().height),
+      alt: img.alt,
+    };
+    const drawn = new Promise((resolve) => el.addEventListener('cover', resolve, { once: true }));
+    el.removeAttribute('loading');
+    await drawn;
+    await img.decode();
+    return { before, after: Math.round(img.getBoundingClientRect().height) };
+  });
+  expect(shape).toEqual({ before: { src: null, height: 200, alt: 'Cover: Square' }, after: 200 });
+});
+
+test('the gallery and the app fit a 320px phone @mobile', async ({ page }) => {
+  for (const path of ['/gallery/', '/#title=Phone&style=bigtype&seed=m']) {
+    await page.setViewportSize({ width: 320, height: 640 });
+    await page.goto(path);
+    await expect(page.locator('.site-header')).toBeVisible();
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(overflow, path).toBeLessThanOrEqual(0);
+  }
+});
+
 test('a Japanese title sets the language of the cover', async ({ page }) => {
   await page.goto(`/#title=${encodeURIComponent('ガラスの街')}&style=minimal&seed=j`);
   expect(await svgOf(page, '#preview')).toMatch(/^<svg [^>]* lang="ja"/);

@@ -953,8 +953,10 @@ input[type='number'][aria-invalid='true'] {
 
 .variations {
   display: grid;
-  grid-template-columns: repeat(6, 36px);
+  /* (They shrink a little on the narrowest phones rather than push the row off the screen.) */
+  grid-template-columns: repeat(6, minmax(26px, 36px));
   gap: 6px;
+  min-width: 0;
 }
 
 .variation {
@@ -1666,7 +1668,7 @@ pre {
 /* Phones: one column, the preview pinned while you edit, styles in strips. */
 @media (max-width: 759px) {
   /* (Room for the app's bar along the bottom: other pages have none.) */
-  body:has(.mobile-bar) {
+  body.app-page {
     padding-bottom: 76px;
   }
 
@@ -1674,7 +1676,8 @@ pre {
     padding: 14px 16px 4px;
   }
 
-  .site-header nav a[href='#usage'] {
+  /* (Only Gallery and GitHub: the header fits a 320px screen.) */
+  .site-header nav .nav-wide {
     display: none;
   }
 

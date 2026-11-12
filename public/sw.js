@@ -51,11 +51,13 @@ async function networkFirst(request) {
     }
     return response;
   } catch (err) {
-    // Offline. The app is kept as "/", whatever its query; another page (the gallery) as itself.
-    const app = new URL(request.url).pathname === '/';
+    // Offline. The app is kept as "/" (whatever its query, and as /index.html), another page (the
+    // gallery) as its own address, with its slash.
+    const path = new URL(request.url).pathname;
+    const page = path === '/index.html' ? '/' : path.endsWith('/') ? path : `${path}/`;
     const kept =
       (await cache.match(request, { ignoreSearch: true })) ??
-      (request.mode === 'navigate' && app ? await cache.match('/') : undefined);
+      (request.mode === 'navigate' ? await cache.match(page) : undefined);
     if (kept) return kept;
     throw err;
   }
