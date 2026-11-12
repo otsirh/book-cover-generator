@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-11-12
+
+Genres and five styles made for them, an HTTP API that draws covers from a URL, and text that fits in Node as it does in the browser. Covers made without a style may come out in a new one, and text made in Node may be set a little differently (see Changed); covers drawn in the browser with a style are as in 1.6.0.
+
 ### Added
 
 - **Five genre styles**: Hollow (horror: a dead tree across a full or blood moon, fog, and worn lettering), Ribbon (romance: ribbons turning over under an italic title, and falling petals; dark palettes make it a dark romance), Crest (fantasy: a heraldic shield before laurels, swords or rays, framed in gold, with its field, emblem and what's behind it to pin), Storybook (children's: hills with trees and a house, a sun or a rainbow, clouds, and a bold outlined title) and Big Idea (non-fiction: a big plain title, a prominent subtitle, and bars, a trend line or a pie). There are 39 styles now.
@@ -248,7 +252,8 @@ A redesign of the covers and the app, based on a design review.
 
 - First release: 27 styles, 20 palettes, seeded randomizer, text fitting, CLI and the web app with SVG, PNG and JPEG export.
 
-[Unreleased]: https://github.com/otsirh/book-cover-generator/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/otsirh/book-cover-generator/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/otsirh/book-cover-generator/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/otsirh/book-cover-generator/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/otsirh/book-cover-generator/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/otsirh/book-cover-generator/compare/v1.3.0...v1.4.0
