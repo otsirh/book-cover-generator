@@ -12,6 +12,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { extname, join, resolve, sep } from 'node:path';
 import { Readable } from 'node:stream';
 import worker from '../worker/index.js';
+import { galleryHtml } from './gallery.js';
 
 const [portArg, ...rootArgs] = process.argv.slice(2);
 const port = Number(portArg ?? 4173);
@@ -105,6 +106,12 @@ async function handle(req, res) {
   // with the body as a stream: routing, limits and headers as in production (which doesn't add
   // _headers to the Worker's answers).
   const rawPath = new URL(req.url ?? '/', 'http://localhost').pathname;
+  // The gallery, as the build writes it.
+  if (rawPath === '/gallery/' || rawPath === '/gallery') {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+    res.end(req.method === 'HEAD' ? undefined : galleryHtml());
+    return;
+  }
   if (rawPath === '/mcp' || rawPath.startsWith('/api/')) {
     const method = req.method ?? 'GET';
     const headers = new Headers();

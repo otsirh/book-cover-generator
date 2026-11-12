@@ -1816,6 +1816,32 @@ test('<book-cover> draws a cover on a page from its attributes', async ({ page }
   expect(result.src).toBeNull();
 });
 
+test('the gallery draws every style, and a click opens the generator in it', async ({ page }) => {
+  await page.goto('/gallery/');
+  const covers = page.locator('book-cover');
+  await expect(covers).toHaveCount(39);
+  await expect
+    .poll(() =>
+      covers.evaluateAll((els) => els.filter((el) => el.shadowRoot?.querySelector('img')?.getAttribute('src')).length),
+    )
+    .toBe(39);
+  await page.locator('a', { has: page.locator('book-cover[cover-style="crest"]') }).click();
+  await selected(page, 'crest');
+  await expect(page.locator('#title')).toHaveValue('Kingdom of Ash');
+});
+
+for (const scheme of /** @type {const} */ (['light', 'dark'])) {
+  test(`the gallery has no accessibility violations (${scheme})`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.goto('/gallery/');
+    await expect(page.locator('book-cover')).toHaveCount(39);
+    const results = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+      .analyze();
+    expect(results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([]);
+  });
+}
+
 test('a Japanese title sets the language of the cover', async ({ page }) => {
   await page.goto(`/#title=${encodeURIComponent('ガラスの街')}&style=minimal&seed=j`);
   expect(await svgOf(page, '#preview')).toMatch(/^<svg [^>]* lang="ja"/);

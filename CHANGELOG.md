@@ -4,6 +4,11 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+
+- **A gallery** of every style at [covers.otsirh.dev/gallery/](https://covers.otsirh.dev/gallery/), each drawn for a book of the genre it suits (by `<book-cover>`, in your browser) and opening the generator in it.
+- The app's developer section shows every way to use the covers: an image link, `<book-cover>`, an AI assistant (MCP) and the library.
+
 ## [1.8.0] - 2026-11-12
 
 Covers wherever you work: an MCP server for AI assistants, a `<book-cover>` element for any page, Deno and Bun, and signed releases. Covers are drawn as in 1.7.0.

@@ -145,7 +145,8 @@
       </a>
       <nav aria-label="Main">
         <a href="#styles">Styles</a>
-        <a href="#usage">Library</a>
+        <a href="/gallery/">Gallery</a>
+        <a href="#usage">Developers</a>
         <a href="https://github.com/otsirh/book-cover-generator">GitHub</a>
       </nav>
     </header>
@@ -547,38 +548,54 @@
 
     <section class="usage" id="usage" aria-labelledby="usage-heading">
       <div class="section-head">
-        <h2 id="usage-heading">Use the library</h2>
-        <p>Zero dependencies, plain ES modules, TypeScript types included. Works in the browser and in Node.</p>
+        <h2 id="usage-heading">Covers anywhere</h2>
+        <p>
+          A link, an element, an AI assistant or a library: the same covers, free and open source. Zero dependencies;
+          the browser, Node, Deno and Bun.
+        </p>
       </div>
       <div class="code-grid">
         <div>
-          <h3>Browser (CDN)</h3>
-          <pre tabindex="0"><code>import { generateCover } from
-  'https://cdn.jsdelivr.net/npm/book-cover-generator@1/src/index.js';
-
-const svg = generateCover({
-  title: 'The Lighthouse Keeper',
-  author: 'Mara Ellison',
-  style: 'artdeco',   // or 'random'
-  palette: 'midnight' // or 'random'
-});
-document.body.innerHTML = svg;</code></pre>
+          <h3>An image link</h3>
+          <pre tabindex="0"><code>&lt;img src="https://covers.otsirh.dev/api/cover.svg
+  ?title=Dune&amp;author=Frank+Herbert&amp;style=retro"
+  alt="Dune"&gt;</code></pre>
+          <p class="code-note">Any design's link works too: <b>Copy image link</b> above gives it.</p>
         </div>
         <div>
-          <h3>Node / bundlers</h3>
+          <h3>An element for any page</h3>
+          <pre tabindex="0"><code>&lt;script type="module"
+  src="https://covers.otsirh.dev/src/element.js"&gt;&lt;/script&gt;
+
+&lt;book-cover cover-title="Dune" author="Frank Herbert"
+  cover-style="retro"&gt;&lt;/book-cover&gt;</code></pre>
+        </div>
+        <div>
+          <h3>From an AI assistant (MCP)</h3>
+          <pre tabindex="0"><code>claude mcp add book-covers -- \
+  npx -y book-cover-generator --mcp
+
+# or the hosted server:
+claude mcp add --transport http book-covers \
+  https://covers.otsirh.dev/mcp</code></pre>
+        </div>
+        <div>
+          <h3>The library</h3>
           <pre tabindex="0"><code>npm install book-cover-generator
 
 import { createCover } from 'book-cover-generator';
 
-const { svg, style, palette, seed } = createCover({
-  title: 'Dune Sea',
-  author: 'A. Writer',
-  subtitle: 'A Novel',
-  seed: 42,          // same seed → same art
+const { svg } = createCover({
+  title: 'Dune', author: 'Frank Herbert',
+  genre: 'fantasy', seed: 42, // same seed, same cover
   width: 1600, height: 2560,
 });</code></pre>
         </div>
       </div>
+      <p class="code-more">
+        <a href="https://github.com/otsirh/book-cover-generator#readme">Everything they take, in the README</a> ·
+        <a href="/gallery/">All 39 styles</a>
+      </p>
     </section>
 
     <footer class="site-footer">

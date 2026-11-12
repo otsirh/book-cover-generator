@@ -1421,6 +1421,80 @@ input[type='number'][aria-invalid='true'] {
     center / 13px no-repeat;
 }
 
+/* ----------------------------------------------------------------- gallery */
+
+.gallery {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 24px 24px 32px;
+}
+
+.gallery h1 {
+  margin: 0;
+  font: 600 34px/1.15 var(--display);
+}
+
+.gallery-group h2 {
+  margin: 28px 0 14px;
+  font: 600 22px/1.2 var(--display);
+}
+
+.gallery-grid {
+  display: grid;
+  /* (Two to a row on a phone.) */
+  grid-template-columns: repeat(auto-fill, minmax(min(46%, 180px), 1fr));
+  gap: 22px 16px;
+}
+
+.gallery-item {
+  margin: 0;
+}
+
+.gallery-item a {
+  display: block;
+  border-radius: 6px;
+}
+
+.gallery-item book-cover {
+  width: 100%;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 10px 24px -14px rgb(0 0 0 / 0.5);
+  aspect-ratio: 2 / 3;
+  background: var(--surface-2);
+  transition: transform 0.15s ease;
+}
+
+.gallery-item a:hover book-cover,
+.gallery-item a:focus-visible book-cover {
+  transform: translateY(-3px);
+}
+
+.gallery-item figcaption {
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.gallery-item figcaption strong {
+  display: block;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.gallery-genres {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gallery-item book-cover {
+    transition: none;
+  }
+}
+
 /* ------------------------------------------------------------------- usage */
 
 .usage {
@@ -1441,7 +1515,8 @@ input[type='number'][aria-invalid='true'] {
 
 .code-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  /* (Two to a row: wide enough for the code without scrolling.) */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr));
   gap: 18px;
 }
 
@@ -1452,6 +1527,16 @@ input[type='number'][aria-invalid='true'] {
 .code-grid h3 {
   margin: 0 0 8px;
   font-size: 14px;
+}
+
+.code-note {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.code-more {
+  margin: 20px 0 0;
 }
 
 pre {

@@ -10,7 +10,7 @@
 
 Generate book covers from a **title** and an **author**. 39 styles, 28 palettes or your own colours, a seeded randomizer, any size, and export to **SVG, PNG, JPEG or WebP**. The library has no dependencies and ships TypeScript types. It's written as plain ES modules, so it runs in the browser, Node, Deno and Bun.
 
-**[▶ Open the generator](https://covers.otsirh.dev)**
+**[▶ Open the generator](https://covers.otsirh.dev)** · [See every style](https://covers.otsirh.dev/gallery/)
 
 ![Sample covers](docs/preview.png)
 

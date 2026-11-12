@@ -23,7 +23,9 @@ test('every local asset referenced by index.html exists', () => {
   const html = readFileSync('index.html', 'utf8');
   const refs = [...html.matchAll(/(?:href|src)="([^"#:]+)"/g)].map((m) => m[1]).filter((r) => !r.startsWith('./'));
   assert.ok(refs.length > 5);
-  for (const ref of refs) assert.ok(existsSync(ref) || existsSync(`public/${ref}`), `missing ${ref}`);
+  // (Pages the build writes: scripts/build.js.)
+  const built = new Set(['/gallery/']);
+  for (const ref of refs) assert.ok(built.has(ref) || existsSync(ref) || existsSync(`public/${ref}`), `missing ${ref}`);
 });
 
 test('_headers sets a strict CSP and keeps the library importable cross-origin', () => {

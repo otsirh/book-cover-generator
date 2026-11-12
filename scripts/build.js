@@ -2,6 +2,7 @@
 // (headers, 404 page, icons, manifest, service worker…) at the site root. Deployed by `npm run deploy`.
 import { cpSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { galleryHtml } from './gallery.js';
 
 const SITE = ['index.html', 'site', 'src'];
 
@@ -45,5 +46,9 @@ if (!built.includes(release) || built.includes('const FILES = [];')) {
   throw new Error('scripts/build.js: dist/sw.js no longer has the RELEASE and FILES lines to fill in');
 }
 writeFileSync('dist/sw.js', built);
+
+// The gallery page, from the styles as they are now.
+mkdirSync('dist/gallery');
+writeFileSync('dist/gallery/index.html', galleryHtml());
 
 console.log(`Built dist/ from ${SITE.join(', ')} and public/ (offline copy: ${offline.length} files, ${release})`);
