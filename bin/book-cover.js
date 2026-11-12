@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { parseArgs } from 'node:util';
 import { createCover, listStyles, palettes, formats, parseBookList, optionsForBook, genres } from '../src/index.js';
 import { hex, slug } from '../src/shared.js';
-import { handleMessage } from '../src/mcp.js';
+import { handlePayload } from '../src/mcp.js';
 
 const HELP = `Usage: book-cover "<title>" ["<author>"] [options]
 
@@ -355,6 +355,8 @@ function serveMcp() {
   const lines = createInterface({ input: process.stdin });
   /** @param {string} path @param {string} data */
   const writeFile = (path, data) => {
+    // (A host starts the server in a folder of its own choosing: a relative path would land there.)
+    if (!isAbsolute(path)) throw new Error(`output must be an absolute path, got "${path}"`);
     const file = resolve(path);
     mkdirSync(dirname(file), { recursive: true });
     writeFileSync(file, data);
@@ -373,7 +375,7 @@ function serveMcp() {
       answer({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } });
       return;
     }
-    answer(handleMessage(message, { writeFile }));
+    answer(handlePayload(message, { writeFile }));
   });
 }
 

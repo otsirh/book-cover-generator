@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtemp, readFile, realpath, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { handleMessage } from '../src/mcp.js';
@@ -83,16 +83,35 @@ test('create_cover: links that draw the cover it drew, by name, genre and pins',
     },
   }).result;
   assert.equal(createCover(optionsFromLink(query)).svg, tool.content[1].text);
-  // A genre by its name; a seed from the title stays one.
-  const genred = call('tools/call', { name: 'create_cover', arguments: { title: 'Night', genre: 'Horror' } }).result;
+  // A genre by its name; a seed from the title stays one (and isn't reported as one to give back).
+  const genred = call('tools/call', {
+    name: 'create_cover',
+    arguments: { title: 'Night', genre: 'Horror', seed: '  ' },
+  }).result;
   assert.ok(['hollow', 'noir', 'silhouette'].includes(genred.structuredContent.style));
   assert.equal(new URL(genred.structuredContent.imageUrl).searchParams.get('seed'), '');
+  assert.equal(genred.structuredContent.seed, null);
   // Your own colours.
   const own = call('tools/call', {
     name: 'create_cover',
     arguments: { title: 'X', colors: { bg: '#0b132b', ink: '#f8f9fa', accents: ['#ff6b6b'] } },
   }).result;
   assert.match(own.structuredContent.imageUrl, /palette=custom-0b132b-f8f9fa-ff6b6b&/);
+  // Short hex too: links that draw those colours; more than three accents is an error.
+  const short = call('tools/call', {
+    name: 'create_cover',
+    arguments: { title: 'X', colors: { bg: '#000', ink: '#fff', accents: ['#f00'] }, svg: true },
+  }).result;
+  assert.match(short.structuredContent.imageUrl, /palette=custom-000000-ffffff-ff0000&/);
+  assert.equal(
+    createCover(optionsFromLink(new URL(short.structuredContent.imageUrl).searchParams)).svg,
+    short.content[1].text,
+  );
+  const four = call('tools/call', {
+    name: 'create_cover',
+    arguments: { title: 'X', colors: { bg: '#000', ink: '#fff', accents: ['#f00', '#0f0', '#00f', '#ff0'] } },
+  }).result;
+  assert.equal(four.isError, true);
 });
 
 test('create_mockup, the lists, and errors the assistant can fix', () => {
@@ -105,6 +124,9 @@ test('create_mockup, the lists, and errors the assistant can fix', () => {
     card.content[1].text,
     createMockup(createCover({ title: 'Dune', seed: 'm' }), { kind: 'card', text: 'Out now' }).svg,
   );
+  for (const genre of ["children's", 'Childrens', 'thriller and crime']) {
+    assert.equal(call('tools/call', { name: 'list_styles', arguments: { genre } }).result.isError, undefined, genre);
+  }
   const styles = call('tools/call', { name: 'list_styles', arguments: { genre: 'Horror' } }).result;
   assert.deepEqual(
     styles.structuredContent.styles.map((/** @type {any} */ s) => s.id),
@@ -137,8 +159,17 @@ test('book-cover --mcp: a message a line, and a cover saved to a file', async ()
         jsonrpc: '2.0',
         id: 2,
         method: 'tools/call',
-        params: { name: 'create_cover', arguments: { title: 'Saved', output: 'out/cover.svg' } },
+        params: { name: 'create_cover', arguments: { title: 'Saved', output: join(dir, 'out', 'cover.svg') } },
       },
+      [
+        { jsonrpc: '2.0', id: 3, method: 'ping' },
+        {
+          jsonrpc: '2.0',
+          id: 4,
+          method: 'tools/call',
+          params: { name: 'create_cover', arguments: { title: 'X', output: 'relative.svg' } },
+        },
+      ],
     ];
     child.stdin.end(`${lines.map((l) => JSON.stringify(l)).join('\n')}\nnot json\n`);
     await new Promise((resolve) => child.on('close', resolve));
@@ -147,11 +178,13 @@ test('book-cover --mcp: a message a line, and a cover saved to a file', async ()
       .split('\n')
       .map((l) => JSON.parse(l));
     assert.deepEqual(
-      answers.map((a) => a.id),
-      [1, 2, null],
+      answers.map((a) => (Array.isArray(a) ? a.map((b) => b.id) : a.id)),
+      [1, 2, [3, 4], null],
     );
-    assert.equal(answers[2].error.code, -32700);
-    assert.equal(answers[1].result.structuredContent.file, join(await realpath(dir), 'out', 'cover.svg'));
+    // A relative path is refused: the host chose the folder the server runs in.
+    assert.match(answers[2][1].result.content[0].text, /absolute path/);
+    assert.equal(answers[3].error.code, -32700);
+    assert.equal(answers[1].result.structuredContent.file, join(dir, 'out', 'cover.svg'));
     assert.match(await readFile(join(dir, 'out', 'cover.svg'), 'utf8'), /^<svg [\s\S]*Saved/);
   } finally {
     await rm(dir, { recursive: true, force: true });
@@ -188,6 +221,15 @@ test('the Worker answers MCP at /mcp', async () => {
     ])
   ).json();
   assert.deepEqual(batch, [{ jsonrpc: '2.0', id: 1, result: {} }]);
+  // A batch is capped (each message may draw a cover), and an empty one is an error.
+  const many = await (
+    await post(
+      'POST',
+      Array.from({ length: 21 }, (_, i) => ({ jsonrpc: '2.0', id: i, method: 'ping' })),
+    )
+  ).json();
+  assert.equal(many.error.code, -32600);
+  assert.equal((await (await post('POST', [])).json()).error.code, -32600);
   assert.equal((await post('GET')).status, 405);
   assert.equal((await post('OPTIONS')).status, 204);
   const bad = await worker.fetch(

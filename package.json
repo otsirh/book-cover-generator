@@ -23,7 +23,9 @@
   "license": "MIT",
   "author": "otsirh (https://github.com/otsirh)",
   "type": "module",
-  "sideEffects": false,
+  "sideEffects": [
+    "./src/element.js"
+  ],
   "exports": {
     ".": {
       "types": "./src/index.d.ts",
@@ -55,7 +57,7 @@
     "dev": "node scripts/serve.js 4173",
     "build": "node scripts/build.js",
     "lint": "eslint .",
-    "lint:package": "publint --strict && attw --pack . --profile esm-only",
+    "lint:package": "publint --strict && attw --pack . --profile esm-only && node scripts/check-bundle.js",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc -p tsconfig.json",

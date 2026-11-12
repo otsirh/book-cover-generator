@@ -4,8 +4,9 @@ name: Release
 # release from the CHANGELOG. npm trusts this workflow to publish (trusted publishing, set in the
 # package's settings on npmjs.com), so no npm token is stored anywhere.
 #
-# Run it by hand for a dry run: the checks, and what the package would hold. Give it a released
-# tag to bring that GitHub release up to date (notes, and the package with its signed provenance).
+# Run it by hand for a dry run: the checks, and what the package would hold. Run it on a released
+# tag, naming it, to bring that GitHub release up to date (notes, and the package with its signed
+# provenance).
 
 on:
   push:
@@ -67,7 +68,8 @@ jobs:
   github:
     name: GitHub release
     needs: npm
-    if: github.event_name == 'push' || inputs.release != ''
+    # (A run by hand must run on the tag it names, so the signed provenance names that tag.)
+    if: github.event_name == 'push' || (inputs.release != '' && github.ref == format('refs/tags/{0}', inputs.release))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -115,6 +117,8 @@ jobs:
           if gh release view "$TAG" > /dev/null 2>&1; then
             gh release edit "$TAG" --title "${TAG#v}" --notes-file notes.md
           else
-            gh release create "$TAG" --verify-tag --latest --title "${TAG#v}" --notes-file notes.md
+            # (Only a new release, pushed, is the latest: an old one made by hand isn't.)
+            latest=$([ "$GITHUB_EVENT_NAME" = push ] && echo --latest || echo --latest=false)
+            gh release create "$TAG" --verify-tag "$latest" --title "${TAG#v}" --notes-file notes.md
           fi
           gh release upload "$TAG" "book-cover-generator-${TAG#v}.tgz" "book-cover-generator-${TAG#v}.tgz.sigstore" --clobber

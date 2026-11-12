@@ -27,7 +27,8 @@ const filesIn = (dir) =>
 const offline = [
   '/',
   ...filesIn('site'),
-  ...filesIn('src').filter((path) => path.endsWith('.js')),
+  // (Not the MCP server or <book-cover>: the app loads neither.)
+  ...filesIn('src').filter((path) => path.endsWith('.js') && !['/src/mcp.js', '/src/element.js'].includes(path)),
   '/manifest.webmanifest',
   ...filesIn('icons'),
 ];

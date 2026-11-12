@@ -3,7 +3,7 @@
 // design the app stored) and gives the field's value, or undefined for one it can't read: the app
 // drops it, the API says so. (Not part of the library's API.)
 
-import { styleIdFor, palettes, formats, sizeLimits } from './index.js';
+import { styleIdFor, palettes, formats, sizeLimits, version } from './index.js';
 import { LINE_BREAK, clipGraphemes } from './text.js';
 import {
   idFor,
@@ -79,6 +79,82 @@ export const LINK = {
     return undefined;
   },
 };
+
+/**
+ * @typedef {object} Field
+ * @property {(v: unknown) => unknown} read  the value from a link or a stored design; undefined drops it
+ * @property {(v: any) => string} [write]    the value as a link writes it (default: as it is)
+ * @property {unknown} empty                 the value of a design that leaves it out (see complete())
+ * @property {boolean} [optional]            links may leave it out and still be whole designs
+ * @property {boolean} [omitEmpty]           links leave it out when it is empty
+ */
+
+/**
+ * Every field of a design, in the order links name them. A field added later is `optional`, so
+ * links made before it existed still open as whole designs (with its `empty` value).
+ * @type {Record<string, Field>}
+ */
+export const LINK_FIELDS = {
+  // (Each read by LINK, as the HTTP API reads links too: one link draws one design.)
+  // (Line breaks kept since 1.5.0: the cover breaks the title there.)
+  title: { read: LINK.title, empty: '' },
+  author: { read: LINK.author, empty: '' },
+  // (Optional since 1.2.0: older links left it out when empty.)
+  subtitle: { read: LINK.subtitle, empty: '', optional: true },
+  // (Since 1.5.0.)
+  series: { read: LINK.series, empty: '', optional: true, omitEmpty: true },
+  credit: { read: LINK.credit, empty: '', optional: true, omitEmpty: true },
+  // (Since 1.6.0.)
+  badge: { read: LINK.badge, empty: '', optional: true, omitEmpty: true },
+  style: { read: LINK.style, empty: '' },
+  // (Since 1.5.0.) Checked against the style when used (the app's pinsFor()).
+  variant: { read: LINK.variant, empty: '', optional: true, omitEmpty: true },
+  // (Since 1.5.0.)
+  font: { read: LINK.font, empty: '', optional: true, omitEmpty: true },
+  case: { read: LINK.case, empty: '', optional: true, omitEmpty: true },
+  palette: { read: LINK.palette, empty: 'auto' },
+  seed: { read: LINK.seed, empty: '' },
+  format: { read: LINK.format, empty: 'paperback' },
+  // On or off; any other value (texture=yes) is dropped like other unknown values.
+  texture: { read: LINK.texture, write: (v) => (v ? '1' : '0'), empty: false, optional: true },
+};
+
+/**
+ * A design's link (the part of an app link after #, the HTTP API's query): every field, even when
+ * empty or off, so a link is the whole design, never mistaken for a hand-edited partial one (which
+ * changes only the keys it names); last, the version that drew it (artwork can change between
+ * minor versions).
+ * @param {Record<string, unknown>} design
+ */
+export function writeLink(design) {
+  const q = new URLSearchParams();
+  for (const [key, field] of Object.entries(LINK_FIELDS)) {
+    if (field.omitEmpty && design[key] === field.empty) continue;
+    q.set(key, field.write?.(design[key]) ?? String(design[key]));
+  }
+  q.set('v', version);
+  return q;
+}
+
+/**
+ * Your own colours (background, text, one to three accents) as a link's palette: each as six hex
+ * digits (#abc is #aabbcc; an alpha is dropped).
+ * @param {readonly string[]} colors
+ */
+export const customPalette = (colors) => `custom-${colors.map((c) => sixDigits(c).slice(1)).join('-')}`;
+
+/** A colour as #rrggbb, lower-case (#abc as #aabbcc; an alpha dropped). @param {string} c */
+export function sixDigits(c) {
+  const h = c.trim().replace(/^#/, '').toLowerCase();
+  return `#${h.length === 3 || h.length === 4 ? [...h.slice(0, 3)].map((x) => x + x).join('') : h.slice(0, 6)}`;
+}
+
+/** A design's pins as a link holds them (sorted by name, so the same pins make the same link). @param {Record<string, string>} pins */
+export const variantOf = (pins) =>
+  Object.keys(pins)
+    .sort()
+    .map((name) => `${name}.${pins[name]}`)
+    .join('-');
 
 /**
  * The value of each key in a query, the last when it is given more than once (as an app link's

@@ -11,7 +11,7 @@
 
 import { createCover } from './index.js';
 import { svgToDataUrl } from './browser.js';
-import { optionsFromLink } from './link.js';
+import { LINK, optionsFromLink } from './link.js';
 
 /** The attributes that draw the cover, and the link parameter each is. */
 const ATTRIBUTES = /** @type {const} */ ({
@@ -55,6 +55,8 @@ export class BookCover extends Base {
   /** @type {HTMLImageElement} */
   #img;
   #queued = false;
+  /** Drawn once connected: until then, attributes set (or present when upgraded) wait for it. */
+  #ready = false;
 
   constructor() {
     super();
@@ -72,12 +74,14 @@ export class BookCover extends Base {
   }
 
   connectedCallback() {
+    this.#ready = true;
     this.#render();
   }
 
   attributeChangedCallback() {
-    // (Several attributes set at once draw once.)
-    if (this.#queued || !this.isConnected) return;
+    // (Several attributes set at once draw once; an element upgraded on the page draws once, when
+    // it connects.)
+    if (!this.#ready || this.#queued || !this.isConnected) return;
     this.#queued = true;
     queueMicrotask(() => {
       this.#queued = false;
@@ -92,7 +96,9 @@ export class BookCover extends Base {
       const value = this.getAttribute(attribute);
       if (value != null) q.set(key, value);
     }
-    if (this.hasAttribute('texture')) q.set('texture', this.getAttribute('texture') === 'false' ? '0' : '1');
+    // (Present is on, as a boolean attribute; 0 and false, as links write them, are off.)
+    const texture = this.getAttribute('texture');
+    if (texture !== null) q.set('texture', LINK.texture(texture) === false ? '0' : '1');
     return optionsFromLink(q);
   }
 

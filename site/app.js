@@ -26,7 +26,7 @@ import {
 } from '../src/browser.js';
 import { hashString, contrast } from '../src/core.js';
 import { CUSTOM_SIZE, customColors, slug } from '../src/shared.js';
-import { LINK, fits, lastValues } from '../src/link.js';
+import { LINK_FIELDS, fits, lastValues, writeLink, customPalette, variantOf } from '../src/link.js';
 
 /** @typedef {keyof typeof formats} Preset */
 /**
@@ -114,7 +114,6 @@ function sizeOf(format) {
 /** The five colours the editor shows: background, text and three accents (repeating the ones given). @param {string[]} colors */
 const fiveColors = (colors) => [colors[0], colors[1], ...[0, 1, 2].map((i) => colors[2 + (i % (colors.length - 2))])];
 /** A design's palette for these colours (#rrggbb). @param {readonly string[]} colors */
-const customPalette = (colors) => `custom-${colors.map((c) => c.slice(1).toLowerCase()).join('-')}`;
 /** A built-in palette's colours, as the editor shows them. @param {string} id */
 function colorsOf(id) {
   const p = palettes.find((x) => x.id === id) ?? palettes[0];
@@ -176,44 +175,8 @@ let current;
 /** A title as one line, for labels and file names. @param {string} title */
 const oneLine = (title) => title.replace(/\s*\n\s*/g, ' ').trim();
 
-/**
- * @typedef {object} Field
- * @property {(v: unknown) => unknown} read  the value from a link or a stored design; undefined drops it
- * @property {(v: any) => string} [write]    the value as a link writes it (default: as it is)
- * @property {unknown} empty                 the value of a design that leaves it out (see complete())
- * @property {boolean} [optional]            links may leave it out and still be whole designs
- * @property {boolean} [omitEmpty]           links leave it out when it is empty
- */
-
-/**
- * Every field of a design, in the order links name them. A field added later is `optional`, so
- * links made before it existed still open as whole designs (with its `empty` value).
- * @type {Record<keyof Design, Field>}
- */
-const FIELDS = {
-  // (Each read as src/link.js reads links, the HTTP API too: one link draws one design.)
-  // (Line breaks kept since 1.5.0: the cover breaks the title there.)
-  title: { read: LINK.title, empty: '' },
-  author: { read: LINK.author, empty: '' },
-  // (Optional since 1.2.0: older links left it out when empty.)
-  subtitle: { read: LINK.subtitle, empty: '', optional: true },
-  // (Since 1.5.0.)
-  series: { read: LINK.series, empty: '', optional: true, omitEmpty: true },
-  credit: { read: LINK.credit, empty: '', optional: true, omitEmpty: true },
-  // (Since 1.6.0.)
-  badge: { read: LINK.badge, empty: '', optional: true, omitEmpty: true },
-  style: { read: LINK.style, empty: '' },
-  // (Since 1.5.0.) Checked against the style when used: see pinsFor().
-  variant: { read: LINK.variant, empty: '', optional: true, omitEmpty: true },
-  // (Since 1.5.0.)
-  font: { read: LINK.font, empty: '', optional: true, omitEmpty: true },
-  case: { read: LINK.case, empty: '', optional: true, omitEmpty: true },
-  palette: { read: LINK.palette, empty: 'auto' },
-  seed: { read: LINK.seed, empty: '' },
-  format: { read: LINK.format, empty: 'paperback' },
-  // On or off; any other value (texture=yes) is dropped like other unknown values.
-  texture: { read: LINK.texture, write: (v) => (v ? '1' : '0'), empty: false, optional: true },
-};
+/** The design's fields, as links name them (src/link.js). */
+const FIELDS = /** @type {Record<keyof Design, import('../src/link.js').Field>} */ (LINK_FIELDS);
 const KEYS = /** @type {(keyof Design)[]} */ (Object.keys(FIELDS));
 
 /** Validate a design-like object (from the URL, storage or a file); unknown values are dropped. @param {Record<string, unknown>} raw */
@@ -235,16 +198,7 @@ function fromHash(hash) {
 
 /** @param {Design} d */
 function toHash(d) {
-  // Every key, even when empty or off: a link is then the whole design, never mistaken for a
-  // hand-edited partial one (which changes only the keys it names). Last, the version that drew
-  // it: artwork can change between minor versions.
-  const q = new URLSearchParams();
-  for (const key of KEYS) {
-    if (FIELDS[key].omitEmpty && d[key] === FIELDS[key].empty) continue;
-    q.set(key, FIELDS[key].write?.(d[key]) ?? String(d[key]));
-  }
-  q.set('v', version);
-  return `#${q}`;
+  return `#${writeLink(d)}`;
 }
 
 /**
@@ -760,11 +714,6 @@ function pinsFor(variant, style) {
 }
 
 /** A design's variant for these pins (sorted by name, so the same pins make the same link). @param {Record<string, string>} pins */
-const variantOf = (pins) =>
-  Object.keys(pins)
-    .sort()
-    .map((name) => `${name}.${pins[name]}`)
-    .join('-');
 
 /** Give the preview and the thumbnails the cover's shape (as site/boot.js does before first paint). */
 function applyShape() {

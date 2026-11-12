@@ -1792,6 +1792,21 @@ test('<book-cover> draws a cover on a page from its attributes', async ({ page }
     return { first, retitled, error: await failed, src: img.getAttribute('src') };
   });
   expect(result.first).toEqual({ style: 'artdeco', alt: 'Cover: Dune by Frank Herbert', width: 300, height: 450 });
+  // An element on the page before its class is defined (as a page's HTML is) draws once when
+  // upgraded; texture="0", as links write it, is off.
+  const upgraded = await page.evaluate(async () => {
+    const { BookCover } = await import('/src/element.js');
+    const late = document.createElement('book-cover-late');
+    late.setAttribute('title', 'Late');
+    late.setAttribute('texture', '0');
+    let drawn = 0;
+    late.addEventListener('cover', () => (drawn += 1));
+    document.body.append(late);
+    customElements.define('book-cover-late', class extends BookCover {});
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    return { drawn, texture: /** @type {any} */ (late).options().texture };
+  });
+  expect(upgraded).toEqual({ drawn: 1, texture: false });
   expect(result.retitled).toBe('Cover: Arrakis by Frank Herbert');
   expect(result.error).toContain('Unknown style "nope"');
   expect(result.src).toBeNull();

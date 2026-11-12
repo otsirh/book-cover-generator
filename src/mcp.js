@@ -3,7 +3,8 @@
 // transports are theirs. (Not part of the library's API.)
 
 import { createCover, createMockup, listStyles, palettes, genres, formats, mockupKinds, version } from './index.js';
-import { optionsFromLink } from './link.js';
+import { LINK, optionsFromLink, writeLink, customPalette, variantOf, sixDigits } from './link.js';
+import { idFor } from './shared.js';
 
 /** The site that draws covers from links, and edits them. */
 export const SITE = 'https://covers.otsirh.dev';
@@ -77,7 +78,7 @@ function designProperties(ctx) {
     },
     svg: { type: 'boolean', description: 'Also answer with the SVG markup (large).' },
   };
-  if (ctx.writeFile) properties.output = { type: 'string', description: 'A file to save the SVG to.' };
+  if (ctx.writeFile) properties.output = { type: 'string', description: 'An absolute path to save the SVG to.' };
   return properties;
 }
 
@@ -129,9 +130,13 @@ function tools(ctx) {
   ];
 }
 
+/** Whether the arguments give a seed (else the cover's comes from its title). @param {Record<string, unknown>} args */
+const seedGiven = (args) => typeof args.seed === 'number' || (typeof args.seed === 'string' && args.seed.trim() !== '');
+
 /** A tool's arguments as a link's query, read as the HTTP API reads one. @param {Record<string, unknown>} args */
 function queryFrom(args) {
   const q = new URLSearchParams();
+  if (seedGiven(args)) q.set('seed', String(args.seed).trim());
   for (const key of [
     'title',
     'author',
@@ -142,7 +147,6 @@ function queryFrom(args) {
     'style',
     'genre',
     'palette',
-    'seed',
     'format',
     'font',
     'case',
@@ -157,48 +161,48 @@ function queryFrom(args) {
   }
   const colors = /** @type {{ bg?: unknown, ink?: unknown, accents?: unknown } | undefined} */ (args.colors);
   if (colors && typeof colors === 'object') {
-    q.set('bg', String(colors.bg ?? ''));
-    q.set('ink', String(colors.ink ?? ''));
-    q.set('accent', Array.isArray(colors.accents) ? colors.accents.join(',') : String(colors.accents ?? ''));
+    if (!Array.isArray(colors.accents) || colors.accents.length < 1 || colors.accents.length > 3) {
+      throw new RangeError('colors.accents is a list of one to three colours');
+    }
+    // (Each as #rrggbb, as the link of the cover will write it: the two draw the same bytes.)
+    q.set('bg', sixDigits(String(colors.bg ?? '')));
+    q.set('ink', sixDigits(String(colors.ink ?? '')));
+    q.set('accent', colors.accents.map((c) => sixDigits(String(c))).join(','));
   }
   return q;
 }
 
 /**
- * The link of the cover drawn, with everything the seed chose written out, so the app opens the
- * same cover (an app link holds the whole design).
+ * The link of the cover drawn (written as the app writes its links), with what the seed chose
+ * written out, so the app and the API draw that cover.
  * @param {Record<string, unknown>} args @param {ReturnType<typeof createCover>} cover
  */
 function linkOf(args, cover) {
-  const q = new URLSearchParams({ title: cover.title, author: cover.author });
-  for (const key of ['subtitle', 'series', 'credit', 'badge']) {
-    if (typeof args[key] === 'string' && args[key]) q.set(key, /** @type {string} */ (args[key]));
-  }
-  q.set('style', cover.style);
+  const str = (/** @type {string} */ key) => (typeof args[key] === 'string' ? /** @type {string} */ (args[key]) : '');
   const pins = args.variants && typeof args.variants === 'object' ? Object.keys(args.variants) : [];
-  const variant = pins
-    .map((name) => name.toLowerCase())
-    .filter((name) => cover.variants[name])
-    .sort()
-    .map((name) => `${name}.${cover.variants[name]}`)
-    .join('-');
-  if (variant) q.set('variant', variant);
-  for (const key of ['font', 'case'])
-    if (typeof args[key] === 'string' && args[key]) q.set(key, /** @type {string} */ (args[key]));
-  const { bg, ink, accents } = cover.colors;
-  q.set(
-    'palette',
-    cover.palette === 'custom'
-      ? `custom-${[bg, ink, ...new Set(accents)].map((c) => c.slice(1).toLowerCase()).join('-')}`
-      : cover.palette,
-  );
-  // (A seed from the title stays one: the app reads an empty seed so.)
-  q.set('seed', args.seed != null && args.seed !== '' ? cover.seed : '');
+  /** @type {Record<string, string>} */
+  const pinned = {};
+  for (const name of pins.map((n) => n.toLowerCase())) if (cover.variants[name]) pinned[name] = cover.variants[name];
+  const colors = /** @type {{ bg: string, ink: string, accents: string[] } | undefined} */ (args.colors);
   const preset = Object.entries(formats).find(([, [w, h]]) => w === cover.width && h === cover.height);
-  q.set('format', preset ? preset[0] : `${cover.width}x${cover.height}`);
-  if (args.texture === true) q.set('texture', '1');
-  q.set('v', version);
-  return q;
+  return writeLink({
+    title: cover.title,
+    author: cover.author,
+    subtitle: str('subtitle'),
+    series: str('series'),
+    credit: str('credit'),
+    badge: str('badge'),
+    style: cover.style,
+    variant: variantOf(pinned),
+    font: LINK.font(args.font) ?? '',
+    case: LINK.case(args.case) ?? '',
+    palette:
+      cover.palette === 'custom' && colors ? customPalette([colors.bg, colors.ink, ...colors.accents]) : cover.palette,
+    // (A seed from the title stays one: the app reads an empty seed so.)
+    seed: seedGiven(args) ? cover.seed : '',
+    format: preset ? preset[0] : `${cover.width}x${cover.height}`,
+    texture: args.texture === true,
+  });
 }
 
 /** Text for a tool's answer. @param {string} body */
@@ -213,7 +217,7 @@ function callTool(tool, args, ctx) {
   try {
     if (tool === 'list_styles') {
       const genre = typeof args.genre === 'string' && args.genre ? args.genre : null;
-      const genreId = genre ? genres.find((g) => [g.id, g.name.toLowerCase()].includes(genre.toLowerCase()))?.id : null;
+      const genreId = genre ? idFor(genre, genres) : null;
       if (genre && !genreId)
         throw new RangeError(`Unknown genre "${genre}". Available: ${genres.map((g) => g.id).join(', ')}`);
       const styles = listStyles().filter((s) => !genreId || s.genres.includes(genreId));
@@ -274,7 +278,7 @@ function callTool(tool, args, ctx) {
       typeof args.output === 'string' && args.output && ctx.writeFile ? ctx.writeFile(args.output, svg) : null;
     const styleName = listStyles().find((s) => s.id === cover.style)?.name ?? cover.style;
     const paletteName = palettes.find((p) => p.id === cover.palette)?.name ?? 'your own colours';
-    const seed = args.seed != null && args.seed !== '' ? `seed ${cover.seed}` : 'seed from the title';
+    const seed = seedGiven(args) ? `seed ${cover.seed}` : 'seed from the title';
     const content = [
       text(
         `Drew ${what} in the ${styleName} style (${cover.style}), palette ${paletteName}, ${seed} (${cover.width} × ${cover.height} px).\n` +
@@ -288,7 +292,8 @@ function callTool(tool, args, ctx) {
       structuredContent: {
         style: cover.style,
         palette: cover.palette,
-        seed: cover.seed,
+        // (Null when it comes from the title: give the title again to keep the cover.)
+        seed: seedGiven(args) ? cover.seed : null,
         width: cover.width,
         height: cover.height,
         variants: cover.variants,
@@ -300,6 +305,22 @@ function callTool(tool, args, ctx) {
   } catch (err) {
     return { content: [text(err instanceof Error ? err.message : String(err))], isError: true };
   }
+}
+
+/** The most messages a batch may hold (a batch is one request: each message draws a cover). */
+export const MAX_BATCH = 20;
+
+/**
+ * Answer what a client sent: one message, or a batch (older protocol versions), as each
+ * transport receives them. Null when nothing needs an answer (notifications only).
+ * @param {unknown} payload @param {Context} [ctx]
+ */
+export function handlePayload(payload, ctx = {}) {
+  if (!Array.isArray(payload)) return handleMessage(payload, ctx);
+  if (!payload.length) return failure(null, -32600, 'An empty batch');
+  if (payload.length > MAX_BATCH) return failure(null, -32600, `A batch holds at most ${MAX_BATCH} messages`);
+  const answers = payload.map((m) => handleMessage(m, ctx)).filter(Boolean);
+  return answers.length ? answers : null;
 }
 
 /** @param {unknown} id @param {unknown} result */

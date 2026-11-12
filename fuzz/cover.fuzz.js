@@ -90,7 +90,7 @@ test('any cover makes every mockup', () => {
   );
 });
 
-test('any text reads as a book list: books with titles, never an error', () => {
+test('any text reads as a book list: books with titles, or which JSON line is wrong', () => {
   const listText = fc.oneof(
     anyText,
     fc.array(fc.tuple(anyText, anyText), { maxLength: 6 }).map((rows) => rows.map((r) => r.join(' | ')).join('\n')),
@@ -100,7 +100,15 @@ test('any text reads as a book list: books with titles, never an error', () => {
   );
   fc.assert(
     fc.property(listText, (text) => {
-      for (const book of parseBookList(text)) {
+      let books;
+      try {
+        books = parseBookList(text);
+      } catch (err) {
+        // JSON lines (every line starting with "{") must be JSON: a list that says which line isn't.
+        assert.ok(err instanceof SyntaxError && /^\s*\{/.test(text), String(err));
+        return;
+      }
+      for (const book of books) {
         assert.equal(typeof book.title, 'string');
         assert.ok(String(book.title).trim());
       }

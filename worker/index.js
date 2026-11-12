@@ -10,7 +10,7 @@
 import { createCover, createMockup, version } from '../src/index.js';
 import { hex } from '../src/shared.js';
 import { optionsFromLink } from '../src/link.js';
-import { handleMessage } from '../src/mcp.js';
+import { handlePayload } from '../src/mcp.js';
 
 // (The query is read by src/link.js, as the app reads its links; the name the tests use.)
 export { optionsFromLink as coverOptions };
@@ -136,19 +136,19 @@ export async function mcp(request) {
       headers: { ...MCP_HEADERS, Allow: 'POST, OPTIONS', 'Content-Type': 'text/plain; charset=utf-8' },
     });
   }
-  if (Number(request.headers.get('content-length') ?? 0) > 1_000_000) {
+  // (The body as read, not as Content-Length says: a chunked body sends none.)
+  const body = await request.text();
+  if (body.length > 1_000_000) {
     return json(413, { jsonrpc: '2.0', id: null, error: { code: -32600, message: 'Request too large' } });
   }
   let message;
   try {
-    message = await request.json();
+    message = JSON.parse(body);
   } catch {
     return json(400, { jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } });
   }
-  const ctx = { base: url.origin };
-  const answers = (Array.isArray(message) ? message : [message]).map((m) => handleMessage(m, ctx)).filter(Boolean);
-  if (!answers.length) return new Response(null, { status: 202, headers: MCP_HEADERS });
-  return json(200, Array.isArray(message) ? answers : answers[0]);
+  const answer = handlePayload(message, { base: url.origin });
+  return answer ? json(200, answer) : new Response(null, { status: 202, headers: MCP_HEADERS });
 }
 
 export default {
