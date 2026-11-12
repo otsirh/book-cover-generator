@@ -24,9 +24,9 @@ import {
   zipFiles,
   extensionOf,
 } from '../src/browser.js';
-import { clipGraphemes, LINE_BREAK } from '../src/text.js';
 import { hashString, contrast } from '../src/core.js';
-import { CUSTOM_SIZE, CUSTOM_PALETTE, VARIANT, customColors, slug, idFor, fontEntries } from '../src/shared.js';
+import { CUSTOM_SIZE, customColors, slug } from '../src/shared.js';
+import { LINK, fits, lastValues } from '../src/link.js';
 
 /** @typedef {keyof typeof formats} Preset */
 /**
@@ -101,17 +101,7 @@ const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 /** @template T @param {readonly T[]} arr @param {T} current @returns {T} */
 const pickOther = (arr, current) => pick(arr.filter((x) => x !== current));
-/** Clip to the inputs' maxlength (which counts UTF-16 code units), between whole characters. */
-const clip = (/** @type {string} */ str, /** @type {number} */ max) => clipGraphemes(str, max, { units: true });
 
-/** Whether the library can make a cover this size (in whole px). @param {number} w @param {number} hgt */
-const fits = (w, hgt) =>
-  Number.isInteger(w) &&
-  Number.isInteger(hgt) &&
-  Math.min(w, hgt) >= sizeLimits.min &&
-  Math.max(w, hgt) <= sizeLimits.max &&
-  w <= hgt * sizeLimits.ratio &&
-  hgt <= w * sizeLimits.ratio;
 /** A format that is a size of its own, not a preset. @param {string} format */
 const isCustomSize = (format) => !Object.hasOwn(FORMATS, format);
 /** A format's cover size in px. @param {string} format @returns {readonly [number, number]} */
@@ -183,10 +173,6 @@ let current;
 
 /* ------------------------------------------------------------ URL & history */
 
-// Line breaks become spaces: the single-line inputs would drop them, and the cover spaces them.
-const text = (/** @type {unknown} */ v) => (typeof v === 'string' ? v.split(LINE_BREAK).join(' ') : null);
-/** Text that may hold line breaks (the title, typed on several lines), each as "\n". @param {unknown} v */
-const lines = (v) => (typeof v === 'string' ? v.split(LINE_BREAK).join('\n') : null);
 /** A title as one line, for labels and file names. @param {string} title */
 const oneLine = (title) => title.replace(/\s*\n\s*/g, ' ').trim();
 
@@ -205,81 +191,30 @@ const oneLine = (title) => title.replace(/\s*\n\s*/g, ' ').trim();
  * @type {Record<keyof Design, Field>}
  */
 const FIELDS = {
+  // (Each read as src/link.js reads links, the HTTP API too: one link draws one design.)
   // (Line breaks kept since 1.5.0: the cover breaks the title there.)
-  title: { read: (v) => clipText(v, 200, lines), empty: '' },
-  author: { read: (v) => clipText(v, 120), empty: '' },
+  title: { read: LINK.title, empty: '' },
+  author: { read: LINK.author, empty: '' },
   // (Optional since 1.2.0: older links left it out when empty.)
-  subtitle: { read: (v) => clipText(v, 160), empty: '', optional: true },
+  subtitle: { read: LINK.subtitle, empty: '', optional: true },
   // (Since 1.5.0.)
-  series: { read: (v) => clipText(v, 120), empty: '', optional: true, omitEmpty: true },
-  credit: { read: (v) => clipText(v, 120), empty: '', optional: true, omitEmpty: true },
+  series: { read: LINK.series, empty: '', optional: true, omitEmpty: true },
+  credit: { read: LINK.credit, empty: '', optional: true, omitEmpty: true },
   // (Since 1.6.0.)
-  badge: { read: (v) => clipText(v, 60), empty: '', optional: true, omitEmpty: true },
-  // (Ids or names, in any case, as the library reads them: a hand-edited link opens as the API draws it.)
-  // ('random' leaves it to the title, as a link without a style does.)
-  style: { read: (v) => idFor(text(v), STYLES), empty: '' },
+  badge: { read: LINK.badge, empty: '', optional: true, omitEmpty: true },
+  style: { read: LINK.style, empty: '' },
   // (Since 1.5.0.) Checked against the style when used: see pinsFor().
-  variant: {
-    read: (v) => oneOf(text(v)?.toLowerCase(), VARIANT.test.bind(VARIANT)),
-    empty: '',
-    optional: true,
-    omitEmpty: true,
-  },
+  variant: { read: LINK.variant, empty: '', optional: true, omitEmpty: true },
   // (Since 1.5.0.)
-  font: { read: (v) => idFor(text(v), fontEntries()), empty: '', optional: true, omitEmpty: true },
-  case: {
-    read: (v) => oneOf(text(v)?.toLowerCase(), (t) => t === 'upper' || t === 'normal'),
-    empty: '',
-    optional: true,
-    omitEmpty: true,
-  },
-  palette: {
-    read: (v) => {
-      const t = text(v);
-      const lower = t?.toLowerCase();
-      if (lower === 'auto' || lower === 'random') return 'auto';
-      if (lower && CUSTOM_PALETTE.test(lower)) return lower;
-      return idFor(t, palettes);
-    },
-    empty: 'auto',
-  },
-  seed: { read: (v) => clipText(text(v)?.trim(), 40), empty: '' },
-  format: {
-    read: (v) =>
-      oneOf(text(v), (f) => {
-        const size = CUSTOM_SIZE.exec(f);
-        return !isCustomSize(f) || (size !== null && fits(Number(size[1]), Number(size[2])));
-      }),
-    empty: 'paperback',
-  },
+  font: { read: LINK.font, empty: '', optional: true, omitEmpty: true },
+  case: { read: LINK.case, empty: '', optional: true, omitEmpty: true },
+  palette: { read: LINK.palette, empty: 'auto' },
+  seed: { read: LINK.seed, empty: '' },
+  format: { read: LINK.format, empty: 'paperback' },
   // On or off; any other value (texture=yes) is dropped like other unknown values.
-  texture: {
-    read: (v) => {
-      const t = typeof v === 'string' ? v.toLowerCase() : v;
-      return t === true || t === '1' || t === 'true'
-        ? true
-        : t === false || t === '0' || t === 'false'
-          ? false
-          : undefined;
-    },
-    write: (v) => (v ? '1' : '0'),
-    empty: false,
-    optional: true,
-  },
+  texture: { read: LINK.texture, write: (v) => (v ? '1' : '0'), empty: false, optional: true },
 };
 const KEYS = /** @type {(keyof Design)[]} */ (Object.keys(FIELDS));
-
-/**
- * Text clipped to `max` (as the inputs' maxlength counts).
- * @param {unknown} v @param {number} max @param {(v: unknown) => string | null} [read] how to read it
- */
-function clipText(v, max, read = text) {
-  const s = read(v);
-  return s == null ? undefined : clip(s, max);
-}
-
-/** The value if it passes `ok`, else undefined. @param {string | null | undefined} v @param {(v: string) => boolean} ok */
-const oneOf = (v, ok) => (v && ok(v) ? v : undefined);
 
 /** Validate a design-like object (from the URL, storage or a file); unknown values are dropped. @param {Record<string, unknown>} raw */
 function sanitize(raw) {
@@ -294,8 +229,8 @@ function sanitize(raw) {
 
 /** @param {string} hash */
 function fromHash(hash) {
-  // (Own properties only, even for a key named __proto__.)
-  return sanitize(Object.fromEntries(new URLSearchParams(hash.replace(/^#/, ''))));
+  // (The last value of a repeated key, as the API reads it; own properties only, even for __proto__.)
+  return sanitize(lastValues(new URLSearchParams(hash.replace(/^#/, ''))));
 }
 
 /** @param {Design} d */

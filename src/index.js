@@ -7,7 +7,7 @@ import { createRng, hashString, isHex, luminance, escapeXml, stripInvalidXml, gr
 import { palettes } from './palettes.js';
 import { BREAKING_SPACE, FONTS, LINE_BREAK, clipGraphemes, recordText } from './text.js';
 import { drawBadge } from './badge.js';
-import { idFor, fontEntries } from './shared.js';
+import { idFor, fontEntries, reserved, STYLE_WORDS, PALETTE_WORDS } from './shared.js';
 import { styleList, genreList, builtInGenres } from './styles/index.js';
 
 export { palettes } from './palettes.js';
@@ -110,15 +110,6 @@ const entryFor = (style, genres) => ({
   render: (/** @type {import('./index.js').StyleContext} */ ctx) => style.render(ctx),
 });
 
-/**
- * The words that leave a choice to the seed, in any case and with spaces around: 'random' for a
- * style, and 'random' or 'auto' for a palette. Registering refuses them as ids, so every id stays
- * one that can be chosen.
- * @param {unknown} v @param {readonly string[]} words
- */
-const reserved = (v, words) => typeof v === 'string' && words.includes(v.trim().toLowerCase());
-const STYLE_WORDS = ['random'];
-const PALETTE_WORDS = ['random', 'auto'];
 /** Whether a style option leaves the choice to the seed. @param {unknown} v */
 const unsetStyle = (v) => v == null || v === '' || reserved(v, STYLE_WORDS);
 /** Whether a palette option leaves the choice to the seed. @param {unknown} v */
@@ -592,6 +583,9 @@ export function generateCover(options = {}) {
 
 export default generateCover;
 
+/** Shared pins optionsForBook has checked already. @type {WeakSet<object>} */
+const checkedPins = new WeakSet();
+
 /**
  * Cover options for a book from a list (see `parseBookList`) over `defaults`, the options every
  * book shares. The book's own values win, and a size it gives replaces both sides of the
@@ -611,7 +605,12 @@ export function optionsForBook(book, defaults = {}) {
     throw new Error(`Unknown style "${String(defaults.style)}". Available: ${[...registry.keys()].join(', ')}`);
   }
   // A shared pin no style offers is reported for every book, whichever style each one gets.
-  if (defaults.variants != null && typeof defaults.variants === 'object') checkOffered(pinsByName(defaults.variants));
+  // (Checked once for the shared pins of a whole list.)
+  const pins = defaults.variants;
+  if (pins != null && typeof pins === 'object' && !checkedPins.has(pins)) {
+    checkOffered(pinsByName(pins));
+    checkedPins.add(pins);
+  }
   const own = unsetStyle(book.style) ? undefined : idFor(book.style, registry.values());
   const genre = idFor(book.genre, genreList);
   const sharedEntry = shared === undefined ? undefined : registry.get(shared);

@@ -1517,3 +1517,15 @@ test('only random and auto (any case, spaces around) leave a choice to the seed,
     unregisterStyle('art-deco');
   }
 });
+
+test('a name as written but for case wins over an id only spelled alike', async () => {
+  const { unregisterStyle } = await import('../src/index.js');
+  registerStyle({ id: 'art-deco', name: 'Deco Mine', render: () => '' });
+  try {
+    for (const style of ['Art Deco', 'art deco', 'ART DECO'])
+      assert.equal(createCover({ title: 'x', style }).style, 'artdeco', style);
+    assert.equal(createCover({ title: 'x', style: 'ART-DECO' }).style, 'art-deco');
+  } finally {
+    unregisterStyle('art-deco');
+  }
+});

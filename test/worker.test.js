@@ -62,11 +62,8 @@ test('an app link draws the cover the app draws', () => {
     height: 960,
     texture: false,
   });
-  assert.deepEqual(coverOptions(new URLSearchParams('format=900x1350&palette=auto')), {
-    width: 900,
-    height: 1350,
-    palette: 'auto',
-  });
+  // (auto leaves the palette to the seed, as the library's default.)
+  assert.deepEqual(coverOptions(new URLSearchParams('format=900x1350&palette=auto')), { width: 900, height: 1350 });
   for (const [query, message] of [
     ['format=huge', /Unknown format "huge"/],
     ['texture=yes', /texture is 1/],
@@ -141,8 +138,7 @@ test('mockups, errors, other methods, and what isn’t the API', async () => {
 
 test('the API reads a link as the app does, and sizes a format as the CLI does', () => {
   const o = coverOptions(new URLSearchParams(`palette=Mint&seed=%20abc%20&title=${'x'.repeat(250)}`));
-  // (A palette's name in any case is left to the library, which reads it.)
-  assert.equal(o.palette, 'Mint');
+  assert.equal(o.palette, 'mint');
   assert.equal(createCover({ ...o, title: 'x' }).palette, 'mint');
   assert.equal(o.seed, 'abc');
   assert.equal(o.title?.length, 200);
@@ -164,4 +160,26 @@ test('a mockup background without its #, and a preflight for any header', async 
   const pre = /** @type {Response} */ (get('/api/cover.svg', 'OPTIONS'));
   assert.equal(pre.headers.get('access-control-allow-headers'), '*');
   assert.equal(pre.headers.get('access-control-max-age'), '86400');
+});
+
+test('the API and the app read one link alike: the last of a repeated key, CRLF, titleCase, sizes', async () => {
+  const { LINK, lastValues } = await import('../src/link.js');
+  const q = new URLSearchParams(
+    `style=retro&style=swiss&title=a%0D%0A${'x'.repeat(198)}&titleCase=UPPER&palette=auto%20`,
+  );
+  const o = coverOptions(q);
+  assert.equal(o.style, 'swiss');
+  assert.equal(o.style, LINK.style(lastValues(q).style));
+  assert.equal(o.title, LINK.title(lastValues(q).title));
+  assert.equal(o.title?.length, 200);
+  assert.equal(o.titleCase, 'upper');
+  assert.equal(o.palette, undefined);
+  assert.throws(
+    () => coverOptions(new URLSearchParams('format=ebook&height=abc')),
+    /height must be a number of px, got "abc"/,
+  );
+  // Unknown names still get the library's own message.
+  const bad = /** @type {Response} */ (get('/api/cover.svg?style=Art%20Decco'));
+  assert.equal(bad.status, 400);
+  assert.match(await bad.text(), /Unknown style "Art Decco"/);
 });

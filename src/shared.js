@@ -18,14 +18,8 @@ export const fold = (name) =>
     .filter((word) => word && word !== 'and')
     .join(' ');
 
-/** @type {{ key: string, entries: { id: string, name?: string }[] } | null} */
-let fonts = null;
-/** The fonts of FONTS (as it is now: fonts may be added) by id and name, as idFor reads them. */
-export function fontEntries() {
-  const key = Object.keys(FONTS).join();
-  if (fonts?.key !== key) fonts = { key, entries: Object.entries(FONTS).map(([id, f]) => ({ id, name: f.name })) };
-  return fonts.entries;
-}
+/** The fonts of FONTS (as it is now: fonts may be added or renamed) by id and name, as idFor reads them. */
+export const fontEntries = () => Object.entries(FONTS).map(([id, f]) => ({ id, name: f.name }));
 
 /**
  * The id that `given` names among `entries`: an id as it is, else an id or a name in any case and
@@ -36,8 +30,16 @@ export function fontEntries() {
 export function idFor(given, entries) {
   if (typeof given !== 'string') return undefined;
   const list = Array.isArray(entries) ? entries : [...entries];
-  // An id or a name as written wins over one only spelled alike ("Art Deco" is the style named so).
-  const exact = list.find((e) => e.id === given) ?? list.find((e) => e.name === given);
+  // An id or a name as written, or as written but for case, wins over one only spelled alike
+  // ("Art Deco" and "art deco" are the style named so, even beside an id "art-deco").
+  const lower = given.toLowerCase();
+  /** @param {unknown} name */
+  const named = (name) => typeof name === 'string' && name.toLowerCase() === lower;
+  const exact =
+    list.find((e) => e.id === given) ??
+    list.find((e) => e.name === given) ??
+    list.find((e) => e.id.toLowerCase() === lower) ??
+    list.find((e) => named(e.name));
   if (exact) return exact.id;
   const key = fold(given);
   if (!key) return undefined;
@@ -45,6 +47,16 @@ export function idFor(given, entries) {
     list.find((e) => fold(e.id) === key)?.id ?? list.find((e) => typeof e.name === 'string' && fold(e.name) === key)?.id
   );
 }
+
+/**
+ * The words that leave a choice to the seed, in any case and with spaces around: 'random' for a
+ * style, and 'random' or 'auto' for a palette. Registering refuses them as ids, so every id stays
+ * one that can be chosen.
+ * @param {unknown} v @param {readonly string[]} words
+ */
+export const reserved = (v, words) => typeof v === 'string' && words.includes(v.trim().toLowerCase());
+export const STYLE_WORDS = ['random'];
+export const PALETTE_WORDS = ['random', 'auto'];
 
 /** A size of your own in a link: width x height in px. */
 export const CUSTOM_SIZE = /^([1-9]\d{1,4})x([1-9]\d{1,4})$/;

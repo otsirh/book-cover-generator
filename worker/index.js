@@ -8,42 +8,76 @@
 // a little differently from the app on another system, which measures with its own fonts.
 
 import { createCover, createMockup, formats, version } from '../src/index.js';
-import { LINE_BREAK, clipGraphemes } from '../src/text.js';
-import { CUSTOM_SIZE, VARIANT, customColors, hex } from '../src/shared.js';
+import { CUSTOM_SIZE, customColors, hex } from '../src/shared.js';
+import { LINK, lastValues } from '../src/link.js';
 
-/** Query parameters that are cover options as they are. */
-const TEXT = ['style', 'genre', 'font', 'lang'];
-/** Text read as the app reads its links: cut to the app's lengths (in UTF-16 units). */
-const LIMITS = { title: 200, author: 120, subtitle: 160, series: 120, credit: 120, badge: 60 };
+/** A size in px as typed (whole or decimal), else an error naming the parameter. @param {string} key @param {string} raw */
+function px(key, raw) {
+  if (!/^\s*\d+(?:\.\d+)?\s*$/.test(raw)) throw new RangeError(`${key} must be a number of px, got "${raw}"`);
+  return Number(raw);
+}
 
 /**
- * Cover options from a query string: the app's link parameters (`format`, `palette` with your
- * own colours as `custom-…`, `case`, `texture` 1 or 0, `variant` as name.value pairs joined by
- * "-"), the library's option names, and for convenience `width` and `height`, and `bg`, `ink`
- * and `accent` (hex, with or without the #, accents separated by commas).
+ * Cover options from a query string. The app's link parameters are read as the app reads them
+ * (src/link.js), the last of a repeated one too, except that a value the app would drop is an
+ * error here. Also the library's option names (`titleCase`, `genre`, `lang`, `width`, `height`)
+ * and your own colours as `bg`, `ink` and `accent` (hex, the # optional, accents separated by
+ * commas).
  * @param {URLSearchParams} q
  * @returns {import('../src/index.js').CoverOptions}
  */
 export function coverOptions(q) {
+  const v = lastValues(q);
+  /** A parameter's value, if it has one. @param {string} key */
+  const given = (key) => (v[key] != null && v[key] !== '' ? v[key] : undefined);
   /** @type {Record<string, unknown>} */
   const o = {};
-  for (const key of TEXT) {
-    const value = q.get(key);
+  for (const key of /** @type {const} */ (['title', 'author', 'subtitle', 'series', 'credit', 'badge', 'seed'])) {
+    const value = given(key) === undefined ? undefined : LINK[key](v[key]);
     if (value) o[key] = value;
   }
-  for (const [key, max] of Object.entries(LIMITS)) {
-    const value = q.get(key);
-    if (value) o[key] = clipGraphemes(value, max, { units: true });
+  // Styles, fonts and palettes the reader doesn't know go to the library as typed: it picks for
+  // 'random', and says what's wrong with the others.
+  for (const key of /** @type {const} */ (['style', 'font'])) {
+    const raw = given(key);
+    if (raw !== undefined) o[key] = LINK[key](raw) ?? raw;
   }
-  // (The app trims the seed it reads from a link, and keeps 40 characters.)
-  const seed = q.get('seed')?.split(LINE_BREAK).join(' ').trim();
-  if (seed) o.seed = clipGraphemes(seed, 40, { units: true });
-  const [width, height] = ['width', 'height'].map((key) => (q.get(key) ? Number(q.get(key)) : undefined));
-  const format = q.get('format');
-  if (format) {
-    const size = Object.hasOwn(formats, format)
-      ? formats[/** @type {keyof typeof formats} */ (format)]
-      : CUSTOM_SIZE.exec(format)?.slice(1).map(Number);
+  for (const key of ['genre', 'lang']) if (given(key) !== undefined) o[key] = given(key);
+  const palette = given('palette');
+  if (palette !== undefined) {
+    const read = LINK.palette(palette);
+    const colors = read ? customColors(read) : null;
+    if (colors) o.palette = { bg: colors[0], ink: colors[1], accents: colors.slice(2) };
+    else if (read !== 'auto') o.palette = read ?? palette;
+  }
+  const titleCase = given('case') ?? given('titleCase');
+  if (titleCase !== undefined) {
+    o.titleCase = LINK.case(titleCase);
+    if (!o.titleCase) throw new RangeError(`case is upper or normal, got "${titleCase}"`);
+  }
+  const texture = given('texture');
+  if (texture !== undefined) {
+    o.texture = LINK.texture(texture);
+    if (o.texture === undefined) throw new RangeError('texture is 1 (on) or 0 (off)');
+  }
+  const variant = given('variant');
+  if (variant !== undefined) {
+    const pairs = LINK.variant(variant);
+    if (!pairs) {
+      throw new RangeError('variant is name.value pairs joined by "-", such as scene.forest or field.pale-emblem.sun');
+    }
+    o.variants = Object.fromEntries(pairs.split('-').map((pair) => pair.split('.')));
+  }
+  const width = given('width') === undefined ? undefined : px('width', /** @type {string} */ (given('width')));
+  const height = given('height') === undefined ? undefined : px('height', /** @type {string} */ (given('height')));
+  const format = given('format');
+  if (format !== undefined) {
+    const read = LINK.format(format);
+    const size = !read
+      ? null
+      : Object.hasOwn(formats, read)
+        ? formats[/** @type {keyof typeof formats} */ (read)]
+        : CUSTOM_SIZE.exec(read)?.slice(1).map(Number);
     if (!size) {
       throw new RangeError(
         `Unknown format "${format}". Use one of ${Object.keys(formats).join(', ')}, or a size such as 1600x2560`,
@@ -64,12 +98,7 @@ export function coverOptions(q) {
     if (width !== undefined) o.width = width;
     if (height !== undefined) o.height = height;
   }
-  // A palette id or name (the library reads either in any case), or your own colours.
-  const palette = q.get('palette');
-  const colors = palette ? customColors(palette.toLowerCase()) : null;
-  if (colors) o.palette = { bg: colors[0], ink: colors[1], accents: colors.slice(2) };
-  else if (palette) o.palette = palette;
-  const [bg, ink, accent] = [q.get('bg'), q.get('ink'), q.get('accent')];
+  const [bg, ink, accent] = [given('bg'), given('ink'), given('accent')];
   if (bg || ink || accent) {
     if (!bg || !ink || !accent) throw new RangeError('Your own colours need bg, ink and accent');
     o.palette = {
@@ -80,20 +109,6 @@ export function coverOptions(q) {
         .filter((c) => c.trim())
         .map(hex),
     };
-  }
-  const titleCase = q.get('case');
-  if (titleCase) o.titleCase = titleCase;
-  const texture = q.get('texture')?.toLowerCase();
-  if (texture) {
-    if (!['1', '0', 'true', 'false'].includes(texture)) throw new RangeError('texture is 1 (on) or 0 (off)');
-    o.texture = texture === '1' || texture === 'true';
-  }
-  const variant = q.get('variant')?.toLowerCase();
-  if (variant) {
-    if (!VARIANT.test(variant)) {
-      throw new RangeError('variant is name.value pairs joined by "-", such as scene.forest or field.pale-emblem.sun');
-    }
-    o.variants = Object.fromEntries(variant.split('-').map((pair) => pair.split('.')));
   }
   return /** @type {import('../src/index.js').CoverOptions} */ (o);
 }
@@ -140,9 +155,11 @@ export function api(request) {
       kind === 'cover'
         ? cover.svg
         : createMockup(cover, {
-            kind: /** @type {import('../src/index.js').MockupKind} */ (q.get('kind') || 'book'),
-            text: q.get('text') ?? '',
-            background: q.get('background') ? hex(/** @type {string} */ (q.get('background'))) : undefined,
+            kind: /** @type {import('../src/index.js').MockupKind} */ (q.getAll('kind').at(-1) || 'book'),
+            text: q.getAll('text').at(-1) ?? '',
+            background: q.getAll('background').at(-1)
+              ? hex(/** @type {string} */ (q.getAll('background').at(-1)))
+              : undefined,
           }).svg;
     return new Response(request.method === 'HEAD' ? null : svg, {
       headers: {
