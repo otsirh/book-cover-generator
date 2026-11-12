@@ -36,13 +36,13 @@ All notable changes to this project are documented here. The format follows [Kee
 - `Cover.body`: the markup inside the outer `<svg>`, to nest covers in another SVG.
 - The helpers the built-in styles use, for custom styles: `strongAccents`, `textColor`, `tintText`, `fitTitleWith`, `textPanel`, `TEXT_CONTRAST`, `baselineOf`, `textBottom`, `textGroupAttrs` and `markExtent`.
 - Browser helpers: `rasterize` takes an exact `width` and `height` and a `dpi`; `downloadCover` resolves to the file name it saved; `copyImage`, `canCopyImage`, `setDpi`, `zipFiles` and `extensionOf`.
-- `registerPalette` and `unregisterPalette`, so a palette can be used by id; `unregisterStyle`; and `version`.
+- `registerPalette` and `unregisterPalette`, so a palette can be used by id; `unregisterStyle`; `version`; and `sizeLimits` and `formats`, the sizes covers can have and the app's shapes.
 - CLI: your own colours (`--bg`, `--ink`, `--accent`), `--format`, `--size`, `--lang`, `--json`, and `--count` to write many variations at once.
 - `TextFit.above` and `TextFit.below` (room for accents and marks), `StackFit` line `above`, and `baselineOf(fit, y, i)` for styles that draw a fit's lines themselves.
 
 ### Changed
 
-- `registerStyle` no longer replaces a built-in style unless you pass `{ replace: true }`, and refuses the id `'random'`.
+- `registerStyle` no longer replaces a built-in style unless you pass `{ replace: true }`, and refuses the id `'random'` and ids with spaces at either end (which could never be picked).
 - The page's Content Security Policy allows one Trusted Types policy, `sw`, which only lets the page register its own service worker.
 
 ## [1.3.0] - 2026-11-12

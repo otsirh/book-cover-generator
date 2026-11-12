@@ -6,6 +6,12 @@ import generateDefault, {
   palettes,
   listStyles,
   registerStyle,
+  unregisterStyle,
+  registerPalette,
+  unregisterPalette,
+  formats,
+  sizeLimits,
+  version,
   randomSeed,
   pickStyle,
   fitText,
@@ -49,6 +55,12 @@ const cover: Cover = createCover({
 const svg: string = generateCover({ title: cover.style });
 const body: string = cover.body;
 const coverLang: string = createCover({ title: 'ガラス', lang: 'ja' }).lang;
+const [ebookWidth, ebookHeight] = formats.ebook;
+createCover({ width: ebookWidth, height: Math.min(ebookHeight, sizeLimits.max) });
+registerPalette({ id: 'brand', bg: '#000', ink: '#fff', accents: ['#f00'] }, { replace: false });
+const removed: boolean = unregisterPalette('brand') && unregisterStyle('plain');
+const libraryVersion: string = version;
+void [removed, libraryVersion];
 // @ts-expect-error lang is a string
 createCover({ lang: true });
 const fromDefault: string = generateDefault();

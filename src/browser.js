@@ -185,21 +185,23 @@ export async function zipFiles(files) {
   // MS-DOS time and date, in local time as zip tools expect (two-second steps, from 1980).
   const time = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
   const date = (Math.max(0, now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
-  /** @type {Uint8Array[]} */
+  /** @type {(Uint8Array | Blob)[]} */
   const parts = [];
   /** @type {Uint8Array[]} */
   const central = [];
   let offset = 0;
   for (const file of files) {
     const name = encoder.encode(file.name);
-    const data =
-      typeof file.data === 'string'
+    const blob = file.data instanceof Blob ? file.data : null;
+    const bytes = blob
+      ? null
+      : typeof file.data === 'string'
         ? encoder.encode(file.data)
-        : file.data instanceof Uint8Array
-          ? file.data
-          : new Uint8Array(await file.data.arrayBuffer());
-    if (offset + 30 + name.length + data.length > 0xffffffff) throw new RangeError('zipFiles: over 4 GB');
-    const crc = crc32(data);
+        : /** @type {Uint8Array} */ (file.data);
+    const size = blob ? blob.size : /** @type {Uint8Array} */ (bytes).length;
+    if (offset + 30 + name.length + size > 0xffffffff) throw new RangeError('zipFiles: over 4 GB');
+    // (A Blob is read only for its checksum, and the archive holds the Blob itself, not a copy.)
+    const crc = crc32(bytes ?? new Uint8Array(await /** @type {Blob} */ (blob).arrayBuffer()));
     const local = new Uint8Array(30);
     const lv = new DataView(local.buffer);
     lv.setUint32(0, 0x04034b50, true);
@@ -209,10 +211,10 @@ export async function zipFiles(files) {
     lv.setUint16(10, time, true);
     lv.setUint16(12, date, true);
     lv.setUint32(14, crc, true);
-    lv.setUint32(18, data.length, true);
-    lv.setUint32(22, data.length, true);
+    lv.setUint32(18, size, true);
+    lv.setUint32(22, size, true);
     lv.setUint16(26, name.length, true);
-    parts.push(local, name, data);
+    parts.push(local, name, blob ?? /** @type {Uint8Array} */ (bytes));
     const entry = new Uint8Array(46);
     const cv = new DataView(entry.buffer);
     cv.setUint32(0, 0x02014b50, true);
@@ -223,12 +225,12 @@ export async function zipFiles(files) {
     cv.setUint16(12, time, true);
     cv.setUint16(14, date, true);
     cv.setUint32(16, crc, true);
-    cv.setUint32(20, data.length, true);
-    cv.setUint32(24, data.length, true);
+    cv.setUint32(20, size, true);
+    cv.setUint32(24, size, true);
     cv.setUint16(28, name.length, true);
     cv.setUint32(42, offset, true);
     central.push(entry, name);
-    offset += 30 + name.length + data.length;
+    offset += 30 + name.length + size;
   }
   const size = central.reduce((sum, p) => sum + p.length, 0);
   const end = new Uint8Array(22);
@@ -238,7 +240,9 @@ export async function zipFiles(files) {
   ev.setUint16(10, files.length, true);
   ev.setUint32(12, size, true);
   ev.setUint32(16, offset, true);
-  return new Blob(/** @type {Uint8Array<ArrayBuffer>[]} */ ([...parts, ...central, end]), { type: 'application/zip' });
+  return new Blob(/** @type {(Uint8Array<ArrayBuffer> | Blob)[]} */ ([...parts, ...central, end]), {
+    type: 'application/zip',
+  });
 }
 
 /** Trigger a file download for a Blob. */

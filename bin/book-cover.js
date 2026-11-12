@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
-import { createCover, listStyles, palettes } from '../src/index.js';
+import { createCover, listStyles, palettes, formats } from '../src/index.js';
 
 const HELP = `Usage: book-cover "<title>" ["<author>"] [options]
 
@@ -32,9 +32,6 @@ Examples:
   book-cover "Neon Tide" "Kai Moreno" --style retro --palette synth --size 1600x2560 > cover.svg
   book-cover "Bright Machines" --bg 0b132b --ink f8f9fa --accent ff6b6b,4ecdc4 --format ebook -o cover.svg
   book-cover "Salt and Static" "J. R. Okafor" --count 12 -o ideas/cover.svg`;
-
-/** Cover shapes, as in the web app: width to height. */
-const FORMATS = { paperback: [2, 3], ebook: [5, 8], square: [1, 1] };
 
 let args;
 try {
@@ -119,11 +116,12 @@ function dimensions() {
   const width = size(values.width, 'width');
   const height = size(values.height, 'height');
   if (values.format === undefined) return { width, height };
-  if (!Object.hasOwn(FORMATS, values.format)) {
-    throw new Error(`Unknown format "${values.format}". Available: ${Object.keys(FORMATS).join(', ')}`);
+  if (!Object.hasOwn(formats, values.format)) {
+    throw new Error(`Unknown format "${values.format}". Available: ${Object.keys(formats).join(', ')}`);
   }
   if (height !== undefined) throw new Error('--format sets the height from the width: use --size for both');
-  const [w, h] = FORMATS[/** @type {keyof typeof FORMATS} */ (values.format)];
+  // The shape of the app's format, at the width asked for.
+  const [w, h] = formats[/** @type {keyof typeof formats} */ (values.format)];
   const W = width ?? 600;
   return { width: W, height: Math.round((W * h) / w) };
 }
@@ -162,17 +160,24 @@ function count() {
 }
 
 /**
- * The file for cover `n` of `total`: --out itself for one cover, else with {n} and {seed}
- * filled in, or "-n" before the extension.
+ * The file for cover `n` of `total`: --out with {n} and {seed} filled in, or (for several
+ * covers) with "-n" before the extension.
  * @param {string} out @param {number} n @param {number} total @param {string} seed
  */
 function fileFor(out, n, total, seed) {
+  if (/\{n\}|\{seed\}/.test(out)) return out.replaceAll('{n}', String(n)).replaceAll('{seed}', safeName(seed));
   if (total === 1) return out;
-  if (/\{n\}|\{seed\}/.test(out)) return out.replaceAll('{n}', String(n)).replaceAll('{seed}', seed);
   const dot = out.lastIndexOf('.');
   const slash = Math.max(out.lastIndexOf('/'), out.lastIndexOf('\\'));
   return dot > slash + 1 ? `${out.slice(0, dot)}-${n}${out.slice(dot)}` : `${out}-${n}`;
 }
+
+/**
+ * A seed as part of a file name: letters, digits, dots, dashes and underscores only (so a seed
+ * can't add folders, leave the folder or break names on Windows), never starting with a dot.
+ * @param {string} seed
+ */
+const safeName = (seed) => seed.replace(/[^\p{L}\p{N}._-]+/gu, '-').replace(/^[.-]+/, '') || 'cover';
 
 try {
   const total = count();

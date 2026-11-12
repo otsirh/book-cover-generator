@@ -5,15 +5,20 @@ import { createHash } from 'node:crypto';
 
 const SITE = ['index.html', 'site', 'src'];
 
+/** OS and editor leftovers (.DS_Store, backups, swap files): never published. @param {string} path */
+const junk = (path) => /(^|[\\/])(\.DS_Store|Thumbs\.db|desktop\.ini)$|~$|\.sw[op]$/i.test(path);
+const filter = (/** @type {string} */ src) => !junk(src);
+
 rmSync('dist', { recursive: true, force: true });
 mkdirSync('dist');
-for (const entry of SITE) cpSync(entry, `dist/${entry}`, { recursive: true });
-cpSync('public', 'dist', { recursive: true });
+for (const entry of SITE) cpSync(entry, `dist/${entry}`, { recursive: true, filter });
+cpSync('public', 'dist', { recursive: true, filter });
 
 /** Every file under a folder of dist/, as a site path. @param {string} dir */
 const filesIn = (dir) =>
   readdirSync(`dist/${dir}`, { recursive: true, withFileTypes: true })
-    .filter((entry) => entry.isFile())
+    // (Not hidden files: the offline copy is only what the page loads.)
+    .filter((entry) => entry.isFile() && !entry.name.startsWith('.'))
     .map((entry) => `/${entry.parentPath.slice('dist/'.length)}/${entry.name}`.replaceAll('\\', '/'))
     .sort();
 

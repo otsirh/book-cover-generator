@@ -1,4 +1,13 @@
-import { createCover, listStyles, palettes, pickStyle, randomSeed, version } from '../src/index.js';
+import {
+  createCover,
+  listStyles,
+  palettes,
+  pickStyle,
+  randomSeed,
+  version,
+  formats,
+  sizeLimits,
+} from '../src/index.js';
 import {
   svgToDataUrl,
   downloadCover,
@@ -13,7 +22,7 @@ import {
 import { clipGraphemes } from '../src/text.js';
 import { hashString, contrast } from '../src/core.js';
 
-/** @typedef {'paperback' | 'ebook' | 'square'} Preset */
+/** @typedef {keyof typeof formats} Preset */
 /**
  * @typedef {object} Design  Everything that defines a cover; mirrored in the URL.
  * @property {string} title
@@ -28,11 +37,11 @@ import { hashString, contrast } from '../src/core.js';
 /** @typedef {{ design: Design, svg: string }} Kept  a kept design, and the cover as it was drawn then ('' if unknown) */
 /** @typedef {{ button: HTMLButtonElement, img: HTMLImageElement, visible: boolean, dirty: boolean }} Tile  visible: on screen or close to it */
 
-/** @type {Record<Preset, [number, number]>} */
-const FORMATS = { paperback: [600, 900], ebook: [600, 960], square: [600, 600] };
-/** A custom size: width x height in px, as the library allows (see fits()). */
+/** The preset formats (the library's, as the CLI's --format has them too). */
+const FORMATS = formats;
+/** A custom size: width x height in px (see fits() for the sizes the library can make). */
 const CUSTOM_SIZE = /^([1-9]\d{1,4})x([1-9]\d{1,4})$/;
-const MAX_SIDE = 10000;
+const MAX_SIDE = sizeLimits.max;
 /** Your own colours: background, text and one to three accents. */
 const CUSTOM_PALETTE = /^custom(?:-[0-9a-f]{6}){3,5}$/;
 /** Pixels per inch recorded in PNG and JPEG downloads, so print software sizes them right. */
@@ -88,13 +97,13 @@ const clip = (/** @type {string} */ str, /** @type {number} */ max) => clipGraph
 const fits = (w, hgt) =>
   Number.isInteger(w) &&
   Number.isInteger(hgt) &&
-  Math.min(w, hgt) >= 50 &&
-  Math.max(w, hgt) <= MAX_SIDE &&
-  w <= hgt * 3 &&
-  hgt <= w * 3;
+  Math.min(w, hgt) >= sizeLimits.min &&
+  Math.max(w, hgt) <= sizeLimits.max &&
+  w <= hgt * sizeLimits.ratio &&
+  hgt <= w * sizeLimits.ratio;
 /** A format that is a size of its own, not a preset. @param {string} format */
 const isCustomSize = (format) => !Object.hasOwn(FORMATS, format);
-/** A format's cover size in px. @param {string} format @returns {[number, number]} */
+/** A format's cover size in px. @param {string} format @returns {readonly [number, number]} */
 function sizeOf(format) {
   if (!isCustomSize(format)) return FORMATS[/** @type {Preset} */ (format)];
   const m = CUSTOM_SIZE.exec(format);
@@ -753,7 +762,10 @@ function buildVariations() {
     const img = /** @type {HTMLImageElement} */ (h('img', { alt: '' }));
     const button = h('button', { type: 'button', className: 'variation' }, img);
     const variant = { button, img, seed: '' };
-    button.addEventListener('click', () => update({ seed: variant.seed }));
+    // (Not before its thumbnail is drawn: it has no seed yet, and '' would mean "from the title".)
+    button.addEventListener('click', () => {
+      if (variant.seed) update({ seed: variant.seed });
+    });
     variants.push(variant);
     strip.append(button);
   }
@@ -914,7 +926,8 @@ function buildControls() {
       const [w, hgt] = typedSize();
       if (fits(w, hgt)) return;
       syncSize(true);
-      toast('Sizes go from 50 to 10,000 px, at most three times as tall as wide');
+      const { min, max, ratio } = sizeLimits;
+      toast(`Sizes go from ${min} to ${max.toLocaleString('en')} px, at most ${ratio} times as tall as wide`);
     });
   }
   $('size-preset').addEventListener('change', (e) => {
@@ -1403,49 +1416,79 @@ function keptFrom(item) {
   return { design: complete(sanitize(raw)), svg };
 }
 
-/** @returns {Kept[]} */
+/**
+ * The kept designs as last read or saved, so a click doesn't parse the whole tray again; null when
+ * storage may hold something newer (another tab changed it).
+ * @type {Kept[] | null}
+ */
+let keptCache = null;
+
+/** The kept designs, newest first (a copy of the list: change it and save it with saveKept). @returns {Kept[]} */
 function loadKept() {
-  try {
-    const raw = JSON.parse(localStorage.getItem(KEEP_KEY) || '[]');
-    if (!Array.isArray(raw)) return [];
-    // (Cut first: there's no use completing designs that are thrown away.)
-    return raw.slice(0, MAX_KEPT).map(keptFrom);
-  } catch {
-    return [];
+  if (!keptCache) {
+    keptCache = [];
+    try {
+      const raw = JSON.parse(localStorage.getItem(KEEP_KEY) || '[]');
+      // (Cut first: there's no use completing designs that are thrown away.)
+      if (Array.isArray(raw)) keptCache = raw.slice(0, MAX_KEPT).map(keptFrom);
+    } catch {
+      // Unreadable or blocked: none.
+    }
   }
+  return [...keptCache];
 }
+
+// Another tab kept or removed a design: show the tray as it is now.
+window.addEventListener('storage', (e) => {
+  if (e.key !== KEEP_KEY && e.key !== null) return;
+  keptCache = null;
+  renderKept();
+});
 
 /** A kept design as stored and exported: the design's fields, and its SVG. @param {Kept} k @param {boolean} [withSvg] */
 const stored = (k, withSvg = true) => (withSvg && k.svg ? { ...k.design, svg: k.svg } : { ...k.design });
 
 /**
- * Save the kept designs; whether they were saved. When storage is full, the oldest give up their
- * SVG first (they are then drawn again from their settings).
+ * Save the kept designs. When storage is full, the oldest give up their SVG first, a quarter at a
+ * time (they are then drawn from their settings, which a later version may draw differently).
+ * Returns how many lost their SVG that way, or -1 when nothing could be saved.
  * @param {Kept[]} list
  */
 function saveKept(list) {
-  for (const withSvg of [list.length, Math.ceil(list.length / 2), 0]) {
+  const n = list.length;
+  for (const withSvg of new Set([n, Math.ceil(n * 0.75), Math.ceil(n / 2), Math.ceil(n / 4), Math.min(n, 1), 0])) {
     try {
       localStorage.setItem(KEEP_KEY, JSON.stringify(list.map((k, i) => stored(k, i < withSvg))));
-      return true;
     } catch {
       // Full (try with fewer SVGs) or blocked.
+      continue;
     }
+    keptCache = list.map((k, i) => (i < withSvg || !k.svg ? k : { ...k, svg: '' }));
+    return list.filter((k, i) => i >= withSvg && k.svg).length;
   }
-  return false;
+  return -1;
 }
+
+/** What to add to a message when saving made older designs give up their SVG. @param {number} lost */
+const lostNote = (lost) =>
+  lost > 0
+    ? ` Storage is full, so the ${lost === 1 ? 'oldest is' : `${lost} oldest are`} now kept as settings only.`
+    : '';
 
 function keepDesign() {
   const hash = toHash(design);
   const list = loadKept().filter((k) => toHash(k.design) !== hash);
   list.unshift({ design: { ...design }, svg: current.svg.length <= MAX_SNAPSHOT ? current.svg : '' });
-  const kept = list.slice(0, MAX_KEPT);
-  if (!saveKept(kept)) {
+  const lost = saveKept(list.slice(0, MAX_KEPT));
+  if (lost < 0) {
     toast('Could not save here (private browsing?)');
     return;
   }
-  renderKept(kept);
-  toast(list.length > MAX_KEPT ? `Kept. The oldest of ${MAX_KEPT} made room.` : 'Kept. It’s under the preview.');
+  renderKept();
+  toast(
+    (list.length > MAX_KEPT ? `Kept. The oldest of ${MAX_KEPT} made room.` : 'Kept. It’s under the preview.') +
+      lostNote(lost),
+  );
 }
 
 /** Kept thumbnails by design, so Keep and Remove only draw the one that changed. */
@@ -1494,9 +1537,8 @@ function renderKept(list = loadKept()) {
       );
       remove.addEventListener('click', () => {
         // Remove this exact design (another tab may have changed the list since it was drawn).
-        const rest = loadKept().filter((other) => toHash(other.design) !== hash);
-        saveKept(rest);
-        renderKept(rest);
+        saveKept(loadKept().filter((other) => toHash(other.design) !== hash));
+        renderKept();
         // The button is gone: move focus to the next design's (or the last one's), or to Keep.
         const buttons = $('kept-list').querySelectorAll('.kept-remove');
         const next = /** @type {HTMLElement | undefined} */ (buttons[Math.min(i, buttons.length - 1)]);
@@ -1607,14 +1649,14 @@ async function importKept(file) {
     );
     return;
   }
-  const kept = [...taken, ...list];
-  if (!saveKept(kept)) {
+  const lost = saveKept([...taken, ...list]);
+  if (lost < 0) {
     toast('Could not save here (private browsing?)');
     return;
   }
-  renderKept(kept);
+  renderKept();
   const note = taken.length < added.length ? ` (the tray holds ${MAX_KEPT})` : '';
-  toast(`Imported ${taken.length} design${taken.length === 1 ? '' : 's'}${note}`);
+  toast(`Imported ${taken.length} design${taken.length === 1 ? '' : 's'}${note}.${lostNote(lost)}`);
 }
 
 /** Draw the next queued kept thumbnail: the SVG kept with it, else from its settings. */

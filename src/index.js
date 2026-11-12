@@ -27,6 +27,19 @@ export * as svgUtils from './core.js';
 /** This version of the library (artwork for a seed can change between minor versions). */
 export const version = '1.3.0';
 
+/** The sizes a cover can have: each side `min` to `max` px, and neither more than `ratio` times the other. */
+export const sizeLimits = Object.freeze({ min: 50, max: 10000, ratio: 3 });
+
+/** Common cover shapes at 600 px wide, as the web app offers them: [width, height]. */
+export const formats = Object.freeze({
+  paperback: Object.freeze([600, 900]),
+  ebook: Object.freeze([600, 960]),
+  square: Object.freeze([600, 600]),
+});
+
+/** An id as registries take it: a string, not empty, without spaces at either end. @param {unknown} id */
+const isId = (id) => typeof id === 'string' && id !== '' && id === id.trim();
+
 /**
  * A registry entry: the style's details with defaults filled in, and a render that calls
  * the style's own method on the style itself (so class styles keep `this` and private fields).
@@ -65,8 +78,10 @@ export const styles = listStyles().map((s) => s.id);
  * @param {{ replace?: boolean }} [options]
  */
 export function registerStyle(style, { replace = false } = {}) {
-  if (!style || !style.id || typeof style.render !== 'function') {
-    throw new TypeError('registerStyle: a style needs an `id` and a `render(ctx)` function');
+  if (!style || !isId(style.id) || typeof style.render !== 'function') {
+    throw new TypeError(
+      'registerStyle: a style needs an `id` (a string without spaces at either end) and a `render(ctx)` function',
+    );
   }
   if (style.id === 'random') throw new TypeError('registerStyle: "random" is not a style id, it picks one');
   if (builtInStyles.has(style.id) && !replace) {
@@ -88,7 +103,8 @@ export function unregisterStyle(id) {
     return true;
   }
   if (!registry.delete(id)) return false;
-  styles.splice(styles.indexOf(id), 1);
+  const at = styles.indexOf(id);
+  if (at !== -1) styles.splice(at, 1);
   return true;
 }
 
@@ -102,13 +118,17 @@ const RESERVED_PALETTES = new Set(['random', 'auto', 'custom']);
  * @param {{ replace?: boolean }} [options]
  */
 export function registerPalette(palette, { replace = false } = {}) {
-  const id = palette && typeof palette.id === 'string' ? palette.id.trim() : '';
-  if (!id) throw new TypeError('registerPalette: a palette needs an `id`');
+  if (!palette || !isId(palette.id)) {
+    throw new TypeError('registerPalette: a palette needs an `id` (a string without spaces at either end)');
+  }
+  const id = palette.id;
   if (RESERVED_PALETTES.has(id)) throw new TypeError(`registerPalette: "${id}" is reserved`);
   if (builtInPalettes.has(id) && !replace) {
     throw new Error(`registerPalette: "${id}" is a built-in palette; pass { replace: true } to replace it`);
   }
-  const { name, bg, ink, dark } = normalizePalette({ ...palette, id });
+  const { bg, ink, dark } = normalizePalette(palette);
+  // Named after its id when it has no name, as a style is.
+  const name = typeof palette.name === 'string' && palette.name.trim() ? palette.name : id;
   const entry = { id, name, bg, ink, accents: palette.accents.map((c) => c.trim()), dark };
   const at = paletteList.findIndex((p) => p.id === id);
   if (at === -1) paletteList.push(entry);
@@ -193,16 +213,17 @@ function cleanText(value, max) {
  */
 function dimension(value, fallback, name) {
   if (value == null || value === '') {
-    if (fallback > 10000) {
+    if (fallback > sizeLimits.max) {
       throw new RangeError(
-        `${name} defaults to ${Math.round(fallback)} here, which is over 10000; pass ${name} explicitly`,
+        `${name} defaults to ${Math.round(fallback)} here, which is over ${sizeLimits.max}; pass ${name} explicitly`,
       );
     }
     return Math.round(fallback);
   }
   const v = Number(value);
-  if (!Number.isFinite(v) || v < 50 || v > 10000) {
-    throw new RangeError(`${name} must be a number from 50 to 10000, got ${String(value)}`);
+  const { min, max } = sizeLimits;
+  if (!Number.isFinite(v) || v < min || v > max) {
+    throw new RangeError(`${name} must be a number from ${min} to ${max}, got ${String(value)}`);
   }
   return Math.round(v);
 }
@@ -261,8 +282,9 @@ export function createCover(options = {}) {
   const W = dimension(options.width, 600, 'width');
   const H = dimension(options.height, W * 1.5, 'height');
   const lang = resolveLang(options.lang, `${title} ${subtitle} ${author}`);
-  if (W / H > 3 || H / W > 3) {
-    throw new RangeError(`The aspect ratio must be between 1:3 and 3:1, got ${W}×${H}`);
+  const { ratio } = sizeLimits;
+  if (W / H > ratio || H / W > ratio) {
+    throw new RangeError(`The aspect ratio must be between 1:${ratio} and ${ratio}:1, got ${W}×${H}`);
   }
   const style = /** @type {ReturnType<typeof entryFor>} */ (registry.get(styleId)); // resolveStyle checked it
   const palette = resolvePalette(options.palette, createRng(`${seed}|palette`), style);

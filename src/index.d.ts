@@ -23,6 +23,14 @@ export * as svgUtils from './core.js';
 
 /** This version of the library, such as `'1.4.0'`. Artwork for a seed can change between minor versions. */
 export declare const version: string;
+/** The sizes a cover can have: each side `min` to `max` px, and neither more than `ratio` times the other. */
+export declare const sizeLimits: Readonly<{ min: number; max: number; ratio: number }>;
+/** Common cover shapes at 600 px wide, as the web app offers them: `[width, height]`. */
+export declare const formats: Readonly<{
+  paperback: readonly [number, number];
+  ebook: readonly [number, number];
+  square: readonly [number, number];
+}>;
 
 export type StyleId =
   | 'minimal'

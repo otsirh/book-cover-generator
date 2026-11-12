@@ -1402,6 +1402,47 @@ test('Store size shows the cover as small as a store lists it', async ({ page })
   expect(await height()).toBeGreaterThan(200);
 });
 
+test('when storage is full, the oldest kept designs give up their SVG first, and Keep says so', async ({ page }) => {
+  await page.addInitScript(() => {
+    if (!sessionStorage.getItem('seeded')) {
+      sessionStorage.setItem('seeded', '1');
+      const svg = `<svg ${'a'.repeat(6000)}></svg>`;
+      const old = ['A', 'B', 'C', 'D'].map((title) => ({ title, style: 'minimal', seed: title, svg }));
+      localStorage.setItem('book-cover-generator:kept', JSON.stringify(old));
+    }
+    // A small quota: four old snapshots and a new one don't fit, two do.
+    const real = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      if (key === 'book-cover-generator:kept' && value.length > 20_000) {
+        throw new DOMException('Quota exceeded', 'QuotaExceededError');
+      }
+      return real.call(this, key, value);
+    };
+  });
+  await page.goto('/#title=New&style=minimal&seed=n');
+  await expect(page.locator('#kept-list li')).toHaveCount(4);
+  await page.locator('#keep').click();
+  await expect(page.locator('#toast')).toContainText('Storage is full');
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('book-cover-generator:kept') ?? '[]'));
+  expect(stored.map((/** @type {{ title: string }} */ k) => k.title)).toEqual(['New', 'A', 'B', 'C', 'D']);
+  // The newest keep theirs.
+  expect(stored[0].svg).toMatch(/^<svg [\s\S]*New/);
+  expect(stored.at(-1).svg).toBeUndefined();
+});
+
+test('a variation clicked before its thumbnail is drawn never clears the variation', async ({ page }) => {
+  await page.addInitScript(() =>
+    document.addEventListener('DOMContentLoaded', () =>
+      /** @type {HTMLElement | null} */ (document.querySelector('.variation'))?.click(),
+    ),
+  );
+  await page.goto('/#title=T&style=minimal&seed=keep');
+  await ready(page);
+  // (Either the click came too early and did nothing, or the thumbnail was drawn and it applied that.)
+  await expect(page.locator('#seed')).not.toHaveValue('');
+  await expect(page.locator('#meta')).not.toContainText('from the title');
+});
+
 test('a Japanese title sets the language of the cover', async ({ page }) => {
   await page.goto(`/#title=${encodeURIComponent('ガラスの街')}&style=minimal&seed=j`);
   expect(await svgOf(page, '#preview')).toMatch(/^<svg [^>]* lang="ja"/);

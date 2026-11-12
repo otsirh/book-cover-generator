@@ -957,3 +957,14 @@ test('version matches the package', async () => {
   const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
   assert.equal(version, pkg.version);
 });
+
+test('sizeLimits and formats describe the sizes covers can have', async () => {
+  const { sizeLimits, formats } = await import('../src/index.js');
+  assert.deepEqual({ ...sizeLimits }, { min: 50, max: 10000, ratio: 3 });
+  assert.throws(() => createCover({ width: sizeLimits.max + 1, height: sizeLimits.max }), /from 50 to 10000/);
+  assert.throws(() => createCover({ width: 100, height: 100 * sizeLimits.ratio + 1 }), /aspect ratio/);
+  for (const [width, height] of Object.values(formats)) {
+    assert.match(createCover({ title: 'x', width, height }).svg, new RegExp(`width="${width}" height="${height}"`));
+  }
+  assert.ok(Object.isFrozen(formats) && Object.isFrozen(formats.ebook));
+});

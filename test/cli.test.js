@@ -214,3 +214,25 @@ test('--count writes variations, named from --out', async () => {
     assert.match(stderr, message);
   }
 });
+
+test('{n} and {seed} in --out are filled in for one cover too, and a seed never makes a path', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'book-cover-'));
+  try {
+    const one = await cli('Dune', '--seed', 'abc', '-o', join(dir, 'c-{seed}-{n}.svg'));
+    assert.equal(one.code, 0);
+    await stat(join(dir, 'c-abc-1.svg'));
+    const sneaky = await cli('Dune', '--count', '2', '--seed', '../a/b:c', '--json', '-o', join(dir, '{seed}.svg'));
+    assert.equal(sneaky.code, 0);
+    const files = sneaky.stdout
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line).file);
+    assert.deepEqual(files, [join(dir, 'a-b-c-1.svg'), join(dir, 'a-b-c-2.svg')]);
+    // The title's own seed (title and author, joined by a separator) makes a name too.
+    const derived = await cli('Dune', 'Herbert', '-o', join(dir, '{seed}.svg'));
+    assert.equal(derived.code, 0);
+    await stat(join(dir, 'Dune-Herbert.svg'));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

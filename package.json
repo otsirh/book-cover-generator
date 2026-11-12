@@ -38,7 +38,7 @@
   "main": "./src/index.js",
   "types": "./src/index.d.ts",
   "bin": {
-    "book-cover": "./bin/book-cover.js"
+    "book-cover": "bin/book-cover.js"
   },
   "files": [
     "src",

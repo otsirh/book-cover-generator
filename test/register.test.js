@@ -62,6 +62,9 @@ test('a built-in style is replaced only when asked, and can be brought back', ()
   const plain = { id: 'minimal', render: () => '<rect width="1" height="1" fill="#abc123"/>' };
   assert.throws(() => registerStyle(plain), /built-in style; pass \{ replace: true \}/);
   assert.throws(() => registerStyle({ id: 'random', render: () => '' }), /picks one/);
+  // A padded id would slip past the guard and could never be picked.
+  assert.throws(() => registerStyle({ id: ' minimal ', render: () => '' }), /without spaces/);
+  assert.throws(() => registerStyle({ id: /** @type {any} */ (7), render: () => '' }), TypeError);
   const before = createCover({ title: 'x', style: 'minimal', seed: 's' }).svg;
   const count = styles.length;
   registerStyle(plain, { replace: true });
@@ -71,6 +74,12 @@ test('a built-in style is replaced only when asked, and can be brought back', ()
   assert.equal(createCover({ title: 'x', style: 'minimal', seed: 's' }).svg, before);
   assert.equal(unregisterStyle('minimal'), false, 'the built-in stays');
   assert.equal(unregisterStyle('no-such-style'), false);
+  registerStyle({ id: 'test-gone', render: () => '' });
+  // Gone from `styles` already (someone filtered it): nothing else is taken out with it.
+  styles.splice(styles.indexOf('test-gone'), 1);
+  const listed = [...styles];
+  assert.equal(unregisterStyle('test-gone'), true);
+  assert.deepEqual(styles, listed);
   registerStyle({ id: 'test-gone', render: () => '' });
   assert.equal(unregisterStyle('test-gone'), true);
   assert.ok(!styles.includes('test-gone'));
@@ -96,7 +105,10 @@ test('palettes can be registered by id, and built-ins replaced only when asked',
   const seeds = Array.from({ length: 400 }, (_, i) => `seed-${i}`);
   assert.ok(seeds.some((seed) => createCover({ title: 'x', style: 'minimal', seed }).palette === 'brand'));
   assert.throws(() => registerPalette({ id: 'mint', bg: '#000', ink: '#fff', accents: ['#f00'] }), /built-in palette/);
-  for (const id of ['random', 'auto', 'custom', ' ']) {
+  registerPalette({ id: 'nameless', bg: '#000000', ink: '#ffffff', accents: ['#ff0000'] });
+  assert.equal(palettes.find((p) => p.id === 'nameless')?.name, 'nameless');
+  assert.equal(unregisterPalette('nameless'), true);
+  for (const id of ['random', 'auto', 'custom', ' ', ' brand']) {
     assert.throws(() => registerPalette({ id, bg: '#000', ink: '#fff', accents: ['#f00'] }), TypeError);
   }
   assert.throws(() => registerPalette({ id: 'bad', bg: 'black', ink: '#fff', accents: ['#f00'] }), /hex/);
