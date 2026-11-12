@@ -1569,6 +1569,32 @@ test('mockups: a preview, a line for cards, and a PNG at the mockup’s size', a
   expect(w).toBeGreaterThan(1200);
 });
 
+test('many covers: a list in, a preview, and a ZIP of one design for every book', async ({ page }) => {
+  await page.goto('/#title=T&style=minimal&palette=mint&seed=series');
+  await page.locator('#many summary').click();
+  await page.locator('#many-list').fill('Dune | Frank Herbert\nFish & Chips | Ana | A Novel\nThird');
+  await expect(page.locator('#many-count')).toHaveText('3 books');
+  await expect(page.locator('#many-preview img')).toHaveCount(3);
+  await expect.poll(() => svgSoon(page, '#many-preview li:nth-child(2) img')).toContain('Fish &amp; Chips');
+  // The preview follows the design.
+  await page.locator('.tile[data-style="swiss"]').click();
+  await expect.poll(() => svgSoon(page, '#many-preview li:first-child img')).toContain('Dune');
+  await page.locator('#many-format').selectOption('svg');
+  const [download] = await Promise.all([page.waitForEvent('download'), page.locator('#many-download').click()]);
+  expect(download.suggestedFilename()).toBe('covers.zip');
+  const files = unzip(await readFile(/** @type {string} */ (await download.path())));
+  expect([...files.keys()]).toEqual(['1-dune.svg', '2-fish-chips.svg', '3-third.svg']);
+  // One design: the same palette for every book (mint), unless each gets its own.
+  for (const svg of files.values()) expect(svg.toString()).toContain('#e4f1ea');
+  await expect(page.locator('#toast')).toContainText('Saved 3 covers');
+  await page.locator('label.switch:has(#many-palettes)').click();
+  const [again] = await Promise.all([page.waitForEvent('download'), page.locator('#many-download').click()]);
+  const varied = [...unzip(await readFile(/** @type {string} */ (await again.path()))).values()].map((b) =>
+    b.toString(),
+  );
+  expect(varied.filter((svg) => svg.includes('#e4f1ea'))).toHaveLength(1);
+});
+
 test('a Japanese title sets the language of the cover', async ({ page }) => {
   await page.goto(`/#title=${encodeURIComponent('ガラスの街')}&style=minimal&seed=j`);
   expect(await svgOf(page, '#preview')).toMatch(/^<svg [^>]* lang="ja"/);

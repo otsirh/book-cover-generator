@@ -289,3 +289,44 @@ test('--badge sets a seal', async () => {
   assert.match(stdout, /aria-label="Bestseller"/);
   assert.match(stdout, />BESTSELLER</);
 });
+
+test('--batch writes a cover per book, with the other options for every book', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'book-cover-'));
+  try {
+    const list = join(dir, 'books.csv');
+    const { writeFile, readdir } = await import('node:fs/promises');
+    await writeFile(list, 'title,author,palette\nDune,Frank Herbert,mint\n"Fish, Chips",Ana,\n');
+    const out = join(dir, 'covers');
+    const made = await cli('--batch', list, '--out-dir', out, '-s', 'minimal', '--seed', 'set', '--json');
+    assert.equal(made.code, 0, made.stderr);
+    const lines = made.stdout
+      .trim()
+      .split('\n')
+      .map((l) => JSON.parse(l));
+    assert.deepEqual(
+      lines.map((l) => [l.file, l.style, l.palette, l.seed]),
+      [
+        [join(out, '1-dune.svg'), 'minimal', 'mint', 'set'],
+        [join(out, '2-fish-chips.svg'), 'minimal', lines[1].palette, 'set'],
+      ],
+    );
+    assert.deepEqual((await readdir(out)).sort(), ['1-dune.svg', '2-fish-chips.svg']);
+    assert.match(made.stderr, /Wrote 2 of 2 covers/);
+    // A book that can't be made is reported, the rest are written, and the exit code says so.
+    await writeFile(list, 'title,style\nGood,swiss\nBad,nope\n');
+    const partial = await cli('--batch', list, '--out-dir', join(dir, 'partial'));
+    assert.equal(partial.code, 1);
+    assert.match(partial.stderr, /Book 2 \("Bad"\): Unknown style "nope"/);
+    assert.match(partial.stderr, /Wrote 1 of 2 covers/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+  for (const [args, message] of [
+    [['T', '--batch', 'x.csv'], /give no title/],
+    [['--batch', 'x.csv', '-o', 'a.svg'], /without --out or --count/],
+  ]) {
+    const { code, stderr } = await cli(...args);
+    assert.equal(code, 1);
+    assert.match(stderr, message);
+  }
+});

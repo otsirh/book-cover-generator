@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { createCover, listStyles, palettes, formats } from '../src/index.js';
+import { createCover, listStyles, palettes, formats, parseBookList } from '../src/index.js';
 
 const HELP = `Usage: book-cover "<title>" ["<author>"] [options]
 
@@ -27,6 +28,13 @@ Options:
       --height <px>     height (default: from the format)
       --size <WxH>      width and height at once, e.g. 1600x2560
       --lang <tag>      language of the text, e.g. ja or zh-Hant (default: inferred)
+      --batch <file>    a cover for each book in a list (- reads stdin): CSV or
+                        TSV with a header row (title, author, subtitle, series,
+                        credit, badge, style, palette, seed, font, case, lang,
+                        width, height, texture), JSON lines, or one book per
+                        line as "Title | Author | Subtitle"; the other options
+                        apply to every book the list doesn't say otherwise for
+      --out-dir <dir>   where --batch writes its covers (default: here)
   -o, --out <file>      write SVG to a file instead of stdout
       --count <n>       write n variations (seeds 1…n, or <seed>-1…), named
                         cover-1.svg… from --out (or put {n} or {seed} in it)
@@ -39,7 +47,8 @@ Examples:
   book-cover "The Lighthouse Keeper" "Mara Ellison" -s artdeco -o cover.svg
   book-cover "Neon Tide" "Kai Moreno" --style retro --palette synth --size 1600x2560 > cover.svg
   book-cover "Bright Machines" --bg 0b132b --ink f8f9fa --accent ff6b6b,4ecdc4 --format ebook -o cover.svg
-  book-cover "Salt and Static" "J. R. Okafor" --count 12 -o ideas/cover.svg`;
+  book-cover "Salt and Static" "J. R. Okafor" --count 12 -o ideas/cover.svg
+  book-cover --batch books.csv --style minimal --seed series --out-dir covers`;
 
 let args;
 try {
@@ -66,6 +75,8 @@ try {
       size: { type: 'string' },
       lang: { type: 'string' },
       out: { type: 'string', short: 'o' },
+      batch: { type: 'string' },
+      'out-dir': { type: 'string' },
       count: { type: 'string' },
       json: { type: 'boolean' },
       list: { type: 'boolean' },
@@ -97,7 +108,11 @@ if (values.list) {
   process.exit(0);
 }
 
-if (!positionals.length) {
+if (values.batch !== undefined && positionals.length) {
+  console.error('--batch takes the titles from its list: give no title on the command line');
+  process.exit(1);
+}
+if (!positionals.length && values.batch === undefined) {
   console.error(HELP);
   process.exit(1);
 }
@@ -210,7 +225,81 @@ function fileFor(out, n, total, seed) {
  */
 const safeName = (seed) => seed.replace(/[^\p{L}\p{N}._-]+/gu, '-').replace(/^[.-]+/, '') || 'cover';
 
+/** A title as part of a file name: lower case, accents off Latin letters, dashes between words. @param {string} title */
+function slug(title) {
+  const words = title
+    .normalize('NFKD')
+    .replace(/(\p{Script=Latin})[\u0300-\u036f]+/gu, '$1')
+    .normalize('NFC')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{M}\p{N}]+/gu, '-')
+    .replace(/^-+/, '');
+  return Array.from(words).slice(0, 60).join('').replace(/-+$/, '') || 'cover';
+}
+
+/**
+ * Write a cover for each book in the --batch list into --out-dir; the command line's options
+ * apply to every book the list doesn't say otherwise for.
+ * @param {import('../src/index.js').CoverOptions} defaults
+ */
+function batch(defaults) {
+  if (values.count !== undefined || values.out !== undefined) {
+    throw new Error('--batch writes a file per book into --out-dir: use it without --out or --count');
+  }
+  const source = /** @type {string} */ (values.batch);
+  const books = parseBookList(readFileSync(source === '-' ? 0 : source, 'utf8'));
+  if (!books.length) {
+    throw new Error(
+      `No books in ${source === '-' ? 'the input' : source}: a title per line, or a CSV with a "title" column`,
+    );
+  }
+  const dir = values['out-dir'] ?? '.';
+  mkdirSync(dir, { recursive: true });
+  const digits = String(books.length).length;
+  let failed = 0;
+  books.forEach((book, i) => {
+    const n = i + 1;
+    try {
+      // A size in the list replaces the command line's.
+      const sized = book.width !== undefined || book.height !== undefined;
+      const cover = createCover({
+        ...defaults,
+        ...(sized ? { width: undefined, height: undefined } : {}),
+        ...book,
+        seed: book.seed ?? values.seed,
+      });
+      const file = join(dir, `${String(n).padStart(digits, '0')}-${slug(cover.title)}.svg`);
+      writeFileSync(file, cover.svg);
+      const { style, palette: paletteId, seed, width, height } = cover;
+      if (values.json)
+        process.stdout.write(JSON.stringify({ file, style, palette: paletteId, seed, width, height }) + '\n');
+    } catch (err) {
+      failed += 1;
+      console.error(`Book ${n} ("${book.title}"): ${err instanceof Error ? err.message : String(err)}`);
+    }
+  });
+  console.error(`Wrote ${books.length - failed} of ${books.length} covers to ${dir}`);
+  if (failed) process.exit(1);
+}
+
 try {
+  if (values.batch !== undefined) {
+    batch({
+      subtitle: values.subtitle,
+      series: values.series,
+      credit: values.credit,
+      badge: values.badge,
+      texture: values.texture,
+      style: values.style,
+      palette: palette(),
+      lang: values.lang,
+      variants: variants(),
+      font: values.font,
+      titleCase: /** @type {'upper' | 'normal' | undefined} */ (values.case),
+      ...dimensions(),
+    });
+    process.exit(0);
+  }
   const total = count();
   const options = {
     title: positionals[0],

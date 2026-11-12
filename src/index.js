@@ -25,6 +25,7 @@ export { titleBlock, authorFit, fitStack, drawStack, splitLead } from './type.js
 export { strongAccents, textColor, tintText, fitTitleWith, textPanel, TEXT_CONTRAST } from './styles/util.js';
 export * as svgUtils from './core.js';
 export { createMockup, mockupKinds } from './mockups.js';
+export { parseBookList } from './books.js';
 
 /** This version of the library (artwork for a seed can change between minor versions). */
 export const version = '1.5.0';

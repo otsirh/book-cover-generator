@@ -9,6 +9,7 @@ import {
   sizeLimits,
   FONTS,
   createMockup,
+  parseBookList,
 } from '../src/index.js';
 import {
   svgToDataUrl,
@@ -761,6 +762,11 @@ let galleryTimer;
 function render({ fade = false, announce = false } = {}) {
   applyShape();
   renderPreview(fade, announce);
+  // The list's preview follows the design too (after a pause while typing).
+  if (/** @type {HTMLDetailsElement} */ ($('many')).open) {
+    clearTimeout(manyTimer);
+    manyTimer = setTimeout(renderMany, typing ? 250 : 0);
+  }
   syncControls();
   markRail();
   // The gallery shows every style, so it only changes when something other than the style does.
@@ -1124,6 +1130,7 @@ function buildControls() {
       }
     }),
   );
+  buildMany();
   $('thumb-toggle').addEventListener('click', () => {
     const on = $('book').classList.toggle('store-size');
     $('thumb-toggle').setAttribute('aria-pressed', String(on));
@@ -1959,6 +1966,125 @@ function renderMockup() {
   /** @type {HTMLImageElement} */ ($('mockup-preview')).src = svgToDataUrl(
     createMockup(current, { kind, text: words.value }).svg,
   );
+}
+
+/* ------------------------------------------------------------ many covers */
+
+/** The most books one download makes. */
+const MAX_BOOKS = 300;
+/** How many the panel previews. */
+const PREVIEWED = 12;
+
+/** The books in the list (or why it can't be read). @returns {{ books: import('../src/index.js').CoverOptions[], error: string }} */
+function listedBooks() {
+  try {
+    return { books: parseBookList(/** @type {HTMLTextAreaElement} */ ($('many-list')).value), error: '' };
+  } catch (err) {
+    return { books: [], error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * Cover options for book `i` of the list: this design, with what the list says for it, and a
+ * palette of its own when asked for.
+ * @param {import('../src/index.js').CoverOptions} book @param {number} i
+ */
+function bookOptions(book, i) {
+  const base = optionsFor({ ...design, title: '', author: '', subtitle: design.subtitle });
+  const own = /** @type {HTMLInputElement} */ ($('many-palettes')).checked;
+  const start = Math.max(
+    0,
+    palettes.findIndex((p) => p.id === design.palette),
+  );
+  return {
+    ...base,
+    ...(own && !book.palette ? { palette: palettes[(start + i) % palettes.length].id } : {}),
+    // (Another style than this design's: none of this one's pinned choices.)
+    ...(book.style && book.style !== design.style ? { variants: {} } : {}),
+    ...(book.width !== undefined || book.height !== undefined ? { width: undefined, height: undefined } : {}),
+    ...book,
+  };
+}
+
+/** @type {ReturnType<typeof setTimeout> | undefined} */
+let manyTimer;
+
+/** The count and the first covers of the list, as they will come out. */
+function renderMany() {
+  const { books, error } = listedBooks();
+  const extra = books.length > MAX_BOOKS ? ` (the first ${MAX_BOOKS} are made)` : '';
+  $('many-count').textContent =
+    error || (books.length ? `${books.length} book${books.length === 1 ? '' : 's'}${extra}` : '');
+  $('many-preview').replaceChildren(
+    ...books.slice(0, PREVIEWED).map((book, i) => {
+      const img = /** @type {HTMLImageElement} */ (h('img', { alt: '' }));
+      try {
+        img.src = svgToDataUrl(createCover(bookOptions(book, i)).svg);
+      } catch {
+        // A row the library refuses (an unknown style, say): shown empty, reported on download.
+      }
+      return h('li', {}, img);
+    }),
+  );
+}
+
+function buildMany() {
+  const later = () => {
+    clearTimeout(manyTimer);
+    manyTimer = setTimeout(renderMany, 250);
+  };
+  $('many-list').addEventListener('input', later);
+  $('many').addEventListener('toggle', renderMany);
+  $('many-palettes').addEventListener('change', renderMany);
+  const button = /** @type {HTMLButtonElement} */ ($('many-download'));
+  button.addEventListener('click', () => busyWhile(button, downloadMany));
+}
+
+/** Every book in the list as a PNG or SVG, together in one ZIP. */
+async function downloadMany() {
+  const { books, error } = listedBooks();
+  if (!books.length) {
+    toast(error || 'Add a book per line first');
+    return;
+  }
+  const format = /** @type {HTMLSelectElement} */ ($('many-format')).value;
+  const button = $('many-download');
+  const list = books.slice(0, MAX_BOOKS);
+  /** @type {Set<string>} */
+  const taken = new Set();
+  /** @type {{ name: string, data: Blob | string }[]} */
+  const files = [];
+  /** @type {string[]} */
+  const failed = [];
+  try {
+    for (const [i, book] of list.entries()) {
+      button.textContent = `Drawing ${i + 1} of ${list.length}…`;
+      let cover;
+      try {
+        cover = createCover(bookOptions(book, i));
+      } catch (err) {
+        failed.push(`${i + 1}: ${err instanceof Error ? err.message : String(err)}`);
+        continue;
+      }
+      const base = `${String(i + 1).padStart(String(list.length).length, '0')}-${slug(oneLine(cover.title))}`;
+      if (format === 'svg') files.push({ name: uniqueName(base, 'svg', taken), data: cover.svg });
+      else {
+        const blob = await rasterize(cover.svg, { scale: scaleFor(design.format), dpi: DPI });
+        files.push({ name: uniqueName(base, extensionOf(blob) ?? 'png', taken), data: blob });
+      }
+    }
+    if (files.length) downloadBlob(await zipFiles(files), 'covers.zip');
+    if (failed.length) console.warn('Books left out:', failed);
+    toast(
+      `Saved ${files.length} cover${files.length === 1 ? '' : 's'} in covers.zip` +
+        (failed.length ? `; ${failed.length} couldn’t be made (see the console)` : ''),
+    );
+  } catch (err) {
+    console.error(err);
+    toast('Export failed. Try SVG, or fewer books.');
+  } finally {
+    button.textContent = 'Download all as ZIP';
+  }
 }
 
 /** @type {ReturnType<typeof setTimeout> | undefined} */

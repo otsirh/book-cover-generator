@@ -488,6 +488,37 @@
           </p>
           <ul class="kept-list" id="kept-list"></ul>
         </section>
+
+        <section class="many" aria-labelledby="many-heading">
+          <details id="many">
+            <summary><h2 id="many-heading">Many covers</h2></summary>
+            <p class="many-help" id="many-help">
+              One book per line, as <code>Title | Author | Subtitle</code>, or paste a CSV with a title column. Each
+              gets this design: with a fixed variation, a series gets one look.
+            </p>
+            <textarea
+              id="many-list"
+              rows="5"
+              aria-describedby="many-help"
+              aria-label="Books, one per line"
+              placeholder="The Lighthouse Keeper | Mara Ellison&#10;Salt and Static | J. R. Okafor"
+            ></textarea>
+            <label class="switch">
+              <input type="checkbox" id="many-palettes" role="switch" />
+              <span class="switch-track" aria-hidden="true"></span>
+              <span>A different palette for each</span>
+            </label>
+            <div class="many-row">
+              <select id="many-format" aria-label="File type">
+                <option value="png">PNG</option>
+                <option value="svg">SVG</option>
+              </select>
+              <button type="button" class="kept-tool" id="many-download">Download all as ZIP</button>
+              <span class="many-count" id="many-count" role="status"></span>
+            </div>
+            <ul class="kept-list" id="many-preview"></ul>
+          </details>
+        </section>
       </section>
 
       <aside class="rail" id="styles" aria-labelledby="rail-heading">

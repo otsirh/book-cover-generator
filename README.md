@@ -43,6 +43,8 @@ On [covers.otsirh.dev](https://covers.otsirh.dev) you type a title and author (p
 
 **Mockup** shows and downloads the cover as a 3D book, a flat shot, on an e-reader, or on a social card (a 1200 × 630 link preview, a square post or a story, with a line such as "Out now").
 
+**Many covers** takes a list of books (one per line as `Title | Author | Subtitle`, or a CSV with a title column) and makes them all with the design you have, as PNG or SVG in one ZIP. With a fixed variation they share one look, as a series does; switch on "A different palette for each" for a set in several colours.
+
 **Keep** saves a design to a tray under the preview, together with the cover as it was drawn, so a later version of the app can't change it. **Download all** saves every kept design as a PNG in one ZIP file. **Export** saves the kept designs to a file, and **Import** adds them in another browser.
 
 The app works offline once it has loaded.
@@ -108,11 +110,13 @@ npx book-cover-generator --list   # all styles and palettes
 npx book-cover-generator "Bright Machines" --bg 0b132b --ink f8f9fa --accent ff6b6b,4ecdc4 --format ebook --width 1600 -o cover.svg
 # any size, and the choices as JSON (with the SVG, when there is no -o)
 npx book-cover-generator "Neon Tide" --size 1800x2700 --json
+# a cover for every book in a list (CSV with a header row, JSON lines, or "Title | Author" lines), one look for all
+npx book-cover-generator --batch books.csv --style minimal --seed series --out-dir covers
 # twelve variations to choose from: ideas/cover-1.svg … ideas/cover-12.svg (seeds 1 to 12)
 npx book-cover-generator "Salt and Static" --count 12 -o ideas/cover.svg
 ```
 
-Options: `-s/--style`, `-p/--palette`, `--bg`, `--ink`, `--accent`, `--subtitle`, `--texture`, `--seed`, `--format` (`paperback`, `ebook` or `square`), `--width`, `--height`, `--size`, `--lang`, `--series`, `--credit`, `--badge`, `--font`, `--case upper|normal`, `--variant name=value` (`--list` shows each style's), `-o/--out`, `--count`, `--json`, `--list`, `--help`.
+Options: `-s/--style`, `-p/--palette`, `--bg`, `--ink`, `--accent`, `--subtitle`, `--texture`, `--seed`, `--format` (`paperback`, `ebook` or `square`), `--width`, `--height`, `--size`, `--lang`, `--series`, `--credit`, `--badge`, `--font`, `--case upper|normal`, `--variant name=value` (`--list` shows each style's), `-o/--out`, `--count`, `--batch <file|->`, `--out-dir`, `--json`, `--list`, `--help`.
 
 ## API
 
@@ -156,6 +160,7 @@ Titles and subtitles longer than 300 characters (authors: 200) are cut. With `'r
 - `pickStyle(options)`: the style id `createCover` would use for these options (resolving `'random'` from the seed), without drawing the cover
 - `registerStyle({ id, name, description, group, prefer, render(ctx) })`: add your own style (see below). Replacing a built-in style takes `registerStyle(style, { replace: true })`; `unregisterStyle(id)` removes a style or brings the built-in back
 - `registerPalette({ id, name, bg, ink, accents })`: add a palette to use by id, as `palette: 'brand'` (`{ replace: true }` for a built-in id); `unregisterPalette(id)` removes it. Registered styles and palettes can also be picked by `'random'`, so registering one changes what a seed gives
+- `parseBookList(text)`: a list of books (CSV or TSV with a header row, JSON lines, or one "Title | Author | Subtitle" per line) as cover options, one per book
 - `version`: the library's version (artwork for a seed can change between minor versions)
 - `sizeLimits` (`{ min: 50, max: 10000, ratio: 3 }`) and `formats` (`paperback`, `ebook` and `square` as `[width, height]` at 600 px wide): the sizes covers can have, and the app's shapes
 - `titleBlock`, `authorFit`: the typography the built-in styles use (a title with its lead line and subtitle, and the author line)

@@ -1118,6 +1118,56 @@ input[type='number'][aria-invalid='true'] {
   width: min(100%, 520px);
 }
 
+/* Many covers: a list in, a ZIP out. */
+.many {
+  width: min(100%, 520px);
+}
+
+.many details {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.many summary {
+  cursor: pointer;
+}
+
+.many summary h2 {
+  display: inline;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.many details[open] > * + * {
+  margin-top: 10px;
+}
+
+.many-help {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.many-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.many-row select {
+  width: auto;
+}
+
+.many-count {
+  font-size: 13px;
+  color: var(--muted);
+}
+
 .kept-head {
   display: flex;
   align-items: center;
