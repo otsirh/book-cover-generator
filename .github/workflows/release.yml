@@ -1,0 +1,87 @@
+name: Release
+
+# A version tag (v1.7.0) publishes that version to npm, with provenance, and makes its GitHub
+# release from the CHANGELOG. npm trusts this workflow to publish (trusted publishing, set in the
+# package's settings on npmjs.com), so no npm token is stored anywhere.
+#
+# Run it by hand for a dry run: the checks, and what the package would hold.
+
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  npm:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          registry-url: https://registry.npmjs.org
+      - name: The tag names the package's version
+        if: github.ref_type == 'tag'
+        run: |
+          version="v$(node -p 'require("./package.json").version')"
+          [ "$version" = "$GITHUB_REF_NAME" ] || { echo "::error::Tag $GITHUB_REF_NAME, package $version"; exit 1; }
+      - name: npm can publish with trusted publishing (11.5.1 or later)
+        run: |
+          node -e '
+            const [major, minor, patch] = process.argv[1].split(".").map(Number);
+            const ok = major > 11 || (major === 11 && (minor > 5 || (minor === 5 && patch >= 1)));
+            if (!ok) { console.error(`::error::npm ${process.argv[1]} is too old for trusted publishing`); process.exit(1); }
+          ' "$(npm --version)"
+      - run: npm ci
+      - run: npm run check
+      - name: Publish
+        if: github.ref_type == 'tag'
+        run: npm publish
+      - name: What would be published
+        if: github.ref_type != 'tag'
+        run: npm pack --dry-run
+
+  github:
+    name: GitHub release
+    needs: npm
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Release notes from the CHANGELOG
+        run: |
+          awk -v v="${GITHUB_REF_NAME#v}" '
+            index($0, "## [" v "]") == 1 { on = 1; next }
+            on && /^## \[/ { exit }
+            on { print }
+          ' CHANGELOG.md > notes.md
+          [ -s notes.md ] || { echo "::error::No CHANGELOG section for ${GITHUB_REF_NAME#v}"; exit 1; }
+      - name: Make the release (or bring an existing one's notes up to date)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" --title "${GITHUB_REF_NAME#v}" --notes-file notes.md
+          else
+            gh release create "$GITHUB_REF_NAME" --verify-tag --latest --title "${GITHUB_REF_NAME#v}" --notes-file notes.md
+          fi
