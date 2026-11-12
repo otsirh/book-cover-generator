@@ -187,6 +187,7 @@ const REPLACE_MS = 300;
  * @param {() => void} write
  */
 function safely(write) {
+  recentWrites.push(performance.now());
   try {
     write();
     return true;
@@ -195,10 +196,24 @@ function safely(write) {
   }
 }
 
+/** Times of recent history writes. Safari allows about 100 in 30 s; typing slows down well before. */
+/** @type {number[]} */
+const recentWrites = [];
+
+/** How long a typing burst waits between history writes: longer once many were made recently. */
+function replaceInterval() {
+  const now = performance.now();
+  while (recentWrites.length && now - recentWrites[0] > 30_000) recentWrites.shift();
+  return recentWrites.length > 40 ? 2000 : REPLACE_MS;
+}
+
 /** @type {ReturnType<typeof setTimeout> | undefined} */
 let stampTimer;
 /** Counts entry changes (pushes and traversals), so a delayed write can tell it is stale. */
 let entryGen = 0;
+/** Each entry's design by index, for an entry whose state the browser refused to store. */
+/** @type {Map<number, Design>} */
+const designs = new Map();
 /** The URL fragment of the current entry, as last written or visited. */
 let entryHash = '';
 /**
@@ -211,6 +226,7 @@ function stamp(gen = entryGen) {
   stampTimer = undefined;
   // Another entry is current now (a click or Back since): this write was for the old one.
   if (gen !== entryGen) return;
+  designs.set(historyIndex, { ...design });
   if (
     !safely(() => history.replaceState({ i: historyIndex }, '', toHash(design))) ||
     history.state?.i !== historyIndex
@@ -236,7 +252,7 @@ function flushReplace() {
 
 /**
  * Keystrokes within a typing burst update the burst's entry: at once, then at most
- * every REPLACE_MS (browsers rate-limit history writes). The entry is never more than
+ * every REPLACE_MS, or less often after many writes (browsers rate-limit history writes). The entry is never more than
  * that behind, even if the toolbar's Back button (which can't be intercepted) leaves it.
  */
 function scheduleReplace() {
@@ -247,10 +263,10 @@ function scheduleReplace() {
     replaceTimer = undefined;
     if (replaceDirty) {
       writeReplace();
-      replaceTimer = setTimeout(tick, REPLACE_MS);
+      replaceTimer = setTimeout(tick, replaceInterval());
     }
   };
-  replaceTimer = setTimeout(tick, REPLACE_MS);
+  replaceTimer = setTimeout(tick, replaceInterval());
 }
 
 /** A new history step for the current design. Callers save pending keystrokes first (update()). */
@@ -266,6 +282,7 @@ function commit() {
   if (pushed) {
     entryGen += 1;
     entryHash = location.hash;
+    designs.set(historyIndex + 1, { ...design });
     historyIndex += 1;
     historyMax = historyIndex;
     saveHistoryMax();
@@ -331,26 +348,37 @@ window.addEventListener('popstate', (e) => {
   stampTimer = undefined;
   entryGen += 1;
   typing = false;
-  const dir = stepping;
+  // (A step whose popstate never came, after a second, says nothing about this one.)
+  const dir = performance.now() - steppingSince < 1000 ? stepping : 0;
   stepping = 0;
   const ours = Boolean(e.state) && typeof e.state.i === 'number';
-  if (ours) historyIndex = e.state.i;
+  if (ours) {
+    historyIndex = e.state.i;
+    // An entry of ours that is reachable again (toolbar Forward after the max was lowered).
+    if (historyIndex > historyMax) {
+      historyMax = historyIndex;
+      saveHistoryMax();
+    }
+  }
   const linked = ours ? null : fromHash(location.hash);
+  /** The design of an entry whose state was never stored, if this tab saw it. @type {Design | null} */
+  let remembered = null;
   if (!ours) {
-    queuedSteps = 0;
     if (dir) {
       // Undo or Redo landed on an entry whose index was never written (the browser refused).
       historyIndex += dir;
+      remembered = designs.get(historyIndex) ?? null;
     } else if (location.hash !== entryHash) {
       // A new entry (an edited URL, a pasted link, or a fragment like #usage): the browser put
       // it right after the one we were on and dropped any ahead of it.
+      queuedSteps = 0;
       historyIndex += 1;
       historyMax = historyIndex;
       saveHistoryMax();
     }
     // Otherwise the same URL again (Enter in the address bar): the browser replaced this entry.
   } else entryHash = location.hash;
-  if (linked && !Object.keys(linked).length) {
+  if (linked && !remembered && !Object.keys(linked).length) {
     // A fragment that isn't a design (say #usage, typed to jump to the docs): keep the design.
     stamp();
     syncHistoryButtons();
@@ -367,6 +395,7 @@ window.addEventListener('popstate', (e) => {
   // edited URL changes just the keys it names, and a pasted link names them all. A link from
   // before 1.2.0 names every key but the optional ones, which it left out when empty or off.
   if (!linked) Object.assign(design, OPTIONAL, fromHash(location.hash));
+  else if (remembered) Object.assign(design, remembered);
   else {
     // (Judged by the keys the URL names: an unknown value is dropped, but the link is still whole,
     // and opens as it would in a new tab.)
@@ -918,7 +947,7 @@ function loadKept() {
   try {
     const raw = JSON.parse(localStorage.getItem(KEEP_KEY) || '[]');
     if (!Array.isArray(raw)) return [];
-    // (Cut first: completing a design can render a cover to pick its style.)
+    // (Cut first: there's no use completing designs that are thrown away.)
     return raw.slice(0, MAX_KEPT).map((item) => complete(sanitize(item && typeof item === 'object' ? item : {})));
   } catch {
     return [];

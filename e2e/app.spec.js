@@ -367,6 +367,113 @@ test('loading the same URL again (Enter in the address bar) adds no Undo step', 
   await expect(page.locator('#undo')).toBeDisabled();
 });
 
+test('Undo onto an entry whose write was refused shows that entry, not a mix', async ({ page }) => {
+  await page.goto('/#title=T&style=minimal&palette=parchment&seed=w');
+  await page.locator('.tile[data-style="swiss"]').click();
+  await selected(page, 'swiss');
+  await page.evaluate(() => {
+    const real = history.replaceState.bind(history);
+    let refuse = true;
+    history.replaceState = (...args) => {
+      if (refuse) {
+        refuse = false;
+        throw new DOMException('Too many calls', 'SecurityError');
+      }
+      return real(...args);
+    };
+    location.hash = 'style=orbit&seed=w2';
+  });
+  await selected(page, 'orbit');
+  await page.locator('[data-palette="mint"]').click();
+  await expect(page.locator('[data-palette="mint"]')).toHaveAttribute('aria-pressed', 'true');
+  await page.waitForTimeout(1200);
+  await page.locator('#undo').click();
+  await selected(page, 'orbit');
+  // The palette change is undone too.
+  await expect(page.locator('[data-palette="parchment"]')).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('a step the browser ignored does not steer a later navigation', async ({ page }) => {
+  await page.goto('/#title=T&style=minimal&seed=g');
+  await page.locator('.tile[data-style="swiss"]').click();
+  await page.locator('.tile[data-style="bauhaus"]').click();
+  await selected(page, 'bauhaus');
+  await page.locator('#undo').click();
+  await selected(page, 'swiss');
+  await page.locator('#undo').click();
+  await selected(page, 'minimal');
+  await expect(page.locator('#redo')).toBeEnabled();
+  // The browser drops the next history.go.
+  await page.evaluate(() => {
+    const real = history.go.bind(history);
+    let drop = true;
+    history.go = (delta) => {
+      if (drop) {
+        drop = false;
+        return;
+      }
+      real(delta);
+    };
+  });
+  await page.locator('#redo').click();
+  await page.waitForTimeout(1200);
+  await page.evaluate(() => {
+    location.hash = 'style=orbit&seed=g2';
+  });
+  await selected(page, 'orbit');
+  // A new entry: nothing is ahead of it.
+  await expect(page.locator('#redo')).toBeDisabled();
+  await page.locator('#undo').click();
+  await selected(page, 'minimal');
+});
+
+test('coming back with Forward makes the app entries ahead reachable again', async ({ page }) => {
+  await page.goto('about:blank');
+  await page.goto('/#title=T&style=minimal&seed=f');
+  for (const style of ['swiss', 'bauhaus']) {
+    await page.locator(`.tile[data-style="${style}"]`).click();
+    await selected(page, style);
+  }
+  await page.locator('#undo').click();
+  await page.locator('#undo').click();
+  await selected(page, 'minimal');
+  await page.goBack();
+  await page.goForward();
+  await selected(page, 'minimal');
+  await page.goForward();
+  await selected(page, 'swiss');
+  await page.locator('#undo').click();
+  await selected(page, 'minimal');
+  await expect(page.locator('#redo')).toBeEnabled();
+  await page.locator('#redo').click();
+  await selected(page, 'swiss');
+});
+
+test('a long typing session slows its history writes, inside browser rate limits', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('/#title=&style=minimal&seed=r');
+  const writes = await page.evaluate(() => {
+    let count = 0;
+    const real = history.replaceState.bind(history);
+    history.replaceState = (...args) => {
+      count += 1;
+      return real(...args);
+    };
+    /** @type {any} */ (window).__writes = () => count;
+    return 0;
+  });
+  expect(writes).toBe(0);
+  const title = page.locator('#title');
+  await title.focus();
+  // 30 s of steady typing: a key every 250 ms.
+  for (let i = 0; i < 120; i++) {
+    await page.keyboard.type(String.fromCharCode(97 + (i % 26)));
+    await page.clock.runFor(250);
+  }
+  const total = await page.evaluate(() => /** @type {any} */ (window).__writes());
+  expect(total).toBeLessThan(70);
+});
+
 test('a write refused for an edited URL is not retried onto a later entry', async ({ page }) => {
   await page.goto('/#title=T&style=minimal&seed=w');
   await page.locator('.tile[data-style="swiss"]').click();

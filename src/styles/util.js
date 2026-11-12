@@ -1,4 +1,4 @@
-import { n, circle, contrast, readable, clamp } from '../core.js';
+import { n, circle, contrast, readable, clamp, mix } from '../core.js';
 import { titleBlock } from '../type.js';
 import { graphemes } from '../text.js';
 
@@ -27,6 +27,40 @@ export function strongAccents(p, bg, min = 1.8) {
   return list.length ? list : [readable(bg, [...p.accents, p.ink, p.bg])];
 }
 
+/** Text needs this much contrast with what is behind it (WCAG's floor for large text). */
+export const TEXT_CONTRAST = 3;
+
+/**
+ * A colour for text over `bg` (or over every colour in `bg`, for text on a gradient): the
+ * first of `preferred` with at least 3:1 against all of them, else whichever of the
+ * palette's ink and background, white and near-black reads best. Decoration can use any
+ * accent; text that takes an accent goes through here.
+ * @param {import('../index.js').ResolvedPalette} p
+ * @param {string | string[]} bg
+ * @param {string[]} [preferred]
+ */
+export function textColor(p, bg, preferred = []) {
+  const bgs = Array.isArray(bg) ? bg : [bg];
+  const worst = (/** @type {string} */ col) => Math.min(...bgs.map((b) => contrast(col, b)));
+  const good = preferred.find((col) => worst(col) >= TEXT_CONTRAST);
+  if (good) return good;
+  return [p.ink, p.bg, '#ffffff', '#111111'].reduce((best, col) => (worst(col) > worst(best) ? col : best));
+}
+
+/**
+ * `mix(base, toward, k)` for text: as much of `toward` (up to `k`) as keeps 3:1 against
+ * `bg` (or every colour in it). `base` itself must already read well.
+ * @param {string} base @param {string} toward @param {number} k @param {string | string[]} bg
+ */
+export function tintText(base, toward, k, bg) {
+  const bgs = Array.isArray(bg) ? bg : [bg];
+  for (let t = k; t > 0.001; t -= 0.05) {
+    const col = mix(base, toward, t);
+    if (bgs.every((b) => contrast(col, b) >= TEXT_CONTRAST)) return col;
+  }
+  return base;
+}
+
 /**
  * Try layouts in order until the title fits comfortably: not truncated, and at
  * least `minSize` × the short side. The last layout wins if none does.
@@ -40,7 +74,7 @@ export function strongAccents(p, bg, min = 1.8) {
 export function fitTitleWith(c, candidates, optionsFor, minSize = 0.06) {
   let block = titleBlock(c, optionsFor(candidates[0]));
   let value = candidates[0];
-  for (let i = 1; i < candidates.length && (block.truncated || block.size < c.S * minSize); i++) {
+  for (let i = 1; i < candidates.length && (block.truncated || block.smallest < c.S * minSize); i++) {
     value = candidates[i];
     block = titleBlock(c, optionsFor(value));
   }

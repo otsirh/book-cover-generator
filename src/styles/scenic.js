@@ -18,7 +18,7 @@ import {
 } from '../core.js';
 import { FONTS, drawText } from '../text.js';
 import { titleBlock, authorFit } from '../type.js';
-import { strongAccents, fitTitleWith } from './util.js';
+import { strongAccents, fitTitleWith, tintText } from './util.js';
 
 /** @typedef {import('../index.js').StyleContext} Ctx */
 
@@ -380,7 +380,9 @@ export const constellation = {
       maxLines: 4,
     });
     s += t.draw({ x: W / 2, y: top + (aY - m * 0.8 - top - t.height) / 2, anchor: 'middle', fill: ink });
-    s += drawText(a, { x: W / 2, y: aY, anchor: 'middle', fill: mix(ink, accent, 0.3) });
+    // The sky runs from the background to this at the bottom, behind the author.
+    const skyLow = dark ? mix(bg, accent, 0.28) : mix(bg, p.ink, 0.12);
+    s += drawText(a, { x: W / 2, y: aY, anchor: 'middle', fill: tintText(ink, accent, 0.3, [bg, skyLow]) });
     return s;
   },
 };
@@ -476,7 +478,7 @@ export const orbit = {
       subtitleItalic: false,
     });
     s += t.draw({ x: W / 2, y: top + (aY - m * 0.8 - top - t.height) / 2, anchor: 'middle', fill: light });
-    s += drawText(a, { x: W / 2, y: aY, anchor: 'middle', fill: mix(light, rc, 0.35) });
+    s += drawText(a, { x: W / 2, y: aY, anchor: 'middle', fill: tintText(light, rc, 0.35, night) });
     return s;
   },
 };

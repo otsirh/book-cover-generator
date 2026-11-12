@@ -511,6 +511,15 @@ function memphisShape(type, x, y, size, color, rot, u) {
   const tr = `transform="rotate(${n(rot)} ${n(x)} ${n(y)})"`;
   const stroke = (/** @type {number} */ w) =>
     `fill="none" stroke="${color}" stroke-width="${n(w * u)}" stroke-linecap="round" stroke-linejoin="round"`;
+  // The filled and the outlined triangle share their points.
+  const triangle = pathD(
+    [
+      [x, y - size * 0.6],
+      [x + size * 0.6, y + size * 0.45],
+      [x - size * 0.6, y + size * 0.45],
+    ],
+    true,
+  );
   switch (type) {
     case 'squiggle': {
       const pts = [];
@@ -518,27 +527,9 @@ function memphisShape(type, x, y, size, color, rot, u) {
       return `<path d="${pathD(pts)}" ${stroke(Math.max(5, (size * 0.06) / u))} ${tr}/>`;
     }
     case 'triangle':
-      return path(
-        pathD(
-          [
-            [x, y - size * 0.6],
-            [x + size * 0.6, y + size * 0.45],
-            [x - size * 0.6, y + size * 0.45],
-          ],
-          true,
-        ),
-        color,
-        tr,
-      );
+      return path(triangle, color, tr);
     case 'outline':
-      return `<path d="${pathD(
-        [
-          [x, y - size * 0.6],
-          [x + size * 0.6, y + size * 0.45],
-          [x - size * 0.6, y + size * 0.45],
-        ],
-        true,
-      )}" ${stroke(5)} ${tr}/>`;
+      return `<path d="${triangle}" ${stroke(5)} ${tr}/>`;
     case 'circle':
       return circle(x, y, size * 0.5, color);
     case 'ring':

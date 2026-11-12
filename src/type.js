@@ -173,6 +173,7 @@ export function drawStack(fit, { x, y, anchor = 'start', fill = '#000', opacity,
  * @property {number} height   cap height of the first line to the bottom of the block
  * @property {number} width
  * @property {number} size     main title size (largest line for stacks)
+ * @property {number} smallest the smallest title line's size (the same as `size` unless stacked)
  * @property {boolean} stacked  whether the title came out as a justified stack
  * @property {number} lines    number of title lines (excluding the lead and subtitle)
  * @property {boolean} truncated  the title was cut with an ellipsis because it didn't fit
@@ -327,7 +328,7 @@ export function titleBlock(c, o) {
     const inB = b.height <= o.maxHeight + 0.5;
     if (inA !== inB) return inA;
     if (inOrder(a) !== inOrder(b)) return inOrder(a);
-    if (Math.abs(a.fit.size - b.fit.size) > 0.01) return a.fit.size > b.fit.size;
+    if (Math.abs(titleSize(a) - titleSize(b)) > 0.01) return titleSize(a) > titleSize(b);
     return truncatedIn(b) && !truncatedIn(a);
   };
 
@@ -354,6 +355,7 @@ export function titleBlock(c, o) {
     height: L.height,
     width,
     size: fit.size,
+    smallest: titleSize(L),
     stacked: 'kind' in fit,
     lines: fit.lines.length,
     truncated: truncatedIn(L),

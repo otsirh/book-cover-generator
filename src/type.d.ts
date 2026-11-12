@@ -55,6 +55,8 @@ export interface TitleBlock {
   width: number;
   /** The main title size (the largest line, for stacks). */
   size: number;
+  /** The smallest title line's size: the same as `size` unless stacked. */
+  smallest: number;
   /** Whether the title came out as a justified stack. */
   stacked: boolean;
   /** Number of title lines, not counting the lead or subtitle. */

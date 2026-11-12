@@ -14,7 +14,7 @@ import {
 } from '../core.js';
 import { FONTS, fitText, drawText, textBottom, graphemes, measureText, textGroupAttrs } from '../text.js';
 import { titleBlock, authorFit } from '../type.js';
-import { strongAccents, flower, initialChars, textPanel } from './util.js';
+import { strongAccents, flower, initialChars, textPanel, textColor } from './util.js';
 
 /** @typedef {import('../index.js').StyleContext} Ctx */
 
@@ -133,7 +133,7 @@ export const artdeco = {
     }
 
     const font = rng.pick([FONTS.didone, FONTS.condensed]);
-    const titleColor = rng.bool(0.5) ? gold : light;
+    const titleColor = rng.bool(0.5) ? textColor(p, bg, [gold]) : light;
     const a = authorFit(c, {
       font: FONTS.geometric,
       weight: 500,
@@ -457,7 +457,8 @@ export const engraved = {
     const { W, H, S, u, m, rng, p } = c;
     const cloth = p.bg;
     const gilt = rng.pick(strongAccents(p, cloth, 2).concat(p.ink));
-    const ink = gilt;
+    // The gilt decorates; text takes it only where it reads (3:1).
+    const ink = textColor(p, cloth, [gilt]);
     const o1 = m * 0.5;
     const band = S * 0.05;
     const o2 = o1 + band;
@@ -527,20 +528,22 @@ export const engraved = {
     }
 
     const inner = W - o2 * 2 - m * 1.2;
+    // The title is centred between the inner border and the medallion, and fits that region.
+    const tTop = o2 + m * 0.9;
+    const regionH = my - mr - m * 0.8 - tTop;
     const t = titleBlock(c, {
       font: rng.pick([FONTS.didone, FONTS.serif, FONTS.garamond]),
       upper: true,
       letterSpacing: 0.12,
       maxWidth: inner,
-      maxHeight: my - mr - o2 - m * 1.6,
+      maxHeight: regionH,
       maxSize: S * 0.1,
       lineHeight: 1.2,
       maxLines: 5,
     });
-    const tTop = o2 + m * 0.9;
     s += t.draw({
       x: W / 2,
-      y: tTop + Math.max(0, (my - mr - m * 0.8 - tTop - t.height) / 2),
+      y: tTop + Math.max(0, (regionH - t.height) / 2),
       anchor: 'middle',
       fill: ink,
     });

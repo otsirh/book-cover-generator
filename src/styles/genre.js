@@ -17,7 +17,7 @@ import {
 } from '../core.js';
 import { FONTS, fitText, drawText, textGroupAttrs } from '../text.js';
 import { titleBlock, authorFit } from '../type.js';
-import { strongAccents, fitTitleWith, flower } from './util.js';
+import { strongAccents, fitTitleWith, flower, textColor } from './util.js';
 
 /** @typedef {import('../index.js').StyleContext} Ctx */
 
@@ -354,7 +354,7 @@ export const noir = {
     let bars = '';
     for (let y = -H * 0.3; y < H * 0.9; y += sp) bars += rect(-W * 0.3, y, W * 1.6, sp * 0.3, bg);
     s += `<g transform="rotate(${n(ang)} ${n(W / 2)} ${n(H / 3)})" opacity="0.38">${bars}</g>`;
-    s += drawText(a, { x: m, y: tY + t.height + m * 0.7, fill: accent });
+    s += drawText(a, { x: m, y: tY + t.height + m * 0.7, fill: textColor(p, bg, [accent]) });
     s += g.layer;
     return s;
   },

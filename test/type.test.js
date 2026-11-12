@@ -177,3 +177,17 @@ test('layout helpers reject a missing box instead of drawing NaN', () => {
     /titleBlock: `maxWidth`/,
   );
 });
+
+test('a title block reports its smallest line, which is the size for an unstacked title', () => {
+  const stacked = titleBlock(ctx({ title: 'Signal Lost Forever' }), {
+    maxWidth: 400,
+    maxHeight: 600,
+    maxSize: 200,
+    stack: true,
+    font: FONTS.sans,
+  });
+  assert.ok(stacked.stacked);
+  assert.ok(stacked.smallest < stacked.size, `${stacked.smallest} vs ${stacked.size}`);
+  const plain = titleBlock(ctx(), { maxWidth: 400, maxHeight: 600, maxSize: 60 });
+  assert.equal(plain.smallest, plain.size);
+});

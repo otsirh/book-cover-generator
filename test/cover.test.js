@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createCover, generateCover, styles, palettes, registerStyle, listStyles, pickStyle } from '../src/index.js';
-import { contrast, mix } from '../src/core.js';
+import { contrast, mix, luminance } from '../src/core.js';
 
 // The built-in styles (registration is tested in its own process, in register.test.js).
 const builtIn = [...styles];
@@ -138,21 +138,22 @@ test('invalid sizes throw instead of producing NaN, hanging or changing shape', 
  * @param {string} svg
  */
 function textElements(svg) {
-  /** @type {number[]} */
-  const sizes = [];
-  /** @type {{ text: string, y: number | null, size: number }[]} */
+  /** @type {{ size: number, fill: string }[]} */
+  const stack = [];
+  /** @type {{ text: string, y: number | null, size: number, fill: string }[]} */
   const out = [];
   for (const [, closing, attrs, selfClosing, content] of svg.matchAll(
     /<(\/?)(?:g|text|tspan)\b([^>]*?)(\/?)>([^<]*)/g,
   )) {
     if (closing) {
-      sizes.pop();
+      stack.pop();
       continue;
     }
-    const size = Number(/font-size="([\d.]+)"/.exec(attrs)?.[1] ?? sizes.at(-1) ?? 0);
+    const size = Number(/font-size="([\d.]+)"/.exec(attrs)?.[1] ?? stack.at(-1)?.size ?? 0);
+    const fill = /\bfill="(#[0-9a-f]{6})"/.exec(attrs)?.[1] ?? stack.at(-1)?.fill ?? '';
     const y = /\by="(-?[\d.]+)"/.exec(attrs)?.[1];
-    out.push({ text: content, y: y == null ? null : Number(y), size });
-    if (!selfClosing) sizes.push(size);
+    out.push({ text: content, y: y == null ? null : Number(y), size, fill });
+    if (!selfClosing) stack.push({ size, fill });
   }
   return out;
 }
@@ -686,4 +687,38 @@ test('pickStyle names the style createCover would use, without drawing', () => {
   }
   assert.equal(pickStyle({ style: 'noir' }), 'noir');
   assert.throws(() => pickStyle({ style: 'nope' }), /Unknown style "nope"/);
+});
+
+test('text that takes an accent colour keeps 3:1 against its background', () => {
+  /** @type {Record<string, (p: import('../src/index.js').Palette) => string>} */
+  const backgrounds = {
+    engraved: (p) => p.bg,
+    artdeco: (p) => p.bg,
+    orbit: (p) => p.bg,
+    constellation: (p) => p.bg,
+    noir: (p) => {
+      const night = luminance(p.bg) >= luminance(p.ink) ? p.ink : p.bg;
+      return p.dark ? mix(night, '#000000', 0.45) : p.bg;
+    },
+  };
+  const low = [];
+  for (const [style, bgOf] of Object.entries(backgrounds)) {
+    for (const p of palettes) {
+      const bg = bgOf(p);
+      for (let seed = 0; seed < 24; seed++) {
+        const { svg } = createCover({
+          title: 'Lighthouse',
+          author: 'Mara Ellison',
+          style,
+          palette: p.id,
+          seed: String(seed),
+        });
+        for (const run of textRuns(svg)) {
+          if (run.fill && contrast(run.fill, bg) < 3)
+            low.push(`${style} ${p.id} ${seed} "${run.text}": ${run.fill} on ${bg}`);
+        }
+      }
+    }
+  }
+  assert.deepEqual(low.slice(0, 8), []);
 });
