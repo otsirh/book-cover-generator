@@ -99,6 +99,9 @@ jobs:
           bun=$(bun scripts/runtime-check.js)
           printf 'node %s\ndeno %s\nbun  %s\n' "$node" "$deno" "$bun"
           [ "$node" = "$deno" ] && [ "$node" = "$bun" ] || { echo "::error::The runtimes drew different covers"; exit 1; }
+      # Every module, symbol and member of the public API has docs (JSR's docs pages and score).
+      - name: The API is documented
+        run: deno doc --lint src/index.js src/browser.js src/element.js
 
   e2e:
     name: Browser tests (${{ matrix.project }})

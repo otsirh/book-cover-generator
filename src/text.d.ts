@@ -1,3 +1,4 @@
+/** A font to set text in: a CSS font-family stack, and what fitting text in it needs to know. */
 export interface FontSpec {
   /** Its name as the app's menu shows it (the built-in fonts). */
   name?: string;
@@ -11,6 +12,10 @@ export interface FontSpec {
   mono?: boolean;
 }
 
+/**
+ * The built-in fonts. Each is a stack of system fonts, as an SVG drawn into a canvas (for PNG or
+ * JPEG export) can't load web fonts.
+ */
 export declare const FONTS: Readonly<{
   serif: FontSpec;
   didone: FontSpec;
@@ -23,9 +28,13 @@ export declare const FONTS: Readonly<{
   mono: FontSpec;
 }>;
 
+/** The type `measureText` measures with: a font, its weight and style, and letter-spacing. */
 export interface TextSpec {
+  /** The font. */
   font: FontSpec;
+  /** Font weight. Default 400. */
   weight?: number;
+  /** Italic. Default `false`. */
   italic?: boolean;
   /** In em. */
   letterSpacing?: number;
@@ -43,6 +52,12 @@ export type TextMeasurer = (
  * string and font at a reference size of 100 px, and other sizes are scaled from it. Pass `null` to restore the default.
  */
 export declare function setTextMeasurer(fn: TextMeasurer | null): void;
+/**
+ * The width in px of `text` at `size` px, letter-spacing included: measured with the function set
+ * by `setTextMeasurer`, else with a canvas, else from the built-in fonts' character widths (other
+ * fonts are estimated). Throws a TypeError if that function returns anything but a finite width of
+ * 0 or more.
+ */
 export declare function measureText(text: string, size: number, spec: TextSpec): number;
 /** Throw a TypeError if `maxWidth` is missing or `maxHeight` is NaN. */
 export declare function checkBox(fn: string, o: { maxWidth: number; maxHeight?: number }): void;
@@ -60,9 +75,13 @@ export declare const LINE_BREAK: RegExp;
 export declare function typedLines(text: string): number;
 /** Where some text was drawn. */
 export interface TextBox {
+  /** Left edge, in px. */
   x0: number;
+  /** Top edge, in px. */
   y0: number;
+  /** Right edge, in px. */
   x1: number;
+  /** Bottom edge, in px. */
   y1: number;
 }
 /** Note that text was drawn in this box (drawText and drawStack do it), so a badge can be placed clear of it. */
@@ -74,6 +93,7 @@ export declare function clipGraphemes(str: string, max: number, options?: { unit
 /** Split a string into user-perceived characters. */
 export declare function graphemes(str: string): string[];
 
+/** Options for `fitText`: the box to fit, and how to set the text. */
 export interface FitOptions {
   /** Box width in px. */
   maxWidth: number;
@@ -83,14 +103,19 @@ export interface FitOptions {
   maxHeight?: number;
   /** Smallest font size in px before words are broken and truncated. */
   minSize?: number;
+  /** The font. Default `FONTS.sans`. */
   font?: FontSpec;
+  /** Font weight. Default 400. */
   weight?: number;
+  /** Italic. Default `false`. */
   italic?: boolean;
   /** In em. Ignored for scripts whose letters join (Arabic…), which browsers don't letter-space. */
   letterSpacing?: number;
   /** Multiple of the font size. */
   lineHeight?: number;
+  /** The most lines to wrap to. Default 5. */
   maxLines?: number;
+  /** Set the text in capitals. Default `false`. */
   upper?: boolean;
   /** Even out line lengths (default `true`). */
   balance?: boolean;
@@ -100,18 +125,27 @@ export interface FitOptions {
   hyphenate?: number;
 }
 
+/** Text fitted to a box by `fitText`, ready for `drawText`. */
 export interface TextFit {
+  /** The lines, as set (in capitals with `upper`); empty for empty text. */
   lines: string[];
+  /** Font size in px (0 for empty text). */
   size: number;
+  /** The widest line's width in px. */
   width: number;
   /** From the top of the first line (its cap height, or its accents and marks where they reach higher) to the baseline of the last. */
   height: number;
+  /** The font. */
   font: FontSpec;
+  /** Font weight. */
   weight: number;
+  /** Whether it is italic. */
   italic: boolean;
+  /** Letter-spacing in em (0 for scripts whose letters join). */
   letterSpacing: number;
   /** The pitch between baselines, as a multiple of the size: the requested line height, or more where a line's accents or marks would reach the line above. */
   lineHeight: number;
+  /** Cap height as a fraction of the size: the font's `cap`, else 0.72. */
   cap: number;
   /** Room above the first line's cap height for its accents and marks, as a fraction of the size. */
   above?: number;
@@ -121,12 +155,17 @@ export interface TextFit {
   truncated: boolean;
 }
 
+/** Where and how `drawText` sets a fit. */
 export interface DrawOptions {
+  /** The x of the anchor point, in px. */
   x: number;
   /** Top of the text block: the cap height of the first line, or its accents and marks where they reach higher. */
   y: number;
+  /** How the lines align on `x`, as SVG's `text-anchor`. Default `'start'`. */
   anchor?: 'start' | 'middle' | 'end';
+  /** Text colour. Default `'#000'`. */
   fill?: string;
+  /** Opacity, 0–1. Default 1. */
   opacity?: number;
   /** Extra raw SVG attributes for the wrapping `<g>`. */
   attrs?: string;

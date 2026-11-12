@@ -200,7 +200,7 @@ export function styleIdFor(name) {
   return idFor(name, registry.values());
 }
 
-/** Metadata for every available style: [{ id, name, description, group }] */
+/** Every available style: its id, name, description and group, the genres it suits, and its variants. */
 export function listStyles() {
   return [...registry.values()].map(({ id, name, description, group, variants, genres: suits }) => ({
     id,

@@ -1,3 +1,4 @@
+/** The ids of the built-in palettes. */
 export type PaletteId =
   | 'parchment'
   | 'bauhaus'
@@ -28,13 +29,17 @@ export type PaletteId =
   | 'thriller'
   | 'dusk';
 
+/** A palette: a background, an ink colour for text, and accents. */
 export interface Palette {
+  /** Its id, as `createCover({ palette })` takes it. */
   readonly id: string;
+  /** Its name as people read it, such as `'Midnight'`. */
   readonly name: string;
   /** Background, as hex. */
   readonly bg: string;
   /** Text colour with strong contrast against `bg`. */
   readonly ink: string;
+  /** Accent colours, as hex (three in each built-in palette). */
   readonly accents: readonly string[];
   /** `true` for dark backgrounds. */
   readonly dark?: boolean;

@@ -1,3 +1,29 @@
+/**
+ * Draw book covers as SVG from a title and an author. Every random choice (the style, the palette,
+ * the artwork) comes from a seed, by default the title and author, so the same options give the
+ * same cover.
+ *
+ * ```js
+ * import { createCover } from '@otsirh/book-cover-generator';
+ *
+ * const { svg, style, palette } = createCover({
+ *   title: 'Dune',
+ *   author: 'Frank Herbert',
+ *   style: 'retro', // or 'random' (the default): picked from the seed
+ *   seed: 42,
+ * });
+ * ```
+ *
+ * `generateCover` returns the SVG alone, and `createMockup` shows a cover as a book or on a social
+ * card. To make a PNG, JPEG or WebP in a browser, see the `./browser` entry point; for a cover from
+ * an HTML element, `./element`. `registerStyle` adds a style of your own, drawn with the same text and
+ * colour helpers the built-in styles use.
+ *
+ * (On npm the package is `book-cover-generator`: `import { createCover } from 'book-cover-generator'`.)
+ *
+ * @module
+ */
+
 import type { Rng } from './core.js';
 import type { Palette, PaletteId } from './palettes.js';
 import type { FontSpec, FONTS } from './text.js';
@@ -22,11 +48,14 @@ export {
 } from './text.js';
 export { titleBlock, authorFit, fitStack, drawStack, splitLead } from './type.js';
 export { strongAccents, textColor, tintText, fitTitleWith, textPanel, TEXT_CONTRAST } from './styles/util.js';
+/** The SVG, colour and noise helpers the built-in styles use. */
 export * as svgUtils from './core.js';
 
+/** A kind of mockup: a product shot (`flat`, `book`, `ereader`) or a social card (`card`, `square`, `story`). */
 export type MockupKind = 'flat' | 'book' | 'ereader' | 'card' | 'square' | 'story';
 /** The kinds of mockup `createMockup` makes. */
 export declare const mockupKinds: readonly MockupKind[];
+/** Options for `createMockup`. */
 export interface MockupOptions {
   /** Default `'book'`. `card` is 1200 × 630, `square` 1080 × 1080, `story` 1080 × 1920; the others follow the cover's size. */
   kind?: MockupKind;
@@ -68,6 +97,7 @@ export declare const formats: Readonly<{
   square: readonly [number, number];
 }>;
 
+/** The ids of the built-in styles. */
 export type StyleId =
   | 'minimal'
   | 'swiss'
@@ -109,18 +139,29 @@ export type StyleId =
   | 'storybook'
   | 'idea';
 
+/** The families the built-in styles belong to. */
 export type StyleGroup = 'Typographic' | 'Geometric' | 'Pattern' | 'Scenic' | 'Vintage' | 'Genre';
 
 /** A palette you define yourself. All colours must be hex (`#rgb` or `#rrggbb`). */
 export interface CustomPalette {
+  /** The background. */
   bg: string;
+  /** The text colour. */
   ink: string;
+  /** One or more accents; a cover repeats them to make three if there are fewer. */
   accents: readonly string[];
+  /** Its id: what the cover reports as its `palette` (default `'custom'`). `registerPalette` needs one. */
   id?: string;
+  /** Its name as people read it. Default `'Custom'`, or for `registerPalette` its id. */
   name?: string;
+  /** Whether the background is dark. Default: whether `bg` is darker than `ink`. */
   dark?: boolean;
 }
 
+/**
+ * Options for `createCover` and `generateCover`, all optional. An option that isn't valid throws
+ * an error that says why.
+ */
 export interface CoverOptions {
   /** Defaults to `'Untitled'`. Up to 300 characters are used. */
   title?: string;
@@ -142,7 +183,7 @@ export interface CoverOptions {
   genre?: GenreId | (string & {});
   /** A palette id, a custom palette, or `'random'` / `'auto'` (default; picked from the seed). */
   palette?: PaletteId | 'random' | 'auto' | CustomPalette | (string & {});
-  /** Controls every random choice. Defaults to a hash of title + author. */
+  /** Controls every random choice. Defaults to the title and author (`Cover.seed` says which seed was used). */
   seed?: string | number;
   /** Width in px, 50–10000. Default 600. */
   width?: number;
@@ -169,7 +210,9 @@ export interface CoverOptions {
   titleCase?: 'upper' | 'normal';
 }
 
+/** A cover made by `createCover`: its SVG, and the choices it was made with. */
 export interface Cover {
+  /** The SVG document, `width` × `height` px, named for screen readers by its title, author and other text. */
   svg: string;
   /** The markup inside the outer `<svg>`, to nest the cover in another SVG (its ids are unique to the cover). */
   body: string;
@@ -179,8 +222,14 @@ export interface Cover {
   palette: string;
   /** The palette's colours, as the cover used them. */
   colors: { bg: string; ink: string; accents: string[]; dark: boolean };
+  /**
+   * The seed the cover was drawn from: the `seed` option as a string, else one made from the title
+   * and author. The same options with this seed give the same cover.
+   */
   seed: string;
+  /** Width in px. */
   width: number;
+  /** Height in px. */
   height: number;
   /** The language set on the cover (given or inferred), or `''`. */
   lang: string;
@@ -188,19 +237,27 @@ export interface Cover {
   variants: Record<string, string>;
   /** The title as set (line breaks as "\n"), and the author, after cleaning. */
   title: string;
+  /** The author after cleaning, or `''`. */
   author: string;
 }
 
 /** A choice a style lets you pin, such as Silhouette's scene. */
 export interface StyleVariant {
+  /** The name to pin it by, such as `'scene'`. */
   name: string;
+  /** The name as people read it, such as `'Scene'`. */
   label: string;
+  /** The values it can take, each with a label as people read it. */
   values: { value: string; label: string }[];
 }
 
+/** A style as `listStyles()` describes it. */
 export interface StyleInfo {
+  /** Its id, as `createCover({ style })` takes it. */
   id: string;
+  /** Its name as people read it, such as `'Art Deco'`; for a registered style without one, its id. */
   name: string;
+  /** What it looks like, in a sentence; empty for a registered style without one. */
   description: string;
   /** The family the style belongs to; `'Custom'` for registered styles without one. */
   group: StyleGroup | (string & {});
@@ -210,13 +267,16 @@ export interface StyleInfo {
   genres: string[];
 }
 
+/** The ids of the genres in `genres`. */
 export type GenreId = 'literary' | 'thriller' | 'horror' | 'romance' | 'fantasy' | 'children' | 'nonfiction';
 /** The genres styles can suit, as `createCover({ genre })` and `listStyles()` name them. */
 export declare const genres: readonly { readonly id: GenreId; readonly name: string }[];
 
 /** A palette as seen by styles, with derived light/dark colours. */
 export interface ResolvedPalette extends Palette {
+  /** At least three accents: a palette with fewer has them repeated. */
   readonly accents: readonly string[];
+  /** Whether the background is dark: the palette's `dark`, else whether `bg` is darker than `ink`. */
   readonly dark: boolean;
   /** The lighter of `bg` and `ink`. */
   readonly paper: string;
@@ -226,7 +286,9 @@ export interface ResolvedPalette extends Palette {
 
 /** Everything a style's `render` function receives. */
 export interface StyleContext {
+  /** The title after cleaning (`'Untitled'` if there is none), with any line breaks it was typed with as "\n". */
   readonly title: string;
+  /** The author after cleaning, or empty. */
   readonly author: string;
   /**
    * The subtitle, then the credit ("Translated by …"), if any, on a line of its own (after "\n"):
@@ -247,6 +309,7 @@ export interface StyleContext {
   readonly m: number;
   /** Seeded random numbers, unique to this cover and style. */
   readonly rng: Rng;
+  /** The palette, with its lighter and darker colours as `paper` and `night`. */
   readonly p: ResolvedPalette;
   /** Make an id that is unique to this cover, for gradients, filters, masks… */
   id(name: string): string;
@@ -261,10 +324,15 @@ export interface StyleContext {
   readonly titleCase: 'upper' | 'normal' | null;
 }
 
+/** A style to add with `registerStyle`. */
 export interface CoverStyle {
+  /** Its id: a non-empty string without spaces at either end, and not `'random'` (in any case). */
   id: string;
+  /** Its name as people read it. Default: the id. */
   name?: string;
+  /** What it looks like, in a sentence. Default empty. */
   description?: string;
+  /** The family it belongs to, as `listStyles()` reports it. Default `'Custom'`. */
   group?: StyleGroup | (string & {});
   /** Background preference when the palette is picked automatically. */
   prefer?: 'light' | 'dark';
@@ -284,7 +352,9 @@ export interface CoverStyle {
 
 /** Ids of every available style (including registered custom styles). */
 export declare const styles: string[];
+/** Every available style, built-in and registered, as copies: changing them changes no style. */
 export declare function listStyles(): StyleInfo[];
+/** Options for `registerStyle` and `registerPalette`. */
 export interface RegisterOptions {
   /** Allow replacing the built-in style (or palette) with the same id. */
   replace?: boolean;

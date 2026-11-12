@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Changed
+
+- The whole API is documented: every function, type and option, with module docs and examples for each entry point (shown on JSR and in your editor). CI keeps it so (`deno doc --lint`).
+
+### Fixed
+
+- Docs: `TitleBlockOptions.maxSize` says a short one-word title may grow past it; `CoverOptions.seed` says it defaults to the title and author (as `Cover.seed` shows), not a hash of them.
+
 ## [1.9.1] - 2026-11-12
 
 The library on JSR, as 1.9.0 meant it to be. Covers are drawn as in 1.9.0.

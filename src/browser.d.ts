@@ -1,7 +1,27 @@
+/**
+ * Browser helpers to export a cover: rasterise it to PNG, JPEG or WebP, download it, copy it to the
+ * clipboard, or zip several files. `setDpi` and `zipFiles` also work in Node.
+ *
+ * ```js
+ * import { createCover } from '@otsirh/book-cover-generator';
+ * import { downloadCover, rasterize } from '@otsirh/book-cover-generator/browser';
+ *
+ * const { svg } = createCover({ title: 'Dune', author: 'Frank Herbert' });
+ * await downloadCover(svg, 'png', 'dune', { scale: 3, dpi: 300 }); // dune.png, 1800 × 2700 px
+ * const blob = await rasterize(svg, { type: 'image/webp', width: 1600 }); // 1600 × 2400 px
+ * ```
+ *
+ * @module
+ */
+
+/** SVG markup as a `data:` URL, for an `<img>`'s `src`. */
 export declare function svgToDataUrl(svg: string): string;
+/** SVG markup as a Blob of type `image/svg+xml`. */
 export declare function svgToBlob(svg: string): Blob;
 
+/** Options for `rasterize`. */
 export interface RasterizeOptions {
+  /** The image's type. Default `'image/png'`; a browser that can't encode it makes a PNG. */
   type?: 'image/png' | 'image/jpeg' | 'image/webp';
   /** Multiplier applied to the SVG's width and height. Default 1. Ignored when `width` or `height` is given. */
   scale?: number;
@@ -22,6 +42,7 @@ export declare function rasterize(svg: string, opts?: RasterizeOptions): Promise
 /** Trigger a file download for a Blob. */
 export declare function downloadBlob(blob: Blob, filename: string): void;
 
+/** The formats `downloadCover` makes: the SVG itself, or a PNG, JPEG (`'jpeg'` or `'jpg'`) or WebP image. */
 export type ExportFormat = 'svg' | 'png' | 'jpeg' | 'jpg' | 'webp';
 /**
  * Download a cover; `basename` gets the right extension appended. Resolves to the file name,
