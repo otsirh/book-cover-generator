@@ -143,10 +143,17 @@ export function writeLink(design) {
  */
 export const customPalette = (colors) => `custom-${colors.map((c) => sixDigits(c).slice(1)).join('-')}`;
 
-/** A colour as #rrggbb, lower-case (#abc as #aabbcc; an alpha dropped). @param {string} c */
+/**
+ * A colour as #rrggbb, lower-case: #abc as #aabbcc, and an alpha (#abcd, #aabbccdd) dropped. Any
+ * other value is left as it is, for the reader to refuse.
+ * @param {string} c
+ */
 export function sixDigits(c) {
   const h = c.trim().replace(/^#/, '').toLowerCase();
-  return `#${h.length === 3 || h.length === 4 ? [...h.slice(0, 3)].map((x) => x + x).join('') : h.slice(0, 6)}`;
+  if (!/^[0-9a-f]+$/.test(h)) return c;
+  if (h.length === 3 || h.length === 4) return `#${[...h.slice(0, 3)].map((x) => x + x).join('')}`;
+  if (h.length === 6 || h.length === 8) return `#${h.slice(0, 6)}`;
+  return c;
 }
 
 /** A design's pins as a link holds them (sorted by name, so the same pins make the same link). @param {Record<string, string>} pins */

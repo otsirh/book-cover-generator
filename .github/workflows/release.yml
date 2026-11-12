@@ -68,8 +68,7 @@ jobs:
   github:
     name: GitHub release
     needs: npm
-    # (A run by hand must run on the tag it names, so the signed provenance names that tag.)
-    if: github.event_name == 'push' || (inputs.release != '' && github.ref == format('refs/tags/{0}', inputs.release))
+    if: github.event_name == 'push' || inputs.release != ''
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -79,9 +78,12 @@ jobs:
       id-token: write
       attestations: write
     steps:
-      - name: The tag is a version
+      - name: The tag is a version, and a run by hand runs on it
         run: |
           echo "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' || { echo "::error::Not a version tag: $TAG"; exit 1; }
+          # (So the signed provenance names the tag. A tag made before 1.8.0 has an older copy of this
+          # workflow, which can't bring its release up to date.)
+          [ "$GITHUB_REF" = "refs/tags/$TAG" ] || { echo "::error::Run this on the tag $TAG (Use workflow from: $TAG), not $GITHUB_REF"; exit 1; }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ env.TAG }}

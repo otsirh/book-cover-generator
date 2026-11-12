@@ -3,7 +3,7 @@
 // transports are theirs. (Not part of the library's API.)
 
 import { createCover, createMockup, listStyles, palettes, genres, formats, mockupKinds, version } from './index.js';
-import { LINK, optionsFromLink, writeLink, customPalette, variantOf, sixDigits } from './link.js';
+import { optionsFromLink, writeLink, customPalette, variantOf, sixDigits } from './link.js';
 import { idFor } from './shared.js';
 
 /** The site that draws covers from links, and edits them. */
@@ -156,7 +156,10 @@ function queryFrom(args) {
   }
   if (typeof args.texture === 'boolean') q.set('texture', args.texture ? '1' : '0');
   if (args.variants && typeof args.variants === 'object') {
-    const pairs = Object.entries(args.variants).map(([name, value]) => `${name}.${String(value)}`);
+    // (An empty pin leaves the choice to the seed, as the library takes it.)
+    const pairs = Object.entries(args.variants)
+      .filter(([, value]) => value != null && value !== '')
+      .map(([name, value]) => `${name}.${String(value)}`);
     if (pairs.length) q.set('variant', pairs.join('-'));
   }
   const colors = /** @type {{ bg?: unknown, ink?: unknown, accents?: unknown } | undefined} */ (args.colors);
@@ -173,35 +176,35 @@ function queryFrom(args) {
 }
 
 /**
- * The link of the cover drawn (written as the app writes its links), with what the seed chose
- * written out, so the app and the API draw that cover.
- * @param {Record<string, unknown>} args @param {ReturnType<typeof createCover>} cover
+ * The link of the cover drawn, written as the app writes its links from the options it was drawn
+ * with (not the tool's arguments), with what the seed chose written out: the app and the API draw
+ * that cover.
+ * @param {import('./index.js').CoverOptions} options @param {ReturnType<typeof createCover>} cover
  */
-function linkOf(args, cover) {
-  const str = (/** @type {string} */ key) => (typeof args[key] === 'string' ? /** @type {string} */ (args[key]) : '');
-  const pins = args.variants && typeof args.variants === 'object' ? Object.keys(args.variants) : [];
+function linkOf(options, cover) {
   /** @type {Record<string, string>} */
   const pinned = {};
-  for (const name of pins.map((n) => n.toLowerCase())) if (cover.variants[name]) pinned[name] = cover.variants[name];
-  const colors = /** @type {{ bg: string, ink: string, accents: string[] } | undefined} */ (args.colors);
+  for (const name of Object.keys(options.variants ?? {}).map((n) => n.toLowerCase())) {
+    if (cover.variants[name]) pinned[name] = cover.variants[name];
+  }
+  const own = options.palette && typeof options.palette === 'object' ? options.palette : null;
   const preset = Object.entries(formats).find(([, [w, h]]) => w === cover.width && h === cover.height);
   return writeLink({
     title: cover.title,
     author: cover.author,
-    subtitle: str('subtitle'),
-    series: str('series'),
-    credit: str('credit'),
-    badge: str('badge'),
+    subtitle: options.subtitle ?? '',
+    series: options.series ?? '',
+    credit: options.credit ?? '',
+    badge: options.badge ?? '',
     style: cover.style,
     variant: variantOf(pinned),
-    font: LINK.font(args.font) ?? '',
-    case: LINK.case(args.case) ?? '',
-    palette:
-      cover.palette === 'custom' && colors ? customPalette([colors.bg, colors.ink, ...colors.accents]) : cover.palette,
+    font: options.font ?? '',
+    case: options.titleCase ?? '',
+    palette: own ? customPalette([own.bg, own.ink, ...(own.accents ?? [])]) : cover.palette,
     // (A seed from the title stays one: the app reads an empty seed so.)
-    seed: seedGiven(args) ? cover.seed : '',
+    seed: options.seed != null ? cover.seed : '',
     format: preset ? preset[0] : `${cover.width}x${cover.height}`,
-    texture: args.texture === true,
+    texture: options.texture === true,
   });
 }
 
@@ -260,8 +263,10 @@ function callTool(tool, args, ctx) {
     }
     if (tool !== 'create_cover' && tool !== 'create_mockup') return null;
     if (typeof args.title !== 'string' || !args.title.trim()) throw new TypeError('A cover needs a title');
-    const cover = createCover(optionsFromLink(queryFrom(args)));
-    const link = linkOf(args, cover);
+    const options = optionsFromLink(queryFrom(args));
+    const cover = createCover(options);
+    const link = linkOf(options, cover);
+    let [width, height] = [cover.width, cover.height];
     const edit = `${base}/#${link}`;
     let image = `${base}/api/cover.svg?${link}`;
     let svg = cover.svg;
@@ -269,19 +274,20 @@ function callTool(tool, args, ctx) {
     if (tool === 'create_mockup') {
       const kind = typeof args.kind === 'string' && args.kind ? args.kind : 'book';
       const line = typeof args.text === 'string' ? args.text : '';
-      svg = createMockup(cover, { kind: /** @type {import('./index.js').MockupKind} */ (kind), text: line }).svg;
+      const mockup = createMockup(cover, { kind: /** @type {import('./index.js').MockupKind} */ (kind), text: line });
+      ({ svg, width, height } = mockup);
       const extra = new URLSearchParams({ kind, ...(line ? { text: line } : {}) });
       image = `${base}/api/mockup.svg?${link}&${extra}`;
-      what = `a ${kind} mockup of ${what}`;
+      what = `${/^[aeiou]/.test(kind) ? 'an' : 'a'} ${kind} mockup of ${what}`;
     }
     const saved =
       typeof args.output === 'string' && args.output && ctx.writeFile ? ctx.writeFile(args.output, svg) : null;
     const styleName = listStyles().find((s) => s.id === cover.style)?.name ?? cover.style;
     const paletteName = palettes.find((p) => p.id === cover.palette)?.name ?? 'your own colours';
-    const seed = seedGiven(args) ? `seed ${cover.seed}` : 'seed from the title';
+    const seed = options.seed != null ? `seed ${cover.seed}` : 'seed from the title';
     const content = [
       text(
-        `Drew ${what} in the ${styleName} style (${cover.style}), palette ${paletteName}, ${seed} (${cover.width} × ${cover.height} px).\n` +
+        `Drew ${what} in the ${styleName} style (${cover.style}), palette ${paletteName}, ${seed} (${width} × ${height} px).\n` +
           `Image (SVG): ${image}\nEdit, or download as PNG or JPEG: ${edit}` +
           (saved ? `\nSaved to ${saved}` : ''),
       ),
@@ -293,9 +299,10 @@ function callTool(tool, args, ctx) {
         style: cover.style,
         palette: cover.palette,
         // (Null when it comes from the title: give the title again to keep the cover.)
-        seed: seedGiven(args) ? cover.seed : null,
-        width: cover.width,
-        height: cover.height,
+        seed: options.seed != null ? cover.seed : null,
+        // (The image's size: a mockup's, for a mockup.)
+        width,
+        height,
         variants: cover.variants,
         imageUrl: image,
         editUrl: edit,

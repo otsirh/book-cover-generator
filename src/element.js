@@ -57,6 +57,8 @@ export class BookCover extends Base {
   #queued = false;
   /** Drawn once connected: until then, attributes set (or present when upgraded) wait for it. */
   #ready = false;
+  /** The options last drawn, to skip drawing them again. */
+  #drawn = '';
 
   constructor() {
     super();
@@ -104,7 +106,12 @@ export class BookCover extends Base {
 
   #render() {
     try {
-      this.cover = createCover(this.options());
+      const options = this.options();
+      // (Moved or reconnected with the same attributes: the cover stands.)
+      const key = JSON.stringify(options);
+      if (this.cover && key === this.#drawn) return;
+      this.#drawn = key;
+      this.cover = createCover(options);
       this.#img.src = svgToDataUrl(this.cover.svg);
       this.#img.alt = this.cover.author
         ? `Cover: ${this.cover.title.replace(/\n/g, ' ')} by ${this.cover.author}`
@@ -112,6 +119,7 @@ export class BookCover extends Base {
       this.dispatchEvent(new CustomEvent('cover', { detail: this.cover }));
     } catch (err) {
       this.cover = null;
+      this.#drawn = '';
       this.#img.removeAttribute('src');
       this.#img.alt = '';
       this.dispatchEvent(new CustomEvent('cover-error', { detail: err }));

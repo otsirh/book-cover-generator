@@ -167,3 +167,12 @@ test('a plain line is split at the first kind of separator it uses, and a size k
   );
   assert.deepEqual(o, { style: 'retro', palette: 'mint', width: 1600, height: 2560, title: 'Dune' });
 });
+
+test('colours as a link writes them: six hex digits, or as given for the reader to refuse', async () => {
+  const { sixDigits, customPalette } = await import('../src/link.js');
+  assert.equal(sixDigits('#ABC'), '#aabbcc');
+  assert.equal(sixDigits('abcd'), '#aabbcc');
+  assert.equal(sixDigits('#11223344'), '#112233');
+  for (const odd of ['#1a2b3c4', 'red', '#12345']) assert.equal(sixDigits(odd), odd);
+  assert.equal(customPalette(['#000', '#FFF', '#f00']), 'custom-000000-ffffff-ff0000');
+});

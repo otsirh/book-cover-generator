@@ -1,5 +1,5 @@
-// The site's Worker: an HTTP API that draws covers, at /api/cover.svg and /api/mockup.svg.
-// Everything else is the static site (wrangler.jsonc sends only /api/* here).
+// The site's Worker: an HTTP API that draws covers, at /api/cover.svg and /api/mockup.svg, and the
+// MCP endpoint at /mcp. Everything else is the static site (wrangler.jsonc sends only those here).
 //
 //   <img src="https://covers.otsirh.dev/api/cover.svg?title=Dune&author=Frank+Herbert">
 //
@@ -96,6 +96,9 @@ function cacheKey(request, deployment) {
   return new Request(url.href, { method: 'GET' });
 }
 
+/** The largest body the MCP endpoint reads, in bytes. */
+const MCP_MAX_BODY = 1_000_000;
+
 /** Headers of the MCP endpoint's answers: any page or client may call it. */
 const MCP_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -136,11 +139,31 @@ export async function mcp(request) {
       headers: { ...MCP_HEADERS, Allow: 'POST, OPTIONS', 'Content-Type': 'text/plain; charset=utf-8' },
     });
   }
-  // (The body as read, not as Content-Length says: a chunked body sends none.)
-  const body = await request.text();
-  if (body.length > 1_000_000) {
-    return json(413, { jsonrpc: '2.0', id: null, error: { code: -32600, message: 'Request too large' } });
+  // At most 1 MB: refused up front when it says so, else as soon as it reads past it (a chunked
+  // body says nothing), so a huge body is never held whole.
+  const tooLarge = () => json(413, { jsonrpc: '2.0', id: null, error: { code: -32600, message: 'Request too large' } });
+  if (Number(request.headers.get('content-length') ?? 0) > MCP_MAX_BODY) return tooLarge();
+  const chunks = [];
+  let size = 0;
+  const reader = request.body?.getReader();
+  while (reader) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > MCP_MAX_BODY) {
+      await reader.cancel();
+      return tooLarge();
+    }
+    chunks.push(value);
   }
+  const body = new TextDecoder().decode(
+    chunks.reduce((all, chunk) => {
+      const joined = new Uint8Array(all.byteLength + chunk.byteLength);
+      joined.set(all);
+      joined.set(chunk, all.byteLength);
+      return joined;
+    }, new Uint8Array()),
+  );
   let message;
   try {
     message = JSON.parse(body);

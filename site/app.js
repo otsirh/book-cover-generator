@@ -113,7 +113,6 @@ function sizeOf(format) {
 
 /** The five colours the editor shows: background, text and three accents (repeating the ones given). @param {string[]} colors */
 const fiveColors = (colors) => [colors[0], colors[1], ...[0, 1, 2].map((i) => colors[2 + (i % (colors.length - 2))])];
-/** A design's palette for these colours (#rrggbb). @param {readonly string[]} colors */
 /** A built-in palette's colours, as the editor shows them. @param {string} id */
 function colorsOf(id) {
   const p = palettes.find((x) => x.id === id) ?? palettes[0];
@@ -712,8 +711,6 @@ function pinsFor(variant, style) {
   }
   return pins;
 }
-
-/** A design's variant for these pins (sorted by name, so the same pins make the same link). @param {Record<string, string>} pins */
 
 /** Give the preview and the thumbnails the cover's shape (as site/boot.js does before first paint). */
 function applyShape() {

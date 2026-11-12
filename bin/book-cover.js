@@ -349,7 +349,7 @@ function run() {
 
 /**
  * Serve MCP over stdio: a JSON-RPC message per line in, an answer per line out (nothing else on
- * stdout). A cover can be saved to a file, relative to where it runs.
+ * stdout). A cover can be saved to a file, at an absolute path (the host picks the folder it runs in).
  */
 function serveMcp() {
   const lines = createInterface({ input: process.stdin });

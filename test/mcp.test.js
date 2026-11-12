@@ -239,3 +239,47 @@ test('the Worker answers MCP at /mcp', async () => {
   );
   assert.equal(bad.status, 400);
 });
+
+test('the links are the options drawn, whatever form the arguments took', () => {
+  /** @param {Record<string, unknown>} args */
+  const drawnAlike = (args) => {
+    const answer = call('tools/call', { name: 'create_cover', arguments: { ...args, svg: true } }).result;
+    assert.equal(answer.isError, undefined, JSON.stringify(args));
+    const query = new URL(answer.structuredContent.imageUrl).searchParams;
+    assert.equal(createCover(optionsFromLink(query)).svg, answer.content[1].text, JSON.stringify(args));
+  };
+  drawnAlike({ title: 'Dune', palette: 'custom-0b132b-f8f9fa-ff6b6b' });
+  drawnAlike({ title: 'Dune', subtitle: 2026, seed: 7 });
+  drawnAlike({ title: 'Dune', style: 'silhouette', variants: { scene: '', moon: null } });
+  // A colour that isn't one is the library's error, about that colour.
+  const red = call('tools/call', {
+    name: 'create_cover',
+    arguments: { title: 'X', colors: { bg: 'red', ink: '#fff', accents: ['#f00'] } },
+  }).result;
+  assert.equal(red.isError, true);
+  // A mockup reports its own size.
+  const card = call('tools/call', { name: 'create_mockup', arguments: { title: 'X', kind: 'card' } }).result;
+  assert.deepEqual([card.structuredContent.width, card.structuredContent.height], [1200, 630]);
+  assert.match(
+    call('tools/call', { name: 'create_mockup', arguments: { title: 'X', kind: 'ereader' } }).result.content[0].text,
+    /^Drew an ereader mockup/,
+  );
+});
+
+test('the Worker reads at most 1 MB of a body, even one that doesn’t say its length', async () => {
+  const chunk = new TextEncoder().encode('x'.repeat(64 * 1024));
+  let sent = 0;
+  const stream = new ReadableStream({
+    pull(controller) {
+      if (sent++ < 40) controller.enqueue(chunk);
+      else controller.close();
+    },
+  });
+  const res = await worker.fetch(
+    new Request('https://covers.example/mcp', { method: 'POST', body: stream, duplex: 'half' }),
+    {},
+    { waitUntil() {} },
+  );
+  assert.equal(res.status, 413);
+  assert.ok(sent < 40, `read ${sent} chunks`);
+});

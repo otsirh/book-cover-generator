@@ -1804,6 +1804,9 @@ test('<book-cover> draws a cover on a page from its attributes', async ({ page }
     document.body.append(late);
     customElements.define('book-cover-late', class extends BookCover {});
     await new Promise((resolve) => setTimeout(resolve, 50));
+    // Moved elsewhere on the page, with the same attributes: not drawn again.
+    document.body.prepend(late);
+    await new Promise((resolve) => setTimeout(resolve, 50));
     return { drawn, texture: /** @type {any} */ (late).options().texture };
   });
   expect(upgraded).toEqual({ drawn: 1, texture: false });
