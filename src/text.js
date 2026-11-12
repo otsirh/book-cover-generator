@@ -109,7 +109,7 @@ function heuristicWidth(text, spec) {
   return w;
 }
 
-/** @type {Map<string, number>} */
+/** Widths at the reference size: per font, then per text. @type {Map<string, Map<string, number>>} */
 const widthCache = new Map();
 let lastFont = '';
 // Widths are measured once at this size and scaled: text width is linear in font size,
@@ -167,16 +167,49 @@ function canvasFont(c, font, spec) {
   return accepted;
 }
 
+/** @typedef {{ family: string, weight: number, italic: boolean, mono: boolean, factor: number, font: string, key: string }} SpecFont */
+/** @type {WeakMap<object, SpecFont>} */
+const specFonts = new WeakMap();
+
+/**
+ * The font shorthand (at the reference size) and cache key for a spec, built once per spec
+ * object: measuring runs in the tightest loops, with the same spec each time. Rebuilt if
+ * the spec was changed since.
+ * @param {{ font: { family: string, mono?: boolean, widthFactor?: number }, weight?: number, italic?: boolean }} spec
+ * @returns {SpecFont}
+ */
+function fontOf(spec) {
+  const weight = spec.weight || 400;
+  const italic = !!spec.italic;
+  const mono = !!spec.font.mono;
+  const factor = spec.font.widthFactor ?? 1;
+  const known = specFonts.get(spec);
+  if (
+    known &&
+    known.family === spec.font.family &&
+    known.weight === weight &&
+    known.italic === italic &&
+    known.mono === mono &&
+    known.factor === factor
+  ) {
+    return known;
+  }
+  const font = `${italic ? 'italic ' : ''}${weight} ${REFERENCE}px ${spec.font.family}`;
+  const made = { family: spec.font.family, weight, italic, mono, factor, font, key: `${font}\u0000${mono}${factor}` };
+  specFonts.set(spec, made);
+  return made;
+}
+
 /**
  * Advance width at the reference size, from the custom measurer, a canvas or the estimate.
  * @param {string} text
  * @param {{ font: { family: string, mono?: boolean, widthFactor?: number }, weight?: number, italic?: boolean }} spec
  */
 function referenceWidth(text, spec) {
-  const weight = spec.weight || 400;
-  const font = `${spec.italic ? 'italic ' : ''}${weight} ${REFERENCE}px ${spec.font.family}`;
-  const key = `${font}\u0000${spec.font.mono ? 1 : 0}${spec.font.widthFactor ?? 1}\u0000${text}`;
-  const cached = widthCache.get(key);
+  const { font, weight, key } = fontOf(spec);
+  let widths = widthCache.get(key);
+  if (!widths) widthCache.set(key, (widths = new Map()));
+  const cached = widths.get(text);
   if (cached !== undefined) return cached;
   let w;
   if (customMeasure) w = customMeasure(text, REFERENCE, { family: spec.font.family, weight, italic: !!spec.italic });
@@ -191,8 +224,8 @@ function referenceWidth(text, spec) {
       w = c.measureText(text).width;
     } else w = heuristicWidth(text, spec) * REFERENCE;
   }
-  if (widthCache.size > 20000) widthCache.clear();
-  widthCache.set(key, w);
+  if (widths.size > 20000) widths.clear();
+  widths.set(text, w);
   return w;
 }
 

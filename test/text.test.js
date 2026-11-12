@@ -230,3 +230,14 @@ test('generic font families stay unquoted when names are quoted for the canvas',
   measureText('ab', 100, { font: { family: 'Icons 7, ui-monospace', cap: 0.7 } });
   assert.ok(fontsSet.includes('400 100px "Icons 7", ui-monospace'), fontsSet.join(' | '));
 });
+
+test('a spec changed between measurements is measured with its new font', () => {
+  const spec = { font: FONTS.serif, weight: 400 };
+  measureText('qq', 10, spec);
+  Object.assign(spec, { italic: true, weight: 700 });
+  measureText('qq', 10, spec);
+  assert.ok(
+    fontsSet.some((f) => f.startsWith('italic 700 100px Georgia')),
+    fontsSet.join(' | '),
+  );
+});

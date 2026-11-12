@@ -176,6 +176,18 @@ test('history survives a reload, and redo never leaves the app', async ({ page }
   expect(new URL(page.url()).pathname).toBe('/');
 });
 
+test('typing in another field starts a new undo step', async ({ page }) => {
+  await page.goto('/#title=Before&author=Old&style=minimal&seed=t');
+  await page.locator('#title').fill('After');
+  await page.locator('#author').fill('New');
+  await expect(page).toHaveURL(/title=After&author=New/);
+  await page.locator('#undo').click();
+  await expect(page.locator('#author')).toHaveValue('Old');
+  await expect(page.locator('#title')).toHaveValue('After');
+  await page.locator('#undo').click();
+  await expect(page.locator('#title')).toHaveValue('Before');
+});
+
 test('a burst of typing is one undo step', async ({ page }) => {
   await page.goto('/#title=Before&style=minimal&seed=t');
   await page.locator('#title').fill('');
@@ -532,8 +544,31 @@ test('Copy link falls back when the clipboard API refuses', async ({ page, brows
     });
   });
   await page.goto('/#title=Fallback&style=minimal&seed=c');
-  await page.locator('#copy-link').click();
+  await page.locator('#copy-link').focus();
+  await page.keyboard.press('Enter');
   await expect(page.locator('#toast')).toContainText('Link copied');
+  // The fallback selects a hidden textarea; focus comes back to the button.
+  await expect(page.locator('#copy-link')).toBeFocused();
+});
+
+test('a link from before 1.2.0 pasted into an open tab opens that design', async ({ page }) => {
+  await page.goto('/#title=Busy&author=B&subtitle=A+Novel&style=retro&palette=synth&seed=x&format=ebook&texture=1');
+  await expect(page.locator('#texture')).toBeChecked();
+  await page.evaluate(() => {
+    location.hash = 'title=Old&author=Link&style=noir&palette=noir&seed=s&format=paperback';
+  });
+  await selected(page, 'noir');
+  await expect(page.locator('#subtitle')).toHaveValue('');
+  await expect(page.locator('#texture')).not.toBeChecked();
+});
+
+test('an unknown texture value in an edited URL is ignored', async ({ page }) => {
+  await page.goto('/#title=T&style=minimal&seed=u&texture=1');
+  await page.evaluate(() => {
+    location.hash = 'texture=yes&seed=u2';
+  });
+  await expect(page.locator('#seed')).toHaveValue('u2');
+  await expect(page.locator('#texture')).toBeChecked();
 });
 
 test('a hand-edited URL is rewritten to hold the whole design', async ({ page }) => {
@@ -588,6 +623,21 @@ test('a kept design from another version keeps its look and can be removed', asy
   expect(await svgOf(page, '.kept-open img')).toBe(before);
   await page.locator('.kept-remove').click();
   await expect(page.locator('#kept')).toBeHidden();
+});
+
+test('removing a kept design keeps keyboard focus in the tray', async ({ page }) => {
+  await page.goto('/#title=One&style=minimal&seed=k1');
+  await page.locator('#keep').click();
+  await page.locator('.tile[data-style="swiss"]').click();
+  await page.locator('#keep').click();
+  await expect(page.locator('#kept-list li')).toHaveCount(2);
+  await page.locator('.kept-remove').first().focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#kept-list li')).toHaveCount(1);
+  await expect(page.locator('.kept-remove')).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#kept')).toBeHidden();
+  await expect(page.locator('#keep')).toBeFocused();
 });
 
 test('kept designs are saved, restored and removed', async ({ page }) => {
@@ -691,6 +741,33 @@ test('screen readers hear style changes but not typing', async ({ page }) => {
   await expect(page.locator('#announce')).toHaveText('');
   await page.locator('.tile[data-style="noir"]').click();
   await expect(page.locator('#announce')).toHaveText('Style: Noir. Palette: Mint.');
+});
+
+test('an announcement is read again when the region still holds the same text', async ({ page }) => {
+  for (const [from, to] of [
+    ['Alpha', 'Bravo'],
+    ['Delta', 'Echo'],
+    ['Kilo', 'Lima'],
+    ['Oscar', 'Papa'],
+  ]) {
+    await page.goto(`/#title=${from}&style=minimal&palette=auto&seed=`);
+    await page.locator('.tile[data-style="swiss"]').click();
+    const region = page.locator('#announce');
+    await expect(region).toContainText('Swiss');
+    const first = (await region.textContent()) ?? '';
+    const before = await page.locator('#palette-name').textContent();
+    await page.locator('#title').fill(to);
+    await page.locator('#title').blur();
+    // Only a case where typing changed the automatic palette shows the problem.
+    if ((await page.locator('#palette-name').textContent()) === before) continue;
+    await page.locator('#undo').click();
+    await expect(page.locator('#title')).toHaveValue(from);
+    // (Compared exactly: toHaveText would normalise away the no-break space that marks the change.)
+    await expect.poll(() => region.evaluate((el) => el.textContent)).not.toBe(first);
+    expect(((await region.textContent()) ?? '').trim()).toBe(first.trim());
+    return;
+  }
+  throw new Error('No title pair changed the automatic palette');
 });
 
 test('typing never triggers announcements, even when the palette follows the title', async ({ page }) => {

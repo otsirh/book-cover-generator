@@ -490,6 +490,9 @@ test('a title is never set smaller than its subtitle', () => {
         for (const [title, word] of [
           ['The Lighthouse Keeper', 'LIGHTHOUSE'],
           ['Do Androids Dream of Electric Sheep', 'ANDROIDS'],
+          // One long word: the title is width-bound, so no layout may fit.
+          ['Supercalifragilisticexpialidocious', 'SUPERCAL'],
+          ['Antidisestablishmentarianism', 'ANTIDISE'],
         ]) {
           for (const seed of ['a', 'e', 'h']) {
             const { svg } = createCover({ title, author: 'Mara Ellison', subtitle, style, width, height, seed });

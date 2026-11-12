@@ -116,7 +116,9 @@ function sanitize(raw) {
   if (seed != null) out.seed = clip(seed.trim(), 40);
   const format = str(raw.format);
   if (format && Object.hasOwn(FORMATS, format)) out.format = /** @type {Format} */ (format);
-  if (raw.texture != null) out.texture = raw.texture === true || raw.texture === '1';
+  // On or off; any other value (texture=yes) is ignored like other unknown values.
+  if (raw.texture === true || raw.texture === '1') out.texture = true;
+  else if (raw.texture === false || raw.texture === '0') out.texture = false;
   return out;
 }
 
@@ -152,6 +154,8 @@ let historyMax = 0;
 
 /** Keys that URLs from before 1.2.0 left out when empty or off; entries of ours without them have these values. */
 const OPTIONAL = { subtitle: '', texture: false };
+/** The keys every link names; one that names them all is a whole design. */
+const WHOLE_KEYS = ['title', 'author', 'style', 'palette', 'seed', 'format'];
 
 function saveHistoryMax() {
   try {
@@ -161,6 +165,8 @@ function saveHistoryMax() {
   }
 }
 let typing = false;
+/** The field of the current typing burst: typing in another field starts a new step. */
+let typingField = '';
 /** Direction of an Undo (-1) or Redo (1) in flight, until its popstate arrives. */
 let stepping = 0;
 let steppingSince = 0;
@@ -238,8 +244,8 @@ function scheduleReplace() {
   replaceTimer = setTimeout(tick, REPLACE_MS);
 }
 
+/** A new history step for the current design. Callers save pending keystrokes first (update()). */
 function commit() {
-  flushReplace();
   // A discrete change ends any typing burst, so later keystrokes get their own step.
   typing = false;
   clearTimeout(typingTimer);
@@ -259,10 +265,12 @@ function commit() {
   syncHistoryButtons();
 }
 
-function typed() {
+/** @param {string} field the field being typed in */
+function typed(field) {
   if (!typing) {
     commit();
     typing = true;
+    typingField = field;
   } else scheduleReplace();
   clearTimeout(typingTimer);
   typingTimer = setTimeout(() => {
@@ -338,8 +346,10 @@ window.addEventListener('popstate', (e) => {
     }
   }
   // The app's own entries hold whole designs (older ones leave out empty optional keys); an
-  // edited URL changes just the keys it names, and a pasted link names them all.
-  Object.assign(design, linked ?? { ...OPTIONAL, ...fromHash(location.hash) });
+  // edited URL changes just the keys it names, and a pasted link names them all. A link from
+  // before 1.2.0 names every key but the optional ones, which it left out when empty or off.
+  const whole = !linked || WHOLE_KEYS.every((key) => key in linked);
+  Object.assign(design, whole ? { ...OPTIONAL, ...(linked ?? fromHash(location.hash)) } : linked);
   // Rewrite an edited URL so it always holds the whole design (for Copy link).
   if (!ours) stamp();
   render({ fade: true, announce: true });
@@ -360,10 +370,15 @@ window.addEventListener('popstate', (e) => {
 function update(patch, kind = 'discrete') {
   const changed = Object.entries(patch).some(([key, value]) => design[/** @type {keyof Design} */ (key)] !== value);
   if (!changed) return;
-  // Save the typing burst's last keystrokes to its own entry before a discrete change.
-  if (kind === 'discrete') flushReplace();
+  const field = kind === 'typing' ? Object.keys(patch).join() : '';
+  // A discrete change, or typing in another field, is a new step: first save the burst's last
+  // keystrokes to its own entry.
+  if (kind === 'discrete' || !typing || field !== typingField) {
+    flushReplace();
+    typing = false;
+  }
   Object.assign(design, patch);
-  if (kind === 'typing') typed();
+  if (kind === 'typing') typed(field);
   else commit();
   render({ fade: kind === 'discrete', announce: kind === 'discrete' });
 }
@@ -473,7 +488,12 @@ function renderPreview(fade, announce) {
       : `In ${palette?.name ?? 'your palette'}. Click one to use it.`;
   // Screen readers hear about style and palette changes, not every keystroke.
   const announcement = `Style: ${style?.name ?? current.style}. Palette: ${paletteName}.`;
-  if (announce && lastAnnouncement && announcement !== lastAnnouncement) $('announce').textContent = announcement;
+  if (announce && lastAnnouncement && announcement !== lastAnnouncement) {
+    // If the region still holds this text from before, change it anyway (a trailing no-break
+    // space) so screen readers announce it again.
+    const region = $('announce');
+    region.textContent = region.textContent === announcement ? `${announcement}\u00A0` : announcement;
+  }
   lastAnnouncement = announcement;
 }
 
@@ -923,6 +943,10 @@ function renderKept(list = loadKept()) {
         const rest = loadKept().filter((k) => toHash(k) !== hash);
         saveKept(rest);
         renderKept(rest);
+        // The button is gone: move focus to the next design's (or the last one's), or to Keep.
+        const buttons = $('kept-list').querySelectorAll('.kept-remove');
+        const next = /** @type {HTMLElement | undefined} */ (buttons[Math.min(i, buttons.length - 1)]);
+        (next ?? $('keep')).focus();
       });
       return h('li', {}, open, remove);
     }),

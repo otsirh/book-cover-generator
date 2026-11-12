@@ -52,7 +52,16 @@ export async function rasterize(svg, { type = 'image/png', scale = 1, quality = 
   }
   ctx.drawImage(img, 0, 0, w, h);
   return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Canvas export failed'))), type, quality);
+    canvas.toBlob(
+      (blob) => {
+        // Free the canvas memory now: Safari caps the total, and a 4× export is tens of MB.
+        canvas.width = canvas.height = 0;
+        if (blob) resolve(blob);
+        else reject(new Error('Canvas export failed'));
+      },
+      type,
+      quality,
+    );
   });
 }
 
@@ -65,7 +74,8 @@ export function downloadBlob(blob, filename) {
   document.body.appendChild(a);
   a.click();
   a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  // Some browsers (iOS Safari) fetch the file only after the user confirms the download.
+  setTimeout(() => URL.revokeObjectURL(url), 40_000);
 }
 
 /**
@@ -103,6 +113,8 @@ export async function copyText(text) {
 
 /** Copy through a hidden textarea and the copy command; whether it worked. @param {string} text */
 function copyWithCommand(text) {
+  // Selecting the textarea moves focus to it; give focus back afterwards.
+  const focused = document.activeElement;
   const ta = document.createElement('textarea');
   ta.value = text;
   ta.setAttribute('readonly', '');
@@ -114,5 +126,6 @@ function copyWithCommand(text) {
     return document.execCommand('copy');
   } finally {
     ta.remove();
+    if (focused instanceof HTMLElement) focused.focus({ preventScroll: true });
   }
 }

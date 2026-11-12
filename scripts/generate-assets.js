@@ -41,9 +41,27 @@ async function render(browser) {
   console.log('docs/preview.png');
 }
 
-const server = spawn(process.execPath, ['scripts/serve.js', String(PORT), '.'], { stdio: 'ignore' });
+// Render from this tree only: refuse to start if something else already answers on the port.
+if (
+  await fetch(PAGE).then(
+    () => true,
+    () => false,
+  )
+) {
+  throw new Error(`Port ${PORT} is already in use; stop that server and run again`);
+}
+const server = spawn(process.execPath, ['scripts/serve.js', String(PORT), '.'], {
+  stdio: ['ignore', 'ignore', 'pipe'],
+});
+let serverErrors = '';
+server.stderr.on('data', (chunk) => (serverErrors += chunk));
+/** @type {Promise<never>} */
+const serverDied = new Promise((_, reject) =>
+  server.on('exit', (code) => reject(new Error(`The dev server exited (code ${code}): ${serverErrors.trim()}`))),
+);
+serverDied.catch(() => {}); // it exits on purpose at the end
 try {
-  await waitForServer(PAGE);
+  await Promise.race([waitForServer(PAGE), serverDied]);
   const browser = await chromium
     .launch({ channel: process.env.CI ? undefined : 'chrome' })
     .catch(() => chromium.launch());

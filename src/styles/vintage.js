@@ -376,7 +376,7 @@ export const typewriter = {
       s += typedLine(ln, W / 2, y + t.size * t.cap + i * t.size * t.lineHeight, t.size, 700, rng, ink, 'middle');
     });
     y = textBottom(t, y) + underline;
-    const uw = Math.max(...t.lines.map((ln) => measureText(ln, t.size, { font: FONTS.mono, weight: 700 })));
+    const uw = t.width;
     s += line(
       W / 2 - uw / 2,
       y,

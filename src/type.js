@@ -312,21 +312,22 @@ export function titleBlock(c, o) {
   /** @param {ReturnType<typeof layout>} l */
   const truncatedIn = (l) => !('kind' in l.fit) && l.fit.truncated;
   /** Fits the height, the title is whole and at least as large as its minimum, its lead and its subtitle. @param {ReturnType<typeof layout>} l */
-  const fits = (l) => {
-    // For a stack, its smallest line.
-    const size = 'kind' in l.fit ? Math.min(...l.fit.lines.map((line) => line.size)) : l.fit.size;
-    return (
-      l.height <= o.maxHeight + 0.5 &&
-      !truncatedIn(l) &&
-      size >= minMain * 0.999 &&
-      size >= Math.max(l.sub?.size ?? 0, l.leadFit?.size ?? 0)
-    );
-  };
-  /** Of two layouts that don't fit, whether `a` is better: inside the height, then a larger title, then whole. @param {ReturnType<typeof layout>} a @param {ReturnType<typeof layout>} b */
+  /** The title's size, for a stack its smallest line. @param {ReturnType<typeof layout>} l */
+  const titleSize = (l) => ('kind' in l.fit ? Math.min(...l.fit.lines.map((line) => line.size)) : l.fit.size);
+  /** The title is at least as large as its subtitle and its lead. @param {ReturnType<typeof layout>} l */
+  const inOrder = (l) => titleSize(l) >= Math.max(l.sub?.size ?? 0, l.leadFit?.size ?? 0);
+  /** Fits the height, the title is whole, at its minimum or larger, and in order. @param {ReturnType<typeof layout>} l */
+  const fits = (l) => l.height <= o.maxHeight + 0.5 && !truncatedIn(l) && titleSize(l) >= minMain * 0.999 && inOrder(l);
+  /**
+   * Of two layouts that don't fit, whether `a` is better: inside the height, then a title no
+   * smaller than its subtitle and lead, then a larger title, then a whole one.
+   * @param {ReturnType<typeof layout>} a @param {ReturnType<typeof layout>} b
+   */
   const better = (a, b) => {
     const inA = a.height <= o.maxHeight + 0.5;
     const inB = b.height <= o.maxHeight + 0.5;
     if (inA !== inB) return inA;
+    if (inOrder(a) !== inOrder(b)) return inOrder(a);
     if (Math.abs(a.fit.size - b.fit.size) > 0.01) return a.fit.size > b.fit.size;
     return truncatedIn(b) && !truncatedIn(a);
   };
