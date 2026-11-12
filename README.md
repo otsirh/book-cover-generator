@@ -8,7 +8,7 @@
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/otsirh/book-cover-generator/badge)](https://scorecard.dev/viewer/?uri=github.com/otsirh/book-cover-generator)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-Generate book covers from a **title** and an **author**. 39 styles, 28 palettes or your own colours, a seeded randomizer, any size, and export to **SVG, PNG, JPEG or WebP**. The library has no dependencies and ships TypeScript types. It's written as plain ES modules, so it runs in the browser and in Node.
+Generate book covers from a **title** and an **author**. 39 styles, 28 palettes or your own colours, a seeded randomizer, any size, and export to **SVG, PNG, JPEG or WebP**. The library has no dependencies and ships TypeScript types. It's written as plain ES modules, so it runs in the browser, Node, Deno and Bun.
 
 **[▶ Open the generator](https://covers.otsirh.dev)**
 
@@ -102,7 +102,7 @@ A title breaks its line at `%0A`. Anyone may embed the answers (CORS and `Cross-
 
 `@1` gives you the latest 1.x release. Pin an exact version (such as `@1.1.0`) if you need the artwork to never change.
 
-### Node / bundlers
+### Node, Deno, Bun and bundlers
 
 ```sh
 npm install book-cover-generator
@@ -122,6 +122,8 @@ const { svg, style, palette, seed } = createCover({
 });
 writeFileSync('cover.svg', svg);
 ```
+
+In Deno, import `npm:book-cover-generator`; in Bun, `bun add book-cover-generator`. CI checks that Node, Deno and Bun draw the same covers byte for byte.
 
 ### CLI
 

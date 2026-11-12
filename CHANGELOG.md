@@ -6,6 +6,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
+- Deno and Bun: the library runs in both, and CI checks that Node, Deno and Bun draw the same covers byte for byte.
 - Each GitHub release carries the npm package and its build provenance, signed with Sigstore: check a download with `gh attestation verify book-cover-generator-X.Y.Z.tgz --repo otsirh/book-cover-generator`. (The package on npm has had provenance since 1.7.0.)
 
 ## [1.7.0] - 2026-11-12
