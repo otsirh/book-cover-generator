@@ -8,7 +8,6 @@ import {
   mix,
   inkOn,
   readable,
-  hexToRgb,
   escapeXml,
   grain,
   blurFilter,
@@ -17,7 +16,7 @@ import {
 } from '../core.js';
 import { FONTS, fitText, drawText, textGroupAttrs, typedLines } from '../text.js';
 import { titleBlock, authorFit } from '../type.js';
-import { strongAccents, fitTitleWith, flower, textColor } from './util.js';
+import { strongAccents, fitTitleWith, flower, textColor, leaf, redness } from './util.js';
 
 /** @typedef {import('../index.js').StyleContext} Ctx */
 
@@ -118,22 +117,6 @@ export const thriller = {
     return s;
   },
 };
-
-/** How red a hex colour is (red channel minus the others). @param {string} hex */
-function redness(hex) {
-  const [r, g, b] = hexToRgb(hex);
-  return r - (g + b) / 2;
-}
-
-/**
- * A leaf from (x, y) pointing at `angle`, made of two quadratic curves.
- * @param {number} x @param {number} y @param {number} len @param {number} angle @param {string} color
- */
-function leaf(x, y, len, angle, color) {
-  const w = len * 0.36;
-  const tr = `transform="translate(${n(x)} ${n(y)}) rotate(${n((angle * 180) / Math.PI)})"`;
-  return `<path d="M0 0Q${n(len * 0.45)} ${n(-w)} ${n(len)} 0Q${n(len * 0.45)} ${n(w)} 0 0Z" fill="${color}" ${tr}/>`;
-}
 
 export const botanical = {
   id: 'botanical',

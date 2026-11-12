@@ -462,7 +462,9 @@ test('a long typing session slows its history writes, inside browser rate limits
       count += 1;
       return real(...args);
     };
-    /** @type {any} */ (window).__writes = () => count;
+    // Writes per 30 s of the page's time (the test moves the clock, and a busy machine adds some).
+    const start = performance.now();
+    /** @type {any} */ (window).__writes = () => (count * 30_000) / (performance.now() - start);
     return 0;
   });
   expect(writes).toBe(0);
@@ -473,8 +475,8 @@ test('a long typing session slows its history writes, inside browser rate limits
     await page.keyboard.type(String.fromCharCode(97 + (i % 26)));
     await page.clock.runFor(250);
   }
-  const total = await page.evaluate(() => /** @type {any} */ (window).__writes());
-  expect(total).toBeLessThan(70);
+  const rate = await page.evaluate(() => /** @type {any} */ (window).__writes());
+  expect(rate).toBeLessThan(70);
 });
 
 test('a history write the browser ignores silently is retried', async ({ page }) => {

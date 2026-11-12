@@ -52,3 +52,17 @@ export declare function textPanel(
   a: TextFit,
   o: { pad: number; gap: number; extra?: number; centerY?: number; top?: number; bottom?: number },
 ): { y: number; h: number; gap: number };
+/** A leaf from (x, y) pointing at `angle` (radians), `len` long. */
+export declare function leaf(x: number, y: number, len: number, angle: number, color: string): string;
+/** Red (the red channel over the others). */
+export declare function redness(hex: string): number;
+/** Red, rose or coral (red over green). */
+export declare function rosy(hex: string): number;
+/** Yellow to orange (red and green over blue). */
+export declare function yellowness(hex: string): number;
+/** Green, teal or blue (green or blue over red). */
+export declare function coolness(hex: string): number;
+/** How vivid (the spread of the channels). */
+export declare function chroma(hex: string): number;
+/** The colour that scores highest (the first, on a tie). */
+export declare function most(list: readonly string[], score: (hex: string) => number): string;

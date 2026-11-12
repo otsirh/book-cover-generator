@@ -1,4 +1,4 @@
-import { n, circle, contrast, readable, clamp, mix, inkCandidates } from '../core.js';
+import { n, circle, contrast, readable, clamp, mix, inkCandidates, hexToRgb } from '../core.js';
 import { titleBlock } from '../type.js';
 import { graphemes } from '../text.js';
 
@@ -117,4 +117,48 @@ export function textPanel(c, t, a, { pad, gap, extra = 0, centerY = c.H / 2, top
   const want = top ?? (bottom != null ? bottom - h : centerY - h / 2);
   const y = h > c.H - c.m * 2 ? (c.H - h) / 2 : clamp(want, c.m, c.H - c.m - h);
   return { y, h, gap: space };
+}
+
+/**
+ * A leaf from (x, y) pointing at `angle`, made of two quadratic curves.
+ * @param {number} x @param {number} y @param {number} len @param {number} angle @param {string} color
+ */
+export function leaf(x, y, len, angle, color) {
+  const w = len * 0.36;
+  const tr = `transform="translate(${n(x)} ${n(y)}) rotate(${n((angle * 180) / Math.PI)})"`;
+  return `<path d="M0 0Q${n(len * 0.45)} ${n(-w)} ${n(len)} 0Q${n(len * 0.45)} ${n(w)} 0 0Z" fill="${color}" ${tr}/>`;
+}
+
+// How much a colour leans one way, to give each accent the job it suits (the sun to the yellowest).
+/** Red (the red channel over the others). @param {string} hex */
+export function redness(hex) {
+  const [r, g, b] = hexToRgb(hex);
+  return r - (g + b) / 2;
+}
+/** Red, rose or coral (red over green). @param {string} hex */
+export function rosy(hex) {
+  const [r, g] = hexToRgb(hex);
+  return r - g;
+}
+/** Yellow to orange (red and green over blue). @param {string} hex */
+export function yellowness(hex) {
+  const [r, g, b] = hexToRgb(hex);
+  return Math.min(r, g) - b;
+}
+/** Green, teal or blue (green or blue over red). @param {string} hex */
+export function coolness(hex) {
+  const [r, g, b] = hexToRgb(hex);
+  return Math.max(g, b) - r;
+}
+/** How vivid (the spread of the channels). @param {string} hex */
+export function chroma(hex) {
+  const [r, g, b] = hexToRgb(hex);
+  return Math.max(r, g, b) - Math.min(r, g, b);
+}
+/**
+ * The colour that scores highest (the first, on a tie).
+ * @param {readonly string[]} list @param {(hex: string) => number} score
+ */
+export function most(list, score) {
+  return list.reduce((best, col) => (score(col) > score(best) ? col : best));
 }

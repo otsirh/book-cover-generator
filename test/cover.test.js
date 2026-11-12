@@ -988,7 +988,7 @@ test('styles list the variants they let you pin, and choose them in render', () 
     blueprint: ['drawing'],
     engraved: ['motif'],
     hollow: ['sky'],
-    crest: ['field', 'emblem'],
+    crest: ['field', 'emblem', 'behind'],
     storybook: ['sky'],
     idea: ['mark'],
   });
