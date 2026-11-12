@@ -88,15 +88,17 @@ test('fitText falls back to breaking words and truncating with an ellipsis', () 
 });
 
 test('truncation never splits an emoji', () => {
-  const fit = fitText('aaaa 🧑‍🚀🧑‍🚀🧑‍🚀🧑‍🚀🧑‍🚀', {
-    font: FONTS.sans,
-    maxWidth: 30,
-    maxHeight: 5,
-    maxSize: 10,
-    minSize: 10,
-    maxLines: 1,
-  });
-  assert.doesNotThrow(() => encodeURIComponent(fit.lines.join('')));
+  // (Astronauts: each a sequence of three code points joined by a zero-width joiner.)
+  for (const text of ['🧑‍🚀'.repeat(40), `aaaa ${'🧑‍🚀'.repeat(40)}`]) {
+    const fit = fitText(text, { font: FONTS.sans, maxWidth: 60, maxHeight: 12, maxSize: 10, minSize: 10, maxLines: 1 });
+    const line = fit.lines.join('');
+    assert.ok(fit.truncated && line.endsWith('…'), line);
+    const segmenter = new Intl.Segmenter('en', { granularity: 'grapheme' });
+    const whole = new Set([...segmenter.segment(text)].map((s) => s.segment));
+    const kept = [...segmenter.segment(line.slice(0, -1))].map((s) => s.segment);
+    assert.ok(kept.includes('🧑‍🚀'), line);
+    for (const g of kept) assert.ok(whole.has(g), `${JSON.stringify(g)} is part of a character: ${line}`);
+  }
 });
 
 test('graphemes keeps clusters together', () => {

@@ -16,6 +16,7 @@ import {
 } from '../src/index.js';
 import { fold, idFor } from '../src/shared.js';
 import { LINK, optionsFromLink } from '../src/link.js';
+import { assertWellFormed } from '../test/well-formed.js';
 
 const STYLES = listStyles();
 /** FUZZ_RUNS=20 npm run test:fuzz runs every property 20 times as often. */
@@ -26,7 +27,14 @@ const runs = (n) => ({ numRuns: n * scale });
 const anyText = fc.oneof(
   fc.string({ unit: 'grapheme', maxLength: 80 }),
   fc.string({ unit: 'binary', maxLength: 40 }),
-  fc.constantFrom('', ' ', '\n', 'The', 'A Very Long Title That Has To Wrap Over Several Lines Of The Cover'),
+  fc.constantFrom(
+    '',
+    ' ',
+    '\n',
+    'The',
+    'A Very Long Title That Has To Wrap Over Several Lines Of The Cover',
+    `Fish & "Chips" <b> 'n' ]]>`,
+  ),
 );
 const hex = fc.integer({ min: 0, max: 0xffffff }).map((n) => `#${n.toString(16).padStart(6, '0')}`);
 const palette = fc.oneof(
@@ -66,6 +74,7 @@ test('any cover options draw a well-formed cover, the same every time', () => {
       const options = { ...rest, ...styled, width, height };
       const cover = createCover(options);
       assert.match(cover.svg, /^<svg [\s\S]*<\/svg>$/);
+      assertWellFormed(cover.svg, JSON.stringify(options));
       assert.doesNotMatch(cover.svg, /NaN|Infinity|undefined|\[object /);
       assert.equal(cover.width, width);
       assert.equal(createCover(options).svg, cover.svg);

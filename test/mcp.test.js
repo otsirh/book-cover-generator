@@ -31,6 +31,22 @@ test('initialize, ping, notifications and errors', () => {
   assert.equal(call('nope').error.code, -32601);
   assert.equal(/** @type {any} */ (handleMessage([])).error.code, -32600);
   assert.equal(/** @type {any} */ (handleMessage({ id: 2, method: 'ping' })).error.code, -32600);
+  // Not a request, with no id (or one JSON-RPC doesn't allow, not sent back): an error for id null.
+  for (const message of [
+    { foo: 'boo' },
+    { jsonrpc: '2.0', method: 1, params: 'bar' },
+    { jsonrpc: '2.0', id: { a: 1 }, method: 'ping' },
+    { jsonrpc: '2.0', id: [1], method: 'ping' },
+  ]) {
+    assert.deepEqual(
+      handleMessage(message),
+      { jsonrpc: '2.0', id: null, error: { code: -32600, message: 'Invalid request' } },
+      JSON.stringify(message),
+    );
+  }
+  // A response to the server (which sends no requests) needs no answer.
+  assert.equal(handleMessage({ jsonrpc: '2.0', id: 5, result: {} }), null);
+  assert.equal(handleMessage({ jsonrpc: '2.0', id: 5, error: { code: 1, message: 'x' } }), null);
   assert.equal(call('tools/call', { name: 'nope', arguments: {} }).error.code, -32602);
   assert.equal(call('tools/call', { arguments: {} }).error.code, -32602);
   assert.equal(call('tools/call', { name: 'list_styles', arguments: null }).error.code, -32602);
@@ -172,7 +188,10 @@ test('book-cover --mcp: a message a line, and a cover saved to a file', async ()
         },
       ],
     ];
-    child.stdin.end(`${lines.map((l) => JSON.stringify(l)).join('\n')}\nnot json\n`);
+    // An id nested too deep to write back is refused, and the server goes on.
+    const deep = `{"jsonrpc":"2.0","id":${'['.repeat(20_000)}${']'.repeat(20_000)},"method":"ping"}`;
+    const after = JSON.stringify({ jsonrpc: '2.0', id: 5, method: 'ping' });
+    child.stdin.end(`${lines.map((l) => JSON.stringify(l)).join('\n')}\n${deep}\nnot json\n${after}\n`);
     await new Promise((resolve) => child.on('close', resolve));
     const answers = out
       .trim()
@@ -180,11 +199,12 @@ test('book-cover --mcp: a message a line, and a cover saved to a file', async ()
       .map((l) => JSON.parse(l));
     assert.deepEqual(
       answers.map((a) => (Array.isArray(a) ? a.map((b) => b.id) : a.id)),
-      [1, 2, [3, 4], null],
+      [1, 2, [3, 4], null, null, 5],
     );
     // A relative path is refused: the host chose the folder the server runs in.
     assert.match(answers[2][1].result.content[0].text, /absolute path/);
-    assert.equal(answers[3].error.code, -32700);
+    assert.equal(answers[3].error.code, -32600);
+    assert.equal(answers[4].error.code, -32700);
     assert.equal(answers[1].result.structuredContent.file, join(dir, 'out', 'cover.svg'));
     assert.match(await readFile(join(dir, 'out', 'cover.svg'), 'utf8'), /^<svg [\s\S]*Saved/);
   } finally {
@@ -231,6 +251,17 @@ test('the Worker answers MCP at /mcp', async () => {
   ).json();
   assert.equal(many.error.code, -32600);
   assert.equal((await (await post('POST', [])).json()).error.code, -32600);
+  // An id nested too deep to write back: an answer all the same, not a crash of the Worker.
+  const deep = await worker.fetch(
+    new Request('https://covers.example/mcp', {
+      method: 'POST',
+      body: `{"jsonrpc":"2.0","id":${'['.repeat(20_000)}${']'.repeat(20_000)},"method":"ping"}`,
+    }),
+    {},
+    { waitUntil() {} },
+  );
+  assert.equal(deep.status, 200);
+  assert.deepEqual((await deep.json()).id, null);
   assert.equal((await post('GET')).status, 405);
   assert.equal((await post('OPTIONS')).status, 204);
   const bad = await worker.fetch(

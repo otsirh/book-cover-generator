@@ -38,7 +38,10 @@ export interface TitleBlockOptions {
   letterSpacing?: number;
   lineHeight?: number;
   maxLines?: number;
-  /** Set a leading "The" / "A" / "An" as a small line above the title. Default `true`. */
+  /**
+   * Set a leading article of three letters or more ("The", "Les", "Der") as a small line above the
+   * title; a shorter one ("A", "An", "La") stays with the title. Default `true`.
+   */
   lead?: boolean;
   /** Try a justified stack (each line full width) before regular wrapping. */
   stack?: boolean;

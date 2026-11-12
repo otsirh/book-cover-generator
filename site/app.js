@@ -2194,5 +2194,10 @@ buildVariations();
 render();
 renderKept();
 syncHistoryButtons();
-anchor?.scrollIntoView();
+if (anchor) {
+  anchor.scrollIntoView();
+  // Keyboard focus starts there too, as following an in-page link does, so Tab goes on from it.
+  if (!anchor.hasAttribute('tabindex')) anchor.setAttribute('tabindex', '-1');
+  anchor.focus({ preventScroll: true });
+}
 if (Object.keys(linked).length) noteVersion(linkedHash);

@@ -15,6 +15,10 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Fixed
 
 - On the narrowest phones (320 px), the app no longer scrolls sideways: the variation thumbnails shrink a little to fit.
+- MCP: a request whose id JSON-RPC doesn't allow (an object, an array, however deeply nested) is answered as an invalid request instead of stopping `book-cover --mcp` or failing at `/mcp`; a message that isn't a request is answered with an error even without an id, and a response sent to the server needs no answer. A cover's links no longer carry a pin named `constructor`.
+- Two covers that differ only in their font and their series (say, a series named "serif") no longer share ids, and a mockup's ids are its own, so a cover and its mockups can share a page.
+- Opening the app at a place on the page (`#usage`, or from the gallery) moves keyboard focus there too.
+- Docs: `<book-cover loading="lazy">` in the README and types; a leading "A" or "An" stays with the title (only longer articles get a line of their own); a custom palette's `palette` is its own `id`; a style's `subtitle` holds the credit when there is no subtitle. `isHex` is no longer typed as a type guard.
 
 ## [1.8.0] - 2026-11-12
 

@@ -10,7 +10,7 @@
 import { createCover, createMockup, version } from '../src/index.js';
 import { hex } from '../src/shared.js';
 import { optionsFromLink } from '../src/link.js';
-import { handlePayload } from '../src/mcp.js';
+import { answerPayload } from '../src/mcp.js';
 
 /** Headers every answer has: anyone may embed it, and it's never taken for anything but what it is. */
 const COMMON = {
@@ -124,12 +124,14 @@ export async function mcp(request) {
       },
     });
   }
-  /** @param {number} status @param {unknown} body */
-  const json = (status, body) =>
-    new Response(JSON.stringify(body), {
+  /** @param {number} status @param {string} text */
+  const jsonText = (status, text) =>
+    new Response(text, {
       status,
       headers: { ...MCP_HEADERS, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
     });
+  /** @param {number} status @param {unknown} body */
+  const json = (status, body) => jsonText(status, JSON.stringify(body));
   if (request.method !== 'POST') {
     return new Response('POST JSON-RPC messages here (this server streams nothing).\n', {
       status: 405,
@@ -166,8 +168,8 @@ export async function mcp(request) {
   } catch {
     return json(400, { jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } });
   }
-  const answer = handlePayload(message, { base: url.origin });
-  return answer ? json(200, answer) : new Response(null, { status: 202, headers: MCP_HEADERS });
+  const answer = answerPayload(message, { base: url.origin });
+  return answer === null ? new Response(null, { status: 202, headers: MCP_HEADERS }) : jsonText(200, answer);
 }
 
 export default {

@@ -514,9 +514,10 @@ export function createCover(options = {}) {
         H,
         !!options.texture,
         ...(Object.keys(pins).length ? [pins] : []),
-        ...(titleType.font || titleType.titleCase ? [titleType.fontId, titleType.titleCase ?? ''] : []),
-        ...(series || credit ? [series, credit] : []),
-        ...(badge ? [badge] : []),
+        // (Each optional part named, so one can't pass for another: a series of "serif" isn't a font.)
+        ...(titleType.font || titleType.titleCase ? ['font', titleType.fontId, titleType.titleCase ?? ''] : []),
+        ...(series || credit ? ['series', series, credit] : []),
+        ...(badge ? ['badge', badge] : []),
       ]),
     ).toString(36);
   /** The variants the style chose (or was given). @type {Record<string, string>} */

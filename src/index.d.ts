@@ -175,7 +175,7 @@ export interface Cover {
   body: string;
   /** The style that was used. */
   style: string;
-  /** The palette that was used (`'custom'` for a custom palette). */
+  /** The palette that was used: its id, or for a custom palette its own `id` (`'custom'` if it has none). */
   palette: string;
   /** The palette's colours, as the cover used them. */
   colors: { bg: string; ink: string; accents: string[]; dark: boolean };
@@ -228,7 +228,10 @@ export interface ResolvedPalette extends Palette {
 export interface StyleContext {
   readonly title: string;
   readonly author: string;
-  /** Empty when there is no subtitle. A credit, if any, follows on a line of its own (after "\n"). */
+  /**
+   * The subtitle, then the credit ("Translated by …"), if any, on a line of its own (after "\n"):
+   * the credit alone when there is no subtitle, and empty when there is neither.
+   */
   readonly subtitle: string;
   /** The series line, or empty. `titleBlock` sets it above the title. */
   readonly series: string;

@@ -20,7 +20,7 @@ export declare function clamp(v: number, lo: number, hi: number): number;
 export declare function lerp(a: number, b: number, t: number): number;
 export declare function smoothstep(e0: number, e1: number, x: number): number;
 
-export declare function isHex(v: unknown): v is string;
+export declare function isHex(v: unknown): boolean;
 export declare function hexToRgb(hex: string): [number, number, number];
 export declare function rgbToHex(rgb: readonly number[]): string;
 /** Linear blend of two hex colours; `t = 0` is `a`, `t = 1` is `b`. */

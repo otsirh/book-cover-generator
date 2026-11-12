@@ -185,7 +185,7 @@ function linkOf(options, cover) {
   /** @type {Record<string, string>} */
   const pinned = {};
   for (const name of Object.keys(options.variants ?? {}).map((n) => n.toLowerCase())) {
-    if (cover.variants[name]) pinned[name] = cover.variants[name];
+    if (Object.hasOwn(cover.variants, name)) pinned[name] = cover.variants[name];
   }
   const own = options.palette && typeof options.palette === 'object' ? options.palette : null;
   const preset = Object.entries(formats).find(([, [w, h]]) => w === cover.width && h === cover.height);
@@ -330,8 +330,24 @@ export function handlePayload(payload, ctx = {}) {
   return answers.length ? answers : null;
 }
 
+/**
+ * The answer to what a client sent as the JSON text to send back, or null for none. Whatever goes
+ * wrong while answering is an internal error, not a crash of the server.
+ * @param {unknown} payload @param {Context} [ctx]
+ */
+export function answerPayload(payload, ctx = {}) {
+  try {
+    const answer = handlePayload(payload, ctx);
+    return answer ? JSON.stringify(answer) : null;
+  } catch {
+    return JSON.stringify(failure(null, -32603, 'Internal error'));
+  }
+}
+
 /** @param {unknown} id @param {unknown} result */
 const ok = (id, result) => ({ jsonrpc: '2.0', id, result });
+/** An id as JSON-RPC allows it, so it can be sent back: a string, a number or null. @param {unknown} id */
+const validId = (id) => id === null || typeof id === 'string' || (typeof id === 'number' && Number.isFinite(id));
 /** @param {unknown} id @param {number} code @param {string} message */
 const failure = (id, code, message) => ({ jsonrpc: '2.0', id, error: { code, message } });
 
@@ -343,11 +359,17 @@ export function handleMessage(message, ctx = {}) {
   if (!message || typeof message !== 'object' || Array.isArray(message))
     return failure(null, -32600, 'Invalid request');
   const { jsonrpc, id, method, params } = /** @type {Record<string, any>} */ (message);
-  if (jsonrpc !== '2.0' || typeof method !== 'string') {
-    return 'id' in message ? failure(id ?? null, -32600, 'Invalid request') : null;
+  const hasId = 'id' in message;
+  // A response (this server sends no requests, so it answers none): nothing to say.
+  if (jsonrpc === '2.0' && !('method' in message) && hasId && ('result' in message || 'error' in message)) {
+    return null;
+  }
+  // Not a request: an error, with its id if it is one JSON-RPC allows (else null, as for none).
+  if (jsonrpc !== '2.0' || typeof method !== 'string' || (hasId && !validId(id))) {
+    return failure(hasId && validId(id) ? id : null, -32600, 'Invalid request');
   }
   // A notification (initialized, cancelled…) has no answer.
-  if (!('id' in message)) return null;
+  if (!hasId) return null;
   switch (method) {
     case 'initialize': {
       const asked = params?.protocolVersion;

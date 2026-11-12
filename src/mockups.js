@@ -11,8 +11,18 @@ export const mockupKinds = Object.freeze(['flat', 'book', 'ereader', 'card', 'sq
 const STUDIO = '#ecebe7';
 
 /**
+ * The cover's markup with its ids made a mockup's own (the mockup's tag before the cover's `bc…-`
+ * prefix), so the cover and its mockups, or two mockups of it, can share a page.
+ * @param {string} body @param {string} tag
+ */
+const ownIds = (body, tag) => {
+  const uid = /\bid="(bc[0-9a-z]+)-/.exec(body)?.[1];
+  return uid ? body.replace(new RegExp(`(id="|url\\(#|href="#)${uid}-`, 'g'), `$1${tag}-${uid}-`) : body;
+};
+
+/**
  * The cover nested at a place and size.
- * @param {import('./index.js').Cover} cover @param {number} x @param {number} y @param {number} w @param {number} h
+ * @param {{ width: number, height: number, body: string }} cover @param {number} x @param {number} y @param {number} w @param {number} h
  */
 const nest = (cover, x, y, w, h) =>
   `<svg x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" viewBox="0 0 ${cover.width} ${cover.height}" preserveAspectRatio="none" overflow="hidden">${cover.body}</svg>`;
@@ -53,6 +63,7 @@ export function createMockup(cover, { kind = 'book', background, text = '' } = {
   // Ids unique to this cover and kind of mockup, so several can share a page.
   const tag = `mk${hashString(cover.svg).toString(36)}-${kind}`;
   const id = (/** @type {string} */ name) => `${tag}-${name}`;
+  const nested = { width: cover.width, height: cover.height, body: ownIds(cover.body, tag) };
   const { width: CW, height: CH, colors } = cover;
   // (Cut between whole characters: an emoji or accented letter is never split.)
   const words = clipGraphemes(String(text).replace(/\s+/g, ' ').trim(), 80).trim();
@@ -79,7 +90,7 @@ export function createMockup(cover, { kind = 'book', background, text = '' } = {
       H,
       `<defs>${shadow(id('shadow'), 14 * u, 10 * u, 0.32)}</defs>` +
         `<rect width="${n(W)}" height="${n(H)}" fill="${background ?? STUDIO}"/>` +
-        `<g filter="url(#${id('shadow')})">${nest(cover, pad, pad, CW, CH)}</g>`,
+        `<g filter="url(#${id('shadow')})">${nest(nested, pad, pad, CW, CH)}</g>`,
     );
   }
 
@@ -112,7 +123,7 @@ export function createMockup(cover, { kind = 'book', background, text = '' } = {
         `<ellipse cx="${n(x0 + (CW * turn) / 2)}" cy="${n(y0 + CH - CW * rise * 0.3)}" rx="${n((CW * turn) / 2 + spine)}" ry="${n(CW * 0.035)}" fill="#000" opacity="0.28" filter="url(#${id('soft')})"/>` +
         `<polygon points="${n(x0 - spine)},${n(y0 + sag)} ${n(x0)},${n(y0)} ${n(x0)},${n(y0 + CH)} ${n(x0 - spine)},${n(y0 + CH - sag)}" fill="${spineFill}"/>` +
         `<polygon points="${n(x0 - spine)},${n(y0 + sag)} ${n(x0)},${n(y0)} ${n(x0)},${n(y0 + CH)} ${n(x0 - spine)},${n(y0 + CH - sag)}" fill="url(#${id('spine')})"/>` +
-        `<g transform="matrix(${turn} ${-rise} 0 1 ${n(x0)} ${n(y0)})">${nest(cover, 0, 0, CW, CH)}` +
+        `<g transform="matrix(${turn} ${-rise} 0 1 ${n(x0)} ${n(y0)})">${nest(nested, 0, 0, CW, CH)}` +
         `<rect width="${CW}" height="${CH}" fill="url(#${id('gloss')})"/></g>`,
     );
   }
@@ -134,7 +145,7 @@ export function createMockup(cover, { kind = 'book', background, text = '' } = {
         `<rect width="${n(W)}" height="${n(H)}" fill="${background ?? STUDIO}"/>` +
         `<g filter="url(#${id('shadow')})"><rect x="${n(pad)}" y="${n(pad)}" width="${n(DW)}" height="${n(DH)}" rx="${n(CW * 0.06)}" fill="#1c1c1e"/></g>` +
         `<rect x="${n(pad + 2 * u)}" y="${n(pad + 2 * u)}" width="${n(DW - 4 * u)}" height="${n(DH - 4 * u)}" rx="${n(CW * 0.055)}" fill="none" stroke="#3a3a3c" stroke-width="${n(1.5 * u)}"/>` +
-        nest(cover, pad + side, pad + top, CW, CH) +
+        nest(nested, pad + side, pad + top, CW, CH) +
         `<rect x="${n(pad + DW / 2 - CW * 0.08)}" y="${n(pad + DH - bottom / 2 - 2 * u)}" width="${n(CW * 0.16)}" height="${n(4 * u)}" rx="${n(2 * u)}" fill="#3a3a3c"/>`,
     );
   }
@@ -163,7 +174,7 @@ export function createMockup(cover, { kind = 'book', background, text = '' } = {
   let s =
     `<defs>${shadow(id('shadow'), 18 * u, 14 * u, 0.4)}</defs>` +
     `<rect width="${W}" height="${H}" fill="${bg}"/>` +
-    `<g filter="url(#${id('shadow')})">${nest(cover, cx, cy, cw, ch)}</g>`;
+    `<g filter="url(#${id('shadow')})">${nest(nested, cx, cy, cw, ch)}</g>`;
   // The words: beside the cover on a card, under it otherwise.
   const box =
     kind === 'card'

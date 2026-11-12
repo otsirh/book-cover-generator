@@ -6,7 +6,7 @@ import { parseArgs } from 'node:util';
 import { createCover, listStyles, palettes, parseBookList, optionsForBook, genres } from '../src/index.js';
 import { hex, slug } from '../src/shared.js';
 import { px, formatSize } from '../src/link.js';
-import { handlePayload } from '../src/mcp.js';
+import { answerPayload } from '../src/mcp.js';
 
 const HELP = `Usage: book-cover "<title>" ["<author>"] [options]
 
@@ -349,9 +349,9 @@ function serveMcp() {
     writeFileSync(file, data);
     return file;
   };
-  /** @param {unknown} message */
-  const answer = (message) => {
-    if (message) process.stdout.write(`${JSON.stringify(message)}\n`);
+  /** @param {string | null} text */
+  const send = (text) => {
+    if (text) process.stdout.write(`${text}\n`);
   };
   lines.on('line', (line) => {
     if (!line.trim()) return;
@@ -359,10 +359,10 @@ function serveMcp() {
     try {
       message = JSON.parse(line);
     } catch {
-      answer({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } });
+      send(JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } }));
       return;
     }
-    answer(handlePayload(message, { writeFile }));
+    send(answerPayload(message, { writeFile }));
   });
 }
 

@@ -1867,6 +1867,8 @@ test('your design goes to the gallery and comes back in the style you pick', asy
   await page.locator('.site-header a', { hasText: 'Developers' }).click();
   await expect(page.locator('#title')).toHaveValue('My Own Book');
   await expect(page.locator('#usage')).toBeInViewport();
+  // Keyboard focus starts there too, so Tab goes on from it rather than from the top.
+  await expect(page.locator('#usage')).toBeFocused();
   await expect(page).not.toHaveURL(/usage/);
   await page.goBack();
   await page.locator('a[data-style="crest"]').click();

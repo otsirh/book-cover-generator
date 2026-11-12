@@ -2,31 +2,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createCover, generateCover, styles, palettes, registerStyle, listStyles, pickStyle } from '../src/index.js';
 import { contrast, mix, luminance } from '../src/core.js';
+import * as textLib from '../src/text.js';
+import { assertWellFormed } from './well-formed.js';
 
 // The built-in styles (registration is tested in its own process, in register.test.js).
 const builtIn = [...styles];
-
-/** Minimal XML well-formedness check: balanced tags, no stray `<` or `&`. */
-function assertWellFormed(svg, label) {
-  const stack = [];
-  const tagRe = /<(\/?)([a-zA-Z][\w:-]*)((?:\s+[\w:-]+="[^"]*")*)\s*(\/?)>/g;
-  let last = 0;
-  let m;
-  while ((m = tagRe.exec(svg))) {
-    const between = svg.slice(last, m.index);
-    assert.ok(!between.includes('<'), `${label}: stray "<" near ${svg.slice(last, last + 60)}`);
-    assert.ok(!/&(?!(amp|lt|gt|quot|apos);)/.test(between), `${label}: unescaped "&"`);
-    last = tagRe.lastIndex;
-    const [, closing, name, attrs, selfClosing] = m;
-    const names = [...attrs.matchAll(/([\w:-]+)="/g)].map((a) => a[1]);
-    assert.equal(new Set(names).size, names.length, `${label}: duplicate attribute in <${name}${attrs}>`);
-    if (selfClosing) continue;
-    if (closing) assert.equal(stack.pop(), name, `${label}: mismatched </${name}>`);
-    else stack.push(name);
-  }
-  assert.equal(stack.length, 0, `${label}: unclosed <${stack.join('>, <')}>`);
-  assert.equal(svg.slice(last), '', `${label}: trailing content`);
-}
 
 const titles = [
   ['The Lighthouse Keeper', 'Mara Ellison'],
@@ -158,28 +138,86 @@ function textElements(svg) {
   return out;
 }
 
+const FONT_BY_FAMILY = new Map(Object.values(textLib.FONTS).map((f) => [f.family, f]));
+/** @param {string} s */
+const unescapeXml = (s) =>
+  s.replace(/&(apos|quot|lt|gt|amp);/g, (_, e) => ({ apos: "'", quot: '"', lt: '<', gt: '>', amp: '&' })[e] ?? e);
+
 /**
- * Vertical extent of every line of text: [top of capitals, bottom of descenders, font size].
+ * Every line of text set on the cover, with where it is and what it is set in, inherited through
+ * nested elements. Text in a transformed group (a spine, a turned line) or in definitions (a clip,
+ * a mask) is marked `moved`: its place isn't its x and y.
  * @param {string} svg
  */
-const textLines = (svg) =>
-  textElements(svg).flatMap(({ y, size, text }) =>
-    y != null && size
-      ? [
-          /** @type {[number, number, number]} */ ([
-            y - size * 0.8,
-            // Capitals without a tail (no J or Q) and figures don't reach below the baseline.
-            y + size * (/^[A-IK-PR-Z0-9 .,'’&!?:–—-]+$/.test(text) ? 0.05 : 0.3),
-            size,
-          ]),
-        ]
-      : [],
-  );
+function textBoxes(svg) {
+  /** @type {{ size: number, family?: string, weight: number, italic: boolean, spacing: number, anchor: string, x?: string, moved: boolean }[]} */
+  const stack = [];
+  const out = [];
+  for (const [, closing, tag, attrs, selfClosing, content] of svg.matchAll(
+    /<(\/?)(g|text|tspan|svg|clipPath|mask|pattern|defs|symbol)\b([^>]*?)(\/?)>([^<]*)/g,
+  )) {
+    if (closing) {
+      stack.pop();
+      continue;
+    }
+    const up = stack.at(-1);
+    /** @param {RegExp} re */
+    const get = (re) => re.exec(attrs)?.[1];
+    const state = {
+      size: Number(get(/font-size="([\d.]+)"/) ?? up?.size ?? 0),
+      family: get(/font-family="([^"]*)"/) ?? up?.family,
+      weight: Number(get(/font-weight="(\d+)"/) ?? up?.weight ?? 400),
+      italic: (get(/font-style="(\w+)"/) ?? (up?.italic ? 'italic' : '')) === 'italic',
+      spacing: Number(get(/letter-spacing="(-?[\d.]+)"/) ?? up?.spacing ?? 0),
+      anchor: get(/text-anchor="(\w+)"/) ?? up?.anchor ?? 'start',
+      x: get(/\bx="(-?[\d.]+)"/) ?? (tag === 'tspan' ? up?.x : undefined),
+      moved: !!up?.moved || /\btransform=/.test(attrs) || !['g', 'text', 'tspan', 'svg'].includes(tag),
+    };
+    const y = get(/\by="(-?[\d.]+)"/);
+    const text = unescapeXml(content);
+    if ((tag === 'text' || tag === 'tspan') && text.trim() && y != null && state.size) {
+      out.push({ ...state, text, y: Number(y) });
+    }
+    if (!selfClosing) stack.push(state);
+  }
+  return out;
+}
+
+/**
+ * Every line of text is on the cover: across, from its x, its anchor and its width as the library
+ * measures it, and down, from the top of its capitals to the bottom of its descenders. (Not text
+ * moved by a transform.) Big Letter's giant initial is cropped by design, on one side at most, with
+ * its top kept on the cover by its font's cap height.
+ * @param {string} svg @param {number} width @param {number} height @param {string} label @param {string} style
+ */
+function assertTextInside(svg, width, height, label, style) {
+  for (const box of textBoxes(svg)) {
+    if (box.moved) continue;
+    const font = FONT_BY_FAMILY.get(unescapeXml(box.family ?? ''));
+    assert.ok(font, `${label}: text in an unknown font, ${box.family}`);
+    const where = `${label}: "${box.text.slice(0, 16)}" at ${box.size}px`;
+    const giant = style === 'typographic' && box.anchor === 'middle' && box.size > Math.min(width, height) * 0.5;
+    // Capitals without a tail (no J or Q) and figures don't reach below the baseline.
+    const bottom = box.y + box.size * (/^[A-IK-PR-Z0-9 .,'’&!?:–—-]+$/.test(box.text) ? 0.05 : 0.3);
+    const top = box.y - box.size * (giant ? (font.cap ?? 0.72) + textLib.markExtent(box.text).above : 0.8);
+    assert.ok(top >= -1 && bottom <= height + 1, `${where}: from ${top.toFixed(0)} to ${bottom.toFixed(0)} down`);
+    if (box.x === undefined) continue;
+    const w =
+      textLib.measureText(box.text, box.size, { font, weight: box.weight, italic: box.italic }) +
+      box.spacing * textLib.graphemes(box.text).length;
+    const x = Number(box.x);
+    const left = box.anchor === 'middle' ? x - w / 2 : box.anchor === 'end' ? x - w : x;
+    const [inLeft, inRight] = [left >= -1, left + w <= width + 1];
+    const across = `${where}: from ${left.toFixed(0)} to ${(left + w).toFixed(0)} across`;
+    if (giant) assert.ok(inLeft || inRight, `${across} (cropped on both sides)`);
+    else assert.ok(inLeft && inRight, across);
+  }
+}
 
 /** Every run of visible text with its font size. @param {string} svg */
 const textRuns = (svg) => textElements(svg).filter((el) => el.text.trim());
 
-test('every style keeps its text inside the cover, from 1:3 to 3:1', () => {
+test('every style keeps its text inside the cover, across and down, from 1:3 to 3:1', () => {
   const shapes = [
     [600, 900],
     [600, 960],
@@ -203,12 +241,7 @@ test('every style keeps its text inside the cover, from 1:3 to 3:1', () => {
       for (const [title, author] of cases) {
         for (const seed of ['a', 'b']) {
           const { svg } = createCover({ title, author, style, width, height, seed });
-          const short = Math.min(width, height);
-          for (const [top, bottom, size] of textLines(svg)) {
-            if (size > short * 0.5) continue; // a deliberately cropped giant letter
-            const where = `${style} ${width}x${height} seed ${seed} "${title.slice(0, 12)}": text at ${top.toFixed(0)}..${bottom.toFixed(0)}`;
-            assert.ok(top >= -1 && bottom <= height + 1, where);
-          }
+          assertTextInside(svg, width, height, `${style} ${width}x${height} seed ${seed}`, style);
         }
       }
     }
@@ -1055,10 +1088,7 @@ test('a pinned variant is drawn as pinned, for every value, and stays well-forme
             const pinned = createCover({ ...options, variants: { [variant.name]: value } });
             assert.equal(pinned.variants[variant.name], value, label);
             assertWellFormed(pinned.svg, label);
-            for (const [top, bottom, size] of textLines(pinned.svg)) {
-              if (size > Math.min(width, height) * 0.5) continue;
-              assert.ok(top >= -1 && bottom <= height + 1, `${label}: text at ${top}..${bottom}`);
-            }
+            assertTextInside(pinned.svg, width, height, label, info.id);
             // Pinning what the seed picks anyway changes nothing but the ids.
             const free = createCover(options);
             if (free.variants[variant.name] === value) assert.equal(drawing(pinned.svg), drawing(free.svg), label);
@@ -1118,10 +1148,7 @@ test('a title font and case of your own, in every style', async () => {
           };
           const { svg } = createCover({ ...options, font, titleCase });
           assertWellFormed(svg, label);
-          for (const [top, bottom, size] of textLines(svg)) {
-            if (size > Math.min(width, height) * 0.5) continue;
-            assert.ok(top >= -1 && bottom <= height + 1, `${label}: text at ${top}..${bottom}`);
-          }
+          assertTextInside(svg, width, height, label, style);
           // The title is never set smaller than its subtitle.
           const sizes = textRuns(svg).map((r) => ({ text: r.text, size: r.size }));
           const title = sizes.find((r) => /lighthouse|keeper/i.test(r.text));
@@ -1189,10 +1216,7 @@ test('a title typed on several lines is set on them, in every style, with the sa
       assert.deepEqual(two.variants, one.variants, label);
       assertWellFormed(two.svg, label);
       assert.match(two.svg, /<title>Salt and Static: A Novel by J\. R\. Okafor<\/title>/, label);
-      for (const [top, bottom, size] of textLines(two.svg)) {
-        if (size > Math.min(width, height) * 0.5) continue;
-        assert.ok(top >= -1 && bottom <= height + 1, `${label}: text at ${top}..${bottom}`);
-      }
+      assertTextInside(two.svg, width, height, label, style);
       // The break holds: no line runs from the first typed line into the second.
       assert.ok(!textRuns(two.svg).some((r) => /and static/i.test(r.text)), `${label}: lines joined`);
     }
@@ -1223,10 +1247,7 @@ test('a series line and a credit, in every style', () => {
         height,
       });
       assertWellFormed(svg, label);
-      for (const [top, bottom, size] of textLines(svg)) {
-        if (size > Math.min(width, height) * 0.5) continue;
-        assert.ok(top >= -1 && bottom <= height + 1, `${label}: text at ${top}..${bottom}`);
-      }
+      assertTextInside(svg, width, height, label, style);
       const runs = textRuns(svg);
       const title = runs.find((r) => /lighthouse|keeper/i.test(r.text));
       const series = runs.find((r) => /ember cycle/i.test(r.text));
@@ -1347,6 +1368,14 @@ test('a badge goes in the first corner clear of the text, in every style', async
     assert.match(svg, /aria-label="Winner of the Hugo Award"/, style);
     assert.match(svg, /<title>The Lighthouse Keeper by Mara Ellison\. Winner of the Hugo Award<\/title>/, style);
   }
+  // Markup in any text is escaped wherever it goes, attributes (aria-label) included.
+  const marked = `Fish & "Chips" <b> 'n' ]]>`;
+  for (const style of builtIn) {
+    const fields = { title: marked, author: marked, subtitle: marked, series: marked, credit: marked, badge: marked };
+    const cover = createCover({ ...fields, style, seed: 's' });
+    assertWellFormed(cover.svg, style);
+    assert.match(cover.svg, /aria-label="Fish &amp; &quot;Chips&quot; &lt;b&gt;/, style);
+  }
   // Without one, nothing changes.
   assert.equal(
     createCover({ title: 'x', style: 'minimal', seed: 's', badge: ' ' }).svg,
@@ -1362,7 +1391,11 @@ test('mockups: every kind is a well-formed SVG with the cover in it, at its size
   for (const kind of mockupKinds) {
     const m = createMockup(cover, { kind, text: 'Out now <soon>' });
     assertWellFormed(m.svg, kind);
-    assert.ok(m.svg.includes(cover.body), `${kind}: the cover is nested whole`);
+    // The cover is nested whole, its ids made the mockup's own.
+    assert.ok(
+      m.svg.replace(/mk[0-9a-z]+-[a-z]+-(?=bc)/g, '').includes(cover.body),
+      `${kind}: the cover is nested whole`,
+    );
     assert.match(m.svg, new RegExp(`^<svg xmlns="http://www.w3.org/2000/svg" width="${m.width}" height="${m.height}"`));
     assert.match(m.svg, /<title>Fish &amp; Chips Tonight by O&apos;Brien &amp; Sons<\/title>/, kind);
     const fixed = sizes[kind];
@@ -1370,9 +1403,13 @@ test('mockups: every kind is a well-formed SVG with the cover in it, at its size
       assert.deepEqual([m.width, m.height], fixed, kind);
       assert.match(m.svg, /Out now &lt;soon&gt;/, kind);
     } else assert.ok(m.width > cover.width && m.height > cover.height, kind);
-    // Two mockups on one page don't share ids with each other or the cover.
-    const ids = [...m.svg.matchAll(/id="(mk[^"]+)"/g)].map((x) => x[1]);
+    // Two mockups on one page don't share ids with each other or the cover: every id is the
+    // mockup's, and every reference is to one of them.
+    const ids = [...m.svg.matchAll(/\bid="([^"]+)"/g)].map((x) => x[1]);
+    assert.ok(ids.length && ids.every((x) => x.startsWith(`mk`)), kind);
     assert.equal(new Set(ids).size, ids.length, kind);
+    for (const [, ref] of m.svg.matchAll(/(?:url\(#|href="#)([^)"]+)/g))
+      assert.ok(ids.includes(ref), `${kind}: #${ref}`);
   }
   assert.throws(() => createMockup(cover, { kind: /** @type {any} */ ('poster') }), /Unknown mockup "poster"/);
   assert.throws(() => createMockup(cover, { background: 'red' }), /hex colour/);
