@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [1.9.1] - 2026-11-12
+
+The library on JSR, as 1.9.0 meant it to be. Covers are drawn as in 1.9.0.
+
+### Fixed
+
+- **JSR**: the package publishes there (1.9.0 didn't reach it: its `<book-cover>` types declared the tag globally, which JSR doesn't allow). From JSR, `BookCover` is typed as a class; from npm, `document.createElement('book-cover')` is still typed as one too. CI now checks the package as JSR's server does.
+
 ## [1.9.0] - 2026-11-12
 
 A gallery of every style, the library on JSR, `<book-cover loading="lazy">`, and a sturdier MCP server. Covers are drawn as in 1.8.0 (some of their SVG ids are named differently).
@@ -291,7 +299,8 @@ A redesign of the covers and the app, based on a design review.
 
 - First release: 27 styles, 20 palettes, seeded randomizer, text fitting, CLI and the web app with SVG, PNG and JPEG export.
 
-[Unreleased]: https://github.com/otsirh/book-cover-generator/compare/v1.9.0...HEAD
+[Unreleased]: https://github.com/otsirh/book-cover-generator/compare/v1.9.1...HEAD
+[1.9.1]: https://github.com/otsirh/book-cover-generator/compare/v1.9.0...v1.9.1
 [1.9.0]: https://github.com/otsirh/book-cover-generator/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/otsirh/book-cover-generator/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/otsirh/book-cover-generator/compare/v1.6.0...v1.7.0

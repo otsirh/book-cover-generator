@@ -58,7 +58,7 @@ jobs:
       - run: npm ci
       - run: npm run check
       # JSR takes the package too (checked before npm publishes: a version on npm is for good).
-      - run: npx --yes jsr@0.14.3 publish --dry-run --allow-slow-types
+      - run: npx --yes jsr@0.14.3 publish --dry-run
       # Only a pushed tag publishes: a run started by hand is a dry run, even on a tag.
       - name: Publish
         if: github.event_name == 'push'
@@ -86,9 +86,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
-      # (Slow types: <book-cover>'s types add it to the global element map, which JSR's fast types
-      # don't allow.)
-      - run: npx --yes jsr@0.14.3 publish --allow-slow-types
+      - run: npx --yes jsr@0.14.3 publish
 
   github:
     name: GitHub release

@@ -36,8 +36,9 @@ jobs:
       - run: npm run lint:package
       # Property-based fuzzing (fast-check, a dev dependency: the unit test jobs install nothing).
       - run: npm run test:fuzz
-      # JSR (for Deno) takes the package as it is.
-      - run: npx --yes jsr@0.14.3 publish --dry-run --allow-slow-types
+      # JSR (for Deno) takes the package as it is: fast types too, which its server requires (no
+      # global types, for one).
+      - run: npx --yes jsr@0.14.3 publish --dry-run
       - run: npm audit --audit-level=moderate
 
   unit:
