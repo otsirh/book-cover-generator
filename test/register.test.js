@@ -173,5 +173,21 @@ test('a registered style’s genres must be a list of genre ids', () => {
     );
   }
   registerStyle({ id: 'test-genres', genres: ['horror'], render: () => '' });
-  assert.deepEqual(listStyles().find((s) => s.id === 'test-genres')?.genres, ['horror']);
+  try {
+    assert.deepEqual(listStyles().find((s) => s.id === 'test-genres')?.genres, ['horror']);
+  } finally {
+    unregisterStyle('test-genres');
+  }
+  // A built-in style's replacement suits the built-in's genres, unless it names its own.
+  const noir = () => listStyles().find((s) => s.id === 'noir')?.genres;
+  const before = noir();
+  registerStyle({ id: 'noir', render: () => '' }, { replace: true });
+  try {
+    assert.deepEqual(noir(), before);
+    registerStyle({ id: 'noir', genres: ['literary'], render: () => '' }, { replace: true });
+    assert.deepEqual(noir(), ['literary']);
+  } finally {
+    unregisterStyle('noir');
+  }
+  assert.deepEqual(noir(), before);
 });

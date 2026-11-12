@@ -31,6 +31,8 @@ npm run test:e2e   # browser tests (CI runs these too)
 4. Set the title with `titleBlock` (it handles the lead line, the subtitle and the height budget) and the author with `authorFit`. Use `strongAccents` from `src/styles/util.js` when a colour must stand out from the background, so the style works with every palette. Check long and short titles, subtitles, empty authors, square and wide covers, and dark and light palettes on the contact sheet (`examples/contact-sheet.html?styles=<id>&palettes=noir,mint,sky&seeds=a,b,c&subtitle=A+Novel`).
 5. Update the style count in the README and the page if it changes, and add a line to `CHANGELOG.md`.
 
+If you change a font stack in `FONTS` (`src/text.js`), run `npm run metrics` on a Mac: it measures the stacks' characters in Chrome and rewrites `src/metrics.js`, the widths Node uses where there is no canvas.
+
 The unit tests render every style with every palette at many sizes and shapes, check that the SVG is well-formed, that all text stays on the cover and that the subtitle is drawn, so most mistakes show up in `npm test`.
 
 ## Releasing and deploying

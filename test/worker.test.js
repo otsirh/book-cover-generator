@@ -90,16 +90,27 @@ test('answers are kept at the edge, once per version', async () => {
     },
   };
   try {
-    const first = await worker.fetch(new Request('https://covers.example/api/cover.svg?title=Kept&v=1.0.0'), {}, ctx);
+    const env = { CF_VERSION_METADATA: { id: 'd1' } };
+    const first = await worker.fetch(new Request('https://covers.example/api/cover.svg?title=Kept&v=1.0.0'), env, ctx);
     await Promise.all(waiting);
-    assert.deepEqual([...kept.keys()], [`https://covers.example/api/cover.svg?title=Kept&v=${version}`]);
-    // A link from another version is the same answer.
-    const again = await worker.fetch(new Request('https://covers.example/api/cover.svg?title=Kept&v=1.6.0'), {}, ctx);
+    assert.deepEqual(
+      [...kept.keys()],
+      [`https://covers.example/api/cover.svg?title=Kept&v=${encodeURIComponent(`${version}+d1`)}`],
+    );
+    // A link from another version is the same answer; another deployment draws anew.
+    const again = await worker.fetch(new Request('https://covers.example/api/cover.svg?title=Kept&v=1.6.0'), env, ctx);
     assert.equal(await again.text(), await first.text());
-    // Errors aren't kept.
-    await worker.fetch(new Request('https://covers.example/api/cover.svg?style=nope'), {}, ctx);
+    await worker.fetch(
+      new Request('https://covers.example/api/cover.svg?title=Kept'),
+      { CF_VERSION_METADATA: { id: 'd2' } },
+      ctx,
+    );
     await Promise.all(waiting);
-    assert.equal(kept.size, 1);
+    assert.equal(kept.size, 2);
+    // Errors aren't kept.
+    await worker.fetch(new Request('https://covers.example/api/cover.svg?style=nope'), env, ctx);
+    await Promise.all(waiting);
+    assert.equal(kept.size, 2);
   } finally {
     delete (/** @type {any} */ (globalThis).caches);
   }
@@ -126,4 +137,23 @@ test('mockups, errors, other methods, and what isn’t the API', async () => {
   const assets = { fetch: async () => new Response('static') };
   const res = await worker.fetch(new Request('https://covers.example/'), { ASSETS: assets }, { waitUntil() {} });
   assert.equal(await res.text(), 'static');
+});
+
+test('the API reads a link as the app does, and sizes a format as the CLI does', () => {
+  const o = coverOptions(new URLSearchParams(`palette=Mint&seed=%20abc%20&title=${'x'.repeat(250)}`));
+  assert.equal(o.palette, 'mint');
+  assert.equal(o.seed, 'abc');
+  assert.equal(o.title?.length, 200);
+  assert.deepEqual(coverOptions(new URLSearchParams('format=ebook&width=1200')), { width: 1200, height: 1920 });
+  assert.deepEqual(coverOptions(new URLSearchParams('format=square&height=500')), { width: 500, height: 500 });
+  assert.throws(() => coverOptions(new URLSearchParams('format=ebook&width=600&height=600')), /not both/);
+});
+
+test('a mockup background without its #, and a preflight for any header', async () => {
+  const res = /** @type {Response} */ (get('/api/mockup.svg?title=x&background=ffffff'));
+  assert.equal(res.status, 200);
+  assert.match(await res.text(), /#ffffff/);
+  const pre = /** @type {Response} */ (get('/api/cover.svg', 'OPTIONS'));
+  assert.equal(pre.headers.get('access-control-allow-headers'), '*');
+  assert.equal(pre.headers.get('access-control-max-age'), '86400');
 });

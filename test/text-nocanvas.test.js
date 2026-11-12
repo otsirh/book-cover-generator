@@ -17,9 +17,20 @@ test('falls back to the width estimate if a canvas cannot be created', () => {
 });
 
 test('the estimate treats only emoji-style symbols as 1em wide', () => {
-  const em = measureText('😀', 10, { font: FONTS.sans });
-  assert.ok(measureText('™', 10, { font: FONTS.sans }) < em * 0.8);
-  assert.ok(Math.abs(measureText('❤️', 10, { font: FONTS.sans }) - em) < 1e-9);
+  // (A font without measured widths, so ™ is estimated by its kind, not measured.)
+  const font = { family: 'Example Sans, sans-serif' };
+  const em = measureText('😀', 10, { font });
+  assert.ok(measureText('™', 10, { font }) < em * 0.8);
+  assert.ok(Math.abs(measureText('❤️', 10, { font }) - em) < 1e-9);
+});
+
+test('built-in fonts are measured from their widths, accented letters as their base letters', () => {
+  const spec = { font: FONTS.condensed, weight: 700 };
+  assert.equal(measureText('Café', 100, spec), measureText('Cafe', 100, spec));
+  // Narrow and wide letters measure differently, and bold is wider.
+  assert.ok(measureText('iiii', 100, spec) < measureText('MMMM', 100, spec) / 2);
+  assert.ok(measureText('Keeper', 100, { font: FONTS.condensed, weight: 400 }) < measureText('Keeper', 100, spec));
+  assert.ok(measureText('Keeper', 100, { font: FONTS.garamond, italic: true }) > 0);
 });
 
 test('symbols with text presentation stay with their word', () => {
@@ -45,5 +56,15 @@ test('ASCII punctuation never starts a line after CJK, Thai or emoji', () => {
       for (const line of fit.lines)
         assert.doesNotMatch(line, /^[.,!?:;…]/u, `${title} at ${maxWidth}: ${fit.lines.join(' | ')}`);
     }
+  }
+});
+
+test('every built-in font stack has measured widths for every character', async () => {
+  const { CHARS, METRICS } = await import('../src/metrics.js');
+  for (const font of Object.values(FONTS)) {
+    if (font.mono) continue;
+    const m = METRICS.get(font.family);
+    assert.ok(m, `no widths for ${font.family}: run npm run metrics`);
+    for (const table of [m.regular, m.bold]) assert.equal(table.length, [...CHARS].length * 2);
   }
 });

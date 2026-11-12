@@ -7,6 +7,8 @@
   "account_id": "a52b39ef7a73da0cc3ba58fccc491a55",
   "compatibility_date": "2026-11-01",
   "main": "worker/index.js",
+  // The deployment's id, so the API's edge cache starts afresh with every deploy.
+  "version_metadata": { "binding": "CF_VERSION_METADATA" },
   "build": { "command": "npm run build" },
   "assets": {
     "directory": "./dist",

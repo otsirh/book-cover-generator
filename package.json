@@ -60,6 +60,7 @@
     "test:e2e": "playwright test",
     "check": "npm run lint && npm run format:check && npm run typecheck && npm run lint:package && npm test",
     "assets": "node scripts/generate-assets.js",
+    "metrics": "node scripts/generate-metrics.js",
     "deploy": "npm run check && npm run test:e2e && wrangler deploy"
   },
   "devDependencies": {

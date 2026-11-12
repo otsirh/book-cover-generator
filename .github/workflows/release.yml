@@ -34,11 +34,13 @@ jobs:
         with:
           node-version-file: .nvmrc
           registry-url: https://registry.npmjs.org
-      - name: The tag names the package's version
-        if: github.ref_type == 'tag'
+      - name: The tag names the package's version, and the CHANGELOG has its section
+        if: github.event_name == 'push'
         run: |
           version="v$(node -p 'require("./package.json").version')"
           [ "$version" = "$GITHUB_REF_NAME" ] || { echo "::error::Tag $GITHUB_REF_NAME, package $version"; exit 1; }
+          # (Checked before publishing: a version on npm can't be taken back.)
+          grep -q "^## \[${GITHUB_REF_NAME#v}\]" CHANGELOG.md || { echo "::error::No CHANGELOG section for ${GITHUB_REF_NAME#v}"; exit 1; }
       - name: npm can publish with trusted publishing (11.5.1 or later)
         run: |
           node -e '
@@ -48,17 +50,18 @@ jobs:
           ' "$(npm --version)"
       - run: npm ci
       - run: npm run check
+      # Only a pushed tag publishes: a run started by hand is a dry run, even on a tag.
       - name: Publish
-        if: github.ref_type == 'tag'
+        if: github.event_name == 'push'
         run: npm publish
       - name: What would be published
-        if: github.ref_type != 'tag'
+        if: github.event_name != 'push'
         run: npm pack --dry-run
 
   github:
     name: GitHub release
     needs: npm
-    if: github.ref_type == 'tag'
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

@@ -91,7 +91,8 @@ for (const root of roots) {
   }
 }
 
-const server = createServer(async (req, res) => {
+/** @param {import('node:http').IncomingMessage} req @param {import('node:http').ServerResponse} res */
+async function handle(req, res) {
   let urlPath;
   try {
     urlPath = decodeURIComponent(new URL(req.url ?? '/', 'http://localhost').pathname);
@@ -151,6 +152,15 @@ const server = createServer(async (req, res) => {
   }
   res.writeHead(status, { 'Content-Type': type });
   res.end(req.method === 'HEAD' ? undefined : body);
+}
+
+const server = createServer((req, res) => {
+  // A request nothing here expected (a TRACE, say, which a Request can't hold) is answered, never
+  // left to stop the server.
+  handle(req, res).catch((err) => {
+    if (res.headersSent) res.destroy();
+    else res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' }).end(`${err?.message ?? err}\n`);
+  });
 });
 
 server.listen(port, '127.0.0.1', () => {

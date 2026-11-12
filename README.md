@@ -69,7 +69,7 @@ The site draws covers from a URL too, so a page can show one with nothing instal
 - `GET /api/cover.svg` answers with the cover as SVG.
 - `GET /api/mockup.svg` answers with a [mockup](#mockups) of it. Add `kind` (`book`, `flat`, `ereader`, `card`, `square`, `story`), `text` for the line on a card, square or story, and `background`.
 
-The query takes the options' own names (`title`, `author`, `subtitle`, `series`, `credit`, `badge`, `style`, `palette`, `seed`, `genre`, `font`, `lang`, `width`, `height`) and the app's link parameters, so the part of an app link after `#` draws the same cover:
+The query takes the options' own names (`title`, `author`, `subtitle`, `series`, `credit`, `badge`, `style`, `palette`, `seed`, `genre`, `font`, `lang`, `width`, `height`) and the app's link parameters, so the part of an app link after `#` draws the same design (the server measures text with the widths of the fonts as macOS draws them, so on another system a line can break a little differently from the app's preview):
 
 | parameter             | value                                                                                          |
 | --------------------- | ---------------------------------------------------------------------------------------------- |
@@ -282,7 +282,7 @@ registerStyle({
 
 ## Notes
 
-- **Fonts.** Covers only use system font stacks (Georgia, Helvetica, Futura, Didot, Impact, Courier and others), each with close matches on Windows, Android and Linux. This is because an SVG drawn into a canvas for PNG/JPEG export can't load web fonts. In the browser, text is measured with a canvas, so it fits exactly. In Node, widths are estimated; plug in a real font engine with `setTextMeasurer` if you need exact fits there.
+- **Fonts.** Covers only use system font stacks (Georgia, Helvetica, Futura, Didot, Impact, Courier and others), each with close matches on Windows, Android and Linux. This is because an SVG drawn into a canvas for PNG/JPEG export can't load web fonts. In the browser, text is measured with a canvas, so it fits exactly. In Node (and the CLI and HTTP API), the built-in fonts are measured from their characters' widths as macOS draws them, so text fits much as it does in the app; fonts of your own are estimated. Plug in a real font engine with `setTextMeasurer` if you need exact fits there.
 - **Deterministic.** The same options always give the same artwork. In Node the SVG is identical every time. In the browser, text is measured with the fonts installed on that computer, so line breaks can differ slightly between machines. Registering a custom style changes which style `style: 'random'` picks for a given seed.
 - **Versioning.** Artwork for a given seed can change in minor releases (a style gets better). Pin an exact version if you need byte-identical covers forever.
 - **Browser support.** Current Chrome, Edge, Firefox and Safari. Every release is tested in Chromium, Firefox and WebKit, including PNG and JPEG export.

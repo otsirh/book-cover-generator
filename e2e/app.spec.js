@@ -453,30 +453,37 @@ test('coming back with Forward makes the app entries ahead reachable again', asy
 });
 
 test('a long typing session slows its history writes, inside browser rate limits', async ({ page }) => {
-  await page.clock.install();
+  await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') });
   await page.goto('/#title=&style=minimal&seed=r');
-  const writes = await page.evaluate(() => {
+  await ready(page);
+  // From here only the test moves time, so a busy machine can't add any.
+  await page.clock.pauseAt(new Date('2026-01-01T00:01:00Z'));
+  await page.evaluate(() => {
     let count = 0;
     const real = history.replaceState.bind(history);
     history.replaceState = (...args) => {
       count += 1;
       return real(...args);
     };
-    // Writes per 30 s of the page's time (the test moves the clock, and a busy machine adds some).
-    const start = performance.now();
-    /** @type {any} */ (window).__writes = () => (count * 30_000) / (performance.now() - start);
-    return 0;
+    /** @type {any} */ (window).__writes = () => count;
+    document.getElementById('title')?.focus();
   });
-  expect(writes).toBe(0);
-  const title = page.locator('#title');
-  await title.focus();
-  // 30 s of steady typing: a key every 250 ms.
+  // 30 s of steady typing: a key every 250 ms. (Typed from the page: a key from the test waits
+  // for a frame, and a paused clock draws none.)
   for (let i = 0; i < 120; i++) {
-    await page.keyboard.type(String.fromCharCode(97 + (i % 26)));
+    await page.evaluate(
+      (ch) => {
+        const title = /** @type {HTMLTextAreaElement} */ (document.getElementById('title'));
+        title.value += ch;
+        title.dispatchEvent(new InputEvent('input', { bubbles: true, data: ch, inputType: 'insertText' }));
+      },
+      String.fromCharCode(97 + (i % 26)),
+    );
     await page.clock.runFor(250);
   }
-  const rate = await page.evaluate(() => /** @type {any} */ (window).__writes());
-  expect(rate).toBeLessThan(70);
+  const total = await page.evaluate(() => /** @type {any} */ (window).__writes());
+  expect(total).toBeGreaterThan(10);
+  expect(total).toBeLessThan(70);
 });
 
 test('a history write the browser ignores silently is retried', async ({ page }) => {
@@ -1676,6 +1683,37 @@ test('a genre filters the rail, and Randomize and the arrows stay in it', async 
   await expect(page.locator('#genre')).toHaveValue('horror');
   await page.locator('#genre').selectOption('');
   await expect(visible).toHaveCount(39);
+});
+
+test('a book’s genre in a list picks a style that suits it, unless the design’s does', async ({ page }) => {
+  await page.goto('/#title=x&style=bauhaus&seed=g&palette=mint');
+  await page.locator('#many summary').click();
+  // Bauhaus suits children's books but not horror: only the horror row changes style.
+  await page.locator('#many-list').fill('title,genre\nNight,horror\nNight,\nNight,children');
+  await expect(page.locator('#many-preview img')).toHaveCount(3);
+  const [horror, plain, children] = await Promise.all(
+    [1, 2, 3].map((i) => svgSoon(page, `#many-preview li:nth-child(${i}) img`)),
+  );
+  expect(horror).not.toBe(plain);
+  expect(children).toBe(plain);
+});
+
+test('with no link, the first cover is in the genre chosen last time', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('book-cover-generator:genre', 'horror'));
+  await page.goto('/');
+  await ready(page);
+  await expect(page.locator('#genre')).toHaveValue('horror');
+  const style = await page.locator('.tile[aria-pressed="true"]').getAttribute('data-style');
+  expect(['hollow', 'noir', 'silhouette']).toContain(style);
+});
+
+test('a focused tile that leaves the genre hands focus to the selected one', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('book-cover-generator:genre', 'horror'));
+  await page.goto('/#title=Night&style=minimal&seed=f');
+  await page.locator('.tile[data-style="minimal"]').focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('.tile[data-style="minimal"]')).toBeHidden();
+  await expect(page.locator('.tile[aria-pressed="true"]')).toBeFocused();
 });
 
 test('a Japanese title sets the language of the cover', async ({ page }) => {

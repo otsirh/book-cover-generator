@@ -4,6 +4,7 @@
 // SVG is rasterised through <img>/<canvas> (which cannot load web fonts).
 
 import { escapeXml, n } from './core.js';
+import { CHARS, METRICS } from './metrics.js';
 
 // Each stack starts with the macOS face the style was drawn with, then close matches on
 // Windows, Android and Linux (where Futura, Didot or Gill Sans are rarely installed), so
@@ -120,18 +121,50 @@ function latinWidth(ch) {
   return 0.54;
 }
 
+/** Where each measured character is in a table. */
+const CHAR_INDEX = new Map([...CHARS].map((ch, i) => [ch, i]));
+/** @typedef {{ regular: Float64Array, bold: Float64Array, italic: number }} WidthTable */
+/** Decoded width tables, by font family (null: none). @type {Map<string, WidthTable | null>} */
+const tables = new Map();
+/** Two hex digits per character, in 1/200 em, as widths in em. @param {string} hex */
+const decodeWidths = (hex) =>
+  Float64Array.from({ length: hex.length / 2 }, (_, i) => parseInt(hex.slice(i * 2, i * 2 + 2), 16) / 200);
+/** The measured widths of a built-in font stack, or null. @param {string} family */
+function tableFor(family) {
+  let table = tables.get(family);
+  if (table === undefined) {
+    const m = METRICS.get(family);
+    table = m ? { regular: decodeWidths(m.regular), bold: decodeWidths(m.bold), italic: m.italic } : null;
+    tables.set(family, table);
+  }
+  return table;
+}
+
 /**
- * Rough widths (in em) for environments without a canvas, e.g. Node.
+ * Widths (in em) for environments without a canvas, e.g. Node: from the measured widths of a
+ * built-in font stack's characters (an accented letter as its base letter), else estimated
+ * from the kind of character.
  * @param {string} text
- * @param {{ font: { mono?: boolean, widthFactor?: number }, weight?: number }} spec
+ * @param {{ font: { family?: string, mono?: boolean, widthFactor?: number }, weight?: number, italic?: boolean }} spec
  */
 function heuristicWidth(text, spec) {
-  const factor = (spec.font.widthFactor || 1) * ((spec.weight || 400) >= 600 ? 1.07 : 1);
+  const weight = spec.weight || 400;
+  const factor = (spec.font.widthFactor || 1) * (weight >= 600 ? 1.07 : 1);
+  const table = spec.font.mono || !spec.font.family ? null : tableFor(spec.font.family);
+  // Weights between 400 and 700 fall between the two tables.
+  const bold = Math.min(1, Math.max(0, (weight - 400) / 300));
+  const slant = table && spec.italic ? table.italic : 1;
   let w = 0;
   for (const g of graphemes(text)) {
     if (FULL_WIDTH.test(g)) w += 1;
     else if (spec.font.mono) w += 0.6;
-    else w += latinWidth(g[0]) * factor;
+    else {
+      const i = table ? (CHAR_INDEX.get(g) ?? CHAR_INDEX.get(g.normalize('NFD')[0])) : undefined;
+      w +=
+        table && i !== undefined
+          ? (table.regular[i] + (table.bold[i] - table.regular[i]) * bold) * slant
+          : latinWidth(g[0]) * factor;
+    }
   }
   return w;
 }

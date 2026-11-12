@@ -170,7 +170,8 @@ export function registerStyle(style, { replace = false } = {}) {
   if (builtInStyles.has(style.id) && !replace) {
     throw new Error(`registerStyle: "${style.id}" is a built-in style; pass { replace: true } to replace it`);
   }
-  registry.set(style.id, entryFor(style));
+  // (A built-in style's replacement suits its genres, unless it names its own.)
+  registry.set(style.id, entryFor(style, builtInStyles.get(style.id)?.genres));
   if (!styles.includes(style.id)) styles.push(style.id);
 }
 

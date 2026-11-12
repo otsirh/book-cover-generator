@@ -254,7 +254,10 @@ export interface CoverStyle {
   group?: StyleGroup | (string & {});
   /** Background preference when the palette is picked automatically. */
   prefer?: 'light' | 'dark';
-  /** The genres the style suits (ids from `genres`), so `createCover({ genre })` can pick it. */
+  /**
+   * The genres the style suits (ids from `genres`), so `createCover({ genre })` can pick it. A
+   * replacement for a built-in style suits the built-in's genres unless it names its own.
+   */
   genres?: readonly string[];
   /**
    * The choices `render` makes with `ctx.choose(name, values)` that people can pin, with labels:

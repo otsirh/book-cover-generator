@@ -277,9 +277,19 @@ function batch(defaults) {
     try {
       // A size in the list replaces the command line's.
       const sized = book.width !== undefined || book.height !== undefined;
+      // A book's genre picks a style that suits it, unless the book names a style or --style's
+      // already suits the genre.
+      const ownGenre =
+        book.genre &&
+        !book.style &&
+        defaults.style &&
+        !listStyles()
+          .find((s) => s.id === defaults.style)
+          ?.genres.includes(book.genre);
       const cover = createCover({
         ...defaults,
         ...(sized ? { width: undefined, height: undefined } : {}),
+        ...(ownGenre ? { style: 'random', variants: {} } : {}),
         ...book,
         seed: book.seed ?? values.seed,
       });

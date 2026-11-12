@@ -287,11 +287,8 @@ function sanitize(raw) {
 
 /** @param {string} hash */
 function fromHash(hash) {
-  const q = new URLSearchParams(hash.replace(/^#/, ''));
-  /** @type {Record<string, unknown>} */
-  const raw = {};
-  for (const [key, value] of q) raw[key] = value;
-  return sanitize(raw);
+  // (Own properties only, even for a key named __proto__.)
+  return sanitize(Object.fromEntries(new URLSearchParams(hash.replace(/^#/, ''))));
 }
 
 /** @param {Design} d */
@@ -1128,7 +1125,7 @@ function buildControls() {
     flushReplace();
     try {
       await copyText(imageLink(design));
-      toast('Image link copied: it draws this cover as an SVG, on any page');
+      toast('Image link copied: it draws this design as an SVG, on any page');
     } catch {
       toast('Could not access the clipboard');
     }
@@ -1592,16 +1589,22 @@ function buildRail() {
   buildGenres();
 }
 
+/** The genre chosen on an earlier visit, or '' for all. */
+function savedGenre() {
+  try {
+    const saved = localStorage.getItem(GENRE_KEY) ?? '';
+    return genres.some((g) => g.id === saved) ? saved : '';
+  } catch {
+    // Storage blocked: all genres.
+    return '';
+  }
+}
+
 /** The genre menu: it filters the rail, and what Randomize, the dice and the arrows pick. */
 function buildGenres() {
   const menu = /** @type {HTMLSelectElement} */ ($('genre'));
   for (const g of genres) menu.append(h('option', { value: g.id }, g.name));
-  try {
-    const saved = localStorage.getItem(GENRE_KEY) ?? '';
-    if (genres.some((g) => g.id === saved)) ui.genre = saved;
-  } catch {
-    // Storage blocked: all genres.
-  }
+  ui.genre = savedGenre();
   menu.value = ui.genre;
   menu.addEventListener('change', () => {
     ui.genre = menu.value;
@@ -1621,8 +1624,12 @@ function applyGenre() {
   const rail = $('rail');
   for (const s of STYLES) {
     const tile = tiles.get(s.id);
+    if (!tile) continue;
     // (The selected style always shows, in or out of the genre.)
-    if (tile) tile.button.hidden = Boolean(ui.genre) && !s.genres.includes(ui.genre) && s.id !== design.style;
+    const hide = Boolean(ui.genre) && !s.genres.includes(ui.genre) && s.id !== design.style;
+    // A tile with keyboard focus hands it to the selected one before it goes.
+    if (hide && document.activeElement === tile.button) tiles.get(design.style)?.button.focus();
+    tile.button.hidden = hide;
   }
   const sections = [...rail.querySelectorAll('.rail-group')];
   const jumps = [...$('rail-groups').querySelectorAll('.rail-jump')];
@@ -2103,11 +2110,15 @@ function bookOptions(book, i, d = design, own = /** @type {HTMLInputElement} */ 
     0,
     palettes.findIndex((p) => p.id === d.palette),
   );
+  // A book's genre picks a style that suits it, unless the book names a style or this design's
+  // already suits the genre.
+  const ownGenre = book.genre && !book.style && !STYLES.find((s) => s.id === d.style)?.genres.includes(book.genre);
   return {
     ...base,
     ...(own && !book.palette ? { palette: palettes[(start + i) % palettes.length].id } : {}),
     // (Another style than this design's: none of this one's pinned choices.)
     ...(book.style && book.style !== d.style ? { variants: {} } : {}),
+    ...(ownGenre ? { style: 'random', variants: {} } : {}),
     ...(book.width !== undefined || book.height !== undefined ? { width: undefined, height: undefined } : {}),
     ...book,
   };
@@ -2259,6 +2270,12 @@ function registerServiceWorker() {
 // A shared link opens the same cover every time (see complete()); with no link, the sample stays.
 const linked = fromHash(location.hash);
 if (Object.keys(linked).length) Object.assign(design, complete(linked));
+else if (savedGenre()) {
+  // With no link, the first cover is in the genre chosen last time: a starter that suits it, if any.
+  const suits = STYLES.filter((s) => s.genres.includes(savedGenre())).map((s) => s.id);
+  const starters = STARTERS.filter((id) => suits.includes(id));
+  design.style = pick(starters.length ? starters : suits);
+}
 const linkedHash = location.hash;
 // A fragment that isn't a design (#usage, from a header link opened in a new tab) is a place on
 // the page. The URL is about to hold the design instead, so scroll there once the page is built.

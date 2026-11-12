@@ -163,8 +163,17 @@ function textElements(svg) {
  * @param {string} svg
  */
 const textLines = (svg) =>
-  textElements(svg).flatMap(({ y, size }) =>
-    y != null && size ? [/** @type {[number, number, number]} */ ([y - size * 0.8, y + size * 0.3, size])] : [],
+  textElements(svg).flatMap(({ y, size, text }) =>
+    y != null && size
+      ? [
+          /** @type {[number, number, number]} */ ([
+            y - size * 0.8,
+            // Capitals without a tail (no J or Q) and figures don't reach below the baseline.
+            y + size * (/^[A-IK-PR-Z0-9 .,'’&!?:–—-]+$/.test(text) ? 0.05 : 0.3),
+            size,
+          ]),
+        ]
+      : [],
   );
 
 /** Every run of visible text with its font size. @param {string} svg */
@@ -1412,7 +1421,7 @@ test('every style suits a genre, and a genre picks a random style that suits it'
   assert.throws(() => createCover({ genre: 'poetry' }), /Unknown genre "poetry"/);
 });
 
-test('a genre is checked even with a style given, and a style’s genres must be genre ids', async () => {
+test('a genre is checked even with a style given, and a mockup’s line is cut between whole characters', async () => {
   assert.throws(() => createCover({ style: 'retro', genre: 'poetry' }), /Unknown genre "poetry"/);
   const { createMockup } = await import('../src/index.js');
   // A card's line is cut between whole characters.

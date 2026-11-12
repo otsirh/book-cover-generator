@@ -318,6 +318,16 @@ test('--batch writes a cover per book, with the other options for every book', a
     assert.equal(partial.code, 1);
     assert.match(partial.stderr, /Book 2 \("Bad"\): Unknown style "nope"/);
     assert.match(partial.stderr, /Wrote 1 of 2 covers/);
+    // A book's genre picks a style that suits it, unless --style's already does.
+    await writeFile(list, 'title,genre\nNight,horror\nNight,literary\nNight,\n');
+    const genred = await cli('--batch', list, '--out-dir', join(dir, 'genred'), '-s', 'minimal', '--json');
+    assert.equal(genred.code, 0, genred.stderr);
+    const styles = genred.stdout
+      .trim()
+      .split('\n')
+      .map((l) => JSON.parse(l).style);
+    assert.ok(['hollow', 'noir', 'silhouette'].includes(styles[0]), styles[0]);
+    assert.deepEqual(styles.slice(1), ['minimal', 'minimal']);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

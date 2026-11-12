@@ -3,12 +3,17 @@
 //
 //   <img src="https://covers.otsirh.dev/api/cover.svg?title=Dune&author=Frank+Herbert">
 //
-// The query is the app's link: any design's link (the part after #) draws that cover.
+// The query is the app's link: any design's link (the part after #) draws that design. Text is
+// measured with the built-in fonts' widths (src/metrics.js), as macOS draws them, so it can break
+// a little differently from the app on another system, which measures with its own fonts.
 
 import { createCover, createMockup, formats, version } from '../src/index.js';
+import { clipGraphemes } from '../src/text.js';
 
 /** Query parameters that are cover options as they are. */
-const TEXT = ['title', 'author', 'subtitle', 'series', 'credit', 'badge', 'style', 'seed', 'genre', 'font', 'lang'];
+const TEXT = ['style', 'genre', 'font', 'lang'];
+/** Text read as the app reads its links: cut to the app's lengths (in UTF-16 units). */
+const LIMITS = { title: 200, author: 120, subtitle: 160, series: 120, credit: 120, badge: 60 };
 /** Your own colours as the app's links write them: background, text and one to three accents. */
 const CUSTOM_PALETTE = /^custom((?:-[0-9a-f]{6}){3,5})$/i;
 const SIZE = /^(\d{1,5})x(\d{1,5})$/;
@@ -32,6 +37,14 @@ export function coverOptions(q) {
     const value = q.get(key);
     if (value) o[key] = value;
   }
+  for (const [key, max] of Object.entries(LIMITS)) {
+    const value = q.get(key);
+    if (value) o[key] = clipGraphemes(value, max, { units: true });
+  }
+  // (The app trims the seed it reads from a link, and keeps 40 characters.)
+  const seed = q.get('seed')?.trim();
+  if (seed) o.seed = clipGraphemes(seed, 40, { units: true });
+  const [width, height] = ['width', 'height'].map((key) => (q.get(key) ? Number(q.get(key)) : undefined));
   const format = q.get('format');
   if (format) {
     const size = Object.hasOwn(formats, format)
@@ -42,18 +55,27 @@ export function coverOptions(q) {
         `Unknown format "${format}". Use one of ${Object.keys(formats).join(', ')}, or a size such as 1600x2560`,
       );
     }
-    [o.width, o.height] = size;
-  }
-  for (const key of ['width', 'height']) {
-    const value = q.get(key);
-    if (value) o[key] = Number(value);
+    // A format's shape, at the width or height asked for (as the CLI's --format --width).
+    if (width !== undefined && height !== undefined) {
+      throw new RangeError('format sets the shape: give it a width or a height, not both');
+    }
+    const [w, h] = size;
+    [o.width, o.height] =
+      width !== undefined
+        ? [width, Math.round((width * h) / w)]
+        : height !== undefined
+          ? [Math.round((height * w) / h), height]
+          : [w, h];
+  } else {
+    if (width !== undefined) o.width = width;
+    if (height !== undefined) o.height = height;
   }
   const palette = q.get('palette');
   const custom = palette ? CUSTOM_PALETTE.exec(palette) : null;
   if (custom) {
     const colors = custom[1].slice(1).split('-').map(hex);
     o.palette = { bg: colors[0], ink: colors[1], accents: colors.slice(2) };
-  } else if (palette) o.palette = palette;
+  } else if (palette) o.palette = palette.toLowerCase();
   const [bg, ink, accent] = [q.get('bg'), q.get('ink'), q.get('accent')];
   if (bg || ink || accent) {
     if (!bg || !ink || !accent) throw new RangeError('Your own colours need bg, ink and accent');
@@ -103,7 +125,15 @@ export function api(request) {
   const kind = url.pathname === '/api/cover.svg' ? 'cover' : url.pathname === '/api/mockup.svg' ? 'mockup' : null;
   if (!kind) return null;
   if (request.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: { ...COMMON, 'Access-Control-Allow-Methods': 'GET, HEAD' } });
+    return new Response(null, {
+      status: 204,
+      headers: {
+        ...COMMON,
+        'Access-Control-Allow-Methods': 'GET, HEAD',
+        'Access-Control-Allow-Headers': '*',
+        'Access-Control-Max-Age': '86400',
+      },
+    });
   }
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     return new Response('Use GET\n', {
@@ -120,7 +150,7 @@ export function api(request) {
         : createMockup(cover, {
             kind: /** @type {import('../src/index.js').MockupKind} */ (q.get('kind') || 'book'),
             text: q.get('text') ?? '',
-            background: q.get('background') || undefined,
+            background: q.get('background') ? hex(/** @type {string} */ (q.get('background'))) : undefined,
           }).svg;
     return new Response(request.method === 'HEAD' ? null : svg, {
       headers: {
@@ -144,25 +174,26 @@ export function api(request) {
 }
 
 /**
- * Where an answer is kept at the edge. The `v` an app link names is ignored (the API draws
- * with its own version), so the key names this version instead: a release draws anew.
- * @param {Request} request
+ * Where an answer is kept at the edge. The `v` an app link names is ignored (the API draws with
+ * the code deployed), so the key names this deployment instead: every deploy draws anew, even
+ * one between releases.
+ * @param {Request} request @param {string} deployment
  */
-function cacheKey(request) {
+function cacheKey(request, deployment) {
   const url = new URL(request.url);
-  url.searchParams.set('v', version);
+  url.searchParams.set('v', `${version}+${deployment}`);
   return new Request(url.href, { method: 'GET' });
 }
 
 export default {
   /**
    * @param {Request} request
-   * @param {{ ASSETS?: { fetch(request: Request): Promise<Response> } }} env
+   * @param {{ ASSETS?: { fetch(request: Request): Promise<Response> }, CF_VERSION_METADATA?: { id: string } }} env
    * @param {{ waitUntil(promise: Promise<unknown>): void }} ctx
    */
   async fetch(request, env, ctx) {
     const cache = request.method === 'GET' ? /** @type {any} */ (globalThis).caches?.default : undefined;
-    const key = cache ? cacheKey(request) : null;
+    const key = cache ? cacheKey(request, env.CF_VERSION_METADATA?.id ?? 'dev') : null;
     if (cache && key) {
       const hit = await cache.match(key);
       if (hit) return hit;
