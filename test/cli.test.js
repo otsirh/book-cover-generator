@@ -449,6 +449,20 @@ test('--print: the whole paperback cover, sized from the trim and the pages', as
     ]) {
       assert.ok(svg.includes(text), text);
     }
+    // {n} and {seed} in --out are filled in, as for any single cover.
+    const named = await cli(
+      'T',
+      '--print',
+      '6x9',
+      '--pages',
+      '300',
+      '--seed',
+      'abc',
+      '-o',
+      join(dir, '{n}-{seed}.svg'),
+    );
+    assert.equal(named.code, 0, named.stderr);
+    assert.ok((await stat(join(dir, '1-abc.svg'))).isFile());
     // As JSON, to stdout.
     const json = JSON.parse((await cli('X', '--print', '5x8', '--pages', '60', '--json')).stdout);
     assert.deepEqual(json.inches, { width: 10.38512, height: 8.25, trim: [5, 8], spine: 0.13512, bleed: 0.125 });

@@ -1100,6 +1100,16 @@ test('the tools under the preview: never covered by it while it stays in view, a
   // Their buttons can be pressed (nothing lies over them).
   await page.locator('#print summary').click();
   await expect(page.locator('#print')).toHaveAttribute('open', '');
+  // On a tablet the styles come below, full width: the controls, kept in view, never lie over them.
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await page.evaluate(() =>
+    window.scrollTo(0, (document.querySelector('.rail')?.getBoundingClientRect().top ?? 0) + window.scrollY + 100),
+  );
+  const [controls, styles] = await Promise.all([
+    page.locator('.controls').boundingBox(),
+    page.locator('.rail').boundingBox(),
+  ]);
+  expect(controls && styles && controls.y + controls.height <= styles.y + 0.5).toBe(true);
   // On a phone: after the preview and the export buttons, not above them.
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => window.scrollTo(0, 0));
@@ -1754,13 +1764,53 @@ test('a paperback for print: the whole cover, sized from the trim and pages, as 
   await expect(page.locator('#print-back')).toHaveValue('ink');
 });
 
+test('the spine keeps 1/16 in clear of the ink of accents and tails, in this browser’s fonts', async ({ page }) => {
+  await page.goto('/#title=Ink&style=minimal&seed=s');
+  await ready(page);
+  const rows = await page.evaluate(async () => {
+    const { createPrintCover } = await import('/src/index.js');
+    const ctx = /** @type {CanvasRenderingContext2D} */ (document.createElement('canvas').getContext('2d'));
+    const out = [];
+    for (const [title, font] of [
+      ['Été à Paris', undefined],
+      ['Ça Ira', 'serif'],
+      ['Quiet Days', 'serif'],
+      ['The Lighthouse Keeper', undefined],
+    ]) {
+      const print = createPrintCover({ title, author: 'Ann Lee', font, seed: 's', style: 'minimal' }, { pages: 120 });
+      // (Read from the markup: the page's Trusted Types policy rightly refuses DOMParser.)
+      const spine = /rotate\(90\)">([\s\S]*?)<\/g><\/g>/.exec(print.svg)?.[1] ?? '';
+      const half = (print.inches.spine * 96) / 2 - 6;
+      for (const [, attrs, y, text] of spine.matchAll(/<g ([^>]*)><text x="[^"]*" y="([^"]+)">([^<]*)<\/text>/g)) {
+        const attr = (/** @type {string} */ name) =>
+          (new RegExp(`${name}="([^"]*)"`).exec(attrs)?.[1] ?? '').replaceAll('&apos;', "'").replaceAll('&quot;', '"');
+        ctx.font = `${attr('font-weight') || 400} ${attr('font-size')}px ${attr('font-family')}`;
+        const m = ctx.measureText(text);
+        out.push({
+          line: text,
+          top: Number(y) - m.actualBoundingBoxAscent,
+          bottom: Number(y) + m.actualBoundingBoxDescent,
+          half,
+        });
+      }
+    }
+    return out;
+  });
+  expect(rows.length).toBe(8);
+  for (const { line, top, bottom, half } of rows) {
+    expect(top, `${line}: ink top`).toBeGreaterThanOrEqual(-half - 0.5);
+    expect(bottom, `${line}: ink bottom`).toBeLessThanOrEqual(half + 0.5);
+  }
+});
+
 test('a print cover too large for one canvas is drawn in strips', async ({ page }) => {
   await page.goto('/#title=Strips&style=minimal&seed=s');
   await ready(page);
   const result = await page.evaluate(async () => {
     const { createPrintCover } = await import('/src/index.js');
     const { svgToPdf } = await import('/src/browser.js');
-    const print = createPrintCover({ title: 'Strips', style: 'minimal', seed: 's' }, { pages: 100, trim: '5x8' });
+    // (A "$&" in the title, which a string replacement would read as a pattern.)
+    const print = createPrintCover({ title: 'Rock$&Roll', style: 'minimal', seed: 's' }, { pages: 100, trim: '5x8' });
     const blob = await svgToPdf(print.svg, { dpi: 100, maxPixels: 300_000, bleed: 0.125 });
     const text = new TextDecoder('latin1').decode(await blob.arrayBuffer());
     return {

@@ -218,6 +218,15 @@ kbd {
   box-shadow: var(--shadow);
 }
 
+/* The controls' column, as tall as the first row (which the controls and the preview set): the
+   controls stay in view (sticky) within it, and so never over the styles below on a tablet. */
+.controls-zone {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: stretch;
+  min-width: 0;
+}
+
 .controls {
   display: flex;
   flex-direction: column;
@@ -1742,6 +1751,7 @@ pre {
     padding: 0 16px 24px;
   }
 
+  .controls-zone,
   .stage-zone,
   .stage {
     display: contents;

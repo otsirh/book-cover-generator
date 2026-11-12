@@ -122,12 +122,14 @@ export async function svgToPdf(svg, { dpi = 300, quality = 0.95, bleed = 0, titl
         ? svg
         : svg.replace(
             tag,
-            tag
-              .replace(/\s(width|height|viewBox)="[^"]*"/g, '')
-              .replace(
-                /^<svg\b/i,
-                `<svg width="${(w / pw) * sw}" height="${sh}" viewBox="${vx + (x0 / pw) * vw} ${vy} ${(w / pw) * vw} ${vh}"`,
-              ),
+            // (A function, so a "$&" in the tag's text isn't read as a replacement pattern.)
+            () =>
+              tag
+                .replace(/\s(width|height|viewBox)="[^"]*"/g, '')
+                .replace(
+                  /^<svg\b/i,
+                  `<svg width="${(w / pw) * sw}" height="${sh}" viewBox="${vx + (x0 / pw) * vw} ${vy} ${(w / pw) * vw} ${vh}"`,
+                ),
           );
     const jpeg = await rasterize(part, { type: 'image/jpeg', width: w, height: ph, quality, background: '#ffffff' });
     images.push({

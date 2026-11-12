@@ -167,7 +167,9 @@ const paperback: PrintCover = createPrintCover(
 );
 const spineIn: number = paperback.inches.spine + spineWidth(200, 'white') + paperTypes.cream;
 const trimIn: readonly [number, number] = trimSizes['5.5x8.5'];
-const minPages: number = printLimits.pages[0];
+const minPages: number = printLimits.pages.color[0];
+// @ts-expect-error the print options (with the page count) are required
+void createPrintCover({ title: 'Dune' });
 const paperKind: PaperType = 'premium-color';
 const pdf: Promise<Blob> = svgToPdf(paperback.svg, { bleed: paperback.inches.bleed, title: 'Dune' });
 // @ts-expect-error the page count is required

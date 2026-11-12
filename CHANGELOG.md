@@ -11,6 +11,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Fixed
 
 - On phones, **Many covers** sat above the preview at the top of the page; it now follows the export buttons, with Kept designs and the print panel. On wider screens, the preview stays in view beside the controls however many designs are kept, and never covers what's under it.
+- On tablets, the controls (kept in view as the page scrolls) no longer lie over the styles below them.
 
 ## [1.9.2] - 2026-11-13
 

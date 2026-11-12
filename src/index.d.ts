@@ -100,10 +100,11 @@ export declare const printLimits: Readonly<{
   width: readonly [number, number];
   /** Trim height, in inches: least and most. */
   height: readonly [number, number];
-  /** Page count: least and most. */
-  pages: readonly [number, number];
-  /** The most pages on cream paper, which is thicker. */
-  creamPages: number;
+  /**
+   * Page count on each paper, least and most (cream is thicker; standard colour takes 72 to 600).
+   * Some large trims (8.5 in wide) take fewer pages: KDP's upload checks those.
+   */
+  pages: Readonly<Record<PaperType, readonly [number, number]>>;
   /** A book with fewer pages has no text on its spine. */
   spineTextPages: number;
 }>;
@@ -184,7 +185,7 @@ export interface PrintCover {
  * // inches.width === 13.05, inches.spine === 0.8
  * ```
  */
-export declare function createPrintCover(cover?: CoverOptions, print?: PrintOptions): PrintCover;
+export declare function createPrintCover(cover: CoverOptions, print: PrintOptions): PrintCover;
 
 /** This version of the library, such as `'1.4.0'`. Artwork for a seed can change between minor versions. */
 export declare const version: string;

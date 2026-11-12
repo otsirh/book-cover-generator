@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { createPrintCover, spineWidth, paperTypes, trimSizes, printLimits, styles } from '../src/index.js';
 import { assertWellFormed } from './well-formed.js';
 import { extentOf, textBoxes } from './svg-text.js';
+import { markExtent, descentOf } from '../src/text.js';
 
 const BLURB = [
   'When the lamp at Gull Point goes dark for the first time in ninety years, Ada Fenn rows out through the storm to find out why.',
@@ -22,6 +23,10 @@ test('the spine is the page count times the paper, as KDP figures it', () => {
   assert.throws(() => spineWidth(23), /pages must be a whole number from 24 to 828 on white paper, got 23/);
   assert.throws(() => spineWidth(829), /from 24 to 828/);
   assert.throws(() => spineWidth(777, 'cream'), /from 24 to 776 on cream paper/);
+  // Standard colour takes 72 to 600 pages; premium colour, as white.
+  assert.throws(() => spineWidth(71, 'color'), /from 72 to 600 on color paper, got 71/);
+  assert.throws(() => spineWidth(601, 'color'), /from 72 to 600 on color paper/);
+  assert.equal(spineWidth(828, 'premium-color'), 1.943316);
   assert.throws(() => spineWidth(100.5), /whole number/);
   assert.throws(() => spineWidth(/** @type {any} */ ('100')), /whole number/);
 });
@@ -169,6 +174,54 @@ test('a blurb too long for the back is cut with an ellipsis, at 8 pt', () => {
   assert.match(marked.svg, />&lt;b&gt;&amp;</);
 });
 
+test('a word wider than the back (a web address) is broken to fit, after a / where it can be', () => {
+  const url = 'https://www.goodreads.com/book/show/12345678-the-lighthouse-keeper-a-novel';
+  const print = createPrintCover(
+    { ...book, style: 'retro' },
+    { trim: '5x8', pages: 200, blurb: `Ada rows out to find out why. Read the first chapter at ${url} and join in.` },
+  );
+  assertBackText(print, 'long web address');
+  const lines = textBoxes(print.svg)
+    .filter((b) => !b.moved && b.family?.includes('Georgia'))
+    .map((b) => b.text);
+  // Every character is there, in order, broken only where it had to be.
+  assert.equal(lines.join('').replace(/\s+/g, ''), `Adarowsouttofindoutwhy.Readthefirstchapterat${url}andjoinin.`);
+  assert.ok(
+    lines.some((l) => /\/$/.test(l) || /-$/.test(l)),
+    lines.join(' | '),
+  );
+  // A word no wider than the column is never broken.
+  const plain = textBoxes(createPrintCover(book, { pages: 200, blurb: 'Short words only here.' }).svg)
+    .filter((b) => !b.moved && b.family?.includes('Georgia'))
+    .map((b) => b.text);
+  assert.deepEqual(plain, ['Short words only here.']);
+});
+
+test('the spine keeps the ink of accents and tails 1/16 in from its edges too', () => {
+  for (const [title, font, pages, paper] of /** @type {const} */ ([
+    ['Été à Paris', undefined, 120, 'white'],
+    ['Die Bücher der Nacht', undefined, 100, 'cream'],
+    ['Ça Ira', 'serif', 120, 'white'],
+    ['Quiet Days', 'serif', 120, 'white'],
+    ['夜の図書館', undefined, 120, 'white'],
+  ])) {
+    const print = createPrintCover({ title, author: 'Ann Lee', font, seed: 's', style: 'minimal' }, { pages, paper });
+    assert.equal(print.spineText, true, title);
+    const half = (print.inches.spine * 96) / 2 - 6;
+    const group = /rotate\(90\)">([\s\S]*?)<\/g><\/g>/.exec(print.svg)?.[1] ?? '';
+    for (const line of textBoxes(`<g>${group}</g></g>`)) {
+      const { font: face } = extentOf(line);
+      const up = (face.cap ?? 0.72) + markExtent(line.text).above;
+      const top = line.y - up * line.size;
+      const bottom = line.y + descentOf(line.text) * line.size;
+      assert.ok(
+        top >= -half - 0.01 && bottom <= half + 0.01,
+        `${title}: "${line.text}" from ${top} to ${bottom}, within ±${half}`,
+      );
+    }
+  }
+});
+
 test('the barcode box, the colours and the guides', () => {
   const print = createPrintCover(book, { pages: 200 });
   assert.deepEqual(print.barcode, {
@@ -186,5 +239,10 @@ test('the barcode box, the colours and the guides', () => {
   assert.throws(() => createPrintCover(book, { pages: 200, backColor: 'navy' }), /backColor must be a hex colour/);
   // The same options make the same cover; its limits are what KDP takes.
   assert.equal(createPrintCover(book, { pages: 200 }).svg, print.svg);
-  assert.deepEqual(printLimits.pages, [24, 828]);
+  assert.deepEqual(printLimits.pages, {
+    white: [24, 828],
+    cream: [24, 776],
+    color: [72, 600],
+    'premium-color': [24, 828],
+  });
 });

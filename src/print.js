@@ -4,7 +4,17 @@
 // printers' are close; `bleed` and `pageThickness` change the numbers.
 import { createCover } from './index.js';
 import { escapeXml, grain, hashString, isHex, n } from './core.js';
-import { FONTS, cleanText, fitText, measureText, spacingShift, textGroupAttrs } from './text.js';
+import {
+  FONTS,
+  cleanText,
+  descentOf,
+  fitText,
+  graphemes,
+  markExtent,
+  measureText,
+  spacingShift,
+  textGroupAttrs,
+} from './text.js';
 import { strongAccents, textColor } from './styles/util.js';
 import { fontEntries, idFor } from './shared.js';
 
@@ -27,13 +37,16 @@ export const trimSizes = Object.freeze({
   '8.5x11': Object.freeze([8.5, 11]),
 });
 
-/** What a paperback can be (KDP): its trim, in inches, and its page count. */
+/** What a paperback can be (KDP): its trim, in inches, and its page count on each paper. */
 export const printLimits = Object.freeze({
   width: Object.freeze([4, 8.5]),
   height: Object.freeze([6, 11.69]),
-  pages: Object.freeze([24, 828]),
-  /** Cream paper is thicker: fewer pages fit a binding. */
-  creamPages: 776,
+  pages: Object.freeze({
+    white: Object.freeze([24, 828]),
+    cream: Object.freeze([24, 776]),
+    color: Object.freeze([72, 600]),
+    'premium-color': Object.freeze([24, 828]),
+  }),
   /** Below this many pages, the spine stays blank. */
   spineTextPages: 80,
 });
@@ -66,8 +79,7 @@ function paperOf(paper) {
 
 /** @param {unknown} pages @param {string} paper */
 function checkPages(pages, paper) {
-  const [min, max] = printLimits.pages;
-  const most = paper === 'cream' ? printLimits.creamPages : max;
+  const [min, most] = printLimits.pages[/** @type {keyof typeof paperTypes} */ (paper)];
   if (typeof pages !== 'number' || !Number.isInteger(pages) || pages < min || pages > most) {
     throw new RangeError(
       `pages must be a whole number from ${min} to ${most} on ${paper} paper, got ${JSON.stringify(pages)}`,
@@ -229,12 +241,14 @@ export function createPrintCover(coverOptions = {}, print = /** @type {any} */ (
   let spineText = false;
   const across = spine * PX - 2 * 0.0625 * PX;
   const spineFont = titleFont ?? FONTS.sans;
-  const sizeMax = Math.min(across / ((spineFont.cap ?? 0.72) + 0.12), 22 * PT);
+  const spineTitle = front.title.replace(/\n/g, ' ').toUpperCase();
+  const author = front.author.toUpperCase();
+  // As large as the line's ink fits across, accents above and tails below included (É, Ç, Q, 夜).
+  const sizeMax = Math.min(across / inkHeight(spineTitle, spineFont), 22 * PT);
   if (pages >= printLimits.spineTextPages && sizeMax >= 6 * PT) {
     const along = th * PX - 2 * 0.375 * PX;
-    const author = front.author.toUpperCase();
     const spineInk = textColor(p, spineBg, [front.colors.bg, ink]);
-    const title = fitText(front.title.replace(/\n/g, ' ').toUpperCase(), {
+    const title = fitText(spineTitle, {
       font: spineFont,
       weight: 700,
       maxWidth: author ? along * 0.62 : along,
@@ -248,7 +262,7 @@ export function createPrintCover(coverOptions = {}, print = /** @type {any} */ (
           font: FONTS.sans,
           weight: 500,
           maxWidth: along * 0.32,
-          maxSize: Math.min(sizeMax * 0.8, title.size),
+          maxSize: Math.min(across / inkHeight(author, FONTS.sans), sizeMax * 0.8, title.size),
           minSize: 6 * PT,
           maxLines: 1,
           letterSpacing: 0.08,
@@ -352,9 +366,67 @@ function lines(fit, x, y, fill) {
 function spineLine(fit, x, anchor, fill) {
   if (!fit.lines.length) return '';
   const { size, font, weight, letterSpacing } = fit;
+  const line = fit.lines[0];
   const ls = letterSpacing * size;
   const attrs = textGroupAttrs({ font, size, weight, letterSpacing: ls, fill, anchor });
-  return `<g ${attrs}><text x="${n(x + spacingShift(anchor, ls))}" y="${n((size * fit.cap) / 2)}">${escapeXml(fit.lines[0])}</text></g>`;
+  // The line's ink centred on the spine: from its accents' tops to its tails' bottoms.
+  const up = (font.cap ?? 0.72) + markExtent(line).above;
+  const baseline = ((up - descentOf(line)) / 2) * size;
+  return `<g ${attrs}><text x="${n(x + spacingShift(anchor, ls))}" y="${n(baseline)}">${escapeXml(line)}</text></g>`;
+}
+
+/**
+ * How tall a line's ink is, in em: its capitals and any accents above them, and the tails and
+ * marks below the baseline; with a little to spare, as fonts differ from the measured ones.
+ * @param {string} text @param {import('./text.js').FontSpec} font
+ */
+const inkHeight = (text, font) => ((font.cap ?? 0.72) + markExtent(text).above + descentOf(text)) * 1.08;
+
+/**
+ * Prose wrapped to a width at a size, line by line (not balanced, as a title is). A word wider
+ * than the column, such as a long web address, is broken where it must be: after a / - . or the
+ * like if one is near the end of what fits, else between any two characters.
+ * @param {string} text @param {number} size @param {number} width @param {import('./text.js').FontSpec} font
+ */
+function wrapProse(text, size, width, font) {
+  const spec = { font };
+  const fits = (/** @type {string} */ s) => measureText(s, size, spec) <= width;
+  /** @type {string[]} */
+  const out = [];
+  let line = '';
+  for (const word of text.split(' ')) {
+    if (!word) continue;
+    const joined = line ? `${line} ${word}` : word;
+    if (fits(joined)) {
+      line = joined;
+      continue;
+    }
+    if (line) out.push(line);
+    let rest = word;
+    while (!fits(rest)) {
+      const chars = graphemes(rest);
+      // The most characters that fit (at least one, so a line always moves on).
+      let lo = 1;
+      let hi = chars.length - 1;
+      while (lo < hi) {
+        const mid = Math.ceil((lo + hi) / 2);
+        if (fits(chars.slice(0, mid).join(''))) lo = mid;
+        else hi = mid - 1;
+      }
+      let cut = lo;
+      for (let k = lo; k > lo / 2; k--) {
+        if (/[/\-.?&=_:,;)]/.test(chars[k - 1])) {
+          cut = k;
+          break;
+        }
+      }
+      out.push(chars.slice(0, cut).join(''));
+      rest = chars.slice(cut).join('');
+    }
+    line = rest;
+  }
+  if (line) out.push(line);
+  return out;
 }
 
 /**
@@ -368,12 +440,7 @@ function blurbText(paragraphs, x, y, width, height, fill) {
   const cap = font.cap ?? 0.72;
   /** @param {number} size */
   const layout = (size) => {
-    const wrapped = paragraphs.map(
-      // (Filled line by line, as prose is set: not balanced, as a title is.)
-      (p) =>
-        fitText(p, { font, maxWidth: width, maxSize: size, minSize: size, maxLines: 400, lineHeight, balance: false })
-          .lines,
-    );
+    const wrapped = paragraphs.map((p) => wrapProse(p, size, width, font));
     const count = wrapped.reduce((sum, l) => sum + l.length, 0);
     const tall = cap * size + (count - 1) * size * lineHeight + (wrapped.length - 1) * size * 0.7 + size * 0.3;
     return { wrapped, tall };

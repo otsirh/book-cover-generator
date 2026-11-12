@@ -329,13 +329,15 @@ function printCover(options) {
   const { inches, spineText } = print;
   const about = { inches, spineText, style: print.front.style, palette: print.front.palette, seed: print.front.seed };
   if (values.out) {
-    mkdirSync(dirname(values.out), { recursive: true });
-    writeFileSync(values.out, print.svg);
-    if (values.json) process.stdout.write(JSON.stringify({ file: values.out, ...about }) + '\n');
+    // ({n} and {seed} filled in, as for any single cover.)
+    const out = fileFor(values.out, 1, 1, print.front.seed);
+    mkdirSync(dirname(out), { recursive: true });
+    writeFileSync(out, print.svg);
+    if (values.json) process.stdout.write(JSON.stringify({ file: out, ...about }) + '\n');
     else {
       const size = (/** @type {number} */ v) => String(Math.round(v * 1000) / 1000);
       console.error(
-        `Wrote ${values.out}: ${size(inches.width)} × ${size(inches.height)} in, spine ${size(inches.spine)} in` +
+        `Wrote ${out}: ${size(inches.width)} × ${size(inches.height)} in, spine ${size(inches.spine)} in` +
           `${spineText ? '' : ' (no spine text)'} (style: ${print.front.style})`,
       );
     }
