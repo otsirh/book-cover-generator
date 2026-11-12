@@ -4,9 +4,20 @@
 import { n, rect, circle, path, mix, grain, blurFilter, linearGradient, radialGradient, ridge } from '../core.js';
 import { FONTS, drawText } from '../text.js';
 import { titleBlock, authorFit } from '../type.js';
-import { strongAccents, textColor } from './util.js';
+import { strongAccents, textColor, tintText } from './util.js';
 
 /** @typedef {import('../index.js').StyleContext} Ctx */
+
+/**
+ * The palette's accents, those that stand out on `bg` first, each colour once: at least three
+ * (a palette with fewer different accents gets shades of them).
+ * @param {import('../index.js').ResolvedPalette} p @param {string} bg @param {number} min
+ */
+function accentsOn(p, bg, min) {
+  const list = [...new Set([...strongAccents(p, bg, min), ...p.accents])];
+  while (list.length < 3) list.push(mix(list[list.length - 1], list.length % 2 ? p.ink : p.paper, 0.35));
+  return list;
+}
 
 /* ------------------------------------------------------------------ hollow */
 
@@ -44,9 +55,10 @@ export const hollow = {
     const skyTop = m + a.height + m * 0.6;
 
     const ids = { sky: c.id('sky'), glow: c.id('glow'), fog: c.id('fog'), rough: c.id('rough') };
+    const skyC = [mix(night, '#000000', 0.4), mix(night, glowC, 0.22)];
     let s = `<defs>${linearGradient(ids.sky, [
-      [0, mix(night, '#000000', 0.4)],
-      [1, mix(night, glowC, 0.22)],
+      [0, skyC[0]],
+      [1, skyC[1]],
     ])}${blurFilter(ids.glow, S * 0.06)}${blurFilter(ids.fog, S * 0.03)}`;
     // Worn letters: the edges displaced by a little noise.
     s +=
@@ -99,7 +111,12 @@ export const hollow = {
 
     const g = grain(c, { opacity: 0.18, light: true, id: 'grain' });
     s += `<defs>${g.defs}</defs>${g.layer}`;
-    s += drawAuthor(a, W / 2, m, mix(p.paper, glowC, 0.2));
+    s += drawText(a, {
+      x: W / 2,
+      y: m,
+      anchor: 'middle',
+      fill: tintText(textColor(p, skyC, [p.paper]), glowC, 0.2, skyC),
+    });
     s += `<g filter="url(#${ids.rough})">${t.draw({ x: W / 2, y: titleY, anchor: 'middle', fill: ink })}</g>`;
     return s;
   },
@@ -116,7 +133,7 @@ export const ribbon = {
   /** @param {Ctx} c */
   render(c) {
     const { W, H, S, u, m, rng, p } = c;
-    const [c1, c2] = strongAccents(p, p.paper, 1.3).concat(p.accents);
+    const [c1, c2] = accentsOn(p, p.paper, 1.3);
     const top = mix(p.paper, c1, 0.06);
     const bottom = mix(p.paper, c1, 0.2);
     const ink = textColor(p, [top, bottom], [p.ink, mix(p.ink, c1, 0.4)]);
@@ -169,8 +186,14 @@ export const ribbon = {
     }
     s += `<g filter="url(#${ids.soft})">${petals}</g>`;
 
-    s += t.draw({ x: W / 2, y: titleY, anchor: 'middle', fill: ink, subtitleFill: mix(ink, c1, 0.35) });
-    s += drawAuthor(a, W / 2, aY, ink);
+    s += t.draw({
+      x: W / 2,
+      y: titleY,
+      anchor: 'middle',
+      fill: ink,
+      subtitleFill: tintText(ink, c1, 0.35, [top, bottom]),
+    });
+    s += drawText(a, { x: W / 2, y: aY, anchor: 'middle', fill: ink });
     return s;
   },
 };
@@ -341,7 +364,7 @@ export const crest = {
     s += path(shieldPath(sx, sy, sw), 'none', `stroke="${gold}" stroke-width="${n(3 * u)}"`);
 
     s += t.draw({ x: W / 2, y: titleY, anchor: 'middle', fill: ink });
-    s += drawAuthor(a, W / 2, aY, ink);
+    s += drawText(a, { x: W / 2, y: aY, anchor: 'middle', fill: ink });
     return s;
   },
 };
@@ -359,8 +382,8 @@ export const storybook = {
   render(c) {
     const { W, H, S, u, m, rng, p } = c;
     const skyKind = c.choose('sky', ['sun', 'sun', 'rainbow']);
-    const bright = strongAccents(p, p.paper, 1.2).concat(p.accents);
-    const sky = mix(p.paper, bright[1] ?? p.accents[1], 0.18);
+    const bright = accentsOn(p, p.paper, 1.2);
+    const sky = mix(p.paper, bright[1], 0.18);
     const a = authorFit(c, { font: FONTS.geometric, weight: 700, letterSpacing: 0.12, maxSize: S * 0.042 });
     const fill = textColor(p, [sky, '#ffffff'], [bright[0], p.ink]);
     const t = titleBlock(c, {
@@ -398,12 +421,7 @@ export const storybook = {
       const ry = hillTop + S * 0.05;
       // As wide as the cover allows, and no higher than the band.
       const outer = Math.min(W * 0.46, ry - bandTop - W * 0.025);
-      const colors = [
-        bright[0],
-        bright[1] ?? p.accents[0],
-        bright[2] ?? p.accents[2],
-        mix(p.paper, bright[1] ?? p.ink, 0.3),
-      ];
+      const colors = [bright[0], bright[1], bright[2], mix(p.paper, bright[1], 0.3)];
       colors.forEach((col, i) => {
         const r = outer - W * 0.05 * i;
         if (r <= W * 0.03) return;
@@ -411,7 +429,8 @@ export const storybook = {
       });
     }
     // Clouds: puffs of circles.
-    for (let k = 0; k < rng.int(2, 3); k++) {
+    const clouds = rng.int(2, 3);
+    for (let k = 0; k < clouds; k++) {
       const r = Math.min(S * rng.float(0.035, 0.05), band / 3);
       const cx = W * rng.float(0.1, 0.9);
       const cy = bandTop + r * 1.3 + rng.float(0, Math.max(0, band - r * 2.6));
@@ -429,7 +448,7 @@ export const storybook = {
       s += `<g opacity="0.95">${puff}</g>`;
     }
     // Hills, back to front.
-    const hills = [bright[2] ?? p.accents[2], bright[1] ?? p.accents[1], mix(bright[1] ?? p.accents[0], p.ink, 0.15)];
+    const hills = [bright[2], bright[1], mix(bright[1], p.ink, 0.15)];
     hills.forEach((col, i) => {
       const y = hillTop + (H - hillTop) * (0.08 + i * 0.22);
       const cx = W * rng.float(0.15, 0.85);
@@ -445,7 +464,7 @@ export const storybook = {
       fill,
       attrs: stroke,
     })}</g>`;
-    s += drawAuthor(a, W / 2, aY, textColor(p, sky, [p.ink]));
+    s += drawText(a, { x: W / 2, y: aY, anchor: 'middle', fill: textColor(p, sky, [p.ink]) });
     return s;
   },
 };
@@ -512,17 +531,8 @@ export const idea = {
         s += circle(x0 + size * 0.36, y0 + size * 0.36, size * 0.12, mix(accent, p.paper, 0.55));
       }
     }
-    s += t.draw({ x: pad, y: titleY, fill: ink, subtitleFill: mix(ink, accent, 0.25) });
-    s += drawAuthor(a, pad, aY, ink, 'start');
+    s += t.draw({ x: pad, y: titleY, fill: ink, subtitleFill: tintText(ink, accent, 0.25, p.bg) });
+    s += drawText(a, { x: pad, y: aY, fill: ink });
     return s;
   },
 };
-
-/**
- * The author's name at (x, y), if there is one.
- * @param {import('../text.js').TextFit} a @param {number} x @param {number} y @param {string} fill
- * @param {'start' | 'middle'} [anchor]
- */
-function drawAuthor(a, x, y, fill, anchor = 'middle') {
-  return a.lines.length ? drawText(a, { x, y, anchor, fill }) : '';
-}
