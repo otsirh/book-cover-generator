@@ -42,6 +42,8 @@ export type TextMeasurer = (
  */
 export declare function setTextMeasurer(fn: TextMeasurer | null): void;
 export declare function measureText(text: string, size: number, spec: TextSpec): number;
+/** Throw a TypeError if `maxWidth` is missing or `maxHeight` is NaN. */
+export declare function checkBox(fn: string, o: { maxWidth: number; maxHeight?: number }): void;
 /** The smallest size text shrinks to: `minSize`, else 22% of `maxSize` but at least 6 px. */
 export declare function defaultMinSize(maxSize: number, minSize?: number): number;
 /** Runs of whitespace a line may break at (every kind except the no-break spaces). */

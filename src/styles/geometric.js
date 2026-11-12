@@ -1,7 +1,7 @@
-import { n, rect, circle, path, pathD, inkOn, mix, clamp, quarterDisc, halfDisc } from '../core.js';
+import { n, rect, circle, path, pathD, inkOn, mix, quarterDisc, halfDisc } from '../core.js';
 import { FONTS, drawText } from '../text.js';
 import { titleBlock, authorFit } from '../type.js';
-import { strongAccents, fitTitleWith } from './util.js';
+import { strongAccents, fitTitleWith, textPanel } from './util.js';
 
 /** @typedef {import('../index.js').StyleContext} Ctx */
 
@@ -387,9 +387,11 @@ export const stripes = {
     const innerW = plateW - pad * 2;
     const t = titleBlock(c, { ...titleOpts, maxWidth: innerW, maxHeight: H * 0.34, maxSize: S * 0.15 });
     const a = authorFit(c, { maxWidth: innerW, maxSize: S * 0.04 });
-    const gap = a.lines.length ? m * 0.7 : 0;
-    const plateH = pad * 2 + t.height + gap + a.height;
-    const py = clamp(H * rng.pick([0.5, 0.58, 0.42]) - plateH / 2, m, H - m - plateH);
+    const {
+      y: py,
+      h: plateH,
+      gap,
+    } = textPanel(c, t, a, { pad, gap: m * 0.7, centerY: H * rng.pick([0.5, 0.58, 0.42]) });
     s += rect(m, py, plateW, plateH, p.bg);
     s += rect(
       m + 6 * u,

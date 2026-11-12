@@ -165,3 +165,15 @@ test('titleBlock gives the title the room the lead line does not need', () => {
   assert.ok(block.size > 95, `title at ${block.size}px`);
   assert.ok(block.height <= 150.5, `block ${block.height}`);
 });
+
+test('layout helpers reject a missing box instead of drawing NaN', () => {
+  assert.throws(() => fitStack('Signal Lost', /** @type {any} */ ({ maxSize: 100 })), /fitStack: `maxWidth`/);
+  assert.throws(
+    () => titleBlock(ctx(), /** @type {any} */ ({ maxWidth: 300, maxSize: 60 })),
+    /titleBlock: `maxHeight`/,
+  );
+  assert.throws(
+    () => titleBlock(ctx(), /** @type {any} */ ({ maxHeight: 300, maxSize: 60 })),
+    /titleBlock: `maxWidth`/,
+  );
+});

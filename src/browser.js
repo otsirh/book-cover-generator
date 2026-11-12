@@ -88,9 +88,21 @@ export async function downloadCover(svg, format = 'svg', basename = 'cover', opt
 /** Copy text (e.g. SVG markup) to the clipboard, with a fallback for older browsers. */
 export async function copyText(text) {
   if (navigator.clipboard && window.isSecureContext) {
-    await navigator.clipboard.writeText(text);
-    return;
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch (err) {
+      // Refused (permissions policy, an unfocused page, an iframe without clipboard-write):
+      // the older copy command below often still works.
+      if (!copyWithCommand(text)) throw err;
+      return;
+    }
   }
+  if (!copyWithCommand(text)) throw new Error('Copy failed');
+}
+
+/** Copy through a hidden textarea and the copy command; whether it worked. @param {string} text */
+function copyWithCommand(text) {
   const ta = document.createElement('textarea');
   ta.value = text;
   ta.setAttribute('readonly', '');
@@ -98,7 +110,9 @@ export async function copyText(text) {
   ta.style.opacity = '0';
   document.body.appendChild(ta);
   ta.select();
-  const ok = document.execCommand('copy');
-  ta.remove();
-  if (!ok) throw new Error('Copy failed');
+  try {
+    return document.execCommand('copy');
+  } finally {
+    ta.remove();
+  }
 }

@@ -116,7 +116,21 @@ let lastFont = '';
 // so shrinking a title to fit costs no extra measuring.
 const REFERENCE = 100;
 
-const GENERIC_FAMILIES = new Set(['serif', 'sans-serif', 'monospace', 'cursive', 'fantasy', 'system-ui']);
+const GENERIC_FAMILIES = new Set([
+  'serif',
+  'sans-serif',
+  'monospace',
+  'cursive',
+  'fantasy',
+  'system-ui',
+  'ui-serif',
+  'ui-sans-serif',
+  'ui-monospace',
+  'ui-rounded',
+  'math',
+  'emoji',
+  'fangsong',
+]);
 /** @type {Map<string, string | null>} */
 const canvasFonts = new Map();
 
@@ -380,6 +394,18 @@ function hardWrap(tokens, maxWidth, measure) {
 export const BREAKING_SPACE = /[^\S\u00A0\u2007\u202F\uFEFF]+/g;
 
 /**
+ * Reject a missing or non-numeric box, which would otherwise lay text out with NaN.
+ * `maxWidth` is required; `maxHeight` may be left out (no limit) but not be NaN.
+ * @param {string} fn @param {{ maxWidth: number, maxHeight?: number }} o
+ */
+export function checkBox(fn, o) {
+  if (!Number.isFinite(o.maxWidth)) throw new TypeError(`${fn}: \`maxWidth\` must be a number of pixels`);
+  if (o.maxHeight != null && Number.isNaN(o.maxHeight)) {
+    throw new TypeError(`${fn}: \`maxHeight\` must be a number of pixels`);
+  }
+}
+
+/**
  * The smallest size text shrinks to before wrapping harder: `minSize` if given,
  * else 22% of `maxSize` but at least 6 px (never above `maxSize`).
  * @param {number} maxSize @param {number} [minSize]
@@ -417,6 +443,7 @@ export function fitText(text, opts) {
   const maxSize = opts.maxSize;
   if (!Number.isFinite(maxSize) || maxSize <= 0)
     throw new TypeError('fitText: `maxSize` must be a positive number of pixels');
+  checkBox('fitText', opts);
   if (opts.minSize != null && (!Number.isFinite(opts.minSize) || opts.minSize <= 0)) {
     throw new TypeError('fitText: `minSize` must be a positive number of pixels');
   }

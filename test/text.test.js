@@ -219,3 +219,14 @@ test('a font shorthand the canvas rejects is retried with quoted names, then est
   assert.notEqual(estimate, 40);
   assert.ok(estimate > 0);
 });
+
+test('fitText rejects a missing width or a NaN height', () => {
+  assert.throws(() => fitText('x', /** @type {any} */ ({ maxSize: 40 })), /fitText: `maxWidth`/);
+  assert.throws(() => fitText('x', { maxWidth: 100, maxHeight: NaN, maxSize: 40 }), /fitText: `maxHeight`/);
+  assert.equal(fitText('x', { maxWidth: 100, maxHeight: Infinity, maxSize: 40 }).lines.length, 1);
+});
+
+test('generic font families stay unquoted when names are quoted for the canvas', () => {
+  measureText('ab', 100, { font: { family: 'Icons 7, ui-monospace', cap: 0.7 } });
+  assert.ok(fontsSet.includes('400 100px "Icons 7", ui-monospace'), fontsSet.join(' | '));
+});

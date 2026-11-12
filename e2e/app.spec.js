@@ -446,6 +446,96 @@ test('coming back from another page and reloading never enables a stale Redo', a
   await expect(page.locator('#redo')).toBeDisabled();
 });
 
+test('a link pasted into an open tab opens exactly that design', async ({ page }) => {
+  await page.goto('/#title=Plain&author=A&style=noir&palette=noir&seed=abc&format=paperback');
+  // Copy link and the URL name every key, even an empty subtitle and texture off.
+  await expect(page).toHaveURL(/subtitle=&.*texture=0/);
+  const link = new URL(page.url()).hash;
+  await page.goto('/#title=Busy&author=B&subtitle=A+Novel&style=retro&palette=synth&seed=x&format=ebook&texture=1');
+  await expect(page.locator('#texture')).toBeChecked();
+  await page.evaluate((hash) => {
+    location.hash = hash;
+  }, link);
+  await selected(page, 'noir');
+  await expect(page.locator('#subtitle')).toHaveValue('');
+  await expect(page.locator('#texture')).not.toBeChecked();
+  // (Noir has its own grain; the texture's grain is the one with this id.)
+  await expect.poll(() => svgSoon(page, '#preview')).toContain('Plain');
+  expect(await svgOf(page, '#preview')).not.toContain('texture-dark');
+});
+
+test('an entry whose history write was refused gets its index once the browser allows it', async ({ page }) => {
+  await page.goto('/#title=T&style=minimal&seed=w');
+  await page.locator('.tile[data-style="swiss"]').click();
+  await selected(page, 'swiss');
+  // Refuse the next write, as a rate-limited browser would.
+  await page.evaluate(() => {
+    const real = history.replaceState.bind(history);
+    let refuse = true;
+    history.replaceState = (...args) => {
+      if (refuse) {
+        refuse = false;
+        throw new DOMException('Too many calls', 'SecurityError');
+      }
+      return real(...args);
+    };
+  });
+  await page.evaluate(() => {
+    location.hash = 'style=orbit&seed=w2';
+  });
+  await selected(page, 'orbit');
+  await expect.poll(() => page.evaluate(() => history.state?.i), { timeout: 3000 }).toBe(2);
+  await expect(page).toHaveURL(/title=T&.*style=orbit/);
+});
+
+test('Undo after a hand-edited URL never steps off the app', async ({ page }) => {
+  await page.goto('about:blank');
+  await page.goto('/#title=T&style=minimal&seed=e');
+  for (const style of ['swiss', 'bauhaus', 'retro']) {
+    await page.locator(`.tile[data-style="${style}"]`).click();
+    await selected(page, style);
+  }
+  await page.locator('#undo').click();
+  await selected(page, 'bauhaus');
+  await page.locator('#undo').click();
+  await selected(page, 'swiss');
+  // Editing the URL now drops retro and bauhaus: the app's history is minimal, swiss, orbit.
+  await page.evaluate(() => {
+    location.hash = 'style=orbit&seed=e2';
+  });
+  await selected(page, 'orbit');
+  for (let i = 0; i < 6; i++) {
+    await page.locator('body').press('KeyZ');
+    await page.waitForTimeout(150);
+  }
+  expect(new URL(page.url()).pathname).toBe('/');
+  await selected(page, 'minimal');
+  await expect(page.locator('#undo')).toBeDisabled();
+});
+
+test('a download keeps keyboard focus on its button', async ({ page }) => {
+  await page.goto('/#title=Focus&style=topographic&seed=f');
+  await page.locator('[data-scale="4"]').click();
+  const button = page.locator('#dl-png');
+  await button.focus();
+  const [download] = await Promise.all([page.waitForEvent('download'), page.keyboard.press('Enter')]);
+  expect(download.suggestedFilename()).toBe('focus-topographic.png');
+  await expect(button).not.toHaveAttribute('aria-busy');
+  await expect(button).toBeFocused();
+});
+
+test('Copy link falls back when the clipboard API refuses', async ({ page, browserName }) => {
+  test.skip(browserName !== 'chromium', 'the copy command needs Chromium in automation');
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: () => Promise.reject(new DOMException('Denied', 'NotAllowedError')) },
+    });
+  });
+  await page.goto('/#title=Fallback&style=minimal&seed=c');
+  await page.locator('#copy-link').click();
+  await expect(page.locator('#toast')).toContainText('Link copied');
+});
+
 test('a hand-edited URL is rewritten to hold the whole design', async ({ page }) => {
   await page.goto(
     '/#title=Neon+Tide&author=Kai&subtitle=A+Novel&style=retro&palette=synth&seed=one&format=ebook&texture=1',
@@ -669,7 +759,7 @@ test('the phone download button shows that it is busy @mobile', async ({ page })
     page.evaluate(() => {
       const button = /** @type {HTMLButtonElement} */ (document.getElementById('m-download'));
       button.click();
-      return button.disabled && button.getAttribute('aria-busy') === 'true';
+      return button.getAttribute('aria-disabled') === 'true' && button.getAttribute('aria-busy') === 'true';
     }),
   ]);
   expect(busy).toBe(true);

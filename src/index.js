@@ -13,7 +13,22 @@ export { FONTS, fitText, drawText, measureText, setTextMeasurer } from './text.j
 export { titleBlock, authorFit, fitStack, drawStack, splitLead } from './type.js';
 export * as svgUtils from './core.js';
 
-const registry = new Map(styleList.map((s) => [s.id, s]));
+/**
+ * A registry entry: the style's details with defaults filled in, and a render that calls
+ * the style's own method on the style itself (so class styles keep `this` and private fields).
+ * The caller's object is never changed.
+ * @param {import('./index.js').CoverStyle} style
+ */
+const entryFor = (style) => ({
+  id: style.id,
+  name: style.name ?? style.id,
+  description: style.description ?? '',
+  group: style.group ?? 'Custom',
+  prefer: style.prefer,
+  render: (/** @type {import('./index.js').StyleContext} */ ctx) => style.render(ctx),
+});
+
+const registry = new Map(styleList.map((s) => [s.id, entryFor(s)]));
 
 /** Metadata for every available style: [{ id, name, description, group }] */
 export function listStyles() {
@@ -32,15 +47,7 @@ export function registerStyle(style) {
   if (!style || !style.id || typeof style.render !== 'function') {
     throw new TypeError('registerStyle: a style needs an `id` and a `render(ctx)` function');
   }
-  // Inherit from the style rather than copy it, so a class instance keeps its methods (and
-  // `this`), and fill in missing details without touching the caller's object.
-  // (Defined, not assigned: assigning would throw where a frozen style has these as read-only.)
-  const entry = Object.create(style, {
-    name: { value: style.name ?? style.id, enumerable: true },
-    description: { value: style.description ?? '', enumerable: true },
-    group: { value: style.group ?? 'Custom', enumerable: true },
-  });
-  registry.set(style.id, entry);
+  registry.set(style.id, entryFor(style));
   if (!styles.includes(style.id)) styles.push(style.id);
 }
 
@@ -140,7 +147,7 @@ export function createCover(options = {}) {
   const seed = options.seed == null || options.seed === '' ? `${title}␟${author}` : String(options.seed);
 
   const styleId = resolveStyle(options.style, createRng(`${seed}|style`));
-  const style = /** @type {import('./index.js').CoverStyle} */ (registry.get(styleId)); // resolveStyle checked it
+  const style = /** @type {ReturnType<typeof entryFor>} */ (registry.get(styleId)); // resolveStyle checked it
   const palette = resolvePalette(options.palette, createRng(`${seed}|palette`), style);
   const [paper, night] =
     luminance(palette.bg) >= luminance(palette.ink) ? [palette.bg, palette.ink] : [palette.ink, palette.bg];

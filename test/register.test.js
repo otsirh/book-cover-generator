@@ -31,3 +31,20 @@ test('a style can be a class instance, and missing details get defaults', () => 
   const info = listStyles().find((s) => s.id === 'test-undefined');
   assert.deepEqual(info, { id: 'test-undefined', name: 'test-undefined', description: '', group: 'Custom' });
 });
+
+test('a class style with private fields renders with itself as `this`', () => {
+  class Private {
+    id = 'test-private';
+    #fill = '#abcdef';
+    calls = 0;
+    /** @param {import('../src/index.js').StyleContext} c */
+    render(c) {
+      this.calls++;
+      return `<rect width="${c.W}" height="${c.H}" fill="${this.#fill}"/>`;
+    }
+  }
+  const style = new Private();
+  registerStyle(style);
+  assert.match(createCover({ title: 'x', style: 'test-private' }).svg, /fill="#abcdef"/);
+  assert.equal(style.calls, 1, 'writes to `this` reach the instance');
+});

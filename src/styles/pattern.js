@@ -20,7 +20,7 @@ import {
 } from '../core.js';
 import { FONTS, fitText, drawText, textBottom } from '../text.js';
 import { titleBlock, authorFit } from '../type.js';
-import { strongAccents } from './util.js';
+import { strongAccents, textPanel } from './util.js';
 
 /** @typedef {import('../index.js').StyleContext} Ctx */
 
@@ -109,9 +109,11 @@ export const mosaic = {
       subtitleItalic: false,
     });
     const a = authorFit(c, { font: FONTS.geometric, maxSize: S * 0.042 });
-    const gap = a.lines.length ? m * 0.6 : 0;
-    const bandH = pad * 2 + t.height + gap + a.height;
-    const by = clamp(H * rng.pick([0.62, 0.5, 0.36]) - bandH / 2, m, H - m - bandH);
+    const {
+      y: by,
+      h: bandH,
+      gap,
+    } = textPanel(c, t, a, { pad, gap: m * 0.6, centerY: H * rng.pick([0.62, 0.5, 0.36]) });
     s += rect(0, by, W, bandH, p.bg);
     s += rect(0, by, W, 5 * u, p.ink) + rect(0, by + bandH - 5 * u, W, 5 * u, p.ink);
     s += t.draw({ x: W / 2, y: by + pad, anchor: 'middle', fill: p.ink });
@@ -635,10 +637,8 @@ export const memphis = {
       subtitleItalic: false,
     });
     const a = authorFit(c, { font: FONTS.geometric, weight: 700, maxWidth: innerW, maxSize: S * 0.046 });
-    const gap = a.lines.length ? m * 0.7 : 0;
-    const boxH = pad * 2 + t.height + gap + a.height;
+    const { y: by, h: boxH, gap } = textPanel(c, t, a, { pad, gap: m * 0.7, centerY: H * rng.float(0.42, 0.58) });
     const bx = (W - boxW) / 2;
-    const by = clamp(H * rng.float(0.42, 0.58) - boxH / 2, m, H - m - boxH);
     const tilt = rng.pick([0, -2, 2]);
     const g = `transform="rotate(${tilt} ${n(W / 2)} ${n(by + boxH / 2)})"`;
     s += `<g ${g}>`;
@@ -917,11 +917,14 @@ export const pixel = {
     const title = c.title.toUpperCase();
     const ink = inkOn(skyTop, p);
     const box = { w: W - m * 2, h: horizon - m * 2.2 - sr * g * 1.6 };
-    // The subtitle is fitted first so the title leaves room for it.
+    // The subtitle is fitted first so the title leaves room for it (only if the title can be
+    // drawn in pixel letters at all: otherwise titleBlock sets both).
+    const drawable = pixelable(title);
     const subText = c.subtitle.toUpperCase();
-    const sfit = c.subtitle && pixelable(subText) ? fitPixelText(subText, box.w, S * 0.08, S * 0.008) : null;
+    const sfit =
+      drawable && c.subtitle && pixelable(subText) ? fitPixelText(subText, box.w, S * 0.08, S * 0.008) : null;
     const sText =
-      c.subtitle && !sfit
+      drawable && c.subtitle && !sfit
         ? fitText(c.subtitle, {
             font: FONTS.mono,
             weight: 700,
@@ -933,7 +936,7 @@ export const pixel = {
         : null;
     const subH = sfit ? sfit.height : sText ? textBottom(sText, 0) : 0;
     const reserve = subH ? subH + g * 2.5 : 0;
-    const pfit = pixelable(title) ? fitPixelText(title, box.w, box.h - reserve, S * 0.022) : null;
+    const pfit = drawable ? fitPixelText(title, box.w, box.h - reserve, S * 0.022) : null;
     if (pfit) {
       const y = m * 1.3;
       s += drawPixelText(pfit, W / 2 + g * 0.6, y + g * 0.6, 'middle', mix(skyTop, '#000000', 0.5));

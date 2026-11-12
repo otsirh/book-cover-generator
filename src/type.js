@@ -15,6 +15,7 @@ import {
   textGroupAttrs,
   spacingShift,
   defaultMinSize,
+  checkBox,
 } from './text.js';
 
 const LEAD = /^(the|a|an) +(\S.*)$/i;
@@ -93,6 +94,7 @@ function descentOf(line) {
 export function fitStack(text, o) {
   if (!Number.isFinite(o.maxSize) || o.maxSize <= 0)
     throw new TypeError('fitStack: `maxSize` must be a positive number of pixels');
+  checkBox('fitStack', o);
   const font = o.font ?? FONTS.sans;
   const spec = { font, weight: o.weight ?? 700, italic: !!o.italic, letterSpacing: o.letterSpacing ?? 0 };
   const source = o.upper ? text.toUpperCase() : text;
@@ -201,6 +203,8 @@ function fitSubtitle(c, text, opts) {
  * @returns {TitleBlock}
  */
 export function titleBlock(c, o) {
+  checkBox('titleBlock', o);
+  if (!Number.isFinite(o.maxHeight)) throw new TypeError('titleBlock: `maxHeight` must be a number of pixels');
   const font = o.font ?? FONTS.serif;
   const weight = o.weight ?? 400;
   const { lead, main } =

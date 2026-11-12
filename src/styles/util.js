@@ -1,4 +1,4 @@
-import { n, circle, contrast, readable } from '../core.js';
+import { n, circle, contrast, readable, clamp } from '../core.js';
 import { titleBlock } from '../type.js';
 import { graphemes } from '../text.js';
 
@@ -59,4 +59,22 @@ export function flower(x, y, r, petal, heart, count, width = 0.58) {
     o += `<ellipse cx="${n(x)}" cy="${n(y - r * 0.55)}" rx="${n(r * 0.55 * width)}" ry="${n(r * 0.55)}" fill="${petal}" transform="rotate(${n(a)} ${n(x)} ${n(y)})"/>`;
   }
   return o + circle(x, y, r * 0.3, heart);
+}
+
+/**
+ * A panel holding the title above the author (mosaic, stripes, memphis, sunburst): its top
+ * `y` and height `h`, centred on `centerY` (or starting at `top`) and kept inside the
+ * margins. A panel taller than the room between the margins is centred on the cover.
+ * `gap` is the space between title and author (none without an author); `extra` adds to
+ * the height, e.g. for a frame.
+ * @param {import('../index.js').StyleContext} c
+ * @param {import('../type.js').TitleBlock} t @param {import('../text.js').TextFit} a
+ * @param {{ pad: number, gap: number, extra?: number, centerY?: number, top?: number }} o
+ */
+export function textPanel(c, t, a, { pad, gap, extra = 0, centerY = c.H / 2, top }) {
+  const space = a.lines.length ? gap : 0;
+  const h = pad * 2 + t.height + space + a.height + extra;
+  const want = top ?? centerY - h / 2;
+  const y = h > c.H - c.m * 2 ? (c.H - h) / 2 : clamp(want, c.m, c.H - c.m - h);
+  return { y, h, gap: space };
 }

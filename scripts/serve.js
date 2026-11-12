@@ -130,8 +130,16 @@ const server = createServer(async (req, res) => {
     return;
   }
   const type = TYPES[/** @type {keyof typeof TYPES} */ (extname(file))] ?? 'application/octet-stream';
+  let body;
+  try {
+    body = await readFile(file);
+  } catch {
+    // Gone or unreadable since it was found (say, a rebuild of dist): report it, don't crash.
+    res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' }).end('Could not read the file');
+    return;
+  }
   res.writeHead(status, { 'Content-Type': type });
-  res.end(req.method === 'HEAD' ? undefined : await readFile(file));
+  res.end(req.method === 'HEAD' ? undefined : body);
 });
 
 server.listen(port, '127.0.0.1', () => {

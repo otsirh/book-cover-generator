@@ -131,13 +131,14 @@ function fromHash(hash) {
 
 /** @param {Design} d */
 function toHash(d) {
-  const q = new URLSearchParams({ title: d.title, author: d.author });
-  if (d.subtitle) q.set('subtitle', d.subtitle);
+  // Every key, even when empty or off: a link is then the whole design, never mistaken for a
+  // hand-edited partial one (which changes only the keys it names).
+  const q = new URLSearchParams({ title: d.title, author: d.author, subtitle: d.subtitle });
   q.set('style', d.style);
   q.set('palette', d.palette);
   q.set('seed', d.seed);
   q.set('format', d.format);
-  if (d.texture) q.set('texture', '1');
+  q.set('texture', d.texture ? '1' : '0');
   return `#${q}`;
 }
 
@@ -149,7 +150,7 @@ const MAX_KEY = 'book-cover-generator:history-max';
 let historyIndex = 0;
 let historyMax = 0;
 
-/** Keys that a URL may leave out; navigating to such a URL resets them. */
+/** Keys that URLs from before 1.2.0 left out when empty or off; entries of ours without them have these values. */
 const OPTIONAL = { subtitle: '', texture: false };
 
 function saveHistoryMax() {
@@ -187,10 +188,28 @@ function safely(write) {
   }
 }
 
+/** @type {ReturnType<typeof setTimeout> | undefined} */
+let stampTimer;
+/**
+ * Write the design and the index into the current entry. A write the browser refuses
+ * (rate-limited) is retried, so an entry is not left without its index, which would make
+ * a later visit to it look like a new entry.
+ */
+function stamp() {
+  clearTimeout(stampTimer);
+  stampTimer = undefined;
+  if (
+    !safely(() => history.replaceState({ i: historyIndex }, '', toHash(design))) ||
+    history.state?.i !== historyIndex
+  ) {
+    stampTimer = setTimeout(stamp, 1000);
+  }
+}
+
 /** Write the current design into the current entry. */
 function writeReplace() {
   replaceDirty = false;
-  safely(() => history.replaceState({ i: historyIndex }, '', toHash(design)));
+  stamp();
 }
 
 /** Save keystrokes not yet in the current entry, now. */
@@ -252,8 +271,10 @@ function typed() {
 }
 
 function syncHistoryButtons() {
-  /** @type {HTMLButtonElement} */ ($('undo')).disabled = historyIndex <= 0;
-  /** @type {HTMLButtonElement} */ ($('redo')).disabled = historyIndex >= historyMax;
+  // aria-disabled rather than disabled: a focused button that becomes disabled drops keyboard
+  // focus to the page. (Pressing it does nothing then: step() checks the index.)
+  $('undo').setAttribute('aria-disabled', String(historyIndex <= 0));
+  $('redo').setAttribute('aria-disabled', String(historyIndex >= historyMax));
 }
 
 // The browser's own Back and Forward leave the entry before popstate fires, too
@@ -287,20 +308,25 @@ window.addEventListener('popstate', (e) => {
   clearTimeout(replaceTimer);
   replaceTimer = undefined;
   replaceDirty = false;
+  clearTimeout(stampTimer);
+  stampTimer = undefined;
   typing = false;
   const dir = stepping;
   stepping = 0;
   const ours = Boolean(e.state) && typeof e.state.i === 'number';
   if (ours) historyIndex = e.state.i;
   const linked = ours ? null : fromHash(location.hash);
-  if (!ours) queuedSteps = 0;
-  if (linked && !Object.keys(linked).length) {
-    // A fragment that isn't a design (say #usage, typed to jump to the docs): keep the
-    // design, and make this entry the newest step (the browser dropped the ones ahead).
+  if (!ours) {
+    // A new entry (an edited URL, a pasted link, or a fragment like #usage): the browser put
+    // it right after the one we were on and dropped any ahead of it.
+    queuedSteps = 0;
     historyIndex += 1;
     historyMax = historyIndex;
     saveHistoryMax();
-    safely(() => history.replaceState({ i: historyIndex }, '', toHash(design)));
+  }
+  if (linked && !Object.keys(linked).length) {
+    // A fragment that isn't a design (say #usage, typed to jump to the docs): keep the design.
+    stamp();
     syncHistoryButtons();
     return;
   }
@@ -311,17 +337,11 @@ window.addEventListener('popstate', (e) => {
       return;
     }
   }
-  if (!ours) {
-    // An edited URL: make it the newest entry.
-    historyMax += 1;
-    historyIndex = historyMax;
-    saveHistoryMax();
-  }
-  // The app's own entries hold whole designs, leaving out only empty optional keys; an edited
-  // URL changes just the keys it names, like the rest of the design.
+  // The app's own entries hold whole designs (older ones leave out empty optional keys); an
+  // edited URL changes just the keys it names, and a pasted link names them all.
   Object.assign(design, linked ?? { ...OPTIONAL, ...fromHash(location.hash) });
   // Rewrite an edited URL so it always holds the whole design (for Copy link).
-  if (!ours) safely(() => history.replaceState({ i: historyIndex }, '', toHash(design)));
+  if (!ours) stamp();
   render({ fade: true, announce: true });
   syncHistoryButtons();
   // Presses that came in while this step was in flight.
@@ -370,6 +390,10 @@ function optionsFor(d, extra = {}) {
 /** Cover options for the current design. @param {Partial<import('../src/index.js').CoverOptions>} [extra] */
 const options = (extra = {}) => optionsFor(design, extra);
 
+/** Completed designs by their partial input: picking a missing style renders a cover. */
+/** @type {Map<string, Design>} */
+const completed = new Map();
+
 /**
  * A whole design from a partial one (a shared link, or a kept design saved by another
  * version). What it leaves out gets neutral, deterministic values, never the current
@@ -378,6 +402,9 @@ const options = (extra = {}) => optionsFor(design, extra);
  * @returns {Design}
  */
 function complete(partial) {
+  const key = JSON.stringify(partial);
+  const known = completed.get(key);
+  if (known) return { ...known };
   /** @type {Design} */
   const d = {
     title: '',
@@ -390,7 +417,9 @@ function complete(partial) {
     ...partial,
   };
   if (!partial.style) d.style = createCover(optionsFor(d, { style: 'random' })).style;
-  return d;
+  if (completed.size > 100) completed.clear();
+  completed.set(key, d);
+  return { ...d };
 }
 
 let lastAnnouncement = '';
@@ -940,7 +969,9 @@ async function exportAs(format, button) {
   // Capture what is being exported: the design may change while the PNG renders.
   const [w, hgt] = FORMATS[design.format];
   const scale = ui.scale;
-  button.disabled = true;
+  // One export per button at a time. aria-disabled, not disabled, so focus stays on it.
+  if (button.getAttribute('aria-busy') === 'true') return;
+  button.setAttribute('aria-disabled', 'true');
   button.setAttribute('aria-busy', 'true');
   try {
     await downloadCover(current.svg, format, name, { scale, quality: 0.93 });
@@ -949,7 +980,7 @@ async function exportAs(format, button) {
     console.error(err);
     toast('Export failed. Try SVG instead.');
   } finally {
-    button.disabled = false;
+    button.removeAttribute('aria-disabled');
     button.removeAttribute('aria-busy');
   }
 }
@@ -1007,7 +1038,7 @@ window.addEventListener('pageshow', (e) => {
 // History entries are designs, not places on the page: Undo and Back must not scroll the page
 // to where it was when that design was made.
 history.scrollRestoration = 'manual';
-safely(() => history.replaceState({ i: historyIndex }, '', toHash(design)));
+stamp();
 buildControls();
 buildRail();
 render();

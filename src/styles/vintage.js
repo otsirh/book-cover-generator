@@ -8,14 +8,13 @@ import {
   mix,
   readable,
   inkOn,
-  clamp,
   escapeXml,
   radialGradient,
   contrast,
 } from '../core.js';
 import { FONTS, fitText, drawText, textBottom, graphemes, measureText, textGroupAttrs } from '../text.js';
 import { titleBlock, authorFit } from '../type.js';
-import { strongAccents, flower, initialChars } from './util.js';
+import { strongAccents, flower, initialChars, textPanel } from './util.js';
 
 /** @typedef {import('../index.js').StyleContext} Ctx */
 
@@ -236,9 +235,11 @@ export const sunburst = {
       maxWidth: innerW,
       maxSize: S * 0.05,
     });
-    const gap = a.lines.length ? m * 0.55 : 0;
-    const bandH = pad * 2 + t.height + gap + a.height + 10 * u;
-    const by = clamp(cy + sr * 1.18 + m * 0.6, m, H - m - bandH);
+    const {
+      y: by,
+      h: bandH,
+      gap,
+    } = textPanel(c, t, a, { pad, gap: m * 0.55, extra: 10 * u, top: cy + sr * 1.18 + m * 0.6 });
     s += rect(m, by, W - m * 2, bandH, p.bg);
     s += rect(
       m + 5 * u,
