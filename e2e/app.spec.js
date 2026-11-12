@@ -53,8 +53,10 @@ test('renders a cover and every style in the rail', async ({ page }) => {
   const tiles = page.locator('.tile');
   await expect(tiles).toHaveCount(39);
   for (const tile of await tiles.all()) {
-    await tile.scrollIntoViewIfNeeded();
-    await expect(tile.locator('img')).toHaveAttribute('src', /^data:image\/svg\+xml/);
+    // (Scrolled from the page, not waiting for the tile to hold still over two frames: WebKit on
+    // Linux CI paints a rail of SVG images at a frame or two a second.)
+    await tile.evaluate((el) => el.scrollIntoView({ block: 'nearest' }));
+    await expect(tile.locator('img')).toHaveAttribute('src', /^data:image\/svg\+xml/, { timeout: 10_000 });
   }
 });
 
@@ -687,7 +689,10 @@ test('the rail renders a few tiles ahead of its scroll position', async ({ page 
     return tile ? /** @type {HTMLElement} */ (tile).dataset.style : null;
   });
   expect(below).toBeTruthy();
-  await expect(page.locator(`.tile[data-style="${below}"] img`)).toHaveAttribute('src', /^data:image\/svg\+xml/);
+  // (Tiles are drawn a few per frame, and WebKit on Linux CI paints a frame or two a second.)
+  await expect(page.locator(`.tile[data-style="${below}"] img`)).toHaveAttribute('src', /^data:image\/svg\+xml/, {
+    timeout: 15_000,
+  });
 });
 
 test('the Variation field follows Back even while it has focus', async ({ page }) => {
