@@ -20,6 +20,8 @@ export {
   textBottom,
   textGroupAttrs,
   markExtent,
+  noteText,
+  recordText,
 } from './text.js';
 export { titleBlock, authorFit, fitStack, drawStack, splitLead } from './type.js';
 export { strongAccents, textColor, tintText, fitTitleWith, textPanel, TEXT_CONTRAST } from './styles/util.js';
@@ -377,7 +379,7 @@ export function createCover(options = {}) {
   const badge = cleanText(options.badge, 60);
   const W = dimension(options.width, 600, 'width');
   const H = dimension(options.height, W * 1.5, 'height');
-  const lang = resolveLang(options.lang, `${title} ${subtitle} ${author} ${series} ${credit}`);
+  const lang = resolveLang(options.lang, `${title} ${subtitle} ${author} ${series} ${credit} ${badge}`);
   const { ratio } = sizeLimits;
   if (W / H > ratio || H / W > ratio) {
     throw new RangeError(`The aspect ratio must be between 1:${ratio} and ${ratio}:1, got ${W}×${H}`);

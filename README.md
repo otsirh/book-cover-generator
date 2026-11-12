@@ -160,7 +160,8 @@ Titles and subtitles longer than 300 characters (authors: 200) are cut. With `'r
 - `pickStyle(options)`: the style id `createCover` would use for these options (resolving `'random'` from the seed), without drawing the cover
 - `registerStyle({ id, name, description, group, prefer, render(ctx) })`: add your own style (see below). Replacing a built-in style takes `registerStyle(style, { replace: true })`; `unregisterStyle(id)` removes a style or brings the built-in back
 - `registerPalette({ id, name, bg, ink, accents })`: add a palette to use by id, as `palette: 'brand'` (`{ replace: true }` for a built-in id); `unregisterPalette(id)` removes it. Registered styles and palettes can also be picked by `'random'`, so registering one changes what a seed gives
-- `parseBookList(text)`: a list of books (CSV or TSV with a header row, JSON lines, or one "Title | Author | Subtitle" per line) as cover options, one per book
+- `parseBookList(text)`: a list of books (CSV with commas, semicolons or tabs and a header row naming a `title` column, JSON lines, or one "Title | Author | Subtitle" per line) as cover options, one per book
+- `noteText(x0, y0, x1, y1)` and `recordText(draw)`: note where a custom style writes its own text (so a badge stays clear of it), and collect what `draw` notes
 - `version`: the library's version (artwork for a seed can change between minor versions)
 - `sizeLimits` (`{ min: 50, max: 10000, ratio: 3 }`) and `formats` (`paperback`, `ebook` and `square` as `[width, height]` at 600 px wide): the sizes covers can have, and the app's shapes
 - `titleBlock`, `authorFit`: the typography the built-in styles use (a title with its lead line and subtitle, and the author line)

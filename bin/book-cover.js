@@ -90,37 +90,43 @@ try {
 
 const { values, positionals } = args;
 
-if (values.help) {
-  console.log(HELP);
-  process.exit(0);
-}
-
-if (values.list) {
-  console.log('Styles:');
-  for (const s of listStyles()) {
-    console.log(`  ${s.id.padEnd(14)} ${s.description}`);
-    for (const v of s.variants) {
-      console.log(`  ${''.padEnd(14)}   --variant ${v.name}=${v.values.map((x) => x.value).join('|')}`);
-    }
+/**
+ * Help, the list, and checks of the arguments: whether to go on and make covers. (Exit codes are
+ * set, not exited with, so output piped elsewhere is written in full first.)
+ */
+function preflight() {
+  if (values.help) {
+    console.log(HELP);
+    return false;
   }
-  console.log('\nPalettes:');
-  for (const p of palettes) console.log(`  ${p.id.padEnd(14)} ${p.name}${p.dark ? ' (dark)' : ''}`);
-  process.exit(0);
-}
-
-if (values.batch !== undefined && positionals.length) {
-  console.error('--batch takes the titles from its list: give no title on the command line');
-  process.exit(1);
-}
-if (!positionals.length && values.batch === undefined) {
-  console.error(HELP);
-  process.exit(1);
-}
-if (positionals.length > 2) {
-  console.error(
-    `Expected a title and an author, got ${positionals.length} arguments. Quote values with spaces: book-cover "The Lighthouse Keeper" "Mara Ellison"`,
-  );
-  process.exit(1);
+  if (values.list) {
+    console.log('Styles:');
+    for (const s of listStyles()) {
+      console.log(`  ${s.id.padEnd(14)} ${s.description}`);
+      for (const v of s.variants) {
+        console.log(`  ${''.padEnd(14)}   --variant ${v.name}=${v.values.map((x) => x.value).join('|')}`);
+      }
+    }
+    console.log('\nPalettes:');
+    for (const p of palettes) console.log(`  ${p.id.padEnd(14)} ${p.name}${p.dark ? ' (dark)' : ''}`);
+    return false;
+  }
+  /** @param {string} message */
+  const fail = (message) => {
+    console.error(message);
+    process.exitCode = 1;
+    return false;
+  };
+  if (values.batch !== undefined && positionals.length) {
+    return fail('--batch takes the titles from its list: give no title on the command line');
+  }
+  if (!positionals.length && values.batch === undefined) return fail(HELP);
+  if (positionals.length > 2) {
+    return fail(
+      `Expected a title and an author, got ${positionals.length} arguments. Quote values with spaces: book-cover "The Lighthouse Keeper" "Mara Ellison"`,
+    );
+  }
+  return true;
 }
 
 /**
@@ -279,12 +285,32 @@ function batch(defaults) {
     }
   });
   console.error(`Wrote ${books.length - failed} of ${books.length} covers to ${dir}`);
-  if (failed) process.exit(1);
+  if (failed) process.exitCode = 1;
 }
 
-try {
-  if (values.batch !== undefined) {
-    batch({
+function run() {
+  try {
+    if (values.batch !== undefined) {
+      batch({
+        subtitle: values.subtitle,
+        series: values.series,
+        credit: values.credit,
+        badge: values.badge,
+        texture: values.texture,
+        style: values.style,
+        palette: palette(),
+        lang: values.lang,
+        variants: variants(),
+        font: values.font,
+        titleCase: /** @type {'upper' | 'normal' | undefined} */ (values.case),
+        ...dimensions(),
+      });
+      return;
+    }
+    const total = count();
+    const options = {
+      title: positionals[0],
+      author: positionals[1] ?? '',
       subtitle: values.subtitle,
       series: values.series,
       credit: values.credit,
@@ -297,44 +323,28 @@ try {
       font: values.font,
       titleCase: /** @type {'upper' | 'normal' | undefined} */ (values.case),
       ...dimensions(),
-    });
-    process.exit(0);
-  }
-  const total = count();
-  const options = {
-    title: positionals[0],
-    author: positionals[1] ?? '',
-    subtitle: values.subtitle,
-    series: values.series,
-    credit: values.credit,
-    badge: values.badge,
-    texture: values.texture,
-    style: values.style,
-    palette: palette(),
-    lang: values.lang,
-    variants: variants(),
-    font: values.font,
-    titleCase: /** @type {'upper' | 'normal' | undefined} */ (values.case),
-    ...dimensions(),
-  };
-  for (let n = 1; n <= total; n++) {
-    // One cover: the seed given (or the title's). Several: seeds 1…n, or <seed>-1…<seed>-n.
-    const seed = total === 1 ? values.seed : values.seed ? `${values.seed}-${n}` : String(n);
-    const cover = createCover({ ...options, seed });
-    const { style, palette: paletteId, width, height, lang } = cover;
-    const choices = { style, palette: paletteId, seed: cover.seed, width, height, lang, variants: cover.variants };
-    if (values.out) {
-      const file = fileFor(values.out, n, total, cover.seed);
-      writeFileSync(file, cover.svg);
-      if (values.json) process.stdout.write(JSON.stringify({ file, ...choices }) + '\n');
-      else console.error(`Wrote ${file} (style: ${style}, palette: ${paletteId}, ${width}x${height})`);
-    } else if (values.json) {
-      process.stdout.write(JSON.stringify({ ...choices, svg: cover.svg }) + '\n');
-    } else {
-      process.stdout.write(cover.svg + '\n');
+    };
+    for (let n = 1; n <= total; n++) {
+      // One cover: the seed given (or the title's). Several: seeds 1…n, or <seed>-1…<seed>-n.
+      const seed = total === 1 ? values.seed : values.seed ? `${values.seed}-${n}` : String(n);
+      const cover = createCover({ ...options, seed });
+      const { style, palette: paletteId, width, height, lang } = cover;
+      const choices = { style, palette: paletteId, seed: cover.seed, width, height, lang, variants: cover.variants };
+      if (values.out) {
+        const file = fileFor(values.out, n, total, cover.seed);
+        writeFileSync(file, cover.svg);
+        if (values.json) process.stdout.write(JSON.stringify({ file, ...choices }) + '\n');
+        else console.error(`Wrote ${file} (style: ${style}, palette: ${paletteId}, ${width}x${height})`);
+      } else if (values.json) {
+        process.stdout.write(JSON.stringify({ ...choices, svg: cover.svg }) + '\n');
+      } else {
+        process.stdout.write(cover.svg + '\n');
+      }
     }
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exitCode = 1;
   }
-} catch (err) {
-  console.error(err instanceof Error ? err.message : String(err));
-  process.exit(1);
 }
+
+if (preflight()) run();

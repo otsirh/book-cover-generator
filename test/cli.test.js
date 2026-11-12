@@ -330,3 +330,21 @@ test('--batch writes a cover per book, with the other options for every book', a
     assert.match(stderr, message);
   }
 });
+
+test(
+  '--batch --json writes every line, even to a slow reader',
+  { skip: process.platform === 'win32' && 'needs a POSIX shell' },
+  async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'book-cover-'));
+    try {
+      const { writeFile } = await import('node:fs/promises');
+      const list = join(dir, 'list.txt');
+      await writeFile(list, Array.from({ length: 400 }, (_, i) => `Book ${i} | Author`).join('\n'));
+      const command = `"${process.execPath}" "${CLI}" --batch "${list}" --out-dir "${join(dir, 'out')}" --json 2>/dev/null | (sleep 1; wc -l)`;
+      const { stdout } = await run('sh', ['-c', command]);
+      assert.equal(Number(stdout.trim()), 400);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  },
+);

@@ -1593,6 +1593,16 @@ test('many covers: a list in, a preview, and a ZIP of one design for every book'
     b.toString(),
   );
   expect(varied.filter((svg) => svg.includes('#e4f1ea'))).toHaveLength(1);
+  // A book that can't be made is left out and reported; the rest are saved.
+  await page.locator('#many-list').fill('title,style\nGood,swiss\nBad,nope');
+  await expect(page.locator('#many-count')).toHaveText('2 books');
+  const [partial] = await Promise.all([page.waitForEvent('download'), page.locator('#many-download').click()]);
+  expect([...unzip(await readFile(/** @type {string} */ (await partial.path()))).keys()]).toEqual(['1-good.svg']);
+  await expect(page.locator('#toast')).toContainText('1 couldn’t be made');
+  // None: no file, and the toast says so.
+  await page.locator('#many-list').fill('title,style\nBad,nope');
+  await page.locator('#many-download').click();
+  await expect(page.locator('#toast')).toContainText('None of the books could be made');
 });
 
 test('a Japanese title sets the language of the cover', async ({ page }) => {

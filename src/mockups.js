@@ -1,7 +1,7 @@
 // Mockups: a cover shown as a product (a flat shot, a book, an e-reader) or on a social card,
 // for listings and cover reveals. Each is an SVG with the cover nested in it.
 
-import { n, mix, escapeXml, hashString, luminance } from './core.js';
+import { n, mix, escapeXml, hashString, contrast, readable } from './core.js';
 import { FONTS, fitText, drawText, textBottom } from './text.js';
 
 /** The kinds of mockup, with the size of each (or how it follows the cover's). */
@@ -50,15 +50,19 @@ export function createMockup(cover, { kind = 'book', background, text = '' } = {
   if (background != null && !/^#(?:[0-9a-f]{3}){1,2}$/i.test(background)) {
     throw new RangeError(`createMockup: background must be a hex colour, got ${JSON.stringify(background)}`);
   }
-  const id = (/** @type {string} */ name) => `mk${hashString(cover.svg).toString(36)}-${name}`;
+  // Ids unique to this cover and kind of mockup, so several can share a page.
+  const tag = `mk${hashString(cover.svg).toString(36)}-${kind}`;
+  const id = (/** @type {string} */ name) => `${tag}-${name}`;
   const { width: CW, height: CH, colors } = cover;
   const words = String(text).replace(/\s+/g, ' ').trim().slice(0, 80);
   const label = escapeXml(`${cover.title.replace(/\n/g, ' ')}${cover.author ? ` by ${cover.author}` : ''}`);
 
+  // (The cover's language too, so Chinese characters keep that language's forms.)
+  const lang = cover.lang ? ` lang="${escapeXml(cover.lang)}" xml:lang="${escapeXml(cover.lang)}"` : '';
   /** @param {number} W @param {number} H @param {string} inner */
   const wrap = (W, H, inner) => ({
     svg:
-      `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.round(W)}" height="${Math.round(H)}" viewBox="0 0 ${n(W)} ${n(H)}" role="img" aria-label="${label}">` +
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.round(W)}" height="${Math.round(H)}" viewBox="0 0 ${n(W)} ${n(H)}"${lang} role="img" aria-label="${label}">` +
       `<title>${label}</title>${inner}</svg>`,
     width: Math.round(W),
     height: Math.round(H),
@@ -139,7 +143,8 @@ export function createMockup(cover, { kind = 'book', background, text = '' } = {
     /** @type {'card' | 'square' | 'story'} */ (kind)
   ];
   const bg = background ?? mix(colors.bg, colors.dark ? '#000000' : colors.ink, colors.dark ? 0.35 : 0.08);
-  const ink = luminance(bg) > 0.4 ? '#141414' : '#f7f5f0';
+  // Whichever of near-black and near-white reads better on it.
+  const ink = readable(bg, ['#141414', '#f7f5f0']);
   const u = Math.min(W, H) / 600;
   // Where the cover goes (as large as its area allows), where the words go, and their sizes.
   const layout = {
@@ -216,7 +221,8 @@ export function createMockup(cover, { kind = 'book', background, text = '' } = {
       x: box.x,
       y,
       anchor,
-      fill: colors.accents.find((a) => Math.abs(luminance(a) - luminance(bg)) > 0.3) ?? ink,
+      // An accent if one reads on the background (3:1, for large bold text), else the ink.
+      fill: colors.accents.find((a) => contrast(a, bg) >= 3) ?? ink,
     });
   }
   return wrap(W, H, s);

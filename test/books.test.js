@@ -42,3 +42,16 @@ test('the books it reads make covers', () => {
     assert.match(createCover({ ...book, seed: 's' }).svg, /^<svg/);
   }
 });
+
+test('numbers as titles, semicolon CSV, a lone title column, and the right line in errors', () => {
+  assert.deepEqual(parseBookList('{"title":1984,"author":"Orwell","seed":7}\n{"title":"Dune"}'), [
+    { title: '1984', author: 'Orwell', seed: 7 },
+    { title: 'Dune' },
+  ]);
+  assert.deepEqual(parseBookList('title;author\nDune;Frank Herbert\n"A; B";C'), [
+    { title: 'Dune', author: 'Frank Herbert' },
+    { title: 'A; B', author: 'C' },
+  ]);
+  assert.deepEqual(parseBookList('title\nDune\nThe Hobbit'), [{ title: 'Dune' }, { title: 'The Hobbit' }]);
+  assert.throws(() => parseBookList('{"title":"a"}\n\n\n{bad}'), /Line 4 is not valid JSON/);
+});

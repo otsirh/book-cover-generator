@@ -55,6 +55,8 @@ const MAX_SIDE = sizeLimits.max;
 const CUSTOM_PALETTE = /^custom(?:-[0-9a-f]{6}){3,5}$/;
 /** Pinned variants as a design holds them: name.value pairs joined by '-'. */
 const VARIANT = /^[a-z][a-z0-9]*\.[a-z][a-z0-9]*(?:-[a-z][a-z0-9]*\.[a-z][a-z0-9]*)*$/;
+/** The most pixels an image is drawn with where it needn't be larger (iOS Safari's canvas limit). */
+const MAX_PIXELS = 16_000_000;
 /** Pixels per inch recorded in PNG and JPEG downloads, so print software sizes them right. */
 const DPI = 300;
 const STYLES = listStyles();
@@ -762,8 +764,10 @@ let galleryTimer;
 function render({ fade = false, announce = false } = {}) {
   applyShape();
   renderPreview(fade, announce);
-  // The list's preview follows the design too (after a pause while typing).
-  if (/** @type {HTMLDetailsElement} */ ($('many')).open) {
+  // The list's preview follows the design too (not its title and author, which the list replaces).
+  const manyKey = JSON.stringify({ ...design, title: '', author: '' });
+  if (manyKey !== lastManyKey && /** @type {HTMLDetailsElement} */ ($('many')).open) {
+    lastManyKey = manyKey;
     clearTimeout(manyTimer);
     manyTimer = setTimeout(renderMany, typing ? 250 : 0);
   }
@@ -893,7 +897,9 @@ function renderPreview(fade, announce) {
     prev.classList.add('fading');
   }
   img.src = svgToDataUrl(current.svg);
-  renderMockup();
+  // (After a pause while typing: it is a second full-size drawing.)
+  clearTimeout(mockupTimer);
+  mockupTimer = setTimeout(renderMockup, typing ? 300 : 0);
   const title = oneLine(design.title) || 'Untitled';
   img.alt = `Cover preview: “${title}”${design.author.trim() ? ` by ${design.author.trim()}` : ''}, ${style?.name} style`;
   const paletteName = `${palette?.name ?? 'Custom'}${design.palette === 'auto' ? ' (auto)' : ''}`;
@@ -1119,11 +1125,20 @@ function buildControls() {
     busyWhile(mockupButton, async () => {
       const kind = /** @type {import('../src/index.js').MockupKind} */ (mockupKind.value);
       const m = createMockup(current, { kind, text: mockupText.value });
-      // Product shots follow the cover's size: twice it, for sharpness. Cards have theirs.
-      const scale = ['card', 'square', 'story'].includes(kind) ? 1 : 2;
+      // Product shots follow the cover's size: twice it, for sharpness, within what browsers can
+      // draw (10,000 px a side, and about 16 million pixels on phones). Cards have their own size.
+      const card = ['card', 'square', 'story'].includes(kind);
+      const scale = card
+        ? 1
+        : Math.min(2, MAX_SIDE / Math.max(m.width, m.height), Math.sqrt(MAX_PIXELS / (m.width * m.height)));
+      const [pw, ph] = [Math.round(m.width * scale), Math.round(m.height * scale)];
       try {
-        await downloadCover(m.svg, 'png', `${slug(oneLine(design.title))}-${kind}`, { scale, dpi: DPI });
-        toast(`Saved the mockup · ${m.width * scale} × ${m.height * scale} px`);
+        await downloadCover(m.svg, 'png', `${slug(oneLine(design.title))}-${kind}`, {
+          width: pw,
+          height: ph,
+          dpi: DPI,
+        });
+        toast(`Saved the mockup · ${pw} × ${ph} px`);
       } catch (err) {
         console.error(err);
         toast('Export failed. Try again.');
@@ -1956,6 +1971,9 @@ async function shareCover() {
   }
 }
 
+/** @type {ReturnType<typeof setTimeout> | undefined} */
+let mockupTimer;
+
 /** The mockup preview, and the card's line shown only for the kinds that have one. */
 function renderMockup() {
   const kind = /** @type {import('../src/index.js').MockupKind} */ (
@@ -1985,22 +2003,22 @@ function listedBooks() {
 }
 
 /**
- * Cover options for book `i` of the list: this design, with what the list says for it, and a
- * palette of its own when asked for.
+ * Cover options for book `i` of the list: the design `d`, with what the list says for it, and a
+ * palette of its own when `own` asks for one.
  * @param {import('../src/index.js').CoverOptions} book @param {number} i
+ * @param {Design} [d] @param {boolean} [own]
  */
-function bookOptions(book, i) {
-  const base = optionsFor({ ...design, title: '', author: '', subtitle: design.subtitle });
-  const own = /** @type {HTMLInputElement} */ ($('many-palettes')).checked;
+function bookOptions(book, i, d = design, own = /** @type {HTMLInputElement} */ ($('many-palettes')).checked) {
+  const base = optionsFor({ ...d, title: '', author: '' });
   const start = Math.max(
     0,
-    palettes.findIndex((p) => p.id === design.palette),
+    palettes.findIndex((p) => p.id === d.palette),
   );
   return {
     ...base,
     ...(own && !book.palette ? { palette: palettes[(start + i) % palettes.length].id } : {}),
     // (Another style than this design's: none of this one's pinned choices.)
-    ...(book.style && book.style !== design.style ? { variants: {} } : {}),
+    ...(book.style && book.style !== d.style ? { variants: {} } : {}),
     ...(book.width !== undefined || book.height !== undefined ? { width: undefined, height: undefined } : {}),
     ...book,
   };
@@ -2008,6 +2026,22 @@ function bookOptions(book, i) {
 
 /** @type {ReturnType<typeof setTimeout> | undefined} */
 let manyTimer;
+/** The design the list's preview was last drawn for (title and author aside). */
+let lastManyKey = '';
+/** List covers still to draw. @type {{ img: HTMLImageElement, options: import('../src/index.js').CoverOptions }[]} */
+let manyQueue = [];
+
+/** Draw the next queued list cover (a few per frame, so a long list never stalls the page). */
+const scheduleMany = sliced(() => {
+  const item = manyQueue.shift();
+  if (!item) return false;
+  try {
+    item.img.src = svgToDataUrl(createCover(item.options).svg);
+  } catch {
+    // A row the library refuses (an unknown style, say): shown empty, reported on download.
+  }
+  return true;
+});
 
 /** The count and the first covers of the list, as they will come out. */
 function renderMany() {
@@ -2015,17 +2049,16 @@ function renderMany() {
   const extra = books.length > MAX_BOOKS ? ` (the first ${MAX_BOOKS} are made)` : '';
   $('many-count').textContent =
     error || (books.length ? `${books.length} book${books.length === 1 ? '' : 's'}${extra}` : '');
+  lastManyKey = JSON.stringify({ ...design, title: '', author: '' });
+  manyQueue = [];
   $('many-preview').replaceChildren(
     ...books.slice(0, PREVIEWED).map((book, i) => {
       const img = /** @type {HTMLImageElement} */ (h('img', { alt: '' }));
-      try {
-        img.src = svgToDataUrl(createCover(bookOptions(book, i)).svg);
-      } catch {
-        // A row the library refuses (an unknown style, say): shown empty, reported on download.
-      }
+      manyQueue.push({ img, options: bookOptions(book, i) });
       return h('li', {}, img);
     }),
   );
+  scheduleMany();
 }
 
 function buildMany() {
@@ -2047,6 +2080,10 @@ async function downloadMany() {
     toast(error || 'Add a book per line first');
     return;
   }
+  // Taken now: changing the design while the ZIP is made doesn't change the books still to draw.
+  const d = { ...design };
+  const own = /** @type {HTMLInputElement} */ ($('many-palettes')).checked;
+  const chosen = scaleFor(d.format);
   const format = /** @type {HTMLSelectElement} */ ($('many-format')).value;
   const button = $('many-download');
   const list = books.slice(0, MAX_BOOKS);
@@ -2059,22 +2096,28 @@ async function downloadMany() {
   try {
     for (const [i, book] of list.entries()) {
       button.textContent = `Drawing ${i + 1} of ${list.length}…`;
-      let cover;
+      // A book that can't be made (an unknown style, a size too large to draw) is left out and
+      // reported; the others are saved.
       try {
-        cover = createCover(bookOptions(book, i));
+        const cover = createCover(bookOptions(book, i, d, own));
+        const base = `${String(i + 1).padStart(String(list.length).length, '0')}-${slug(oneLine(cover.title))}`;
+        if (format === 'svg') files.push({ name: uniqueName(base, 'svg', taken), data: cover.svg });
+        else {
+          // The chosen scale, within 10,000 px for this book's own size.
+          const scale = Math.max(1, Math.min(chosen, Math.floor(MAX_SIDE / Math.max(cover.width, cover.height))));
+          const blob = await rasterize(cover.svg, { scale, dpi: DPI });
+          files.push({ name: uniqueName(base, extensionOf(blob) ?? 'png', taken), data: blob });
+        }
       } catch (err) {
         failed.push(`${i + 1}: ${err instanceof Error ? err.message : String(err)}`);
-        continue;
-      }
-      const base = `${String(i + 1).padStart(String(list.length).length, '0')}-${slug(oneLine(cover.title))}`;
-      if (format === 'svg') files.push({ name: uniqueName(base, 'svg', taken), data: cover.svg });
-      else {
-        const blob = await rasterize(cover.svg, { scale: scaleFor(design.format), dpi: DPI });
-        files.push({ name: uniqueName(base, extensionOf(blob) ?? 'png', taken), data: blob });
       }
     }
-    if (files.length) downloadBlob(await zipFiles(files), 'covers.zip');
     if (failed.length) console.warn('Books left out:', failed);
+    if (!files.length) {
+      toast('None of the books could be made (see the console)');
+      return;
+    }
+    downloadBlob(await zipFiles(files), 'covers.zip');
     toast(
       `Saved ${files.length} cover${files.length === 1 ? '' : 's'} in covers.zip` +
         (failed.length ? `; ${failed.length} couldn’t be made (see the console)` : ''),

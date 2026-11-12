@@ -4,7 +4,7 @@ import type { FontSpec, FONTS } from './text.js';
 
 export type { Rng } from './core.js';
 export type { Palette, PaletteId } from './palettes.js';
-export type { FontSpec, FitOptions, TextFit, DrawOptions, TextSpec, TextMeasurer } from './text.js';
+export type { FontSpec, FitOptions, TextFit, DrawOptions, TextSpec, TextMeasurer, TextBox } from './text.js';
 export type { StackFit, TitleBlock, TitleBlockOptions } from './type.js';
 export { palettes } from './palettes.js';
 export {
@@ -17,6 +17,8 @@ export {
   textBottom,
   textGroupAttrs,
   markExtent,
+  noteText,
+  recordText,
 } from './text.js';
 export { titleBlock, authorFit, fitStack, drawStack, splitLead } from './type.js';
 export { strongAccents, textColor, tintText, fitTitleWith, textPanel, TEXT_CONTRAST } from './styles/util.js';

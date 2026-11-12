@@ -81,9 +81,11 @@ function optionsFrom(named) {
       if (v) out.texture = raw === true || ['1', 'true', 'yes', 'y', 'on'].includes(v);
       continue;
     }
-    const value = typeof raw === 'number' ? raw : String(raw).trim();
+    // (Numbers stay numbers for sizes and the seed; any other column is text, a title of 1984 too.)
+    const value = typeof raw === 'number' && option !== 'title' ? raw : String(raw).trim();
     if (value === '') continue;
-    out[option] = option === 'width' || option === 'height' ? Number(value) : value;
+    if (option === 'width' || option === 'height') out[option] = Number(value);
+    else out[option] = option === 'seed' ? value : String(value);
   }
   return /** @type {import('./index.js').CoverOptions} */ (out);
 }
@@ -102,29 +104,36 @@ function optionsFrom(named) {
  */
 export function parseBookList(text) {
   const src = String(text ?? '').replace(/^\uFEFF/, '');
-  const lines = src.split(/\r\n|[\r\n]/).filter((line) => line.trim());
+  // (Each with its line number in the text, for errors.)
+  const lines = src
+    .split(/\r\n|[\r\n]/)
+    .map((line, i) => ({ line, number: i + 1 }))
+    .filter(({ line }) => line.trim());
   if (!lines.length) return [];
   /** @type {import('./index.js').CoverOptions[]} */
   let books;
-  if (lines.every((line) => line.trim().startsWith('{'))) {
-    books = lines.map((line, i) => {
+  if (lines.every(({ line }) => line.trim().startsWith('{'))) {
+    books = lines.map(({ line, number }) => {
       let value;
       try {
         value = JSON.parse(line);
       } catch {
-        throw new SyntaxError(`Line ${i + 1} is not valid JSON`);
+        throw new SyntaxError(`Line ${number} is not valid JSON`);
       }
       return value && typeof value === 'object' ? optionsFrom(value) : {};
     });
   } else {
-    const first = lines[0];
-    const delimiter = first.includes('\t') ? '\t' : ',';
-    const header = csvRows(first, delimiter)[0] ?? [];
-    if (header.length > 1 && header.some((name) => name.trim().toLowerCase() === 'title')) {
+    // A header row names a "title" column, separated by tabs, commas or semicolons (as
+    // spreadsheets in many countries save CSV).
+    const first = lines[0].line;
+    const delimiter = ['\t', ',', ';'].find((d) =>
+      (csvRows(first, d)[0] ?? []).some((name) => name.trim().toLowerCase() === 'title'),
+    );
+    if (delimiter) {
       const [names, ...rows] = csvRows(src, delimiter);
       books = rows.map((row) => optionsFrom(Object.fromEntries(names.map((name, i) => [name, row[i] ?? '']))));
     } else {
-      books = lines.map((line) => {
+      books = lines.map(({ line }) => {
         const [title, author, subtitle] = line.split(LINE_SEPARATOR);
         return optionsFrom({ title, author, subtitle });
       });

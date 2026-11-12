@@ -1358,3 +1358,32 @@ test('mockups: every kind is a well-formed SVG with the cover in it, at its size
   assert.throws(() => createMockup(/** @type {any} */ ({ svg: '' })), /a cover from createCover/);
   assert.match(createMockup(cover, { kind: 'flat', background: '#123456' }).svg, /fill="#123456"/);
 });
+
+test('mockups keep the cover’s language, have ids of their own per kind, and readable card text', async () => {
+  const { createMockup, noteText, recordText } = await import('../src/index.js');
+  const ja = createCover({ title: 'ガラスの街', style: 'minimal', seed: 's' });
+  assert.match(createMockup(ja, { kind: 'flat' }).svg, /^<svg [^>]* lang="ja" xml:lang="ja"/);
+  const cover = createCover({ title: 'T', style: 'minimal', seed: 's' });
+  const ids = (/** @type {string} */ svg) => [...svg.matchAll(/id="(mk[^"]+)"/g)].map((m) => m[1]);
+  const flat = ids(createMockup(cover, { kind: 'flat' }).svg);
+  const reader = ids(createMockup(cover, { kind: 'ereader' }).svg);
+  assert.deepEqual(
+    flat.filter((x) => reader.includes(x)),
+    [],
+  );
+  // Card text reads on its background, whatever the palette.
+  for (const p of palettes) {
+    const c = createCover({ title: 'Readable', author: 'A', style: 'minimal', palette: p.id, seed: 's' });
+    const { svg } = createMockup(c, { kind: 'card', text: 'Out now' });
+    const bg = /<rect width="1200" height="630" fill="(#[0-9a-f]{6})"/.exec(svg)?.[1] ?? '';
+    for (const run of textRuns(svg)) {
+      if (!/Readable|Out now|^A$/.test(run.text) || !run.fill) continue;
+      const need = /Out now/.test(run.text) ? 3 : 4.5;
+      assert.ok(contrast(run.fill, bg) >= need, `${p.id}: "${run.text}" at ${contrast(run.fill, bg).toFixed(2)}:1`);
+    }
+  }
+  // noteText and recordText are exported for styles that write their own text.
+  assert.deepEqual(recordText(() => noteText(1, 2, 3, 4)).boxes, [{ x0: 1, y0: 2, x1: 3, y1: 4 }]);
+  // The badge counts when the language is inferred.
+  assert.equal(createCover({ title: 'Glass City', badge: 'ベストセラー' }).lang, 'ja');
+});
