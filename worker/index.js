@@ -12,9 +12,6 @@ import { hex } from '../src/shared.js';
 import { optionsFromLink } from '../src/link.js';
 import { handlePayload } from '../src/mcp.js';
 
-// (The query is read by src/link.js, as the app reads its links; the name the tests use.)
-export { optionsFromLink as coverOptions };
-
 /** Headers every answer has: anyone may embed it, and it's never taken for anything but what it is. */
 const COMMON = {
   'Access-Control-Allow-Origin': '*',
@@ -156,14 +153,13 @@ export async function mcp(request) {
     }
     chunks.push(value);
   }
-  const body = new TextDecoder().decode(
-    chunks.reduce((all, chunk) => {
-      const joined = new Uint8Array(all.byteLength + chunk.byteLength);
-      joined.set(all);
-      joined.set(chunk, all.byteLength);
-      return joined;
-    }, new Uint8Array()),
-  );
+  const bytes = new Uint8Array(size);
+  let at = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, at);
+    at += chunk.byteLength;
+  }
+  const body = new TextDecoder().decode(bytes);
   let message;
   try {
     message = JSON.parse(body);

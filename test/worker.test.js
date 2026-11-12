@@ -1,7 +1,8 @@
 // The HTTP API the site's Worker answers.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import worker, { api, coverOptions } from '../worker/index.js';
+import worker, { api } from '../worker/index.js';
+import { optionsFromLink } from '../src/link.js';
 import { createCover, createMockup, version } from '../src/index.js';
 
 const get = (/** @type {string} */ path, method = 'GET') =>
@@ -27,7 +28,7 @@ test('every option the library has, by name', () => {
   const q = new URLSearchParams(
     'title=T&author=A&subtitle=S&series=Se&credit=C&badge=B&style=crest&seed=1&genre=fantasy&font=didone&lang=ja&width=600&height=600&case=upper&texture=1&variant=field.pale-emblem.sun&bg=fff&ink=%23000&accent=f00,0f0',
   );
-  assert.deepEqual(coverOptions(q), {
+  assert.deepEqual(optionsFromLink(q), {
     title: 'T',
     author: 'A',
     subtitle: 'S',
@@ -52,7 +53,7 @@ test('an app link draws the cover the app draws', () => {
   const q = new URLSearchParams(
     'title=Glass%0ACity&author=A&subtitle=&style=crest&variant=emblem.sun&palette=custom-0b132b-f8f9fa-ff6b6b&seed=&format=ebook&texture=0&v=1.2.0',
   );
-  assert.deepEqual(coverOptions(q), {
+  assert.deepEqual(optionsFromLink(q), {
     title: 'Glass\nCity',
     author: 'A',
     style: 'crest',
@@ -63,14 +64,14 @@ test('an app link draws the cover the app draws', () => {
     texture: false,
   });
   // (auto leaves the palette to the seed, as the library's default.)
-  assert.deepEqual(coverOptions(new URLSearchParams('format=900x1350&palette=auto')), { width: 900, height: 1350 });
+  assert.deepEqual(optionsFromLink(new URLSearchParams('format=900x1350&palette=auto')), { width: 900, height: 1350 });
   for (const [query, message] of [
     ['format=huge', /Unknown format "huge"/],
     ['texture=yes', /texture is 1/],
     ['variant=scene', /name\.value pairs/],
     ['bg=fff&ink=000', /need bg, ink and accent/],
   ]) {
-    assert.throws(() => coverOptions(new URLSearchParams(query)), message);
+    assert.throws(() => optionsFromLink(new URLSearchParams(query)), message);
   }
 });
 
@@ -137,20 +138,20 @@ test('mockups, errors, other methods, and what isn’t the API', async () => {
 });
 
 test('the API reads a link as the app does, and sizes a format as the CLI does', () => {
-  const o = coverOptions(new URLSearchParams(`palette=Mint&seed=%20abc%20&title=${'x'.repeat(250)}`));
+  const o = optionsFromLink(new URLSearchParams(`palette=Mint&seed=%20abc%20&title=${'x'.repeat(250)}`));
   assert.equal(o.palette, 'mint');
   assert.equal(createCover({ ...o, title: 'x' }).palette, 'mint');
   assert.equal(o.seed, 'abc');
   assert.equal(o.title?.length, 200);
-  assert.deepEqual(coverOptions(new URLSearchParams('format=ebook&width=1200')), { width: 1200, height: 1920 });
-  assert.deepEqual(coverOptions(new URLSearchParams('format=square&height=500')), { width: 500, height: 500 });
-  assert.throws(() => coverOptions(new URLSearchParams('format=ebook&width=600&height=600')), /not both/);
+  assert.deepEqual(optionsFromLink(new URLSearchParams('format=ebook&width=1200')), { width: 1200, height: 1920 });
+  assert.deepEqual(optionsFromLink(new URLSearchParams('format=square&height=500')), { width: 500, height: 500 });
+  assert.throws(() => optionsFromLink(new URLSearchParams('format=ebook&width=600&height=600')), /not both/);
   // Sizes and pins as the app reads them: no leading zeros, and pins in any case.
-  assert.throws(() => coverOptions(new URLSearchParams('format=0x0')), /Unknown format/);
-  assert.deepEqual(coverOptions(new URLSearchParams('variant=Moon.Blood')).variants, { moon: 'blood' });
+  assert.throws(() => optionsFromLink(new URLSearchParams('format=0x0')), /Unknown format/);
+  assert.deepEqual(optionsFromLink(new URLSearchParams('variant=Moon.Blood')).variants, { moon: 'blood' });
   // Texture in any case, and a seed's line breaks as spaces, as the app reads them.
-  assert.equal(coverOptions(new URLSearchParams('texture=TRUE')).texture, true);
-  assert.equal(coverOptions(new URLSearchParams('seed=a%0Ab')).seed, 'a b');
+  assert.equal(optionsFromLink(new URLSearchParams('texture=TRUE')).texture, true);
+  assert.equal(optionsFromLink(new URLSearchParams('seed=a%0Ab')).seed, 'a b');
 });
 
 test('a mockup background without its #, and a preflight for any header', async () => {
@@ -167,7 +168,7 @@ test('the API and the app read one link alike: the last of a repeated key, CRLF,
   const q = new URLSearchParams(
     `style=retro&style=swiss&title=a%0D%0A${'x'.repeat(198)}&titleCase=UPPER&palette=auto%20`,
   );
-  const o = coverOptions(q);
+  const o = optionsFromLink(q);
   assert.equal(o.style, 'swiss');
   assert.equal(o.style, LINK.style(lastValues(q).style));
   assert.equal(o.title, LINK.title(lastValues(q).title));
@@ -175,8 +176,8 @@ test('the API and the app read one link alike: the last of a repeated key, CRLF,
   assert.equal(o.titleCase, 'upper');
   assert.equal(o.palette, undefined);
   assert.throws(
-    () => coverOptions(new URLSearchParams('format=ebook&height=abc')),
-    /height must be a number of px, got "abc"/,
+    () => optionsFromLink(new URLSearchParams('format=ebook&height=abc')),
+    /height must be a number, got "abc"/,
   );
   // Unknown names still get the library's own message.
   const bad = /** @type {Response} */ (get('/api/cover.svg?style=Art%20Decco'));
@@ -185,11 +186,14 @@ test('the API and the app read one link alike: the last of a repeated key, CRLF,
 });
 
 test('a format is a shape a width or height may scale; the library says what’s wrong with a size', () => {
-  assert.deepEqual(coverOptions(new URLSearchParams('format=10x16&width=1600')), { width: 1600, height: 2560 });
-  assert.deepEqual(coverOptions(new URLSearchParams('format=16x25&height=2500')), { width: 1600, height: 2500 });
-  assert.deepEqual(coverOptions(new URLSearchParams('width=1e3')), { width: 1000 });
-  assert.throws(() => coverOptions(new URLSearchParams('titleCase=bold')), /titleCase is upper or normal, got "bold"/);
-  assert.throws(() => createCover(coverOptions(new URLSearchParams('format=12000x18000'))), /10000/);
+  assert.deepEqual(optionsFromLink(new URLSearchParams('format=10x16&width=1600')), { width: 1600, height: 2560 });
+  assert.deepEqual(optionsFromLink(new URLSearchParams('format=16x25&height=2500')), { width: 1600, height: 2500 });
+  assert.deepEqual(optionsFromLink(new URLSearchParams('width=1e3')), { width: 1000 });
+  assert.throws(
+    () => optionsFromLink(new URLSearchParams('titleCase=bold')),
+    /titleCase is upper or normal, got "bold"/,
+  );
+  assert.throws(() => createCover(optionsFromLink(new URLSearchParams('format=12000x18000'))), /10000/);
 });
 
 test('the app’s format and texture readers: presets, sizes it can make, on and off', async () => {

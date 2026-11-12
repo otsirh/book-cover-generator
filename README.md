@@ -90,10 +90,10 @@ One script, then a cover wherever you write the element:
 ```html
 <script type="module" src="https://covers.otsirh.dev/src/element.js"></script>
 
-<book-cover title="Dune" author="Frank Herbert" cover-style="retro" seed="1"></book-cover>
+<book-cover cover-title="Dune" author="Frank Herbert" cover-style="retro" seed="1"></book-cover>
 ```
 
-Its attributes are the app's link parameters, except the style, which is `cover-style` (`style` is HTML's own): `title`, `author`, `subtitle`, `series`, `credit`, `badge`, `cover-style`, `genre`, `palette`, `seed`, `format`, `font`, `case`, `variant` and `texture` (present: on). Styles, palettes and fonts may be named as the app's menus name them. The cover is 240 px wide unless you style the element's `width`; it draws again when an attribute changes, and fires `cover` (with the cover) or `cover-error` (with what's wrong). It is drawn in the page, measuring the text with the fonts installed there, and shown as an image, so a page with Trusted Types can show it (its CSP must allow `data:` images). An image can't use the page's web fonts: if the page loads one that a cover's font stack names (such as EB Garamond or Oswald), the text is measured in it but drawn in the system's font, and may fit less well. From npm: `import 'book-cover-generator/element'`.
+Its attributes are the app's link parameters, except the title and the style, which are `cover-title` and `cover-style` (`title` and `style` are HTML's own): `cover-title`, `author`, `subtitle`, `series`, `credit`, `badge`, `cover-style`, `genre`, `palette`, `seed`, `format`, `font`, `case`, `variant`, `texture` (present: on) and `lang` (the language of the text, such as `zh-Hant`). Styles, palettes and fonts may be named as the app's menus name them. The cover is 240 px wide unless you style the element's `width`; it draws again when an attribute changes, and fires `cover` (with the cover) or `cover-error` (with what's wrong). It is drawn in the page, measuring the text with the fonts installed there, and shown as an image, so a page with Trusted Types can show it (its CSP must allow `data:` images). An image can't use the page's web fonts: if the page loads one that a cover's font stack names (such as EB Garamond or Oswald), the text is measured in it but drawn in the system's font, and may fit less well. From npm: `import 'book-cover-generator/element'`.
 
 ## From an AI assistant (MCP)
 

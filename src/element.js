@@ -1,11 +1,12 @@
 // <book-cover>: a cover on any page, from its attributes.
 //
 //   <script type="module" src="https://covers.otsirh.dev/src/element.js"></script>
-//   <book-cover title="Dune" author="Frank Herbert" cover-style="retro"></book-cover>
+//   <book-cover cover-title="Dune" author="Frank Herbert" cover-style="retro"></book-cover>
 //
-// Attributes: title, author, subtitle, series, credit, badge, cover-style (a style by id or
-// name; `style` is HTML's own), genre, palette, seed, format (paperback, ebook, square or 1600x2560),
-// font, case, texture (present: on) and variant (as in the app's links: scene.forest). The cover
+// Attributes: cover-title and cover-style (`title` and `style` are HTML's own: a tooltip, the
+// element's CSS), author, subtitle, series, credit, badge, genre, palette, seed, format (paperback,
+// ebook, square or 1600x2560), font, case, texture (present: on), variant (as in the app's links:
+// scene.forest) and lang (the language of the text, as on any element). The cover
 // is drawn as an image (so pages with Trusted Types can show it: the page's CSP must allow data:
 // images), sized by the element's width (240px unless styled).
 
@@ -15,7 +16,7 @@ import { LINK, optionsFromLink } from './link.js';
 
 /** The attributes that draw the cover, and the link parameter each is. */
 const ATTRIBUTES = /** @type {const} */ ({
-  title: 'title',
+  'cover-title': 'title',
   author: 'author',
   subtitle: 'subtitle',
   series: 'series',
@@ -29,6 +30,7 @@ const ATTRIBUTES = /** @type {const} */ ({
   font: 'font',
   case: 'case',
   variant: 'variant',
+  lang: 'lang',
 });
 
 const CSS =

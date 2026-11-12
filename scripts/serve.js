@@ -6,11 +6,12 @@
 // Serves files from the given roots in order (default: the repo root, then
 // public/), applies the Cloudflare-style `_headers` file found in a root and
 // answers unknown paths with 404.html, so local runs behave like production. /api/* and /mcp
-// are the Worker's (worker/index.js), as in production.
+// are the Worker's (worker/index.js), answered by its own fetch, as in production.
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, resolve, sep } from 'node:path';
-import { api, mcp } from '../worker/index.js';
+import { Readable } from 'node:stream';
+import worker from '../worker/index.js';
 
 const [portArg, ...rootArgs] = process.argv.slice(2);
 const port = Number(portArg ?? 4173);
@@ -100,32 +101,30 @@ async function handle(req, res) {
     res.writeHead(400).end('Bad request');
     return;
   }
-  if (urlPath === '/mcp') {
-    // The MCP endpoint, as the Worker answers it (with the request's body).
-    const chunks = [];
-    for await (const chunk of req) chunks.push(chunk);
-    const body = ['GET', 'HEAD'].includes(req.method ?? 'GET') ? undefined : Buffer.concat(chunks);
-    const answer = await mcp(
+  // The Worker's paths (wrangler.jsonc runs it first for them), answered by the Worker's own fetch,
+  // with the body as a stream: routing, limits and headers as in production (which doesn't add
+  // _headers to the Worker's answers).
+  const rawPath = new URL(req.url ?? '/', 'http://localhost').pathname;
+  if (rawPath === '/mcp' || rawPath.startsWith('/api/')) {
+    const method = req.method ?? 'GET';
+    const headers = new Headers();
+    for (const [name, value] of Object.entries(req.headers)) {
+      for (const v of Array.isArray(value) ? value : value === undefined ? [] : [value]) headers.append(name, v);
+    }
+    const answer = await worker.fetch(
       new Request(new URL(req.url ?? '/', `http://127.0.0.1:${port}`), {
-        method: req.method,
-        headers: /** @type {Record<string, string>} */ (req.headers),
-        body,
+        method,
+        headers,
+        body: method === 'GET' || method === 'HEAD' ? undefined : /** @type {ReadableStream} */ (Readable.toWeb(req)),
+        // @ts-expect-error duplex is required for a streamed body, and missing from the types
+        duplex: 'half',
       }),
+      {},
+      { waitUntil() {} },
     );
-    if (answer) {
-      res.writeHead(answer.status, Object.fromEntries(answer.headers));
-      res.end(Buffer.from(await answer.arrayBuffer()));
-      return;
-    }
-  }
-  if (urlPath.startsWith('/api/')) {
-    // (Its own headers only: in production the Worker's answers don't get _headers.)
-    const answer = api(new Request(new URL(req.url ?? '/', `http://127.0.0.1:${port}`), { method: req.method }));
-    if (answer) {
-      res.writeHead(answer.status, Object.fromEntries(answer.headers));
-      res.end(Buffer.from(await answer.arrayBuffer()));
-      return;
-    }
+    res.writeHead(answer.status, Object.fromEntries(answer.headers));
+    res.end(Buffer.from(await answer.arrayBuffer()));
+    return;
   }
   // Never serve dotfiles (except .well-known), underscore files or node_modules, whatever the case or separator.
   const hidden = urlPath

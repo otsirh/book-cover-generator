@@ -1764,7 +1764,7 @@ test('<book-cover> draws a cover on a page from its attributes', async ({ page }
   const result = await page.evaluate(async () => {
     await import('/src/element.js');
     const el = /** @type {import('../src/element.js').BookCover} */ (document.createElement('book-cover'));
-    el.setAttribute('title', 'Dune');
+    el.setAttribute('cover-title', 'Dune');
     el.setAttribute('author', 'Frank Herbert');
     el.setAttribute('cover-style', 'Art Deco');
     el.setAttribute('seed', 'e');
@@ -1782,7 +1782,7 @@ test('<book-cover> draws a cover on a page from its attributes', async ({ page }
       height: Math.round(box.height),
     };
     // An attribute changed draws again; one that can't make a cover says so.
-    el.setAttribute('title', 'Arrakis');
+    el.setAttribute('cover-title', 'Arrakis');
     await new Promise((resolve) => el.addEventListener('cover', resolve, { once: true }));
     const retitled = img.alt;
     const failed = new Promise((resolve) =>
@@ -1797,7 +1797,8 @@ test('<book-cover> draws a cover on a page from its attributes', async ({ page }
   const upgraded = await page.evaluate(async () => {
     const { BookCover } = await import('/src/element.js');
     const late = document.createElement('book-cover-late');
-    late.setAttribute('title', 'Late');
+    late.setAttribute('cover-title', 'Late');
+    late.setAttribute('lang', 'zh-Hant');
     late.setAttribute('texture', '0');
     let drawn = 0;
     late.addEventListener('cover', () => (drawn += 1));
@@ -1807,9 +1808,9 @@ test('<book-cover> draws a cover on a page from its attributes', async ({ page }
     // Moved elsewhere on the page, with the same attributes: not drawn again.
     document.body.prepend(late);
     await new Promise((resolve) => setTimeout(resolve, 50));
-    return { drawn, texture: /** @type {any} */ (late).options().texture };
+    return { drawn, texture: /** @type {any} */ (late).options().texture, lang: /** @type {any} */ (late).cover.lang };
   });
-  expect(upgraded).toEqual({ drawn: 1, texture: false });
+  expect(upgraded).toEqual({ drawn: 1, texture: false, lang: 'zh-Hant' });
   expect(result.retitled).toBe('Cover: Arrakis by Frank Herbert');
   expect(result.error).toContain('Unknown style "nope"');
   expect(result.src).toBeNull();

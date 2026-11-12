@@ -14,9 +14,8 @@ import {
   sizeLimits,
   mockupKinds,
 } from '../src/index.js';
-import { LINK } from '../src/link.js';
 import { fold, idFor } from '../src/shared.js';
-import { coverOptions } from '../worker/index.js';
+import { LINK, optionsFromLink } from '../src/link.js';
 
 const STYLES = listStyles();
 /** FUZZ_RUNS=20 npm run test:fuzz runs every property 20 times as often. */
@@ -157,7 +156,7 @@ test('any query either draws a cover or says what is wrong with it', () => {
   fc.assert(
     fc.property(pairs, (entries) => {
       try {
-        createCover(coverOptions(new URLSearchParams(entries)));
+        createCover(optionsFromLink(new URLSearchParams(entries)));
       } catch (err) {
         // A mistake in the query is an Error with a message, never a crash of another kind.
         assert.ok(err instanceof Error, String(err));

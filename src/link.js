@@ -171,10 +171,36 @@ export const variantOf = (pins) =>
 export const lastValues = (q) => /** @type {Record<string, string>} */ (Object.fromEntries(q));
 
 /** A size in px, as the CLI reads one (the library checks its range), else an error naming the parameter. @param {string} key @param {string} raw */
-function px(key, raw) {
+export function px(key, raw) {
   const value = Number(raw);
-  if (!raw.trim() || !Number.isFinite(value)) throw new RangeError(`${key} must be a number of px, got "${raw}"`);
+  if (!raw.trim() || !Number.isFinite(value)) throw new RangeError(`${key} must be a number, got "${raw}"`);
   return value;
+}
+
+/**
+ * A cover's size from a format (a preset, or any WxH shape) and a width or height that scales it,
+ * as the HTTP API and the CLI read them; the format's own size with neither. The library checks
+ * the size it comes to.
+ * @param {string} format @param {number | undefined} width @param {number | undefined} height
+ * @returns {[number, number]}
+ */
+export function formatSize(format, width, height) {
+  const read = format.trim();
+  const size = Object.hasOwn(formats, read)
+    ? formats[/** @type {keyof typeof formats} */ (read)]
+    : CUSTOM_SIZE.exec(read)?.slice(1).map(Number);
+  if (!size) {
+    throw new RangeError(
+      `Unknown format "${format}". Use one of ${Object.keys(formats).join(', ')}, or a size such as 1600x2560`,
+    );
+  }
+  if (width !== undefined && height !== undefined) {
+    throw new RangeError('A format sets the shape: give it a width or a height, not both');
+  }
+  const [w, h] = size;
+  if (width !== undefined) return [width, Math.round((width * h) / w)];
+  if (height !== undefined) return [Math.round((height * w) / h), height];
+  return [w, h];
 }
 
 /**
@@ -232,30 +258,8 @@ export function optionsFromLink(q) {
   const width = given('width') === undefined ? undefined : px('width', /** @type {string} */ (given('width')));
   const height = given('height') === undefined ? undefined : px('height', /** @type {string} */ (given('height')));
   const format = given('format');
-  if (format !== undefined) {
-    // A preset, or any WxH shape: a width or height may scale it, and the library checks the size
-    // it comes to (saying what's wrong with it).
-    const read = format.trim();
-    const size = Object.hasOwn(formats, read)
-      ? formats[/** @type {keyof typeof formats} */ (read)]
-      : CUSTOM_SIZE.exec(read)?.slice(1).map(Number);
-    if (!size) {
-      throw new RangeError(
-        `Unknown format "${format}". Use one of ${Object.keys(formats).join(', ')}, or a size such as 1600x2560`,
-      );
-    }
-    // A format's shape, at the width or height asked for (as the CLI's --format --width).
-    if (width !== undefined && height !== undefined) {
-      throw new RangeError('format sets the shape: give it a width or a height, not both');
-    }
-    const [w, h] = size;
-    [o.width, o.height] =
-      width !== undefined
-        ? [width, Math.round((width * h) / w)]
-        : height !== undefined
-          ? [Math.round((height * w) / h), height]
-          : [w, h];
-  } else {
+  if (format !== undefined) [o.width, o.height] = formatSize(format, width, height);
+  else {
     if (width !== undefined) o.width = width;
     if (height !== undefined) o.height = height;
   }

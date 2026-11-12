@@ -3,8 +3,9 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { parseArgs } from 'node:util';
-import { createCover, listStyles, palettes, formats, parseBookList, optionsForBook, genres } from '../src/index.js';
+import { createCover, listStyles, palettes, parseBookList, optionsForBook, genres } from '../src/index.js';
 import { hex, slug } from '../src/shared.js';
+import { px, formatSize } from '../src/link.js';
 import { handlePayload } from '../src/mcp.js';
 
 const HELP = `Usage: book-cover "<title>" ["<author>"] [options]
@@ -29,7 +30,9 @@ Options:
       --badge <text>    a seal in a corner clear of the text ("Bestseller")
       --texture         add a fine film-grain texture
       --seed <value>    seed for the artwork (default: title + author)
-      --format <shape>  paperback (2:3, the default), ebook (5:8) or square
+      --format <shape>  paperback (2:3, the default), ebook (5:8), square, or a
+                        shape such as 1600x2560; with --width or --height, that
+                        shape at that width or height
       --width <px>      width  (default 600)
       --height <px>     height (default: from the format)
       --size <WxH>      width and height at once, e.g. 1600x2560
@@ -147,17 +150,6 @@ function preflight() {
 }
 
 /**
- * A --width/--height value as a number, reporting what was typed if it isn't one.
- * @param {string | undefined} value @param {string} name
- */
-function size(value, name) {
-  if (value === undefined) return undefined;
-  const number = Number(value);
-  if (!value.trim() || !Number.isFinite(number)) throw new RangeError(`--${name} must be a number, got "${value}"`);
-  return number;
-}
-
-/**
  * Width and height from --format, --width, --height and --size.
  * @returns {{ width?: number, height?: number }}
  */
@@ -170,17 +162,12 @@ function dimensions() {
     if (!m) throw new RangeError(`--size must look like 1600x2560, got "${values.size}"`);
     return { width: Number(m[1]), height: Number(m[2]) };
   }
-  const width = size(values.width, 'width');
-  const height = size(values.height, 'height');
+  const width = values.width === undefined ? undefined : px('--width', values.width);
+  const height = values.height === undefined ? undefined : px('--height', values.height);
   if (values.format === undefined) return { width, height };
-  if (!Object.hasOwn(formats, values.format)) {
-    throw new Error(`Unknown format "${values.format}". Available: ${Object.keys(formats).join(', ')}`);
-  }
-  if (height !== undefined) throw new Error('--format sets the height from the width: use --size for both');
-  // The shape of the app's format, at the width asked for.
-  const [w, h] = formats[/** @type {keyof typeof formats} */ (values.format)];
-  const W = width ?? 600;
-  return { width: W, height: Math.round((W * h) / w) };
+  // A preset or a WxH shape, at the width or height asked for (as the HTTP API reads it).
+  const [w, h] = formatSize(values.format, width, height);
+  return { width: w, height: h };
 }
 
 /** The palette: an id, or your own colours from --bg, --ink and --accent. */

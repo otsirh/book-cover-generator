@@ -1237,14 +1237,11 @@ const CANVAS_PIXELS =
   /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Mac/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
     ? 16_777_216
     : Infinity;
-/** The largest export scale for a format: the long side stays within 10,000 px, and the image within what the device can draw. @param {string} format */
-const maxScale = (format) => {
-  const [w, hgt] = sizeOf(format);
-  return Math.max(
-    1,
-    Math.min(4, Math.floor(MAX_SIDE / Math.max(w, hgt)), Math.floor(Math.sqrt(CANVAS_PIXELS / (w * hgt)))),
-  );
-};
+/** The largest export scale for a cover this size: its long side within 10,000 px, and the image within what the device can draw. @param {number} w @param {number} hgt */
+const maxScaleOf = (w, hgt) =>
+  Math.max(1, Math.min(4, Math.floor(MAX_SIDE / Math.max(w, hgt)), Math.floor(Math.sqrt(CANVAS_PIXELS / (w * hgt)))));
+/** The largest export scale for a format. @param {string} format */
+const maxScale = (format) => maxScaleOf(...sizeOf(format));
 /** The export scale chosen for a format (custom sizes have their own, 1× by default). @param {string} format */
 const scaleFor = (format) => Math.min(isCustomSize(format) ? ui.customScale : ui.scale, maxScale(format));
 
@@ -2085,8 +2082,8 @@ async function downloadMany() {
         const base = `${String(i + 1).padStart(String(list.length).length, '0')}-${slug(oneLine(cover.title))}`;
         if (format === 'svg') files.push({ name: uniqueName(base, 'svg', taken), data: cover.svg });
         else {
-          // The chosen scale, within 10,000 px for this book's own size.
-          const scale = Math.max(1, Math.min(chosen, Math.floor(MAX_SIDE / Math.max(cover.width, cover.height))));
+          // The chosen scale, within what this book's own size allows (10,000 px, the device's canvas).
+          const scale = Math.min(chosen, maxScaleOf(cover.width, cover.height));
           const blob = await rasterize(cover.svg, { scale, dpi: DPI });
           files.push({ name: uniqueName(base, extensionOf(blob) ?? 'png', taken), data: blob });
         }

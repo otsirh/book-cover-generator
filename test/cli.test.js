@@ -171,7 +171,7 @@ test('conflicting or incomplete options are reported', async () => {
     [['T', '--size', '1600'], /--size must look like 1600x2560/],
     [['T', '--size', '1600x2560', '--width', '600'], /without --width/],
     [['T', '--format', 'a4'], /Unknown format "a4"/],
-    [['T', '--format', 'ebook', '--height', '900'], /use --size/],
+    [['T', '--format', 'ebook', '--width', '600', '--height', '900'], /a width or a height, not both/],
     [['T', '--lang', 'not a tag'], /language tag/],
   ]) {
     const { code, stdout, stderr } = await cli(.../** @type {string[]} */ (args));
@@ -386,4 +386,26 @@ test('--genre picks a random style that suits it, and --list names the genres', 
   const bad = await cli('Dune', '--genre', 'poetry');
   assert.equal(bad.code, 1);
   assert.match(bad.stderr, /Unknown genre "poetry"/);
+});
+
+test('--format with --width or --height: the shape at that size, as the HTTP API reads it', async () => {
+  for (const [args, size] of [
+    [
+      ['--format', 'ebook', '--height', '1920'],
+      [1200, 1920],
+    ],
+    [
+      ['--format', '10x16', '--width', '1600'],
+      [1600, 2560],
+    ],
+    [
+      ['--format', '1600x2560'],
+      [1600, 2560],
+    ],
+  ]) {
+    const { code, stdout, stderr } = await cli('T', ...args, '--json');
+    assert.equal(code, 0, stderr);
+    const { width, height } = JSON.parse(stdout);
+    assert.deepEqual([width, height], size, args.join(' '));
+  }
 });
