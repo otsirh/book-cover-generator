@@ -1718,6 +1718,13 @@ test('a focused tile that leaves the genre hands focus to the selected one', asy
   await expect(page.locator('.tile[aria-pressed="true"]')).toBeFocused();
 });
 
+test('a link may name the style, palette and font as the menus do, as the HTTP API reads it', async ({ page }) => {
+  await page.goto('/#title=Named&style=Art%20Deco&palette=Deep%20Sea&font=Old%20style&seed=n');
+  await selected(page, 'artdeco');
+  await expect(page.locator('#title-font')).toHaveValue('garamond');
+  await expect(page.locator('#meta')).toContainText('Deep Sea');
+});
+
 test('a Japanese title sets the language of the cover', async ({ page }) => {
   await page.goto(`/#title=${encodeURIComponent('ガラスの街')}&style=minimal&seed=j`);
   expect(await svgOf(page, '#preview')).toMatch(/^<svg [^>]* lang="ja"/);

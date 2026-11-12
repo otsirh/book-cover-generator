@@ -14,50 +14,59 @@ import { CHARS, UPRIGHT, ITALIC, METRICS } from './metrics.js';
 // the look survives other systems and SVGs opened elsewhere.
 export const FONTS = {
   serif: {
+    name: 'Serif',
     family: "Georgia, 'Times New Roman', Times, 'Noto Serif', 'DejaVu Serif', serif",
     widthFactor: 1.1,
     cap: 0.7,
   },
   didone: {
+    name: 'Didone',
     family: "Didot, 'Bodoni 72', 'Bodoni MT', 'Sitka Display', 'Noto Serif Display', Constantia, Georgia, serif",
     widthFactor: 1.04,
     cap: 0.68,
   },
   garamond: {
+    name: 'Old style',
     family:
       "Garamond, 'EB Garamond', 'Hoefler Text', Baskerville, 'Palatino Linotype', Palatino, 'URW Palladio L', Georgia, serif",
     widthFactor: 0.98,
     cap: 0.66,
   },
   sans: {
+    name: 'Sans',
     family: "'Helvetica Neue', Helvetica, Arial, Roboto, 'Liberation Sans', sans-serif",
     widthFactor: 1.0,
     cap: 0.72,
   },
   geometric: {
+    name: 'Geometric',
     family:
       "Futura, 'Century Gothic', 'Avenir Next', Avenir, 'URW Gothic', 'TeX Gyre Adventor', 'Trebuchet MS', sans-serif",
     widthFactor: 1.06,
     cap: 0.72,
   },
   humanist: {
+    name: 'Humanist',
     family: "'Gill Sans', 'Gill Sans MT', Seravek, Calibri, 'Segoe UI', 'Trebuchet MS', 'Noto Sans', sans-serif",
     widthFactor: 0.96,
     cap: 0.69,
   },
   condensed: {
+    name: 'Condensed',
     family:
       "'Avenir Next Condensed', 'Arial Narrow', 'Bahnschrift Condensed', 'Roboto Condensed', sans-serif-condensed, 'Liberation Sans Narrow', 'Helvetica Neue', sans-serif",
     widthFactor: 0.84,
     cap: 0.7,
   },
   display: {
+    name: 'Heavy',
     family:
       "Impact, Haettenschweiler, 'Arial Narrow Bold', 'Franklin Gothic Bold', Anton, Oswald, sans-serif-condensed, sans-serif",
     widthFactor: 0.82,
     cap: 0.79,
   },
   mono: {
+    name: 'Typewriter',
     family: "'Courier New', Courier, 'Liberation Mono', 'Noto Mono', monospace",
     mono: true,
     widthFactor: 1,

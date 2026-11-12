@@ -246,7 +246,7 @@ test('--variant pins a style’s choice, and --list shows them', async () => {
   const list = await cli('--list');
   assert.match(list.stdout, /silhouette[^\n]*\n(?:\s+genres:[^\n]*\n)?\s+--variant scene=city\|forest/);
   for (const [args, message] of [
-    [['Dune', '-s', 'silhouette', '--variant', 'scene=beach'], /no scene "beach"/],
+    [['Dune', '-s', 'silhouette', '--variant', 'scene=beach'], /scene "beach"/],
     [['Dune', '--variant', 'scene'], /--variant must look like scene=forest/],
   ]) {
     const { code, stderr } = await cli(...args);

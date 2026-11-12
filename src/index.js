@@ -7,6 +7,7 @@ import { createRng, hashString, isHex, luminance, escapeXml, stripInvalidXml, gr
 import { palettes } from './palettes.js';
 import { BREAKING_SPACE, FONTS, LINE_BREAK, clipGraphemes, recordText } from './text.js';
 import { drawBadge } from './badge.js';
+import { idFor } from './shared.js';
 import { styleList, genreList, builtInGenres } from './styles/index.js';
 
 export { palettes } from './palettes.js';
@@ -105,31 +106,13 @@ const entryFor = (style, genres) => ({
   render: (/** @type {import('./index.js').StyleContext} */ ctx) => style.render(ctx),
 });
 
-/** A name as people may type it: without accents, case or punctuation ("Children’s" → "children s"). @param {string} name */
-const fold = (name) =>
-  name
-    .normalize('NFKD')
-    .replace(/\p{M}/gu, '')
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, ' ')
-    .trim();
-
-/**
- * The id that `given` names among `entries`: an id as it is, else an id or a name in any case and
- * spacing, as a list or a link may type it ("Art Deco", "MINT", "Non-fiction"). Undefined if none.
- * @param {unknown} given @param {Iterable<{ id: string, name?: string }>} entries
- */
-function idFor(given, entries) {
-  if (typeof given !== 'string') return undefined;
-  const list = [...entries];
-  if (list.some((e) => e.id === given)) return given;
-  const key = fold(given);
-  if (!key) return undefined;
-  return list.find((e) => fold(e.id) === key)?.id ?? list.find((e) => e.name != null && fold(e.name) === key)?.id;
-}
-
-/** Whether a style or palette option leaves the choice to the seed. @param {unknown} v */
-const unset = (v) => v == null || v === '' || (typeof v === 'string' && ['random', 'auto'].includes(v.toLowerCase()));
+/** Whether a style option leaves the choice to the seed ('random', in any case, or nothing). @param {unknown} v */
+const unsetStyle = (v) => v == null || v === '' || (typeof v === 'string' && v.toLowerCase() === 'random');
+/** Whether a palette option leaves the choice to the seed ('random' or 'auto', in any case, or nothing). @param {unknown} v */
+const unsetPalette = (v) =>
+  v == null || v === '' || (typeof v === 'string' && ['random', 'auto'].includes(v.toLowerCase()));
+/** The fonts by id and name, as idFor reads them. */
+const FONT_ENTRIES = Object.entries(FONTS).map(([id, f]) => ({ id, name: f.name }));
 
 /**
  * The variants pinned for a style: the given ones it has (others are ignored, so the same
@@ -146,21 +129,12 @@ function pinnedVariants(given, style, strict = true) {
       .filter(([, value]) => value != null && value !== '')
       .map(([name, value]) => [name.toLowerCase(), String(value)]),
   );
-  /** @param {{ name: string }} variant @param {string} name */
-  const named = (variant, name) => variant.name.toLowerCase() === name;
-  /** @param {{ values: { value: string }[] }} variant @param {string} value */
-  const valueIn = (variant, value) =>
-    variant.values.find((v) => v.value === value) ??
-    variant.values.find((v) => v.value.toLowerCase() === value.toLowerCase());
-  if (!strict) {
-    // A style picked at random takes only the pins it can (two styles may name a variant alike),
-    // but a value no style offers is a mistake, whichever style the seed picks.
-    for (const [name, value] of byName) {
-      const variants = [...registry.values()].flatMap((s) => s.variants.filter((v) => named(v, name)));
-      if (variants.length && !variants.some((v) => valueIn(v, value))) {
-        const offered = [...new Set(variants.flatMap((v) => v.values.map((x) => x.value)))].join(', ');
-        throw new RangeError(`No style has ${name} "${value}". Available: ${offered}`);
-      }
+  // A value no style offers is a mistake, whatever the style. (A name no style has is ignored.)
+  for (const [name, value] of byName) {
+    const variants = [...registry.values()].flatMap((s) => s.variants.filter((v) => v.name.toLowerCase() === name));
+    if (variants.length && !variants.some((v) => valueIn(v, value))) {
+      const offered = [...new Set(variants.flatMap((v) => v.values.map((x) => x.value)))].join(', ');
+      throw new RangeError(`No style has ${name} "${value}". Available: ${offered}`);
     }
   }
   /** @type {Record<string, string>} */
@@ -170,12 +144,25 @@ function pinnedVariants(given, style, strict = true) {
     if (value === undefined) continue;
     const match = valueIn(variant, value);
     if (match) pins[variant.name] = match.value;
+    // A style you name says when it lacks a value; one picked at random takes only the pins it can
+    // (two styles may name a variant alike).
     else if (strict) {
       const offered = variant.values.map((v) => v.value).join(', ');
       throw new RangeError(`Style "${style.id}" has no ${variant.name} "${value}". Available: ${offered}`);
     }
   }
   return pins;
+}
+
+/**
+ * The value of `variant` that `value` names, in any case.
+ * @param {{ values: { value: string }[] }} variant @param {string} value
+ */
+function valueIn(variant, value) {
+  return (
+    variant.values.find((v) => v.value === value) ??
+    variant.values.find((v) => v.value.toLowerCase() === value.toLowerCase())
+  );
 }
 
 const builtInStyles = new Map(styleList.map((s) => [s.id, entryFor(s, builtInGenres[s.id])]));
@@ -216,7 +203,9 @@ export function registerStyle(style, { replace = false } = {}) {
       'registerStyle: a style needs an `id` (a string without spaces at either end) and a `render(ctx)` function',
     );
   }
-  if (style.id === 'random') throw new TypeError('registerStyle: "random" is not a style id, it picks one');
+  if (style.id.toLowerCase() === 'random')
+    throw new TypeError('registerStyle: "random" is not a style id, it picks one');
+  if (style.name != null && typeof style.name !== 'string') throw new TypeError('registerStyle: name must be a string');
   if (builtInStyles.has(style.id) && !replace) {
     throw new Error(`registerStyle: "${style.id}" is a built-in style; pass { replace: true } to replace it`);
   }
@@ -256,7 +245,7 @@ export function registerPalette(palette, { replace = false } = {}) {
     throw new TypeError('registerPalette: a palette needs an `id` (a string without spaces at either end)');
   }
   const id = palette.id;
-  if (RESERVED_PALETTES.has(id)) throw new TypeError(`registerPalette: "${id}" is reserved`);
+  if (RESERVED_PALETTES.has(String(id).toLowerCase())) throw new TypeError(`registerPalette: "${id}" is reserved`);
   if (builtInPalettes.has(id) && !replace) {
     throw new Error(`registerPalette: "${id}" is a built-in palette; pass { replace: true } to replace it`);
   }
@@ -299,7 +288,7 @@ function resolveStyle(style, rng, genre) {
   if (genre != null && genre !== '' && genreId === undefined) {
     throw new RangeError(`Unknown genre "${String(genre)}". Available: ${genreList.map((g) => g.id).join(', ')}`);
   }
-  if (unset(style)) {
+  if (unsetStyle(style)) {
     if (!genreId) return rng.pick([...registry.keys()]);
     const suited = [...registry.values()].filter((s) => s.genres.includes(genreId));
     if (!suited.length) throw new RangeError(`No style suits the genre "${String(genre)}"`);
@@ -328,7 +317,7 @@ function normalizePalette(p) {
 
 function resolvePalette(palette, rng, style) {
   if (palette && typeof palette === 'object') return normalizePalette(palette);
-  if (unset(palette)) {
+  if (unsetPalette(palette)) {
     let pool = palettes;
     if (style.prefer === 'dark') pool = palettes.filter((p) => p.dark);
     if (style.prefer === 'light') pool = palettes.filter((p) => !p.dark);
@@ -394,10 +383,7 @@ const TITLE_CASES = ['upper', 'normal'];
 function typeOptions(options) {
   const font = /** @type {unknown} */ (options.font);
   const titleCase = /** @type {unknown} */ (options.titleCase);
-  const fontId = idFor(
-    font,
-    Object.keys(FONTS).map((id) => ({ id })),
-  );
+  const fontId = idFor(font, FONT_ENTRIES);
   if (font != null && font !== '' && fontId === undefined) {
     throw new RangeError(`Unknown font "${String(font)}". Available: ${Object.keys(FONTS).join(', ')}`);
   }
@@ -480,7 +466,7 @@ export function createCover(options = {}) {
   const [paper, night] =
     luminance(palette.bg) >= luminance(palette.ink) ? [palette.bg, palette.ink] : [palette.ink, palette.bg];
 
-  const pins = pinnedVariants(options.variants, style, !unset(options.style));
+  const pins = pinnedVariants(options.variants, style, !unsetStyle(options.style));
   const titleType = typeOptions(options);
   const uid =
     'bc' +
@@ -590,18 +576,38 @@ export default generateCover;
  * @returns {import('./index.js').CoverOptions}
  */
 export function optionsForBook(book, defaults = {}) {
-  // The styles as ids (undefined: picked by the seed, or not one that exists, which createCover reports).
-  const shared = unset(defaults.style) ? undefined : idFor(defaults.style, registry.values());
-  const own = unset(book.style) ? undefined : idFor(book.style, registry.values());
+  // The styles as ids (undefined: picked by the seed, or for the book's, not one that exists,
+  // which createCover reports). A shared style that doesn't exist is reported for every book.
+  const shared = unsetStyle(defaults.style) ? undefined : idFor(defaults.style, registry.values());
+  if (!unsetStyle(defaults.style) && shared === undefined) {
+    throw new Error(`Unknown style "${String(defaults.style)}". Available: ${[...registry.keys()].join(', ')}`);
+  }
+  const own = unsetStyle(book.style) ? undefined : idFor(book.style, registry.values());
   const genre = idFor(book.genre, genreList);
   const sharedEntry = shared === undefined ? undefined : registry.get(shared);
   const ownGenre =
     Boolean(book.genre) && !book.style && sharedEntry !== undefined && !sharedEntry.genres.includes(genre ?? '');
+  /** The shared pins a book's own style takes. @type {import('./index.js').CoverOptions['variants']} */
+  let variants = defaults.variants;
+  if (book.style && own !== shared) {
+    const ownEntry = own === undefined ? undefined : registry.get(own);
+    // Pins made for the shared style don't follow a book to another one; with no shared style
+    // they're for any, and the book's style takes the ones it offers.
+    variants =
+      shared !== undefined
+        ? {}
+        : ownEntry && variants && typeof variants === 'object'
+          ? Object.fromEntries(
+              Object.entries(variants).filter(([name, value]) =>
+                ownEntry.variants.some((v) => v.name.toLowerCase() === name.toLowerCase() && valueIn(v, String(value))),
+              ),
+            )
+          : variants;
+  }
   return {
     ...defaults,
     ...(book.width !== undefined || book.height !== undefined ? { width: undefined, height: undefined } : {}),
-    // Pins made for the shared style don't follow a book to another one (with no shared style, they're for any).
-    ...(book.style && shared !== undefined && own !== shared ? { variants: {} } : {}),
+    ...(variants !== defaults.variants ? { variants } : {}),
     ...(ownGenre ? { style: 'random', variants: {} } : {}),
     ...book,
   };

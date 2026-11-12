@@ -3,6 +3,38 @@
 
 import { clipGraphemes } from './text.js';
 
+/**
+ * A name as people may type it: without accents, case, apostrophes or punctuation, and "&" as
+ * "and" ("Children’s" and "childrens", "Thriller & crime" and "thriller and crime" are alike).
+ * @param {string} name
+ */
+export const fold = (name) =>
+  name
+    .normalize('NFKD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/['’‘`]/g, '')
+    .replace(/&/g, ' and ')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+
+/**
+ * The id that `given` names among `entries`: an id as it is, else an id or a name in any case and
+ * spacing, as a list or a link may type it ("Art Deco", "MINT", "Non-fiction"). Undefined if none.
+ * @param {unknown} given @param {Iterable<{ id: string, name?: unknown }>} entries
+ * @returns {string | undefined}
+ */
+export function idFor(given, entries) {
+  if (typeof given !== 'string') return undefined;
+  const list = Array.isArray(entries) ? entries : [...entries];
+  if (list.some((e) => e.id === given)) return given;
+  const key = fold(given);
+  if (!key) return undefined;
+  return (
+    list.find((e) => fold(e.id) === key)?.id ?? list.find((e) => typeof e.name === 'string' && fold(e.name) === key)?.id
+  );
+}
+
 /** A size of your own in a link: width x height in px. */
 export const CUSTOM_SIZE = /^([1-9]\d{1,4})x([1-9]\d{1,4})$/;
 /** Your own colours in a link: background, text and one to three accents. */

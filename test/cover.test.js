@@ -1075,7 +1075,7 @@ test('variants a style lacks are ignored, and a value it lacks throws', () => {
   );
   assert.throws(
     () => createCover({ title: 'x', style: 'silhouette', variants: { scene: 'beach' } }),
-    /no scene "beach". Available: city, forest/,
+    /scene "beach". Available: city, forest/,
   );
   assert.throws(
     () => createCover({ title: 'x', style: 'silhouette', variants: /** @type {any} */ ('forest') }),
@@ -1464,4 +1464,22 @@ test('a pinned value no style offers throws, whichever style the seed picks', ()
     );
   }
   assert.equal(createCover({ title: 'x', style: 'silhouette', variants: { SCENE: 'City' } }).variants.scene, 'city');
+});
+
+test('a pin no style offers throws with a named style too; fonts and genres by their names', async () => {
+  assert.throws(
+    () => createCover({ title: 'x', style: 'noir', variants: { scene: 'forrest' } }),
+    /No style has scene "forrest"/,
+  );
+  for (const font of ['Typewriter', 'old style', 'HEAVY'])
+    assert.doesNotThrow(() => createCover({ title: 'x', font }), font);
+  for (const genre of ['Childrens', 'Thriller and crime'])
+    assert.doesNotThrow(() => createCover({ title: 'x', genre }), genre);
+  const { registerPalette } = await import('../src/index.js');
+  assert.throws(() => registerStyle({ id: 'Random', render: () => '' }), /not a style id/);
+  assert.throws(() => registerPalette({ id: 'AUTO', bg: '#ffffff', ink: '#000000', accents: ['#ff0000'] }), /reserved/);
+  assert.throws(
+    () => registerStyle({ id: 'num', name: /** @type {any} */ (42), render: () => '' }),
+    /name must be a string/,
+  );
 });

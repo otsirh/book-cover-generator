@@ -1,4 +1,6 @@
 export interface FontSpec {
+  /** Its name as the app's menu shows it (the built-in fonts). */
+  name?: string;
   /** CSS font-family stack. */
   family: string;
   /** Width multiplier used by the estimate when no canvas is available. */

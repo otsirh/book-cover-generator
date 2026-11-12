@@ -26,7 +26,7 @@ import {
 } from '../src/browser.js';
 import { clipGraphemes, LINE_BREAK } from '../src/text.js';
 import { hashString, contrast } from '../src/core.js';
-import { CUSTOM_SIZE, CUSTOM_PALETTE, VARIANT, customColors, slug } from '../src/shared.js';
+import { CUSTOM_SIZE, CUSTOM_PALETTE, VARIANT, customColors, slug, idFor } from '../src/shared.js';
 
 /** @typedef {keyof typeof formats} Preset */
 /**
@@ -58,6 +58,8 @@ const MAX_PIXELS = 16_000_000;
 const DPI = 300;
 const STYLES = listStyles();
 const STYLE_IDS = STYLES.map((s) => s.id);
+/** The fonts by id and name, as idFor reads them. */
+const FONT_ENTRIES = Object.entries(FONTS).map(([id, f]) => ({ id, name: f.name }));
 /** @type {Set<string>} */
 const PALETTE_IDS = new Set(['auto', ...palettes.map((p) => p.id)]);
 // First-time visitors start on one of the strongest styles with a sample title.
@@ -174,8 +176,8 @@ const ui = {
   shortcuts: true,
   /** The last custom colours and size, so Custom brings them back. @type {string[] | null} */
   colors: null,
-  /** The genre the rail shows (and Randomize picks from); '' for all. */
-  genre: '',
+  /** The genre the rail shows (and Randomize picks from); '' for all. Kept from the last visit. */
+  genre: savedGenre(),
   size: '1600x2560',
 };
 /** @type {ReturnType<typeof createCover>} */
@@ -215,11 +217,12 @@ const FIELDS = {
   credit: { read: (v) => clipText(v, 120), empty: '', optional: true, omitEmpty: true },
   // (Since 1.6.0.)
   badge: { read: (v) => clipText(v, 60), empty: '', optional: true, omitEmpty: true },
-  style: { read: (v) => oneOf(text(v), STYLE_IDS.includes.bind(STYLE_IDS)), empty: '' },
+  // (Ids or names, in any case, as the library reads them: a hand-edited link opens as the API draws it.)
+  style: { read: (v) => idFor(text(v), STYLES), empty: '' },
   // (Since 1.5.0.) Checked against the style when used: see pinsFor().
   variant: { read: (v) => oneOf(text(v), VARIANT.test.bind(VARIANT)), empty: '', optional: true, omitEmpty: true },
   // (Since 1.5.0.)
-  font: { read: (v) => oneOf(text(v), (f) => Object.hasOwn(FONTS, f)), empty: '', optional: true, omitEmpty: true },
+  font: { read: (v) => idFor(text(v), FONT_ENTRIES), empty: '', optional: true, omitEmpty: true },
   case: {
     read: (v) => oneOf(text(v), (t) => t === 'upper' || t === 'normal'),
     empty: '',
@@ -227,7 +230,12 @@ const FIELDS = {
     omitEmpty: true,
   },
   palette: {
-    read: (v) => oneOf(text(v)?.toLowerCase(), (p) => PALETTE_IDS.has(p) || CUSTOM_PALETTE.test(p)),
+    read: (v) => {
+      const t = text(v);
+      const lower = t?.toLowerCase();
+      if (lower === 'auto' || (lower && CUSTOM_PALETTE.test(lower))) return lower;
+      return idFor(t, palettes);
+    },
     empty: 'auto',
   },
   seed: { read: (v) => clipText(text(v)?.trim(), 40), empty: '' },
@@ -1591,7 +1599,7 @@ function savedGenre() {
 function buildGenres() {
   const menu = /** @type {HTMLSelectElement} */ ($('genre'));
   for (const g of genres) menu.append(h('option', { value: g.id }, g.name));
-  ui.genre = savedGenre();
+  // (ui.genre holds the saved genre already: read once, at start.)
   menu.value = ui.genre;
   menu.addEventListener('change', () => {
     ui.genre = menu.value;
@@ -2242,7 +2250,7 @@ const linked = fromHash(location.hash);
 if (Object.keys(linked).length) Object.assign(design, complete(linked));
 else {
   // With no link, the first cover is in the genre chosen last time: a starter that suits it, if any.
-  const genre = savedGenre();
+  const genre = ui.genre;
   const suits = genre ? STYLES.filter((s) => s.genres.includes(genre)).map((s) => s.id) : [];
   const starters = STARTERS.filter((id) => suits.includes(id));
   if (suits.length) design.style = pick(starters.length ? starters : suits);

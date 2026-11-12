@@ -9,7 +9,7 @@
 
 import { createCover, createMockup, formats, version } from '../src/index.js';
 import { clipGraphemes } from '../src/text.js';
-import { CUSTOM_PALETTE, CUSTOM_SIZE, VARIANT, customColors, hex } from '../src/shared.js';
+import { CUSTOM_SIZE, VARIANT, customColors, hex } from '../src/shared.js';
 
 /** Query parameters that are cover options as they are. */
 const TEXT = ['style', 'genre', 'font', 'lang'];
@@ -66,7 +66,7 @@ export function coverOptions(q) {
   }
   // A palette id or name (the library reads either in any case), or your own colours.
   const palette = q.get('palette');
-  const colors = palette && CUSTOM_PALETTE.test(palette.toLowerCase()) ? customColors(palette.toLowerCase()) : null;
+  const colors = palette ? customColors(palette.toLowerCase()) : null;
   if (colors) o.palette = { bg: colors[0], ink: colors[1], accents: colors.slice(2) };
   else if (palette) o.palette = palette;
   const [bg, ink, accent] = [q.get('bg'), q.get('ink'), q.get('accent')];

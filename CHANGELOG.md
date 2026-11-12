@@ -10,7 +10,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - **Genres.** Every style says which genres it suits (`genres` in `listStyles()`, and the `genres` list), and `createCover({ genre })` picks a random style that suits one. In the app, the style rail's Genre menu shows only those styles (and is remembered), and Randomize, the dice and the arrow keys stay in it. In the CLI, `--genre`, and `--list` shows each style's genres. A book list can give each book its genre, in a `genre` column: a book whose genre the chosen style doesn't suit gets a style that does.
 - **HTTP API.** `https://covers.otsirh.dev/api/cover.svg?title=…&author=…` draws a cover, and `/api/mockup.svg` a mockup, for an `<img>` on any page. The query takes the library's option names and the app's link parameters, so an app link's query draws the same design. In the app, **Copy image link** copies that URL for the design on screen.
 - `optionsForBook(book, defaults)`: a listed book's cover options over the options every book shares, as the app's Many covers and the CLI's `--batch` make them.
-- **Names in any case.** Styles, palettes, genres and fonts may be given by id or by name, in any case (`'Art Deco'`, `'MINT'`, `'Non-fiction'`), in the library, the CLI, the HTTP API and book lists; pinned variants too.
+- **Names in any case.** Styles, palettes, genres and fonts may be given by id or by name, in any case (`'Art Deco'`, `'MINT'`, `'Non-fiction'`), in the library, the CLI, the HTTP API, the app's links and book lists, and fonts by the names the app's menu gives them ("Old style", "Heavy", "Typewriter"); pinned variants too. `FONTS` entries have a `name`.
 
 ### Changed
 

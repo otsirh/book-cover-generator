@@ -86,10 +86,12 @@ test('a listed book’s options: its own values win, and its genre picks a style
     title: 'A',
     genre: 'children',
   });
-  // With a random or unknown shared style, the genre is left to createCover (which picks, or says so).
-  for (const style of ['random', 'bauhauss', undefined]) {
+  // With a random shared style, the genre is left to createCover, which picks; a shared style that
+  // doesn't exist is reported for every book.
+  for (const style of ['random', undefined]) {
     assert.equal(optionsForBook({ title: 'A', genre: 'horror' }, { style, variants: { a: 'b' } }).style, style);
   }
+  assert.throws(() => optionsForBook({ title: 'A', style: 'noir' }, { style: 'bauhauss' }), /Unknown style "bauhauss"/);
 });
 
 test('with no shared style, a book naming its own keeps the shared pins', async () => {
@@ -114,4 +116,13 @@ test('with no shared style, a book naming its own keeps the shared pins', async 
   } finally {
     unregisterPalette('Brand');
   }
+});
+
+test('with no shared style, a book naming its own takes only the shared pins its style offers', async () => {
+  const { optionsForBook } = await import('../src/index.js');
+  const shared = { variants: { layout: 'top' } };
+  // Stripes' layouts are plate and open: it takes none; Aurora's include top.
+  assert.deepEqual(optionsForBook({ title: 'A', style: 'stripes' }, shared).variants, {});
+  assert.equal(createCover(optionsForBook({ title: 'A', style: 'stripes' }, shared)).style, 'stripes');
+  assert.equal(createCover(optionsForBook({ title: 'A', style: 'aurora' }, shared)).variants.layout, 'top');
 });
