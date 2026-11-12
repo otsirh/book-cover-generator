@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+
+- **Five genre styles**: Hollow (horror: a dead tree against a pale or blood moon, fog, and eroded lettering), Ribbon (romance: ribbons crossing under an italic title, and petals), Crest (fantasy: a heraldic shield in laurels, framed in gold, with its field and emblem to pin), Storybook (children's: hills, a sun or a rainbow, clouds, and a bold outlined title) and Big Idea (non-fiction: a big plain title, a prominent subtitle, and bars, an arrow or a circle). There are 39 styles now.
+- **Genres.** Every style says which genres it suits (`genres` in `listStyles()`, and the `genres` list), and `createCover({ genre })` picks a random style that suits one. In the app, the style rail's Genre menu shows only those styles (and is remembered), and Randomize, the dice and the arrow keys stay in it. In the CLI, `--genre`, and `--list` shows each style's genres.
+
+### Changed
+
+- With `style: 'random'` (the default), a seed can now pick one of the new styles, so covers made without a style may come out in a different one. Covers with a style are drawn exactly as before.
+
 ## [1.6.0] - 2026-11-12
 
 Badges, mockups and many covers at once. Covers that use none of these are drawn exactly as in 1.5.0.

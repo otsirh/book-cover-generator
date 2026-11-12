@@ -26,7 +26,7 @@ npm run test:e2e   # browser tests (CI runs these too)
 ## Adding a style
 
 1. Add the style object to the file for its family in `src/styles/` with an `id`, `name`, `group`, `description` and `render(c)`. Annotate `render` with `/** @param {import('../index.js').StyleContext} c */` so it is type-checked.
-2. Register it in `src/styles/index.js` and add its id to the `StyleId` union in `src/index.d.ts`.
+2. Register it in `src/styles/index.js`, give it its genres in `builtInGenres` there, and add its id to the `StyleId` union in `src/index.d.ts`.
 3. Draw everything relative to `c.W`, `c.H`, `c.u` and `c.m`, so the style works at every size and aspect ratio. Use `c.rng` for randomness, never `Math.random`, and `c.id()` for gradient, filter and mask ids.
 4. Set the title with `titleBlock` (it handles the lead line, the subtitle and the height budget) and the author with `authorFit`. Use `strongAccents` from `src/styles/util.js` when a colour must stand out from the background, so the style works with every palette. Check long and short titles, subtitles, empty authors, square and wide covers, and dark and light palettes on the contact sheet (`examples/contact-sheet.html?styles=<id>&palettes=noir,mint,sky&seeds=a,b,c&subtitle=A+Novel`).
 5. Update the style count in the README and the page if it changes, and add a line to `CHANGELOG.md`.

@@ -33,7 +33,7 @@ Generate book covers from a **title** and an **author**. 39 styles, 28 palettes 
 
 On [covers.otsirh.dev](https://covers.otsirh.dev) you type a title and author (press Enter in the title to break its line where you want), and if you like a subtitle, a series line ("Book Two of the Ember Cycle"), a credit ("Translated by…") and a badge ("Winner of the Hugo Award", set as a seal in a corner clear of the text). Then you choose:
 
-- **a style**, from a rail that previews your book in all 39 styles. Fifteen styles let you pin a choice the variation otherwise makes, such as Silhouette's city or forest, or where Aurora puts the title;
+- **a style**, from a rail that previews your book in all 39 styles (its Genre menu shows only those that suit a genre, and Randomize then stays in it). Fifteen styles let you pin a choice the variation otherwise makes, such as Silhouette's city or forest, or where Aurora puts the title;
 - **title type**: any of the nine fonts instead of the style's, and the title in capitals or as typed. It stays when you change style, so the rail shows every style in your type;
 - **a palette**, from swatches that show the background, text colour and accents, or **Custom** for your own five colours (it starts from the palette on the cover and shows the text contrast);
 - **a variation**, the seed behind the artwork: the strip under the preview shows six others to click;
@@ -116,7 +116,7 @@ npx book-cover-generator --batch books.csv --style minimal --seed series --out-d
 npx book-cover-generator "Salt and Static" --count 12 -o ideas/cover.svg
 ```
 
-Options: `-s/--style`, `-p/--palette`, `--bg`, `--ink`, `--accent`, `--subtitle`, `--texture`, `--seed`, `--format` (`paperback`, `ebook` or `square`), `--width`, `--height`, `--size`, `--lang`, `--series`, `--credit`, `--badge`, `--font`, `--case upper|normal`, `--variant name=value` (`--list` shows each style's), `-o/--out`, `--count`, `--batch <file|->`, `--out-dir`, `--json`, `--list`, `--help`.
+Options: `-s/--style`, `-p/--palette`, `--bg`, `--ink`, `--accent`, `--subtitle`, `--texture`, `--seed`, `--format` (`paperback`, `ebook` or `square`), `--width`, `--height`, `--size`, `--genre`, `--lang`, `--series`, `--credit`, `--badge`, `--font`, `--case upper|normal`, `--variant name=value` (`--list` shows each style's), `-o/--out`, `--count`, `--batch <file|->`, `--out-dir`, `--json`, `--list`, `--help`.
 
 ## API
 
@@ -144,6 +144,7 @@ Same as `generateCover`, but also tells you which style and palette were chosen.
 | `height`    | `number`           | `width × 1.5`          | px, 50–10000                                      |
 | `lang`      | `string`           | inferred               | language of the text, such as `'ja'`              |
 | `variants`  | `object`           | `{}`                   | pin a style's choices: `{ scene: 'forest' }`      |
+| `genre`     | `string`           |                        | with a random style, one that suits this genre    |
 | `font`      | `string`           | the style's            | the title's font, one of `FONTS`                  |
 | `titleCase` | `string`           | the style's            | `'upper'` (capitals) or `'normal'` (as typed)     |
 
@@ -154,7 +155,8 @@ Titles and subtitles longer than 300 characters (authors: 200) are cut. With `'r
 ### Other exports
 
 - `styles`: array of style ids
-- `listStyles()`: `[{ id, name, description, group, variants }]`. `variants` lists the choices a style lets you pin, as `[{ name, label, values: [{ value, label }] }]`; pin them with `createCover({ variants: { scene: 'forest' } })`, and `createCover` reports the ones it used in `variants`. Names a style lacks are ignored; a value it lacks throws
+- `genres`: `[{ id, name }]`, the genres styles suit: `literary`, `thriller`, `horror`, `romance`, `fantasy`, `children`, `nonfiction`
+- `listStyles()`: `[{ id, name, description, group, variants, genres }]`. `variants` lists the choices a style lets you pin, as `[{ name, label, values: [{ value, label }] }]`; pin them with `createCover({ variants: { scene: 'forest' } })`, and `createCover` reports the ones it used in `variants`. Names a style lacks are ignored; a value it lacks throws
 - `palettes`: `[{ id, name, bg, ink, accents, dark? }]`
 - `randomSeed()`: a short random seed string
 - `pickStyle(options)`: the style id `createCover` would use for these options (resolving `'random'` from the seed), without drawing the cover
