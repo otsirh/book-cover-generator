@@ -10,6 +10,7 @@ const COLUMNS = /** @type {const} */ ({
   credit: 'credit',
   badge: 'badge',
   style: 'style',
+  genre: 'genre',
   palette: 'palette',
   seed: 'seed',
   font: 'font',
@@ -94,8 +95,8 @@ function optionsFrom(named) {
  * Read a list of books into cover options, one per book (rows without a title are left out):
  *
  * - CSV or TSV whose first row names its columns (`title`, `author`, `subtitle`, `series`,
- *   `credit`, `badge`, `style`, `palette`, `seed`, `font`, `case`, `lang`, `width`, `height`,
- *   `texture`; others are ignored);
+ *   `credit`, `badge`, `style`, `genre`, `palette`, `seed`, `font`, `case`, `lang`, `width`,
+ *   `height`, `texture`; others are ignored);
  * - JSON lines, one object per book, with the same names;
  * - else one book per line: "Title | Author | Subtitle" (a tab, or " — " or " – ", also separates).
  *

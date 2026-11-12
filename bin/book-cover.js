@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { createCover, listStyles, palettes, formats, parseBookList, genres } from '../src/index.js';
+import { clipGraphemes } from '../src/text.js';
 
 const HELP = `Usage: book-cover "<title>" ["<author>"] [options]
 
@@ -33,7 +34,7 @@ Options:
       --lang <tag>      language of the text, e.g. ja or zh-Hant (default: inferred)
       --batch <file>    a cover for each book in a list (- reads stdin): CSV or
                         TSV with a header row (title, author, subtitle, series,
-                        credit, badge, style, palette, seed, font, case, lang,
+                        credit, badge, style, genre, palette, seed, font, case, lang,
                         width, height, texture), JSON lines, or one book per
                         line as "Title | Author | Subtitle"; the other options
                         apply to every book the list doesn't say otherwise for
@@ -247,7 +248,8 @@ function slug(title) {
     .toLowerCase()
     .replace(/[^\p{L}\p{M}\p{N}]+/gu, '-')
     .replace(/^-+/, '');
-  return Array.from(words).slice(0, 60).join('').replace(/-+$/, '') || 'cover';
+  // (Cut between whole characters, as the app cuts its file names.)
+  return clipGraphemes(words, 60).replace(/-+$/, '') || 'cover';
 }
 
 /**

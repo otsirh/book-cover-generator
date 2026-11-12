@@ -2,7 +2,7 @@
 // for listings and cover reveals. Each is an SVG with the cover nested in it.
 
 import { n, mix, escapeXml, hashString, contrast, readable } from './core.js';
-import { FONTS, fitText, drawText, textBottom } from './text.js';
+import { FONTS, fitText, drawText, textBottom, clipGraphemes } from './text.js';
 
 /** The kinds of mockup, with the size of each (or how it follows the cover's). */
 export const mockupKinds = Object.freeze(['flat', 'book', 'ereader', 'card', 'square', 'story']);
@@ -54,7 +54,8 @@ export function createMockup(cover, { kind = 'book', background, text = '' } = {
   const tag = `mk${hashString(cover.svg).toString(36)}-${kind}`;
   const id = (/** @type {string} */ name) => `${tag}-${name}`;
   const { width: CW, height: CH, colors } = cover;
-  const words = String(text).replace(/\s+/g, ' ').trim().slice(0, 80);
+  // (Cut between whole characters: an emoji or accented letter is never split.)
+  const words = clipGraphemes(String(text).replace(/\s+/g, ' ').trim(), 80).trim();
   const label = escapeXml(`${cover.title.replace(/\n/g, ' ')}${cover.author ? ` by ${cover.author}` : ''}`);
 
   // (The cover's language too, so Chinese characters keep that language's forms.)

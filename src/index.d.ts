@@ -37,8 +37,8 @@ export interface MockupOptions {
 }
 /**
  * Read a list of books into cover options, one per book with a title: CSV or TSV whose first row
- * names its columns (title, author, subtitle, series, credit, badge, style, palette, seed, font,
- * case, lang, width, height, texture), JSON lines, or one book per line ("Title | Author | Subtitle").
+ * names its columns (title, author, subtitle, series, credit, badge, style, genre, palette, seed,
+ * font, case, lang, width, height, texture), JSON lines, or one book per line ("Title | Author | Subtitle").
  */
 export declare function parseBookList(text: string): CoverOptions[];
 /** The cover as a product shot (flat, book, e-reader) or on a social card, as SVG. */

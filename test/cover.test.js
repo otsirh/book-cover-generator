@@ -1411,3 +1411,14 @@ test('every style suits a genre, and a genre picks a random style that suits it'
   assert.equal(createCover({ title: 'x', style: 'pixel', genre: 'horror' }).style, 'pixel');
   assert.throws(() => createCover({ genre: 'poetry' }), /Unknown genre "poetry"/);
 });
+
+test('a genre is checked even with a style given, and a style’s genres must be genre ids', async () => {
+  assert.throws(() => createCover({ style: 'retro', genre: 'poetry' }), /Unknown genre "poetry"/);
+  const { createMockup } = await import('../src/index.js');
+  // A card's line is cut between whole characters.
+  const card = createMockup(createCover({ title: 'x' }), { kind: 'card', text: `a${'🎉'.repeat(50)}` }).svg;
+  assert.ok(
+    !/[\uD800-\uDFFF](?![\uDC00-\uDFFF])/.test(card.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '')),
+    'no lone surrogate',
+  );
+});

@@ -994,6 +994,17 @@ test('family links in the rail jump to that family', async ({ page }) => {
   await expect(page.locator('.rail-jump')).toHaveCount(6);
   await page.locator('.rail-jump', { hasText: 'Pattern' }).click();
   await expect(page.locator('.tile[data-style="mosaic"]')).toBeInViewport();
+  // The family's heading lands below the rail's pinned header, not under it.
+  await page.locator('.rail-jump', { hasText: 'Scenic' }).click();
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const heading = [...document.querySelectorAll('.rail-group h3')].find((h) => h.textContent === 'Scenic');
+        const head = document.querySelector('.rail-head');
+        return (heading?.getBoundingClientRect().top ?? 0) - (head?.getBoundingClientRect().bottom ?? 0);
+      }),
+    )
+    .toBeGreaterThanOrEqual(0);
 });
 
 /**
@@ -1609,18 +1620,27 @@ test('a genre filters the rail, and Randomize and the arrows stay in it', async 
   await page.goto('/#title=Night&style=minimal&seed=g');
   await page.locator('#genre').selectOption('horror');
   const visible = page.locator('.tile:not([hidden])');
-  await expect(visible).toHaveCount(3);
-  const horror = await visible.evaluateAll((tiles) => tiles.map((t) => /** @type {HTMLElement} */ (t).dataset.style));
-  expect(horror).toEqual(expect.arrayContaining(['hollow', 'noir', 'silhouette']));
-  // Families without a horror style are hidden, with their links.
-  await expect(page.locator('.rail-jump:not([hidden])')).toHaveCount(2);
+  const shown = () => visible.evaluateAll((tiles) => tiles.map((t) => /** @type {HTMLElement} */ (t).dataset.style));
+  // The horror styles, and the selected style, which shows in or out of the genre.
+  await expect(visible).toHaveCount(4);
+  expect((await shown()).sort()).toEqual(['hollow', 'minimal', 'noir', 'silhouette']);
+  const horror = ['hollow', 'noir', 'silhouette'];
   for (let i = 0; i < 3; i++) {
     await page.locator('#randomize').click();
     await expect.poll(() => page.locator('.tile[aria-pressed="true"]').getAttribute('data-style')).not.toBe('minimal');
     expect(horror).toContain(await page.locator('.tile[aria-pressed="true"]').getAttribute('data-style'));
   }
+  await expect(visible).toHaveCount(3);
+  // Families without a horror style are hidden, with their links.
+  await expect(page.locator('.rail-jump:not([hidden])')).toHaveCount(2);
   await page.locator('body').press('ArrowRight');
   expect(horror).toContain(await page.locator('.tile[aria-pressed="true"]').getAttribute('data-style'));
+  // A style picked from elsewhere shows in the rail even outside the genre.
+  await page.evaluate(() => {
+    location.hash = 'title=Night&style=minimal&seed=g';
+  });
+  await expect(page.locator('.tile[data-style="minimal"]')).toBeVisible();
+  await expect(visible).toHaveCount(4);
   // The choice is remembered, and All genres shows every style again.
   await page.reload();
   await expect(page.locator('#genre')).toHaveValue('horror');

@@ -45,6 +45,19 @@ export const formats = Object.freeze({
 /** An id as registries take it: a string, not empty, without spaces at either end. @param {unknown} id */
 const isId = (id) => typeof id === 'string' && id !== '' && id === id.trim();
 
+/**
+ * A style's genres, checked: a list of genre ids.
+ * @param {string} id the style's id, for errors @param {unknown} genres
+ * @returns {string[]}
+ */
+function genresOf(id, genres) {
+  if (genres == null) return [];
+  if (!Array.isArray(genres) || !genres.every((g) => genreList.some((known) => known.id === g))) {
+    throw new TypeError(`Style "${id}": genres must be a list of genre ids (${genreList.map((g) => g.id).join(', ')})`);
+  }
+  return [...genres];
+}
+
 /** A name or value as people read it: 'bouquet' → 'Bouquet'. @param {string} id */
 const labelFor = (id) => id.charAt(0).toUpperCase() + id.slice(1);
 
@@ -88,7 +101,7 @@ const entryFor = (style, genres) => ({
   group: style.group ?? 'Custom',
   prefer: style.prefer,
   variants: variantsOf(style.id, style.variants),
-  genres: [...(style.genres ?? genres ?? [])].filter((g) => typeof g === 'string'),
+  genres: genresOf(style.id, style.genres ?? genres),
   render: (/** @type {import('./index.js').StyleContext} */ ctx) => style.render(ctx),
 });
 
@@ -230,11 +243,12 @@ export function randomSeed() {
  * @returns {string}
  */
 function resolveStyle(style, rng, genre) {
+  // (Checked whether or not a style is given, so a typo is caught either way.)
+  if (genre != null && genre !== '' && !genreList.some((g) => g.id === genre)) {
+    throw new RangeError(`Unknown genre "${String(genre)}". Available: ${genreList.map((g) => g.id).join(', ')}`);
+  }
   if (style == null || style === '' || style === 'random') {
     if (genre == null || genre === '') return rng.pick([...registry.keys()]);
-    if (!genreList.some((g) => g.id === genre)) {
-      throw new RangeError(`Unknown genre "${String(genre)}". Available: ${genreList.map((g) => g.id).join(', ')}`);
-    }
     const suited = [...registry.values()].filter((s) => s.genres.includes(/** @type {string} */ (genre)));
     if (!suited.length) throw new RangeError(`No style suits the genre "${String(genre)}"`);
     return rng.pick(suited.map((s) => s.id));

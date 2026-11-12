@@ -164,3 +164,14 @@ test('a custom style can offer variants and pick them with choose', () => {
     );
   }
 });
+
+test('a registered style’s genres must be a list of genre ids', () => {
+  for (const genres of ['horror', ['Horror'], [1]]) {
+    assert.throws(
+      () => registerStyle({ id: 'test-genres', genres: /** @type {any} */ (genres), render: () => '' }),
+      /genre ids/,
+    );
+  }
+  registerStyle({ id: 'test-genres', genres: ['horror'], render: () => '' });
+  assert.deepEqual(listStyles().find((s) => s.id === 'test-genres')?.genres, ['horror']);
+});

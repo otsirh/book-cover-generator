@@ -1546,9 +1546,14 @@ function buildRail() {
       rail.append(section);
       // A jump link per family in the rail's header: 39 styles are a long scroll.
       const jump = h('button', { type: 'button', className: 'rail-jump' }, s.group);
-      jump.addEventListener('click', () =>
-        section.scrollIntoView({ behavior: reducedMotion.matches ? 'auto' : 'smooth', block: 'start' }),
-      );
+      jump.addEventListener('click', () => {
+        // Clear of the rail's pinned header, however tall it has grown (on narrower screens, where
+        // it isn't pinned, the stylesheet's margin applies).
+        const head = /** @type {HTMLElement} */ ($('rail').previousElementSibling);
+        section.style.scrollMarginTop =
+          getComputedStyle(head).position === 'sticky' ? `${head.getBoundingClientRect().height + 8}px` : '';
+        section.scrollIntoView({ behavior: reducedMotion.matches ? 'auto' : 'smooth', block: 'start' });
+      });
       $('rail-groups').append(jump);
     }
     const img = /** @type {HTMLImageElement} */ (h('img', { alt: '', decoding: 'async', width: 150, height: 225 }));
@@ -1597,7 +1602,8 @@ function applyGenre() {
   const rail = $('rail');
   for (const s of STYLES) {
     const tile = tiles.get(s.id);
-    if (tile) tile.button.hidden = Boolean(ui.genre) && !s.genres.includes(ui.genre);
+    // (The selected style always shows, in or out of the genre.)
+    if (tile) tile.button.hidden = Boolean(ui.genre) && !s.genres.includes(ui.genre) && s.id !== design.style;
   }
   const sections = [...rail.querySelectorAll('.rail-group')];
   const jumps = [...$('rail-groups').querySelectorAll('.rail-jump')];
@@ -1657,6 +1663,8 @@ const scheduleGallery = sliced(() => {
 
 function markRail() {
   for (const [style, tile] of tiles) tile.button.setAttribute('aria-pressed', String(style === design.style));
+  // The selected style shows in the rail even outside the genre (and the one before it no longer).
+  if (ui.genre) applyGenre();
 }
 
 /* ---------------------------------------------------------------- keeping */
