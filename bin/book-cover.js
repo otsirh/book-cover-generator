@@ -8,18 +8,29 @@ const HELP = `Usage: book-cover "<title>" ["<author>"] [options]
 Options:
   -s, --style <id>      style id or "random" (default: random from seed)
   -p, --palette <id>    palette id or "random" (default: random from seed)
+      --bg <hex>        your own colours instead of a palette: background,
+      --ink <hex>       text,
+      --accent <hex>    and accents (repeat it, or separate them with commas)
       --subtitle <text> a subtitle or tagline
       --texture         add a fine film-grain texture
       --seed <value>    seed for the artwork (default: title + author)
+      --format <shape>  paperback (2:3, the default), ebook (5:8) or square
       --width <px>      width  (default 600)
-      --height <px>     height (default width * 1.5)
+      --height <px>     height (default: from the format)
+      --size <WxH>      width and height at once, e.g. 1600x2560
+      --lang <tag>      language of the text, e.g. ja or zh-Hant (default: inferred)
   -o, --out <file>      write SVG to a file instead of stdout
+      --json            print the choices (and the SVG, without --out) as JSON
       --list            list styles and palettes
       --help            show this help
 
 Examples:
   book-cover "The Lighthouse Keeper" "Mara Ellison" -s artdeco -o cover.svg
-  book-cover "Neon Tide" "Kai Moreno" --style retro --palette synth --width 1600 --height 2560 > cover.svg`;
+  book-cover "Neon Tide" "Kai Moreno" --style retro --palette synth --size 1600x2560 > cover.svg
+  book-cover "Bright Machines" --bg 0b132b --ink f8f9fa --accent ff6b6b,4ecdc4 --format ebook -o cover.svg`;
+
+/** Cover shapes, as in the web app: width to height. */
+const FORMATS = { paperback: [2, 3], ebook: [5, 8], square: [1, 1] };
 
 let args;
 try {
@@ -28,12 +39,19 @@ try {
     options: {
       style: { type: 'string', short: 's' },
       palette: { type: 'string', short: 'p' },
+      bg: { type: 'string' },
+      ink: { type: 'string' },
+      accent: { type: 'string', multiple: true },
       subtitle: { type: 'string' },
       texture: { type: 'boolean' },
       seed: { type: 'string' },
+      format: { type: 'string' },
       width: { type: 'string' },
       height: { type: 'string' },
+      size: { type: 'string' },
+      lang: { type: 'string' },
       out: { type: 'string', short: 'o' },
+      json: { type: 'boolean' },
       list: { type: 'boolean' },
       help: { type: 'boolean' },
     },
@@ -80,6 +98,47 @@ function size(value, name) {
   return number;
 }
 
+/**
+ * Width and height from --format, --width, --height and --size.
+ * @returns {{ width?: number, height?: number }}
+ */
+function dimensions() {
+  if (values.size !== undefined) {
+    if (values.width !== undefined || values.height !== undefined || values.format !== undefined) {
+      throw new Error('--size sets the width and height: use it without --width, --height or --format');
+    }
+    const m = /^\s*(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)\s*$/i.exec(values.size);
+    if (!m) throw new RangeError(`--size must look like 1600x2560, got "${values.size}"`);
+    return { width: Number(m[1]), height: Number(m[2]) };
+  }
+  const width = size(values.width, 'width');
+  const height = size(values.height, 'height');
+  if (values.format === undefined) return { width, height };
+  if (!Object.hasOwn(FORMATS, values.format)) {
+    throw new Error(`Unknown format "${values.format}". Available: ${Object.keys(FORMATS).join(', ')}`);
+  }
+  if (height !== undefined) throw new Error('--format sets the height from the width: use --size for both');
+  const [w, h] = FORMATS[/** @type {keyof typeof FORMATS} */ (values.format)];
+  const W = width ?? 600;
+  return { width: W, height: Math.round((W * h) / w) };
+}
+
+/** A colour as typed, with the # added (it starts a comment in most shells). @param {string} c */
+const hex = (c) => (c.trim().startsWith('#') ? c.trim() : `#${c.trim()}`);
+
+/** The palette: an id, or your own colours from --bg, --ink and --accent. */
+function palette() {
+  const custom = values.bg !== undefined || values.ink !== undefined || values.accent !== undefined;
+  if (!custom) return values.palette;
+  if (values.palette !== undefined)
+    throw new Error('Use --palette or your own colours (--bg, --ink, --accent), not both');
+  const accents = (values.accent ?? []).flatMap((a) => a.split(',')).filter((a) => a.trim());
+  if (values.bg === undefined || values.ink === undefined || !accents.length) {
+    throw new Error('Your own colours need --bg, --ink and at least one --accent');
+  }
+  return { bg: hex(values.bg), ink: hex(values.ink), accents: accents.map(hex) };
+}
+
 // A reader that stops early (book-cover … | head) closes the pipe: that's fine, not a crash.
 process.stdout.on('error', (err) => {
   if (/** @type {NodeJS.ErrnoException} */ (err).code === 'EPIPE') process.exit(0);
@@ -93,16 +152,19 @@ try {
     subtitle: values.subtitle,
     texture: values.texture,
     style: values.style,
-    palette: values.palette,
+    palette: palette(),
     seed: values.seed,
-    width: size(values.width, 'width'),
-    height: size(values.height, 'height'),
+    lang: values.lang,
+    ...dimensions(),
   });
+  const { style, palette: paletteId, seed, width, height, lang } = cover;
+  const choices = { style, palette: paletteId, seed, width, height, lang };
   if (values.out) {
     writeFileSync(values.out, cover.svg);
-    console.error(
-      `Wrote ${values.out} (style: ${cover.style}, palette: ${cover.palette}, ${cover.width}x${cover.height})`,
-    );
+    if (values.json) process.stdout.write(JSON.stringify({ file: values.out, ...choices }) + '\n');
+    else console.error(`Wrote ${values.out} (style: ${style}, palette: ${paletteId}, ${width}x${height})`);
+  } else if (values.json) {
+    process.stdout.write(JSON.stringify({ ...choices, svg: cover.svg }) + '\n');
   } else {
     process.stdout.write(cover.svg + '\n');
   }

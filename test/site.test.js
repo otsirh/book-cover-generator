@@ -30,6 +30,8 @@ test('_headers sets a strict CSP and keeps the library importable cross-origin',
   const headers = readFileSync('public/_headers', 'utf8');
   assert.match(headers, /Content-Security-Policy: default-src 'none'; script-src 'self';/);
   assert.doesNotMatch(headers, /unsafe-inline|unsafe-eval/);
+  // One Trusted Types policy, the one that registers the service worker.
+  assert.match(headers, /require-trusted-types-for 'script'; trusted-types sw\n/);
   assert.match(
     headers,
     /\/src\/\*\n {2}! Cross-Origin-Resource-Policy\n {2}Cross-Origin-Resource-Policy: cross-origin\n {2}Access-Control-Allow-Origin: \*/,

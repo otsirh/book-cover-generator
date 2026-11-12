@@ -1,24 +1,42 @@
 import { createCover, listStyles, palettes, pickStyle, randomSeed } from '../src/index.js';
-import { svgToDataUrl, downloadCover, copyText } from '../src/browser.js';
+import {
+  svgToDataUrl,
+  downloadCover,
+  downloadBlob,
+  copyText,
+  copyImage,
+  canCopyImage,
+  rasterize,
+  zipFiles,
+  extensionOf,
+} from '../src/browser.js';
 import { clipGraphemes } from '../src/text.js';
-import { hashString } from '../src/core.js';
+import { hashString, contrast } from '../src/core.js';
 
-/** @typedef {'paperback' | 'ebook' | 'square'} Format */
+/** @typedef {'paperback' | 'ebook' | 'square'} Preset */
 /**
  * @typedef {object} Design  Everything that defines a cover; mirrored in the URL.
  * @property {string} title
  * @property {string} author
  * @property {string} subtitle
  * @property {string} style
- * @property {string} palette   a palette id or 'auto'
+ * @property {string} palette   a palette id, 'auto', or your own colours ('custom-0b132b-f8f9fa-ff6b6b-…')
  * @property {string} seed      '' means "from the title"
- * @property {Format} format
+ * @property {string} format    a preset, or a size in px ('1600x2560')
  * @property {boolean} texture
  */
+/** @typedef {{ design: Design, svg: string }} Kept  a kept design, and the cover as it was drawn then ('' if unknown) */
 /** @typedef {{ button: HTMLButtonElement, img: HTMLImageElement, visible: boolean, dirty: boolean }} Tile  visible: on screen or close to it */
 
-/** @type {Record<Format, [number, number]>} */
+/** @type {Record<Preset, [number, number]>} */
 const FORMATS = { paperback: [600, 900], ebook: [600, 960], square: [600, 600] };
+/** A custom size: width x height in px, as the library allows (see fits()). */
+const CUSTOM_SIZE = /^([1-9]\d{1,4})x([1-9]\d{1,4})$/;
+const MAX_SIDE = 10000;
+/** Your own colours: background, text and one to three accents. */
+const CUSTOM_PALETTE = /^custom(?:-[0-9a-f]{6}){3,5}$/;
+/** Pixels per inch recorded in PNG and JPEG downloads, so print software sizes them right. */
+const DPI = 300;
 const STYLES = listStyles();
 const STYLE_IDS = STYLES.map((s) => s.id);
 /** @type {Set<string>} */
@@ -52,7 +70,9 @@ const KEEP_KEY = 'book-cover-generator:kept';
 const SHORTCUTS_KEY = 'book-cover-generator:shortcuts';
 /** @type {Record<string, string>} */
 const LETTER_CODES = { KeyR: 'r', KeyZ: 'z', KeyY: 'y' };
-const MAX_KEPT = 24;
+const MAX_KEPT = 100;
+/** A kept cover's SVG is stored with it up to this length (the largest styles are about 100 KB). */
+const MAX_SNAPSHOT = 400_000;
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
 /** @param {string} id */
@@ -63,6 +83,42 @@ const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const pickOther = (arr, current) => pick(arr.filter((x) => x !== current));
 /** Clip to the inputs' maxlength (which counts UTF-16 code units), between whole characters. */
 const clip = (/** @type {string} */ str, /** @type {number} */ max) => clipGraphemes(str, max, { units: true });
+
+/** Whether the library can make a cover this size (in whole px). @param {number} w @param {number} hgt */
+const fits = (w, hgt) =>
+  Number.isInteger(w) &&
+  Number.isInteger(hgt) &&
+  Math.min(w, hgt) >= 50 &&
+  Math.max(w, hgt) <= MAX_SIDE &&
+  w <= hgt * 3 &&
+  hgt <= w * 3;
+/** A format that is a size of its own, not a preset. @param {string} format */
+const isCustomSize = (format) => !Object.hasOwn(FORMATS, format);
+/** A format's cover size in px. @param {string} format @returns {[number, number]} */
+function sizeOf(format) {
+  if (!isCustomSize(format)) return FORMATS[/** @type {Preset} */ (format)];
+  const m = CUSTOM_SIZE.exec(format);
+  return m ? [Number(m[1]), Number(m[2])] : FORMATS.paperback;
+}
+
+/** The colours of a custom palette (background, text, accents), or null for a palette id. @param {string} palette */
+function customColors(palette) {
+  return CUSTOM_PALETTE.test(palette)
+    ? palette
+        .slice('custom-'.length)
+        .split('-')
+        .map((hex) => `#${hex}`)
+    : null;
+}
+/** The five colours the editor shows: background, text and three accents (repeating the ones given). @param {string[]} colors */
+const fiveColors = (colors) => [colors[0], colors[1], ...[0, 1, 2].map((i) => colors[2 + (i % (colors.length - 2))])];
+/** A design's palette for these colours (#rrggbb). @param {readonly string[]} colors */
+const customPalette = (colors) => `custom-${colors.map((c) => c.slice(1).toLowerCase()).join('-')}`;
+/** A built-in palette's colours, as the editor shows them. @param {string} id */
+function colorsOf(id) {
+  const p = palettes.find((x) => x.id === id) ?? palettes[0];
+  return fiveColors([p.bg, p.ink, ...p.accents]);
+}
 
 /**
  * Tiny element builder (no innerHTML, so the page works under Trusted Types).
@@ -92,7 +148,17 @@ const design = {
   format: 'paperback',
   texture: false,
 };
-const ui = { scale: 2, lockStyle: false, lockPalette: false, shortcuts: true };
+const ui = {
+  /** Export scale for the preset formats, and for custom sizes (whose 1× is the size asked for). */
+  scale: 2,
+  customScale: 1,
+  lockStyle: false,
+  lockPalette: false,
+  shortcuts: true,
+  /** The last custom colours and size, so Custom brings them back. @type {string[] | null} */
+  colors: null,
+  size: '1600x2560',
+};
 /** @type {ReturnType<typeof createCover>} */
 let current;
 
@@ -112,12 +178,13 @@ function sanitize(raw) {
   if (subtitle != null) out.subtitle = clip(subtitle, 160);
   const style = str(raw.style);
   if (style && STYLE_IDS.includes(style)) out.style = style;
-  const palette = str(raw.palette);
-  if (palette && PALETTE_IDS.has(palette)) out.palette = palette;
+  const palette = str(raw.palette)?.toLowerCase();
+  if (palette && (PALETTE_IDS.has(palette) || CUSTOM_PALETTE.test(palette))) out.palette = palette;
   const seed = str(raw.seed);
   if (seed != null) out.seed = clip(seed.trim(), 40);
   const format = str(raw.format);
-  if (format && Object.hasOwn(FORMATS, format)) out.format = /** @type {Format} */ (format);
+  const size = format ? CUSTOM_SIZE.exec(format) : null;
+  if (format && (!isCustomSize(format) || (size && fits(Number(size[1]), Number(size[2]))))) out.format = format;
   // On or off; any other value (texture=yes) is ignored like other unknown values.
   if (raw.texture === true || raw.texture === '1') out.texture = true;
   else if (raw.texture === false || raw.texture === '0') out.texture = false;
@@ -530,13 +597,18 @@ function apply(patch, kind) {
 
 /** Cover options for a design. @param {Design} d @param {Partial<import('../src/index.js').CoverOptions>} [extra] */
 function optionsFor(d, extra = {}) {
-  const [width, height] = FORMATS[d.format];
+  const [width, height] = sizeOf(d.format);
+  const colors = customColors(d.palette);
   return {
     title: d.title,
     author: d.author,
     subtitle: d.subtitle,
     style: d.style,
-    palette: d.palette === 'auto' ? 'random' : d.palette,
+    palette: colors
+      ? { bg: colors[0], ink: colors[1], accents: colors.slice(2) }
+      : d.palette === 'auto'
+        ? 'random'
+        : d.palette,
     seed: d.seed,
     texture: d.texture,
     width,
@@ -578,7 +650,7 @@ let galleryTimer;
 
 /** @param {{ fade?: boolean, announce?: boolean }} [opts] */
 function render({ fade = false, announce = false } = {}) {
-  document.documentElement.dataset.coverFormat = design.format;
+  applyShape();
   renderPreview(fade, announce);
   syncControls();
   markRail();
@@ -596,6 +668,21 @@ function render({ fade = false, announce = false } = {}) {
     clearTimeout(variantsTimer);
     if (typing) variantsTimer = setTimeout(renderVariations, 200);
     else renderVariations();
+  }
+}
+
+/** Give the preview and the thumbnails the cover's shape (as site/boot.js does before first paint). */
+function applyShape() {
+  const root = document.documentElement;
+  const custom = isCustomSize(design.format);
+  root.dataset.coverFormat = custom ? 'custom' : design.format;
+  if (custom) {
+    const [w, hgt] = sizeOf(design.format);
+    root.style.setProperty('--cover-w', String(w));
+    root.style.setProperty('--cover-h', String(hgt));
+  } else {
+    root.style.removeProperty('--cover-w');
+    root.style.removeProperty('--cover-h');
   }
 }
 
@@ -677,7 +764,7 @@ function renderPreview(fade, announce) {
   $('rail-note').textContent =
     design.palette === 'auto'
       ? 'Each in a palette picked for it. Click one to use it.'
-      : `In ${palette?.name ?? 'your palette'}. Click one to use it.`;
+      : `In ${palette?.name ?? 'your colours'}. Click one to use it.`;
   // Screen readers hear about style and palette changes, not every keystroke.
   const announcement = `Style: ${style?.name ?? current.style}. Palette: ${paletteName}.`;
   if (announce && lastAnnouncement && announcement !== lastAnnouncement) {
@@ -725,10 +812,32 @@ function buildControls() {
     });
     swatches.append(b);
   }
+  swatches.append(
+    h(
+      'button',
+      {
+        type: 'button',
+        className: 'swatch custom',
+        title: 'Custom: your own colours',
+        'aria-label': 'Your own colours',
+        'data-palette': 'custom',
+      },
+      h('span', { className: 'sw-aa' }, 'Aa'),
+      h('span', { className: 'sw-dots' }, h('i'), h('i'), h('i')),
+    ),
+  );
   swatches.addEventListener('click', (e) => {
     const b = /** @type {HTMLElement} */ (e.target).closest('button[data-palette]');
-    if (b instanceof HTMLElement && b.dataset.palette) update({ palette: b.dataset.palette });
+    if (!(b instanceof HTMLElement) || !b.dataset.palette) return;
+    if (b.dataset.palette !== 'custom') update({ palette: b.dataset.palette });
+    // Your colours from last time, or the colours on the cover now, to start from.
+    else if (!customColors(design.palette)) update({ palette: customPalette(ui.colors ?? colorsOf(current.palette)) });
   });
+  for (const input of colorInputs()) {
+    input.addEventListener('input', () =>
+      update({ palette: customPalette(colorInputs().map((i) => i.value)) }, 'typing'),
+    );
+  }
   const showName = (/** @type {Event} */ e) => {
     const b = /** @type {HTMLElement} */ (e.target).closest('button[data-palette]');
     if (b instanceof HTMLElement) $('palette-name').textContent = b.title.split(':')[0];
@@ -740,14 +849,36 @@ function buildControls() {
 
   $('format').addEventListener('click', (e) => {
     const b = /** @type {HTMLElement} */ (e.target).closest('button[data-format]');
-    if (b instanceof HTMLElement && b.dataset.format) update({ format: /** @type {Format} */ (b.dataset.format) });
+    if (!(b instanceof HTMLElement) || !b.dataset.format) return;
+    if (b.dataset.format !== 'custom') update({ format: b.dataset.format });
+    else if (!isCustomSize(design.format)) update({ format: ui.size });
+  });
+  const sizeInputs = /** @type {HTMLInputElement[]} */ ([$('size-w'), $('size-h')]);
+  const typedSize = () => sizeInputs.map((input) => Number(input.value));
+  for (const input of sizeInputs) {
+    // The cover follows the size as it is typed, whenever it is one the library can make…
+    input.addEventListener('input', () => {
+      const [w, hgt] = typedSize();
+      if (fits(w, hgt)) update({ format: `${w}x${hgt}` }, 'typing');
+    });
+    // …and a size it can't make is put back when the field is left.
+    input.addEventListener('change', () => {
+      const [w, hgt] = typedSize();
+      if (fits(w, hgt)) return;
+      syncSize(true);
+      toast('Sizes go from 50 to 10,000 px, at most three times as tall as wide');
+    });
+  }
+  $('size-preset').addEventListener('change', (e) => {
+    const size = /** @type {HTMLSelectElement} */ (e.target).value;
+    if (size) update({ format: size });
   });
   $('scale').addEventListener('click', (e) => {
     const b = /** @type {HTMLElement} */ (e.target).closest('button[data-scale]');
-    if (b instanceof HTMLElement && b.dataset.scale) {
-      ui.scale = Number(b.dataset.scale);
-      syncControls();
-    }
+    if (!(b instanceof HTMLElement) || !b.dataset.scale || b.getAttribute('aria-disabled') === 'true') return;
+    if (isCustomSize(design.format)) ui.customScale = Number(b.dataset.scale);
+    else ui.scale = Number(b.dataset.scale);
+    syncControls();
   });
 
   $('prev-style').addEventListener('click', () => stepStyle(-1));
@@ -771,6 +902,24 @@ function buildControls() {
   $('undo').addEventListener('click', undo);
   $('redo').addEventListener('click', redo);
 
+  const copyImageButton = /** @type {HTMLButtonElement} */ ($('copy-image'));
+  copyImageButton.hidden = !canCopyImage();
+  copyImageButton.addEventListener('click', () =>
+    busyWhile(copyImageButton, async () => {
+      const [w, hgt] = sizeOf(design.format);
+      const scale = scaleFor(design.format);
+      try {
+        await copyImage(current.svg, { scale });
+        toast(`Image copied · ${w * scale} × ${hgt * scale} px`);
+      } catch (err) {
+        console.warn(err);
+        toast('Could not copy the image. Try Download PNG.');
+      }
+    }),
+  );
+  const shareButton = /** @type {HTMLButtonElement} */ ($('share'));
+  shareButton.hidden = !canShareFiles();
+  shareButton.addEventListener('click', () => busyWhile(shareButton, shareCover));
   $('copy-svg').addEventListener('click', async () => {
     try {
       await copyText(current.svg);
@@ -789,7 +938,7 @@ function buildControls() {
       toast('Could not access the clipboard');
     }
   });
-  for (const format of /** @type {const} */ (['svg', 'png', 'jpeg'])) {
+  for (const format of /** @type {const} */ (['svg', 'png', 'jpeg', 'webp'])) {
     const button = /** @type {HTMLButtonElement} */ ($(`dl-${format}`));
     button.addEventListener('click', () => exportAs(format, button));
   }
@@ -797,6 +946,15 @@ function buildControls() {
   mobileDownload.addEventListener('click', () => exportAs('png', mobileDownload));
   $('keep').addEventListener('click', keepDesign);
   $('kept-all').addEventListener('click', downloadKept);
+  $('kept-export').addEventListener('click', exportKept);
+  $('kept-import').addEventListener('click', () => $('kept-file').click());
+  $('kept-file').addEventListener('change', async (e) => {
+    const input = /** @type {HTMLInputElement} */ (e.target);
+    const file = input.files?.[0];
+    // (Cleared, so choosing the same file again imports it again.)
+    input.value = '';
+    if (file) await importKept(file);
+  });
 
   // In-page links scroll without touching the URL, which holds the design.
   document.addEventListener('click', (e) => {
@@ -924,7 +1082,8 @@ function stepStyle(dir) {
 function stepPalette(dir) {
   const ids = [...PALETTE_IDS];
   const i = ids.indexOf(design.palette);
-  update({ palette: ids[(i + dir + ids.length) % ids.length] });
+  // From your own colours: to the first palette or the last.
+  update({ palette: i === -1 ? ids.at(dir > 0 ? 0 : -1) : ids[(i + dir + ids.length) % ids.length] });
 }
 
 function randomizeAll() {
@@ -937,7 +1096,30 @@ function randomizeAll() {
 
 function syncPaletteName() {
   const p = palettes.find((x) => x.id === current?.palette);
-  $('palette-name').textContent = design.palette === 'auto' ? `Auto · ${p?.name ?? ''}` : (p?.name ?? '');
+  $('palette-name').textContent =
+    design.palette === 'auto' ? `Auto · ${p?.name ?? ''}` : customColors(design.palette) ? 'Custom' : (p?.name ?? '');
+}
+
+/** The colour pickers: background, text and three accents. */
+const colorInputs = () =>
+  ['color-bg', 'color-ink', 'color-a1', 'color-a2', 'color-a3'].map((id) => /** @type {HTMLInputElement} */ ($(id)));
+
+/** The largest export scale for a format: the long side stays within 10,000 px. @param {string} format */
+const maxScale = (format) => Math.max(1, Math.min(4, Math.floor(MAX_SIDE / Math.max(...sizeOf(format)))));
+/** The export scale chosen for a format (custom sizes have their own, 1× by default). @param {string} format */
+const scaleFor = (format) => Math.min(isCustomSize(format) ? ui.customScale : ui.scale, maxScale(format));
+
+/** Show the cover's size in the custom size fields; `always` even where one is being typed in. */
+function syncSize(always = false) {
+  const [w, hgt] = sizeOf(design.format);
+  for (const [id, value] of /** @type {const} */ ([
+    ['size-w', w],
+    ['size-h', hgt],
+  ])) {
+    const input = /** @type {HTMLInputElement} */ ($(id));
+    // (Compared as numbers: a field showing "01600" while typed in is left alone.)
+    if (always || Number(input.value) !== value) input.value = String(value);
+  }
 }
 
 function syncControls() {
@@ -948,25 +1130,80 @@ function syncControls() {
   // (Compared trimmed, as the field's input handler trims: typing a space doesn't get undone.)
   if (input('seed').value.trim() !== design.seed) input('seed').value = design.seed;
   input('texture').checked = design.texture;
+  const colors = customColors(design.palette);
+  if (colors) ui.colors = fiveColors(colors);
   for (const b of document.querySelectorAll('[data-palette]')) {
-    b.setAttribute('aria-pressed', String(b.getAttribute('data-palette') === design.palette));
+    const id = b.getAttribute('data-palette');
+    b.setAttribute('aria-pressed', String(id === 'custom' ? Boolean(colors) : id === design.palette));
   }
+  syncCustomColors(colors);
+  const custom = isCustomSize(design.format);
+  if (custom) ui.size = design.format;
   for (const b of document.querySelectorAll('[data-format]')) {
-    b.setAttribute('aria-pressed', String(b.getAttribute('data-format') === design.format));
+    const id = b.getAttribute('data-format');
+    b.setAttribute('aria-pressed', String(id === 'custom' ? custom : id === design.format));
   }
+  $('custom-size').hidden = !custom;
+  if (custom) syncSize();
+  const preset = /** @type {HTMLSelectElement} */ ($('size-preset'));
+  preset.value = [...preset.options].some((o) => o.value === design.format) ? design.format : '';
+  const scale = scaleFor(design.format);
+  const most = maxScale(design.format);
   for (const b of document.querySelectorAll('[data-scale]')) {
-    b.setAttribute('aria-pressed', String(Number(b.getAttribute('data-scale')) === ui.scale));
+    const value = Number(b.getAttribute('data-scale'));
+    b.setAttribute('aria-pressed', String(value === scale));
+    // Larger than 10,000 px: more than browsers can reliably draw.
+    if (value > most) {
+      b.setAttribute('aria-disabled', 'true');
+      b.setAttribute('title', 'Too large to export');
+    } else {
+      b.removeAttribute('aria-disabled');
+      b.removeAttribute('title');
+    }
   }
-  const [w, hgt] = FORMATS[design.format];
-  const pw = w * ui.scale;
-  const ph = hgt * ui.scale;
+  const [w, hgt] = sizeOf(design.format);
+  const pw = w * scale;
+  const ph = hgt * scale;
   $('png-size').textContent = `${pw} × ${ph} px`;
   $('size-hint').textContent = sizeHint(design.format, pw, ph);
   syncPaletteName();
 }
 
-/** What a given export size is good for. @param {Format} format @param {number} w @param {number} hgt */
+/** The colour pickers and the Custom swatch. @param {string[] | null} colors the design's own colours, if it has them */
+function syncCustomColors(colors) {
+  $('custom-colors').hidden = !colors;
+  const swatch = /** @type {HTMLElement} */ (document.querySelector('.swatch.custom'));
+  // The swatch shows your colours once you have some.
+  swatch.classList.toggle('has-colors', Boolean(ui.colors));
+  if (ui.colors) {
+    const [bg, ink, ...accents] = ui.colors;
+    swatch.style.background = bg;
+    swatch.style.color = ink;
+    swatch.querySelectorAll('i').forEach((dot, i) => {
+      /** @type {HTMLElement} */ (dot).style.background = accents[i];
+    });
+  }
+  if (!colors) return;
+  const five = fiveColors(colors);
+  colorInputs().forEach((input, i) => {
+    if (input.value.toLowerCase() !== five[i]) input.value = five[i];
+  });
+  const ratio = contrast(five[0], five[1]);
+  const note = $('contrast-note');
+  // Styles set text in black or white instead of a colour that reads badly (under 3:1).
+  note.textContent =
+    ratio < 3
+      ? `Text on background: ${ratio.toFixed(1)}:1, too low. Covers use black or white text instead.`
+      : `Text on background: ${ratio.toFixed(1)}:1${ratio < 4.5 ? ', fine for large text' : ''}.`;
+  note.classList.toggle('warn', ratio < 3);
+}
+
+/** What a given export size is good for. @param {string} format @param {number} w @param {number} hgt */
 function sizeHint(format, w, hgt) {
+  if (isCustomSize(format)) {
+    const inches = (/** @type {number} */ px) => String(Math.round((px / DPI) * 100) / 100);
+    return `${inches(w)} × ${inches(hgt)} in at ${DPI} dpi.`;
+  }
   if (format === 'ebook') {
     return hgt >= 2560
       ? 'Meets Kindle’s recommended 1600 × 2560.'
@@ -1096,62 +1333,96 @@ function markRail() {
 
 /* ---------------------------------------------------------------- keeping */
 
-/** @returns {Design[]} */
+/**
+ * A kept design from storage or a file: the design (unknown values dropped, missing ones
+ * completed) and the SVG drawn when it was kept, if it looks like a cover.
+ * @param {unknown} item
+ * @returns {Kept}
+ */
+function keptFrom(item) {
+  const raw = item && typeof item === 'object' ? /** @type {Record<string, unknown>} */ (item) : {};
+  const svg =
+    typeof raw.svg === 'string' &&
+    raw.svg.length <= MAX_SNAPSHOT &&
+    raw.svg.startsWith('<svg ') &&
+    raw.svg.endsWith('</svg>')
+      ? raw.svg
+      : '';
+  return { design: complete(sanitize(raw)), svg };
+}
+
+/** @returns {Kept[]} */
 function loadKept() {
   try {
     const raw = JSON.parse(localStorage.getItem(KEEP_KEY) || '[]');
     if (!Array.isArray(raw)) return [];
     // (Cut first: there's no use completing designs that are thrown away.)
-    return raw.slice(0, MAX_KEPT).map((item) => complete(sanitize(item && typeof item === 'object' ? item : {})));
+    return raw.slice(0, MAX_KEPT).map(keptFrom);
   } catch {
     return [];
   }
 }
 
-/** @param {Design[]} list */
+/** A kept design as stored and exported: the design's fields, and its SVG. @param {Kept} k @param {boolean} [withSvg] */
+const stored = (k, withSvg = true) => (withSvg && k.svg ? { ...k.design, svg: k.svg } : { ...k.design });
+
+/**
+ * Save the kept designs; whether they were saved. When storage is full, the oldest give up their
+ * SVG first (they are then drawn again from their settings).
+ * @param {Kept[]} list
+ */
 function saveKept(list) {
-  try {
-    localStorage.setItem(KEEP_KEY, JSON.stringify(list));
-    return true;
-  } catch {
-    return false;
+  for (const withSvg of [list.length, Math.ceil(list.length / 2), 0]) {
+    try {
+      localStorage.setItem(KEEP_KEY, JSON.stringify(list.map((k, i) => stored(k, i < withSvg))));
+      return true;
+    } catch {
+      // Full (try with fewer SVGs) or blocked.
+    }
   }
+  return false;
 }
 
 function keepDesign() {
   const hash = toHash(design);
-  const list = loadKept().filter((d) => toHash(d) !== hash);
-  list.unshift({ ...design });
+  const list = loadKept().filter((k) => toHash(k.design) !== hash);
+  list.unshift({ design: { ...design }, svg: current.svg.length <= MAX_SNAPSHOT ? current.svg : '' });
   const kept = list.slice(0, MAX_KEPT);
   if (!saveKept(kept)) {
     toast('Could not save here (private browsing?)');
     return;
   }
   renderKept(kept);
-  toast('Kept. It’s under the preview.');
+  toast(list.length > MAX_KEPT ? `Kept. The oldest of ${MAX_KEPT} made room.` : 'Kept. It’s under the preview.');
 }
 
 /** Kept thumbnails by design, so Keep and Remove only draw the one that changed. */
 /** @type {Map<string, string>} */
 const keptThumbs = new Map();
-/** @type {{ img: HTMLImageElement, design: Design, hash: string }[]} */
+/** @type {{ img: HTMLImageElement, kept: Kept, hash: string }[]} */
 let keptQueue = [];
 
-/** @param {Design[]} [list] the kept designs, if already loaded */
+/** @param {Kept[]} [list] the kept designs, if already loaded */
 function renderKept(list = loadKept()) {
-  const hashes = list.map(toHash);
+  const hashes = list.map((k) => toHash(k.design));
   for (const hash of keptThumbs.keys()) if (!hashes.includes(hash)) keptThumbs.delete(hash);
   keptQueue = [];
-  $('kept').hidden = list.length === 0;
+  $('kept-empty').hidden = list.length > 0;
+  for (const id of ['kept-all', 'kept-export']) $(id).hidden = list.length === 0;
   $('kept-list').replaceChildren(
-    ...list.map((d, i) => {
+    ...list.map((k, i) => {
+      const d = k.design;
       const hash = hashes[i];
       const img = /** @type {HTMLImageElement} */ (h('img', { alt: '' }));
       const thumb = keptThumbs.get(hash);
       if (thumb) img.src = thumb;
-      else keptQueue.push({ img, design: d, hash });
+      else keptQueue.push({ img, kept: k, hash });
       const styleName = STYLES.find((s) => s.id === d.style)?.name ?? d.style;
-      const paletteName = d.palette === 'auto' ? 'Auto' : (palettes.find((x) => x.id === d.palette)?.name ?? d.palette);
+      const paletteName = customColors(d.palette)
+        ? 'Custom'
+        : d.palette === 'auto'
+          ? 'Auto'
+          : (palettes.find((x) => x.id === d.palette)?.name ?? d.palette);
       const label = `${d.title || 'Untitled'}, ${styleName}`;
       const open = h(
         'button',
@@ -1163,7 +1434,7 @@ function renderKept(list = loadKept()) {
         },
         img,
       );
-      open.addEventListener('click', () => update({ ...d }));
+      open.addEventListener('click', () => openKept(k));
       const remove = h(
         'button',
         { type: 'button', className: 'kept-remove', 'aria-label': `Remove ${label}`, title: 'Remove' },
@@ -1171,7 +1442,7 @@ function renderKept(list = loadKept()) {
       );
       remove.addEventListener('click', () => {
         // Remove this exact design (another tab may have changed the list since it was drawn).
-        const rest = loadKept().filter((k) => toHash(k) !== hash);
+        const rest = loadKept().filter((other) => toHash(other.design) !== hash);
         saveKept(rest);
         renderKept(rest);
         // The button is gone: move focus to the next design's (or the last one's), or to Keep.
@@ -1185,37 +1456,120 @@ function renderKept(list = loadKept()) {
   scheduleKept();
 }
 
-/** Download every kept design as a PNG at the chosen size, one after another. */
-async function downloadKept() {
-  const button = $('kept-all');
-  if (button.getAttribute('aria-busy') === 'true') return;
-  const list = loadKept();
-  button.setAttribute('aria-busy', 'true');
-  button.setAttribute('aria-disabled', 'true');
-  let saved = 0;
-  try {
-    for (const d of list) {
-      const cover = createCover(optionsFor(d));
-      await downloadCover(cover.svg, 'png', `${slug(d.title)}-${cover.style}`, { scale: ui.scale });
-      saved += 1;
-      // A short pause between files, so browsers take them as separate downloads.
-      await new Promise((resolve) => setTimeout(resolve, 250));
-    }
-    toast(`Saved ${saved} PNG${saved === 1 ? '' : 's'}`);
-  } catch (err) {
-    console.error(err);
-    toast(saved ? `Saved ${saved} of ${list.length}; the rest failed` : 'Export failed. Try one at a time.');
-  } finally {
-    button.removeAttribute('aria-busy');
-    button.removeAttribute('aria-disabled');
+/** Open a kept design, saying so when this version draws it differently from the kept SVG. @param {Kept} k */
+function openKept(k) {
+  update({ ...k.design });
+  if (k.svg && createCover(optionsFor(k.design)).svg !== k.svg) {
+    toast('This version draws it a little differently. Download all saves it as kept.');
   }
 }
 
-/** Draw the next queued kept thumbnail. */
+/** A file name not yet in `taken` (adding -2, -3…), which it then joins. @param {string} base @param {string} ext @param {Set<string>} taken */
+function uniqueName(base, ext, taken) {
+  let name = `${base}.${ext}`;
+  for (let k = 2; taken.has(name); k++) name = `${base}-${k}.${ext}`;
+  taken.add(name);
+  return name;
+}
+
+/** Download every kept design as a PNG at the chosen size, together in one ZIP file. */
+async function downloadKept() {
+  const button = $('kept-all');
+  const list = loadKept();
+  if (!list.length) return;
+  await busyWhile(button, async () => {
+    /** @type {Set<string>} */
+    const taken = new Set();
+    /** @type {{ name: string, data: Blob }[]} */
+    const files = [];
+    try {
+      for (const k of list) {
+        button.textContent = `Drawing ${files.length + 1} of ${list.length}…`;
+        // As kept, when the SVG was kept with it.
+        const svg = k.svg || createCover(optionsFor(k.design)).svg;
+        const blob = await rasterize(svg, { scale: scaleFor(k.design.format), dpi: DPI });
+        const name = uniqueName(`${slug(k.design.title)}-${k.design.style}`, extensionOf(blob) ?? 'png', taken);
+        files.push({ name, data: blob });
+      }
+      downloadBlob(await zipFiles(files), 'kept-covers.zip');
+      toast(`Saved ${files.length} PNG${files.length === 1 ? '' : 's'} in kept-covers.zip`);
+    } catch (err) {
+      console.error(err);
+      toast('Export failed. Try one at a time.');
+    } finally {
+      button.textContent = 'Download all';
+    }
+  });
+}
+
+/** Save the kept designs (with their SVGs) to a file, to keep elsewhere or import in another browser. */
+function exportKept() {
+  const list = loadKept();
+  const data = { app: 'book-cover-generator', kind: 'kept-designs', version: 1, designs: list.map((k) => stored(k)) };
+  downloadBlob(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }), 'kept-designs.json');
+  toast(`Saved ${list.length} design${list.length === 1 ? '' : 's'} to kept-designs.json`);
+}
+
+/** Add the designs in an exported file to the kept ones (those not kept already, first). @param {File} file */
+async function importKept(file) {
+  /** @type {unknown} */
+  let data = null;
+  try {
+    if (file.size <= 50_000_000) data = JSON.parse(await file.text());
+  } catch {
+    // Not JSON: reported below.
+  }
+  const items = Array.isArray(data)
+    ? data
+    : data && typeof data === 'object' && Array.isArray(/** @type {{ designs?: unknown }} */ (data).designs)
+      ? /** @type {unknown[]} */ (/** @type {{ designs: unknown[] }} */ (data).designs)
+      : null;
+  if (!items) {
+    toast('That file has no kept designs in it');
+    return;
+  }
+  const list = loadKept();
+  const have = new Set(list.map((k) => toHash(k.design)));
+  /** @type {Kept[]} */
+  const added = [];
+  for (const item of items) {
+    // (Only designs: an entry naming nothing a design has would come out as an empty cover.)
+    if (
+      !item ||
+      typeof item !== 'object' ||
+      !Object.keys(sanitize(/** @type {Record<string, unknown>} */ (item))).length
+    ) {
+      continue;
+    }
+    const k = keptFrom(item);
+    const hash = toHash(k.design);
+    if (have.has(hash)) continue;
+    have.add(hash);
+    added.push(k);
+  }
+  const room = Math.max(0, MAX_KEPT - list.length);
+  const taken = added.slice(0, room);
+  if (!taken.length) {
+    toast(
+      added.length ? `The tray is full: it holds ${MAX_KEPT} designs` : 'Nothing new: those designs are kept already',
+    );
+    return;
+  }
+  const kept = [...taken, ...list];
+  if (!saveKept(kept)) {
+    toast('Could not save here (private browsing?)');
+    return;
+  }
+  renderKept(kept);
+  const note = taken.length < added.length ? ` (the tray holds ${MAX_KEPT})` : '';
+  toast(`Imported ${taken.length} design${taken.length === 1 ? '' : 's'}${note}`);
+}
+
+/** Draw the next queued kept thumbnail: the SVG kept with it, else from its settings. */
 const scheduleKept = sliced(() => {
   const item = keptQueue.shift();
   if (!item) return false;
-  const url = svgToDataUrl(createCover(optionsFor(item.design)).svg);
+  const url = svgToDataUrl(item.kept.svg || createCover(optionsFor(item.kept.design)).svg);
   keptThumbs.set(item.hash, url);
   item.img.src = url;
   return true;
@@ -1229,7 +1583,7 @@ function slug(str) {
     // Drop accents from Latin letters only (é → e); other marks (й, ά, Japanese voicing
     // marks, Indic vowel signs) are part of the letter and come back together under NFC.
     .normalize('NFKD')
-    .replace(/(\p{Script=Latin})[\u0300-\u036f]+/gu, '$1')
+    .replace(/(\p{Script=Latin})[̀-ͯ]+/gu, '$1')
     .normalize('NFC')
     .toLowerCase()
     .replace(/[^\p{L}\p{M}\p{N}]+/gu, '-')
@@ -1239,27 +1593,86 @@ function slug(str) {
 }
 
 /**
- * @param {'svg' | 'png' | 'jpeg'} format
- * @param {HTMLButtonElement} button
+ * Run `work` with `button` marked busy, ignoring presses meanwhile. (aria-disabled, not
+ * disabled, so keyboard focus stays on it.)
+ * @param {HTMLElement} button @param {() => Promise<void>} work
  */
-async function exportAs(format, button) {
-  const name = `${slug(design.title)}-${current.style}`;
-  // Capture what is being exported: the design may change while the PNG renders.
-  const [w, hgt] = FORMATS[design.format];
-  const scale = ui.scale;
-  // One export per button at a time. aria-disabled, not disabled, so focus stays on it.
+async function busyWhile(button, work) {
   if (button.getAttribute('aria-busy') === 'true') return;
   button.setAttribute('aria-disabled', 'true');
   button.setAttribute('aria-busy', 'true');
   try {
-    await downloadCover(current.svg, format, name, { scale, quality: 0.93 });
-    toast(format === 'svg' ? 'Saved SVG' : `Saved ${format.toUpperCase()} · ${w * scale} × ${hgt * scale} px`);
-  } catch (err) {
-    console.error(err);
-    toast('Export failed. Try SVG instead.');
+    await work();
   } finally {
     button.removeAttribute('aria-disabled');
     button.removeAttribute('aria-busy');
+  }
+}
+
+/**
+ * @param {'svg' | 'png' | 'jpeg' | 'webp'} format
+ * @param {HTMLButtonElement} button
+ */
+async function exportAs(format, button) {
+  // Capture what is being exported: the design may change while the image renders.
+  const name = `${slug(design.title)}-${current.style}`;
+  const svg = current.svg;
+  const [w, hgt] = sizeOf(design.format);
+  const scale = scaleFor(design.format);
+  await busyWhile(button, async () => {
+    try {
+      const saved = await downloadCover(svg, format, name, { scale, quality: 0.93, dpi: DPI });
+      if (format === 'svg') {
+        toast('Saved SVG');
+        return;
+      }
+      const ext = saved.slice(saved.lastIndexOf('.') + 1);
+      // Safari makes a PNG when asked for WebP.
+      const fallback = format === 'webp' && ext !== 'webp' ? ' (this browser can’t make WebP)' : '';
+      toast(`Saved ${ext === 'jpg' ? 'JPEG' : ext.toUpperCase()} · ${w * scale} × ${hgt * scale} px${fallback}`);
+    } catch (err) {
+      console.error(err);
+      toast('Export failed. Try SVG instead.');
+    }
+  });
+}
+
+/** Whether this browser can share image files (phones, Safari, Edge). */
+function canShareFiles() {
+  try {
+    return (
+      typeof navigator.canShare === 'function' &&
+      navigator.canShare({ files: [new File([''], 'cover.png', { type: 'image/png' })] })
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** The PNG last made for Share, so a second tap shares it at once. @type {{ key: string, file: File } | null} */
+let shared = null;
+
+/** Share the cover as a PNG (to Photos, Messages, another app…). */
+async function shareCover() {
+  const scale = scaleFor(design.format);
+  const key = `${scale}|${current.svg}`;
+  const name = `${slug(design.title)}-${current.style}.png`;
+  try {
+    if (shared?.key !== key) {
+      const blob = await rasterize(current.svg, { scale, dpi: DPI });
+      shared = { key, file: new File([blob], name, { type: 'image/png' }) };
+    }
+    await navigator.share({ files: [shared.file], title: design.title.trim() || 'Book cover' });
+  } catch (err) {
+    const why = err instanceof DOMException ? err.name : '';
+    // The share sheet was closed.
+    if (why === 'AbortError') return;
+    // Drawing took longer than the browser lets a tap count for: the image is ready now.
+    if (why === 'NotAllowedError') toast('Ready: tap Share again');
+    else {
+      console.error(err);
+      toast('Could not share. Try Download PNG.');
+    }
   }
 }
 
@@ -1275,6 +1688,30 @@ function toast(msg) {
 }
 
 /* -------------------------------------------------------------------- boot */
+
+/**
+ * Work offline: a service worker keeps the app's files (public/sw.js). The page runs under
+ * Trusted Types, so the worker's URL goes through a policy that allows only it.
+ */
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  try {
+    const types = /** @type {any} */ (window).trustedTypes;
+    const url = types
+      ? types
+          .createPolicy('sw', {
+            createScriptURL: (/** @type {string} */ u) => {
+              if (u !== '/sw.js') throw new TypeError(`Not the service worker: ${u}`);
+              return u;
+            },
+          })
+          .createScriptURL('/sw.js')
+      : '/sw.js';
+    navigator.serviceWorker.register(url).catch((err) => console.warn('No offline copy:', err));
+  } catch (err) {
+    console.warn('No offline copy:', err);
+  }
+}
 
 // A shared link opens the same cover every time (see complete()); with no link, the sample stays.
 const linked = fromHash(location.hash);
@@ -1318,6 +1755,7 @@ window.addEventListener('pageshow', (e) => {
 history.scrollRestoration = 'manual';
 stamp();
 entryHash = location.hash;
+registerServiceWorker();
 buildControls();
 buildRail();
 buildVariations();

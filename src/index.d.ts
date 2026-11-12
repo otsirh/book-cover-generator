@@ -6,8 +6,19 @@ export type { Palette, PaletteId } from './palettes.js';
 export type { FontSpec, FitOptions, TextFit, DrawOptions, TextSpec, TextMeasurer } from './text.js';
 export type { StackFit, TitleBlock, TitleBlockOptions } from './type.js';
 export { palettes } from './palettes.js';
-export { FONTS, fitText, drawText, measureText, setTextMeasurer } from './text.js';
+export {
+  FONTS,
+  fitText,
+  drawText,
+  measureText,
+  setTextMeasurer,
+  baselineOf,
+  textBottom,
+  textGroupAttrs,
+  markExtent,
+} from './text.js';
 export { titleBlock, authorFit, fitStack, drawStack, splitLead } from './type.js';
+export { strongAccents, textColor, tintText, fitTitleWith, textPanel, TEXT_CONTRAST } from './styles/util.js';
 export * as svgUtils from './core.js';
 
 export type StyleId =
@@ -77,10 +88,17 @@ export interface CoverOptions {
   width?: number;
   /** Height in px, 50–10000. Default `width × 1.5`. */
   height?: number;
+  /**
+   * The language of the text, as a BCP 47 tag (`'ja'`, `'zh-Hant'`), so Chinese characters get
+   * that language's glyphs. Default: `'ja'` for text with kana, `'ko'` for text with Hangul, else none.
+   */
+  lang?: string;
 }
 
 export interface Cover {
   svg: string;
+  /** The markup inside the outer `<svg>`, to nest the cover in another SVG (its ids are unique to the cover). */
+  body: string;
   /** The style that was used. */
   style: string;
   /** The palette that was used (`'custom'` for a custom palette). */
@@ -88,6 +106,8 @@ export interface Cover {
   seed: string;
   width: number;
   height: number;
+  /** The language set on the cover (given or inferred), or `''`. */
+  lang: string;
 }
 
 export interface StyleInfo {

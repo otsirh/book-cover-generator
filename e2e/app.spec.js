@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer';
 import { readFile } from 'node:fs/promises';
 import { test, expect } from '@playwright/test';
 import { AxeBuilder } from '@axe-core/playwright';
@@ -937,7 +938,8 @@ test('a kept design from another version keeps its look and can be removed', asy
   await page.reload();
   expect(await svgOf(page, '.kept-open img')).toBe(before);
   await page.locator('.kept-remove').click();
-  await expect(page.locator('#kept')).toBeHidden();
+  await expect(page.locator('#kept-list li')).toHaveCount(0);
+  await expect(page.locator('#kept-empty')).toBeVisible();
 });
 
 test('removing a kept design keeps keyboard focus in the tray', async ({ page }) => {
@@ -951,7 +953,7 @@ test('removing a kept design keeps keyboard focus in the tray', async ({ page })
   await expect(page.locator('#kept-list li')).toHaveCount(1);
   await expect(page.locator('.kept-remove')).toBeFocused();
   await page.keyboard.press('Enter');
-  await expect(page.locator('#kept')).toBeHidden();
+  await expect(page.locator('#kept-list li')).toHaveCount(0);
   await expect(page.locator('#keep')).toBeFocused();
 });
 
@@ -982,19 +984,46 @@ test('family links in the rail jump to that family', async ({ page }) => {
   await expect(page.locator('.tile[data-style="mosaic"]')).toBeInViewport();
 });
 
-test('kept designs show their style, and Download all saves each one', async ({ page }) => {
+/**
+ * The files in a ZIP archive (stored, as the app makes them), by name.
+ * @param {Buffer} zip
+ */
+function unzip(zip) {
+  const end = zip.length - 22;
+  expect(zip.readUInt32LE(end)).toBe(0x06054b50);
+  /** @type {Map<string, Buffer>} */
+  const files = new Map();
+  let at = zip.readUInt32LE(end + 16);
+  for (let k = 0; k < zip.readUInt16LE(end + 10); k++) {
+    const size = zip.readUInt32LE(at + 20);
+    const nameLength = zip.readUInt16LE(at + 28);
+    const local = zip.readUInt32LE(at + 42);
+    const start = local + 30 + zip.readUInt16LE(local + 26);
+    files.set(zip.toString('utf8', at + 46, at + 46 + nameLength), zip.subarray(start, start + size));
+    at += 46 + nameLength;
+  }
+  return files;
+}
+
+test('kept designs show their style, and Download all saves them in one ZIP', async ({ page }) => {
   await page.goto('/#title=One&style=minimal&seed=k1');
   await page.locator('#keep').click();
   await page.locator('.tile[data-style="swiss"]').click();
   await page.locator('#keep').click();
-  await expect(page.locator('.kept-label')).toHaveText(['Swiss', 'Minimal']);
-  /** @type {string[]} */
-  const names = [];
-  page.on('download', (download) => names.push(download.suggestedFilename()));
-  await page.locator('#kept-all').click();
-  await expect.poll(() => names.length, { timeout: 10_000 }).toBe(2);
-  expect(names.sort()).toEqual(['one-minimal.png', 'one-swiss.png']);
-  await expect(page.locator('#toast')).toContainText('Saved 2 PNGs');
+  // The same title and style twice: the names must still differ.
+  await page.locator('#dice-seed').click();
+  await page.locator('#keep').click();
+  await expect(page.locator('.kept-label')).toHaveText(['Swiss', 'Swiss', 'Minimal']);
+  const [download] = await Promise.all([page.waitForEvent('download'), page.locator('#kept-all').click()]);
+  expect(download.suggestedFilename()).toBe('kept-covers.zip');
+  const files = unzip(await readFile(/** @type {string} */ (await download.path())));
+  expect([...files.keys()].sort()).toEqual(['one-minimal.png', 'one-swiss-2.png', 'one-swiss.png']);
+  for (const png of files.values()) {
+    expect(png.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
+    expect(pngSize(png)).toEqual([1200, 1800]);
+  }
+  await expect(page.locator('#toast')).toContainText('Saved 3 PNGs');
+  await expect(page.locator('#kept-all')).toHaveText('Download all');
 });
 
 test('on a laptop screen Randomize is in view at once, and the cover stays in view while scrolling', async ({
@@ -1020,7 +1049,8 @@ test('the toast shows at the top on wide screens, clear of the export buttons', 
 
 test('kept designs are saved, restored and removed', async ({ page }) => {
   await page.goto('/#title=Keeper&style=artdeco&palette=midnight&seed=k');
-  await expect(page.locator('#kept')).toBeHidden();
+  await expect(page.locator('#kept-empty')).toBeVisible();
+  await expect(page.locator('#kept-all')).toBeHidden();
   await page.locator('#keep').click();
   await expect(page.locator('#kept-list li')).toHaveCount(1);
   const thumb = await svgOf(page, '.kept-open img');
@@ -1036,7 +1066,8 @@ test('kept designs are saved, restored and removed', async ({ page }) => {
   await page.locator('.kept-open').first().click();
   await selected(page, 'artdeco');
   await page.locator('.kept-remove').first().click();
-  await expect(page.locator('#kept')).toBeHidden();
+  await expect(page.locator('#kept-list li')).toHaveCount(0);
+  await expect(page.locator('#kept-empty')).toBeVisible();
 });
 
 /** @param {Buffer} buf */
@@ -1162,12 +1193,217 @@ test('typing never triggers announcements, even when the palette follows the tit
   await expect(page.locator('#announce')).toHaveText('');
 });
 
+test('your own colours start from the palette on the cover, and Custom brings them back', async ({ page }) => {
+  await page.goto('/#title=Colours&style=minimal&palette=mint&seed=c');
+  await expect(page.locator('#custom-colors')).toBeHidden();
+  await page.locator('[data-palette="custom"]').click();
+  await expect(page.locator('#custom-colors')).toBeVisible();
+  await expect(page.locator('#color-bg')).toHaveValue('#e4f1ea');
+  await expect(page).toHaveURL(/palette=custom-e4f1ea-12332b-2a9d8f-e76f51-f4a261/);
+  await expect(page.locator('[data-palette="custom"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#palette-name')).toHaveText('Custom');
+  await expect(page.locator('#rail-note')).toContainText('In your colours');
+  await page.locator('#color-bg').fill('#0b132b');
+  await expect.poll(() => svgSoon(page, '#preview')).toContain('#0b132b');
+  await expect(page.locator('#contrast-note')).toContainText('Text on background');
+  await page.locator('[data-palette="sky"]').click();
+  await expect(page.locator('#custom-colors')).toBeHidden();
+  await page.locator('[data-palette="custom"]').click();
+  await expect(page.locator('#color-bg')).toHaveValue('#0b132b');
+  // Undo steps back through the colour change as one step.
+  await page.locator('#undo').click();
+  await expect(page.locator('[data-palette="sky"]')).toHaveAttribute('aria-pressed', 'true');
+  await page.locator('#undo').click();
+  await expect(page.locator('#color-bg')).toHaveValue('#0b132b');
+  await page.locator('#undo').click();
+  await expect(page.locator('#color-bg')).toHaveValue('#e4f1ea');
+});
+
+test('a link with your own colours opens them; one with bad colours is ignored', async ({ page }) => {
+  await page.goto('/#title=Link&style=swiss&seed=l&palette=custom-101010-FAFAFA-ff0066-00ccff');
+  await expect(page.locator('#custom-colors')).toBeVisible();
+  await expect(page.locator('#color-ink')).toHaveValue('#fafafa');
+  await expect(page.locator('#color-a2')).toHaveValue('#00ccff');
+  // Two accents given: the third repeats the first.
+  await expect(page.locator('#color-a3')).toHaveValue('#ff0066');
+  expect(await svgOf(page, '#preview')).toContain('#101010');
+  await page.goto('about:blank');
+  await page.goto('/#title=Link&style=swiss&seed=l&palette=custom-zzzzzz-fafafa-ff0066');
+  await expect(page.locator('[data-palette="auto"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#custom-colors')).toBeHidden();
+});
+
+test('a custom size: presets, typing, and an export size of its own', async ({ page }) => {
+  await page.goto('/#title=Size&style=minimal&seed=s');
+  await expect(page.locator('#custom-size')).toBeHidden();
+  await page.locator('[data-format="custom"]').click();
+  await expect(page.locator('#custom-size')).toBeVisible();
+  await expect(page).toHaveURL(/format=1600x2560/);
+  await expect(page.locator('#size-preset')).toHaveValue('1600x2560');
+  // 1× is the size asked for.
+  await expect(page.locator('#png-size')).toHaveText('1600 × 2560 px');
+  expect(await svgOf(page, '#preview')).toContain('width="1600" height="2560"');
+  await page.locator('#size-preset').selectOption('1800x2700');
+  await expect(page.locator('#size-w')).toHaveValue('1800');
+  await expect(page.locator('#size-hint')).toHaveText('6 × 9 in at 300 dpi.');
+  await page.locator('#size-h').fill('3000');
+  await expect(page).toHaveURL(/format=1800x3000/);
+  await expect(page.locator('#size-preset')).toHaveValue('');
+  // A size the library can't make is put back when the field is left.
+  await page.locator('#size-w').fill('10');
+  await page.locator('#size-w').blur();
+  await expect(page.locator('#size-w')).toHaveValue('1800');
+  await expect(page.locator('#toast')).toContainText('50 to 10,000 px');
+  // Scales past 10,000 px are off.
+  await expect(page.locator('[data-scale="4"]')).toHaveAttribute('aria-disabled', 'true');
+  // (Dispatched: Playwright won't click a button marked disabled.)
+  await page.locator('[data-scale="4"]').dispatchEvent('click');
+  await expect(page.locator('#png-size')).toHaveText('1800 × 3000 px');
+  await page.locator('[data-scale="2"]').click();
+  await expect(page.locator('#png-size')).toHaveText('3600 × 6000 px');
+  const [w, hgt] = await page
+    .locator('#book')
+    .evaluate((el) => [/** @type {HTMLElement} */ (el).offsetWidth, /** @type {HTMLElement} */ (el).offsetHeight]);
+  expect(Math.abs(w / hgt - 0.6)).toBeLessThan(0.01);
+  // The presets keep their own export size.
+  await page.locator('[data-format="ebook"]').click();
+  await expect(page.locator('#png-size')).toHaveText('1200 × 1920 px');
+  await expect(page.locator('#custom-size')).toBeHidden();
+  await page.locator('#undo').click();
+  await expect(page.locator('#size-h')).toHaveValue('3000');
+});
+
+test('a shared link with a custom size has its shape from the start; an impossible one falls back', async ({
+  page,
+}) => {
+  await page.goto('/#format=1650x2550&seed=x');
+  const coverWidth = () =>
+    page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--cover-w').trim());
+  expect(await coverWidth()).toBe('1650');
+  await expect(page.locator('[data-format="custom"]')).toHaveAttribute('aria-pressed', 'true');
+  await page.goto('about:blank');
+  await page.goto('/#format=20000x100&seed=x');
+  await expect(page.locator('[data-format="paperback"]')).toHaveAttribute('aria-pressed', 'true');
+  expect(await coverWidth()).toBe('2');
+});
+
+test('downloads WebP, and PNG and JPEG files say 300 dpi', async ({ page, browserName }) => {
+  await page.goto('/#title=Dots&style=minimal&palette=mint&seed=d');
+  const grab = async (/** @type {string} */ button) => {
+    const [download] = await Promise.all([page.waitForEvent('download'), page.locator(button).click()]);
+    return { name: download.suggestedFilename(), data: await readFile(/** @type {string} */ (await download.path())) };
+  };
+  const png = await grab('#dl-png');
+  // A pHYs chunk right after the header: 11811 pixels per metre.
+  expect(png.data.toString('latin1', 37, 41)).toBe('pHYs');
+  expect(png.data.readUInt32BE(41)).toBe(11811);
+  const jpg = await grab('#dl-jpeg');
+  expect(jpg.data.toString('latin1', 6, 11)).toBe('JFIF\0');
+  expect(jpg.data[13]).toBe(1);
+  expect(jpg.data.readUInt16BE(14)).toBe(300);
+  // Firefox opens a downloaded WebP in a tab, which Playwright reports as a page, not a download.
+  if (browserName === 'firefox') return;
+  const webp = await grab('#dl-webp');
+  if (webp.name.endsWith('.png')) {
+    // Safari can't encode WebP: it says so, and the file is a PNG named as one.
+    expect(browserName).toBe('webkit');
+    await expect(page.locator('#toast')).toContainText('can’t make WebP');
+  } else {
+    expect(webp.name).toBe('dots-minimal.webp');
+    expect(webp.data.toString('latin1', 8, 12)).toBe('WEBP');
+  }
+});
+
+test('copies the cover as an image', async ({ page, context, browserName }) => {
+  test.skip(browserName !== 'chromium', 'Only Chromium lets tests read the clipboard');
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto('/#title=Picture&style=minimal&seed=p');
+  await expect(page.locator('#copy-image')).toBeVisible();
+  await page.locator('#copy-image').click();
+  await expect(page.locator('#toast')).toContainText('Image copied · 1200 × 1800 px');
+  const types = await page.evaluate(async () => (await navigator.clipboard.read()).flatMap((item) => [...item.types]));
+  expect(types).toContain('image/png');
+});
+
+test('kept designs export to a file and import back', async ({ page }) => {
+  await page.goto('/#title=Exported&style=noir&palette=noir&seed=x');
+  await page.locator('#keep').click();
+  const [download] = await Promise.all([page.waitForEvent('download'), page.locator('#kept-export').click()]);
+  expect(download.suggestedFilename()).toBe('kept-designs.json');
+  const data = JSON.parse(await readFile(/** @type {string} */ (await download.path()), 'utf8'));
+  expect(data.designs).toHaveLength(1);
+  expect(data.designs[0]).toMatchObject({ title: 'Exported', style: 'noir', palette: 'noir', seed: 'x' });
+  expect(data.designs[0].svg).toMatch(/^<svg [\s\S]*Exported[\s\S]*<\/svg>$/);
+  // Into a tray holding something else: new designs come first, ones kept already and junk are skipped.
+  await page.locator('.kept-remove').click();
+  await page.locator('.tile[data-style="swiss"]').click();
+  await page.locator('#keep').click();
+  const designs = [...data.designs, data.designs[0], { nonsense: true }, 7];
+  const file = {
+    name: 'kept-designs.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify({ ...data, designs })),
+  };
+  await page.locator('#kept-file').setInputFiles(file);
+  await expect(page.locator('#toast')).toContainText('Imported 1 design');
+  await expect(page.locator('.kept-label')).toHaveText(['Noir', 'Swiss']);
+  await page.locator('#kept-file').setInputFiles(file);
+  await expect(page.locator('#toast')).toContainText('Nothing new');
+  await page
+    .locator('#kept-file')
+    .setInputFiles({ name: 'x.json', mimeType: 'application/json', buffer: Buffer.from('not json') });
+  await expect(page.locator('#toast')).toContainText('no kept designs');
+});
+
+test('a kept design shows the cover as it was kept, and says when this version draws it differently', async ({
+  page,
+}) => {
+  const snapshot =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="900" viewBox="0 0 600 900"><title>As kept</title><rect width="600" height="900" fill="#123456"/></svg>';
+  await page.addInitScript((svg) => {
+    if (sessionStorage.getItem('seeded')) return;
+    sessionStorage.setItem('seeded', '1');
+    const kept = { title: 'Kept', style: 'minimal', palette: 'mint', seed: 'k', format: 'paperback', svg };
+    localStorage.setItem('book-cover-generator:kept', JSON.stringify([kept]));
+  }, snapshot);
+  await page.goto('/#title=Now&style=swiss&seed=n');
+  expect(await svgOf(page, '.kept-open img')).toBe(snapshot);
+  await page.locator('.kept-open').click();
+  await selected(page, 'minimal');
+  await expect(page.locator('#toast')).toContainText('draws it a little differently');
+});
+
+test('a Japanese title sets the language of the cover', async ({ page }) => {
+  await page.goto(`/#title=${encodeURIComponent('ガラスの街')}&style=minimal&seed=j`);
+  expect(await svgOf(page, '#preview')).toMatch(/^<svg [^>]* lang="ja"/);
+});
+
+test('works offline once it has loaded', async ({ page, context, browserName }) => {
+  test.skip(browserName !== 'chromium', 'Playwright emulates offline service workers reliably only in Chromium');
+  await page.goto('/#title=Offline&style=minimal&seed=o');
+  await ready(page);
+  await page.evaluate(() => navigator.serviceWorker.ready.then(() => undefined));
+  await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
+  await context.setOffline(true);
+  try {
+    await page.reload();
+    await ready(page);
+    expect(await svgOf(page, '#preview')).toContain('Offline');
+    await expect(page.locator('.tile')).toHaveCount(34);
+  } finally {
+    await context.setOffline(false);
+  }
+});
+
 for (const scheme of /** @type {const} */ (['light', 'dark'])) {
   test(`has no accessibility violations (${scheme})`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: scheme });
     await page.goto('/#title=Access&style=artdeco&seed=a');
     await ready(page);
     await page.locator('#keep').click();
+    // The colour pickers and the size fields too.
+    await page.locator('[data-palette="custom"]').click();
+    await page.locator('[data-format="custom"]').click();
     await page.locator('.tile').first().scrollIntoViewIfNeeded();
     const results = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
@@ -1227,6 +1463,18 @@ test('the phone download button shows that it is busy @mobile', async ({ page })
   expect(busy).toBe(true);
   expect(download.suggestedFilename()).toBe('busy-minimal.png');
   await expect(page.locator('#m-download')).toBeEnabled();
+});
+
+test('your own colours and size fit a phone screen @mobile', async ({ page }) => {
+  await page.goto(
+    '/#title=Phone&style=bigtype&seed=m&palette=custom-101010-fafafa-ff0066-00ccff-ffe66d&format=1080x1350',
+  );
+  await expect(page.locator('#custom-colors')).toBeVisible();
+  await expect(page.locator('#custom-size')).toBeVisible();
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
 });
 
 test('long values in a shared link are clipped and never overflow @mobile', async ({ page }) => {

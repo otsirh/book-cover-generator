@@ -1,4 +1,5 @@
-// Browser-only helpers for exporting covers: copy, download, rasterise.
+// Browser helpers for exporting covers: copy, download, rasterise, zip. (`setDpi` and
+// `zipFiles` also work in Node.)
 
 /** SVG markup to a `data:` URL usable as an <img> src. */
 export function svgToDataUrl(svg) {
@@ -28,19 +29,34 @@ function svgSize(svg) {
 }
 
 /**
- * Render SVG markup to a PNG/JPEG/WebP Blob.
+ * Render SVG markup to a PNG/JPEG/WebP Blob, `scale` times the SVG's size, or at exactly
+ * `width` × `height` px (one of them alone keeps the SVG's shape). `dpi` is written into PNG
+ * and JPEG files, for print.
  * @param {string} svg
- * @param {{ type?: string, scale?: number, quality?: number, background?: string }} [opts]
+ * @param {{ type?: string, scale?: number, width?: number, height?: number, quality?: number, background?: string, dpi?: number }} [opts]
  */
-export async function rasterize(svg, { type = 'image/png', scale = 1, quality = 0.92, background } = {}) {
+export async function rasterize(
+  svg,
+  { type = 'image/png', scale = 1, width, height, quality = 0.92, background, dpi } = {},
+) {
+  for (const [name, value] of /** @type {const} */ ([
+    ['scale', scale],
+    ['width', width],
+    ['height', height],
+    ['dpi', dpi],
+  ])) {
+    if (value !== undefined && !(Number.isFinite(value) && value > 0)) {
+      throw new RangeError(`rasterize: ${name} must be a positive number, got ${String(value)}`);
+    }
+  }
   const img = new Image();
   img.decoding = 'async';
   img.src = svgToDataUrl(svg);
   await img.decode();
   // Without a usable size in the markup, use the size the browser gives the image.
   const [sw, sh] = svgSize(svg) ?? [img.naturalWidth || 300, img.naturalHeight || 150];
-  const w = Math.round(sw * scale);
-  const h = Math.round(sh * scale);
+  const w = Math.max(1, Math.round(width ?? (height ? (height * sw) / sh : sw * scale)));
+  const h = Math.max(1, Math.round(height ?? (width ? (width * sh) / sw : sh * scale)));
   const canvas = document.createElement('canvas');
   canvas.width = w;
   canvas.height = h;
@@ -51,18 +67,178 @@ export async function rasterize(svg, { type = 'image/png', scale = 1, quality = 
     ctx.fillRect(0, 0, w, h);
   }
   ctx.drawImage(img, 0, 0, w, h);
-  return new Promise((resolve, reject) => {
+  /** @type {Blob} */
+  const blob = await new Promise((resolve, reject) => {
     canvas.toBlob(
-      (blob) => {
+      (result) => {
         // Free the canvas memory now: Safari caps the total, and a 4× export is tens of MB.
         canvas.width = canvas.height = 0;
-        if (blob) resolve(blob);
+        if (result) resolve(result);
         else reject(new Error('Canvas export failed'));
       },
       type,
       quality,
     );
   });
+  return dpi ? setDpi(blob, dpi) : blob;
+}
+
+/* ----------------------------------------------------------- bytes and files */
+
+/** @type {Uint32Array | undefined} */
+let crcTable;
+
+/** CRC-32 (as in PNG and ZIP) of some bytes. @param {Uint8Array} bytes */
+function crc32(bytes) {
+  if (!crcTable) {
+    crcTable = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) {
+      let c = n;
+      for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+      crcTable[n] = c >>> 0;
+    }
+  }
+  let crc = 0xffffffff;
+  for (let i = 0; i < bytes.length; i++) crc = crcTable[(crc ^ bytes[i]) & 0xff] ^ (crc >>> 8);
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+/** @param {Uint8Array[]} parts */
+function concat(parts) {
+  const out = new Uint8Array(parts.reduce((sum, p) => sum + p.length, 0));
+  let at = 0;
+  for (const p of parts) {
+    out.set(p, at);
+    at += p.length;
+  }
+  return out;
+}
+
+const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+
+/** A PNG with its pixel density set (a pHYs chunk after the header, replacing any other). @param {Uint8Array} png @param {number} dpi */
+function pngWithDpi(png, dpi) {
+  if (!PNG_SIGNATURE.every((b, i) => png[i] === b)) return png;
+  const view = new DataView(png.buffer, png.byteOffset, png.byteLength);
+  const phys = new Uint8Array(21);
+  const pv = new DataView(phys.buffer);
+  const perMetre = Math.round(dpi / 0.0254);
+  pv.setUint32(0, 9);
+  phys.set([0x70, 0x48, 0x59, 0x73], 4); // pHYs
+  pv.setUint32(8, perMetre);
+  pv.setUint32(12, perMetre);
+  phys[16] = 1; // the unit is the metre
+  pv.setUint32(17, crc32(phys.subarray(4, 17)));
+  /** @type {Uint8Array[]} */
+  const parts = [png.subarray(0, 8)];
+  let i = 8;
+  while (i + 12 <= png.length) {
+    const end = i + 12 + view.getUint32(i);
+    if (end > png.length) return png;
+    const type = String.fromCharCode(...png.subarray(i + 4, i + 8));
+    if (type !== 'pHYs') parts.push(png.subarray(i, end));
+    if (type === 'IHDR') parts.push(phys);
+    i = end;
+  }
+  return concat(parts);
+}
+
+/** A JPEG with its pixel density set in the JFIF header (added if missing). @param {Uint8Array} jpeg @param {number} dpi */
+function jpegWithDpi(jpeg, dpi) {
+  if (jpeg[0] !== 0xff || jpeg[1] !== 0xd8) return jpeg;
+  const d = Math.min(65535, Math.round(dpi));
+  const jfif = jpeg[2] === 0xff && jpeg[3] === 0xe0 && String.fromCharCode(...jpeg.subarray(6, 11)) === 'JFIF\0';
+  if (jfif && jpeg.length > 18) {
+    const out = jpeg.slice();
+    out[13] = 1; // dots per inch
+    out.set([d >> 8, d & 255, d >> 8, d & 255], 14);
+    return out;
+  }
+  const app0 = [0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0, 1, 1, 1, d >> 8, d & 255, d >> 8, d & 255, 0, 0];
+  return concat([jpeg.subarray(0, 2), new Uint8Array(app0), jpeg.subarray(2)]);
+}
+
+/**
+ * A copy of a PNG or JPEG Blob that says it has `dpi` pixels per inch (what print software reads
+ * for the printed size). Other types come back unchanged.
+ * @param {Blob} blob @param {number} dpi
+ * @returns {Promise<Blob>}
+ */
+export async function setDpi(blob, dpi) {
+  if (!(Number.isFinite(dpi) && dpi > 0)) throw new RangeError(`setDpi: dpi must be a positive number, got ${dpi}`);
+  if (blob.type !== 'image/png' && blob.type !== 'image/jpeg') return blob;
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  const out = blob.type === 'image/png' ? pngWithDpi(bytes, dpi) : jpegWithDpi(bytes, dpi);
+  return new Blob([/** @type {Uint8Array<ArrayBuffer>} */ (out)], { type: blob.type });
+}
+
+/**
+ * A ZIP archive (stored, not compressed: images are compressed already) of the given files.
+ * Names are UTF-8; give each file a unique name.
+ * @param {{ name: string, data: Blob | Uint8Array | string }[]} files
+ * @returns {Promise<Blob>}
+ */
+export async function zipFiles(files) {
+  if (files.length > 0xffff) throw new RangeError('zipFiles: at most 65535 files');
+  const encoder = new TextEncoder();
+  const now = new Date();
+  // MS-DOS time and date, in local time as zip tools expect (two-second steps, from 1980).
+  const time = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
+  const date = (Math.max(0, now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+  /** @type {Uint8Array[]} */
+  const parts = [];
+  /** @type {Uint8Array[]} */
+  const central = [];
+  let offset = 0;
+  for (const file of files) {
+    const name = encoder.encode(file.name);
+    const data =
+      typeof file.data === 'string'
+        ? encoder.encode(file.data)
+        : file.data instanceof Uint8Array
+          ? file.data
+          : new Uint8Array(await file.data.arrayBuffer());
+    if (offset + 30 + name.length + data.length > 0xffffffff) throw new RangeError('zipFiles: over 4 GB');
+    const crc = crc32(data);
+    const local = new Uint8Array(30);
+    const lv = new DataView(local.buffer);
+    lv.setUint32(0, 0x04034b50, true);
+    lv.setUint16(4, 20, true); // version needed: 2.0
+    lv.setUint16(6, 0x0800, true); // names are UTF-8
+    lv.setUint16(8, 0, true); // stored
+    lv.setUint16(10, time, true);
+    lv.setUint16(12, date, true);
+    lv.setUint32(14, crc, true);
+    lv.setUint32(18, data.length, true);
+    lv.setUint32(22, data.length, true);
+    lv.setUint16(26, name.length, true);
+    parts.push(local, name, data);
+    const entry = new Uint8Array(46);
+    const cv = new DataView(entry.buffer);
+    cv.setUint32(0, 0x02014b50, true);
+    cv.setUint16(4, 20, true);
+    cv.setUint16(6, 20, true);
+    cv.setUint16(8, 0x0800, true);
+    cv.setUint16(10, 0, true);
+    cv.setUint16(12, time, true);
+    cv.setUint16(14, date, true);
+    cv.setUint32(16, crc, true);
+    cv.setUint32(20, data.length, true);
+    cv.setUint32(24, data.length, true);
+    cv.setUint16(28, name.length, true);
+    cv.setUint32(42, offset, true);
+    central.push(entry, name);
+    offset += 30 + name.length + data.length;
+  }
+  const size = central.reduce((sum, p) => sum + p.length, 0);
+  const end = new Uint8Array(22);
+  const ev = new DataView(end.buffer);
+  ev.setUint32(0, 0x06054b50, true);
+  ev.setUint16(8, files.length, true);
+  ev.setUint16(10, files.length, true);
+  ev.setUint32(12, size, true);
+  ev.setUint32(16, offset, true);
+  return new Blob(/** @type {Uint8Array<ArrayBuffer>[]} */ ([...parts, ...central, end]), { type: 'application/zip' });
 }
 
 /** Trigger a file download for a Blob. */
@@ -79,20 +255,61 @@ export function downloadBlob(blob, filename) {
 }
 
 /**
- * Download a cover in the given format.
+ * Download a cover in the given format. Resolves to the file name it saved, whose extension
+ * says what was made: browsers that can't encode WebP (Safari) make a PNG.
  * @param {string} svg
  * @param {'svg'|'png'|'jpeg'|'jpg'|'webp'} [format='svg']
  * @param {string} [basename='cover']
- * @param {{ scale?: number, quality?: number }} [opts]
+ * @param {{ scale?: number, width?: number, height?: number, quality?: number, background?: string, dpi?: number }} [opts]
+ * @returns {Promise<string>}
  */
 export async function downloadCover(svg, format = 'svg', basename = 'cover', opts = {}) {
-  if (format === 'svg') return downloadBlob(svgToBlob(svg), `${basename}.svg`);
+  if (format === 'svg') {
+    downloadBlob(svgToBlob(svg), `${basename}.svg`);
+    return `${basename}.svg`;
+  }
   const ext = format === 'jpeg' || format === 'jpg' ? 'jpg' : format;
   const type = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`;
-  const blob = await rasterize(svg, { type, ...opts });
+  const blob = await rasterize(svg, { ...opts, type });
   // Browsers that can't encode a type (e.g. WebP in Safari) return PNG instead; name the file after what we got.
-  const actual = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' }[blob.type] ?? ext;
-  return downloadBlob(blob, `${basename}.${actual}`);
+  const name = `${basename}.${extensionOf(blob) ?? ext}`;
+  downloadBlob(blob, name);
+  return name;
+}
+
+/** The file extension for an image Blob's type, if it is one of ours. @param {Blob} blob */
+export function extensionOf(blob) {
+  return /** @type {Record<string, string>} */ ({ 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' })[
+    blob.type
+  ];
+}
+
+/**
+ * Copy a cover to the clipboard as a PNG image (`scale`, `width`, `height` as for `rasterize`).
+ * Needs a secure page and a browser that can write images to the clipboard (check `canCopyImage()`).
+ * @param {string} svg
+ * @param {{ scale?: number, width?: number, height?: number, background?: string }} [opts]
+ */
+export async function copyImage(svg, opts = {}) {
+  if (!canCopyImage()) throw new Error('This browser cannot copy images');
+  const png = rasterize(svg, { ...opts, type: 'image/png' });
+  // Handled below; without this, a failed render would also be reported as unhandled.
+  png.catch(() => {});
+  /** @type {ClipboardItem} */
+  let item;
+  try {
+    // A promise of the image, so Safari still counts the copy as part of the click.
+    item = new ClipboardItem({ 'image/png': png });
+  } catch {
+    // Browsers that want the image itself.
+    item = new ClipboardItem({ 'image/png': await png });
+  }
+  await navigator.clipboard.write([item]);
+}
+
+/** Whether `copyImage` can work here. */
+export function canCopyImage() {
+  return typeof ClipboardItem === 'function' && Boolean(navigator.clipboard?.write) && window.isSecureContext;
 }
 
 /** Copy text (e.g. SVG markup) to the clipboard, with a fallback for older browsers. */

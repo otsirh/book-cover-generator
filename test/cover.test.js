@@ -905,3 +905,48 @@ test('the Big Letter initial keeps its accent on the cover', () => {
     assert.ok(y - size * (0.72 + 0.3) >= 0, `seed ${seed}: top at ${y - size * 1.02}`);
   }
 });
+
+test('the language is set on the cover: given, or inferred from kana and Hangul', () => {
+  const lang = (/** @type {import('../src/index.js').CoverOptions} */ o) => createCover({ style: 'minimal', ...o });
+  assert.equal(lang({ title: 'ガラスの街' }).lang, 'ja');
+  assert.match(lang({ title: 'ガラスの街' }).svg, /^<svg [^>]* lang="ja" xml:lang="ja" /);
+  assert.equal(lang({ title: '채식주의자', author: '한강' }).lang, 'ko');
+  assert.equal(lang({ title: 'Kafka', author: '村上春樹', subtitle: 'うみべのカフカ' }).lang, 'ja');
+  // Chinese characters alone could be any of the three: no guess.
+  assert.equal(lang({ title: '红楼梦' }).lang, '');
+  assert.doesNotMatch(lang({ title: '红楼梦' }).svg, /lang=/);
+  assert.equal(lang({ title: '红楼梦', lang: 'zh-Hans' }).lang, 'zh-Hans');
+  assert.equal(lang({ title: 'ガラスの街', lang: 'zh-Hant' }).lang, 'zh-Hant');
+  for (const bad of ['en us', 'e', '"><script>', 12]) {
+    assert.throws(() => lang({ title: 'x', lang: /** @type {any} */ (bad) }), /language tag/);
+  }
+  // Inferring a language changes no artwork.
+  const ja = createCover({ title: 'ガラスの街', style: 'swiss', seed: 's' });
+  const given = createCover({ title: 'ガラスの街', style: 'swiss', seed: 's', lang: 'ja' });
+  assert.equal(ja.svg, given.svg);
+});
+
+test('the cover body nests in another SVG', () => {
+  const cover = createCover({ title: 'Nest', style: 'aurora', seed: 'n', texture: true });
+  assert.ok(cover.svg.endsWith(`${cover.body}</svg>`));
+  assert.doesNotMatch(cover.body, /^<svg/);
+  assert.match(cover.body, /texture-dark/);
+});
+
+test('the helpers the built-in styles use are exported for custom styles', async () => {
+  const lib = await import('../src/index.js');
+  for (const name of [
+    'strongAccents',
+    'textColor',
+    'tintText',
+    'fitTitleWith',
+    'textPanel',
+    'baselineOf',
+    'textBottom',
+    'textGroupAttrs',
+    'markExtent',
+  ]) {
+    assert.equal(typeof lib[/** @type {keyof typeof lib} */ (name)], 'function', name);
+  }
+  assert.equal(lib.TEXT_CONTRAST, 3);
+});

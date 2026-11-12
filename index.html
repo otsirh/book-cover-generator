@@ -6,7 +6,7 @@
     <title>Book Cover Generator: covers from a title and an author</title>
     <meta
       name="description"
-      content="Type a title and an author, get a book cover. 34 styles, 28 palettes, a seeded randomizer, and free SVG, PNG or JPEG downloads. Open source."
+      content="Type a title and an author, get a book cover. 34 styles, 28 palettes or your own colours, any size, and free SVG, PNG, JPEG or WebP downloads. Open source."
     />
     <link rel="canonical" href="https://covers.otsirh.dev/" />
     <meta name="color-scheme" content="light dark" />
@@ -18,7 +18,7 @@
     <meta property="og:title" content="Book Cover Generator" />
     <meta
       property="og:description"
-      content="Type a title and an author, get a book cover. 34 styles, 28 palettes, SVG, PNG and JPEG."
+      content="Type a title and an author, get a book cover. 34 styles, 28 palettes or your own colours, any size."
     />
     <meta property="og:url" content="https://covers.otsirh.dev/" />
     <meta property="og:image" content="https://covers.otsirh.dev/og.png" />
@@ -145,7 +145,7 @@
 
     <section class="intro">
       <h1>Type a title. Get a cover.</h1>
-      <p>34 styles · 28 palettes · free SVG, PNG and JPEG downloads</p>
+      <p>34 styles · 28 palettes or your own colours · any size · free downloads</p>
     </section>
 
     <main class="app">
@@ -252,6 +252,14 @@
           </div>
           <div class="swatches" id="swatches" role="group" aria-labelledby="palette-label"></div>
           <p class="swatch-name" id="palette-name" aria-hidden="true"></p>
+          <div class="custom-colors" id="custom-colors" role="group" aria-label="Your colours" hidden>
+            <label class="color"><input type="color" id="color-bg" /><span>Background</span></label>
+            <label class="color"><input type="color" id="color-ink" /><span>Text</span></label>
+            <label class="color"><input type="color" id="color-a1" /><span>Accent 1</span></label>
+            <label class="color"><input type="color" id="color-a2" /><span>Accent 2</span></label>
+            <label class="color"><input type="color" id="color-a3" /><span>Accent 3</span></label>
+            <p class="field-note" id="contrast-note"></p>
+          </div>
         </div>
 
         <div class="field">
@@ -280,10 +288,38 @@
 
         <div class="field">
           <span class="label" id="format-label">Format</span>
-          <div class="segmented" id="format" role="group" aria-labelledby="format-label">
+          <div class="segmented fit" id="format" role="group" aria-labelledby="format-label">
             <button type="button" data-format="paperback" title="2:3, like a 6 × 9 in paperback">Paperback</button>
             <button type="button" data-format="ebook" title="5:8, Kindle and most eBook stores">eBook</button>
             <button type="button" data-format="square" title="1:1, audiobooks">Square</button>
+            <button type="button" data-format="custom" title="Any size in pixels, such as a print trim size">
+              Custom
+            </button>
+          </div>
+          <div class="custom-size" id="custom-size" hidden>
+            <div class="size-inputs">
+              <label class="mini">
+                <span>Width</span>
+                <input id="size-w" type="number" inputmode="numeric" min="50" max="10000" step="1" />
+              </label>
+              <span class="times" aria-hidden="true">×</span>
+              <label class="mini">
+                <span>Height</span>
+                <input id="size-h" type="number" inputmode="numeric" min="50" max="10000" step="1" />
+              </label>
+              <span class="unit" aria-hidden="true">px</span>
+            </div>
+            <select id="size-preset" aria-label="Common sizes">
+              <option value="">Common sizes…</option>
+              <option value="1600x2560">Kindle eBook · 1600 × 2560</option>
+              <option value="1500x2400">Print 5 × 8 in · 1500 × 2400</option>
+              <option value="1650x2550">Print 5.5 × 8.5 in · 1650 × 2550</option>
+              <option value="1800x2700">Print 6 × 9 in · 1800 × 2700</option>
+              <option value="2550x3300">Print 8.5 × 11 in · 2550 × 3300</option>
+              <option value="2400x2400">Audiobook · 2400 × 2400</option>
+              <option value="1080x1350">Social post 4:5 · 1080 × 1350</option>
+            </select>
+            <p class="field-note" id="size-note">Print sizes are the front cover at 300 dpi, without bleed.</p>
           </div>
         </div>
 
@@ -324,9 +360,12 @@
           </button>
           <div class="secondary" role="group" aria-label="More export options">
             <button type="button" id="dl-jpeg" aria-label="Download JPEG">JPEG</button>
+            <button type="button" id="dl-webp" aria-label="Download WebP">WebP</button>
             <button type="button" id="dl-svg" aria-label="Download SVG">SVG</button>
+            <button type="button" id="copy-image" hidden>Copy image</button>
             <button type="button" id="copy-svg">Copy SVG</button>
             <button type="button" id="copy-link">Copy link</button>
+            <button type="button" id="share" hidden>Share</button>
             <button type="button" id="keep" aria-label="Keep this design">
               <svg aria-hidden="true"><use href="#i-star" /></svg> Keep
             </button>
@@ -343,11 +382,19 @@
           <p class="size-hint" id="size-hint"></p>
         </div>
 
-        <section class="kept" id="kept" aria-labelledby="kept-heading" hidden>
+        <section class="kept" id="kept" aria-labelledby="kept-heading">
           <div class="kept-head">
             <h2 id="kept-heading">Kept designs</h2>
-            <button type="button" class="kept-all" id="kept-all">Download all</button>
+            <div class="kept-tools">
+              <button type="button" class="kept-tool" id="kept-all">Download all</button>
+              <button type="button" class="kept-tool" id="kept-export">Export</button>
+              <button type="button" class="kept-tool" id="kept-import">Import</button>
+              <input type="file" id="kept-file" accept=".json,application/json" hidden />
+            </div>
           </div>
+          <p class="kept-empty" id="kept-empty">
+            None yet. <strong>Keep</strong> saves a design here, in this browser; Export saves them to a file.
+          </p>
           <ul class="kept-list" id="kept-list"></ul>
         </section>
       </section>

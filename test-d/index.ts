@@ -15,12 +15,27 @@ import generateDefault, {
   titleBlock,
   authorFit,
   splitLead,
+  strongAccents,
+  textColor,
+  fitTitleWith,
+  textPanel,
+  baselineOf,
+  textBottom,
   type Cover,
   type StyleGroup,
   type StyleContext,
   type StyleInfo,
 } from '../src/index.js';
-import { rasterize, downloadCover, copyText, svgToDataUrl } from '../src/browser.js';
+import {
+  rasterize,
+  downloadCover,
+  copyText,
+  copyImage,
+  canCopyImage,
+  setDpi,
+  zipFiles,
+  svgToDataUrl,
+} from '../src/browser.js';
 
 const cover: Cover = createCover({
   title: 'T',
@@ -32,6 +47,10 @@ const cover: Cover = createCover({
   height: 900,
 });
 const svg: string = generateCover({ title: cover.style });
+const body: string = cover.body;
+const coverLang: string = createCover({ title: 'ガラス', lang: 'ja' }).lang;
+// @ts-expect-error lang is a string
+createCover({ lang: true });
 const fromDefault: string = generateDefault();
 createCover({ palette: { bg: '#000', ink: '#fff', accents: ['#f00'] } });
 createCover({ style: 'random', palette: 'auto', seed: randomSeed() });
@@ -65,6 +84,15 @@ registerStyle({
     const r = c.rng.int(1, 3);
     const block = titleBlock(c, { maxWidth: c.W - c.m * 2, maxHeight: c.H / 2, maxSize: c.S * 0.2, stack: true });
     const a = authorFit(c, { maxSize: c.S * 0.05 });
+    const accent: string = strongAccents(c.p, c.p.bg)[0];
+    const ink: string = textColor(c.p, [c.p.bg, accent], [accent]);
+    const { value } = fitTitleWith(c, [0.5, 0.7] as const, (h) => ({
+      maxWidth: c.W,
+      maxHeight: c.H * h,
+      maxSize: c.S * 0.2,
+    }));
+    const panel = textPanel(c, block, a, { pad: c.m, gap: c.m / 2 });
+    void [ink, value, panel.y, baselineOf(a, 0, 0), textBottom(a, 0)];
     return (
       svgUtils.rect(0, 0, c.W, c.H, c.p.night) +
       drawText(t, { x: c.m, y: c.m * r, fill: c.p.paper }) +
@@ -91,5 +119,15 @@ void downloadCover(svg, 'jpeg', 'name', { scale: 2, quality: 0.9 });
 void copyText(svgToDataUrl(svg));
 // @ts-expect-error gif is not supported
 void downloadCover(svg, 'gif');
+const saved: Promise<string> = downloadCover(svg, 'webp', 'name', { width: 1600, dpi: 300 });
+void rasterize(svg, { height: 2560, dpi: 300 });
+void setDpi(new Blob(), 300);
+const zip: Promise<Blob> = zipFiles([
+  { name: 'a.svg', data: svg },
+  { name: 'b.png', data: new Blob() },
+]);
+if (canCopyImage()) void copyImage(svg, { scale: 2 });
+// @ts-expect-error copyImage always makes a PNG
+void copyImage(svg, { type: 'image/jpeg' });
 
-export { fromDefault, ids, info, firstPalette, blob, group, lead };
+export { fromDefault, ids, info, firstPalette, blob, group, lead, body, coverLang, saved, zip };

@@ -9,8 +9,19 @@ import { BREAKING_SPACE, clipGraphemes } from './text.js';
 import { styleList } from './styles/index.js';
 
 export { palettes } from './palettes.js';
-export { FONTS, fitText, drawText, measureText, setTextMeasurer } from './text.js';
+export {
+  FONTS,
+  fitText,
+  drawText,
+  measureText,
+  setTextMeasurer,
+  baselineOf,
+  textBottom,
+  textGroupAttrs,
+  markExtent,
+} from './text.js';
 export { titleBlock, authorFit, fitStack, drawStack, splitLead } from './type.js';
+export { strongAccents, textColor, tintText, fitTitleWith, textPanel, TEXT_CONTRAST } from './styles/util.js';
 export * as svgUtils from './core.js';
 
 /**
@@ -129,6 +140,28 @@ function dimension(value, fallback, name) {
   return Math.round(v);
 }
 
+/** A BCP 47 language tag, loosely: `ja`, `zh-Hant`, `pt-BR`, `sr-Latn-RS`. */
+const LANG_TAG = /^[a-z]{2,3}(?:-[a-z\d]{1,8})*$/i;
+const KANA = /[\p{Script=Hiragana}\p{Script=Katakana}]/u;
+const HANGUL = /\p{Script=Hangul}/u;
+
+/**
+ * The cover's language: the one given, else Japanese for text with kana and Korean for text
+ * with Hangul (so shared Chinese characters get those countries' glyphs), else none.
+ * @param {unknown} lang @param {string} text
+ */
+function resolveLang(lang, text) {
+  if (lang != null && lang !== '') {
+    if (typeof lang !== 'string' || !LANG_TAG.test(lang)) {
+      throw new RangeError(`lang must be a language tag such as "ja" or "zh-Hant", got ${JSON.stringify(lang)}`);
+    }
+    return lang;
+  }
+  if (KANA.test(text)) return 'ja';
+  if (HANGUL.test(text)) return 'ko';
+  return '';
+}
+
 /**
  * The cleaned title and author, the seed, and the style id a cover with these options uses.
  * @param {Pick<import('./index.js').CoverOptions, 'title' | 'author' | 'seed' | 'style'>} options
@@ -160,6 +193,7 @@ export function createCover(options = {}) {
   const subtitle = cleanText(options.subtitle, 300);
   const W = dimension(options.width, 600, 'width');
   const H = dimension(options.height, W * 1.5, 'height');
+  const lang = resolveLang(options.lang, `${title} ${subtitle} ${author}`);
   if (W / H > 3 || H / W > 3) {
     throw new RangeError(`The aspect ratio must be between 1:3 and 3:1, got ${W}×${H}`);
   }
@@ -196,10 +230,12 @@ export function createCover(options = {}) {
     body += `<defs>${dark.defs}${light.defs}</defs>${dark.layer}${light.layer}`;
   }
   const label = escapeXml(`${title}${subtitle ? `: ${subtitle}` : ''}${author ? ` by ${author}` : ''}`);
+  // (Both spellings: `lang` is SVG 2's, `xml:lang` what older renderers read.)
+  const langAttrs = lang ? ` lang="${lang}" xml:lang="${lang}"` : '';
   const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${label}">` +
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"${langAttrs} role="img" aria-label="${label}">` +
     `<title>${label}</title>${body}</svg>`;
-  return { svg, style: styleId, palette: palette.id, seed, width: W, height: H };
+  return { svg, body, style: styleId, palette: palette.id, seed, width: W, height: H, lang };
 }
 
 /**

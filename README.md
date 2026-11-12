@@ -6,7 +6,7 @@
 ![Types](https://img.shields.io/badge/types-included-blue)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-Generate book covers from a **title** and an **author**. 34 styles, 28 palettes, a seeded randomizer, and export to **SVG, PNG or JPEG**. The library has no dependencies and ships TypeScript types. It's written as plain ES modules, so it runs in the browser and in Node.
+Generate book covers from a **title** and an **author**. 34 styles, 28 palettes or your own colours, a seeded randomizer, any size, and export to **SVG, PNG, JPEG or WebP**. The library has no dependencies and ships TypeScript types. It's written as plain ES modules, so it runs in the browser and in Node.
 
 **[▶ Open the generator](https://covers.otsirh.dev)**
 
@@ -25,18 +25,23 @@ Generate book covers from a **title** and an **author**. 34 styles, 28 palettes,
 - **Typography that responds to the title.** Short titles are set large, a leading "The" or "A" becomes a small line above the title, and some styles stack the words edge to edge. Long titles wrap with balanced lines and shrink to fit. Author names stay readable at thumbnail size. Accents, emoji, Chinese, Japanese and Thai are handled.
 - **Subtitle or tagline**, and an optional **paper texture**.
 - **Randomizer.** Every random choice comes from a seed, so the same seed always gives the same cover. If you don't pass a seed, it is derived from the title and author.
-- **Any size.** 2:3 paperback, 5:8 eBook, 1:1 audiobook, or any width × height from 50 to 10,000 px with an aspect ratio between 1:3 and 3:1.
-- **Export.** Copy the SVG, or download it as SVG, PNG or JPEG at up to 4× resolution.
+- **Any size.** 2:3 paperback, 5:8 eBook, 1:1 audiobook, or any width × height from 50 to 10,000 px with an aspect ratio between 1:3 and 3:1, such as Kindle's 1600 × 2560 or a print trim size at 300 dpi.
+- **Export.** Download SVG, PNG, JPEG or WebP. PNG and JPEG files record 300 dpi, so print software sizes them right. Copy the image or the SVG, or share it from a phone.
 
 ## The web app
 
 On [covers.otsirh.dev](https://covers.otsirh.dev) you type a title and author, then choose:
 
 - **a style**, from a rail that previews your book in all 34 styles;
-- **a palette**, from swatches that show the background, text colour and accents;
-- **a variation**, the seed behind the artwork: the strip under the preview shows six others to click.
+- **a palette**, from swatches that show the background, text colour and accents, or **Custom** for your own five colours (it starts from the palette on the cover and shows the text contrast);
+- **a variation**, the seed behind the artwork: the strip under the preview shows six others to click;
+- **a format**: paperback, eBook, square, or **Custom** for any size in pixels, typed in or picked from common sizes (Kindle, print trim sizes at 300 dpi, audiobook, social posts).
 
-**Randomize** reshuffles everything, except what you've locked. Undo and redo step back and forth through your designs, and so do the browser's Back and Forward buttons. **Keep** saves a design to a tray under the preview, and **Download all** saves every kept design as a PNG. **Copy link** shares the exact design, because the URL holds every setting. The export panel tells you which size suits Kindle, print or audiobook covers.
+**Randomize** reshuffles everything, except what you've locked. Undo and redo step back and forth through your designs, and so do the browser's Back and Forward buttons. **Copy link** shares the exact design, because the URL holds every setting. The export panel tells you which size suits Kindle, print or audiobook covers.
+
+**Keep** saves a design to a tray under the preview, together with the cover as it was drawn, so a later version of the app can't change it. **Download all** saves every kept design as a PNG in one ZIP file. **Export** saves the kept designs to a file, and **Import** adds them in another browser.
+
+The app works offline once it has loaded.
 
 Keyboard shortcuts:
 
@@ -94,7 +99,14 @@ npx github:otsirh/book-cover-generator "The Lighthouse Keeper" "Mara Ellison" --
 npx github:otsirh/book-cover-generator --list   # all styles and palettes
 ```
 
-Options: `-s/--style`, `-p/--palette`, `--subtitle`, `--texture`, `--seed`, `--width`, `--height`, `-o/--out`, `--list`, `--help`.
+```sh
+# your own colours (the # is optional), as an eBook 1600 px wide
+npx github:otsirh/book-cover-generator "Bright Machines" --bg 0b132b --ink f8f9fa --accent ff6b6b,4ecdc4 --format ebook --width 1600 -o cover.svg
+# any size, and the choices as JSON (with the SVG, when there is no -o)
+npx github:otsirh/book-cover-generator "Neon Tide" --size 1800x2700 --json
+```
+
+Options: `-s/--style`, `-p/--palette`, `--bg`, `--ink`, `--accent`, `--subtitle`, `--texture`, `--seed`, `--format` (`paperback`, `ebook` or `square`), `--width`, `--height`, `--size`, `--lang`, `-o/--out`, `--json`, `--list`, `--help`.
 
 ## API
 
@@ -102,9 +114,9 @@ Options: `-s/--style`, `-p/--palette`, `--subtitle`, `--texture`, `--seed`, `--w
 
 Returns the SVG markup.
 
-### `createCover(options) → { svg, style, palette, seed, width, height }`
+### `createCover(options) → { svg, body, style, palette, seed, width, height, lang }`
 
-Same as `generateCover`, but also tells you which style and palette were chosen. This is useful when either one was random.
+Same as `generateCover`, but also tells you which style and palette were chosen. This is useful when either one was random. `body` is the markup inside the outer `<svg>`, for nesting the cover in a larger SVG (its ids are unique to the cover, so several can share a document).
 
 | option     | type               | default                | notes                                          |
 | ---------- | ------------------ | ---------------------- | ---------------------------------------------- |
@@ -117,6 +129,9 @@ Same as `generateCover`, but also tells you which style and palette were chosen.
 | `seed`     | `string \| number` | hash of title + author | controls every random choice                   |
 | `width`    | `number`           | `600`                  | px, 50–10000; aspect ratio 1:3 to 3:1          |
 | `height`   | `number`           | `width × 1.5`          | px, 50–10000                                   |
+| `lang`     | `string`           | inferred               | language of the text, such as `'ja'`           |
+
+`lang` is set on the cover so Chinese characters get the right glyphs for the language. Without it, text with kana is marked Japanese and text with Hangul Korean; pass `'zh-Hans'`, `'zh-Hant'` or `'ja'` for text in Chinese characters only.
 
 Titles and subtitles longer than 300 characters (authors: 200) are cut. With `'random'`, the style and palette are picked from the seed, so you get the same result every time for the same seed. Some styles prefer dark or light palettes when they pick one themselves. Invalid options throw an error that says what's wrong.
 
@@ -129,7 +144,8 @@ Titles and subtitles longer than 300 characters (authors: 200) are cut. With `'r
 - `pickStyle(options)`: the style id `createCover` would use for these options (resolving `'random'` from the seed), without drawing the cover
 - `registerStyle({ id, name, description, group, prefer, render(ctx) })`: add your own style (see below)
 - `titleBlock`, `authorFit`: the typography the built-in styles use (a title with its lead line and subtitle, and the author line)
-- `fitText`, `drawText`, `fitStack`, `drawStack`, `splitLead`, `measureText`, `setTextMeasurer`, `FONTS`: lower-level text helpers (`fitText` can hyphenate one long word with `hyphenate: px`)
+- `fitText`, `drawText`, `fitStack`, `drawStack`, `splitLead`, `measureText`, `setTextMeasurer`, `FONTS`: lower-level text helpers (`fitText` can hyphenate one long word with `hyphenate: px`), and `baselineOf`, `textBottom`, `textGroupAttrs`, `markExtent` for styles that draw text themselves
+- `strongAccents`, `textColor`, `tintText`, `fitTitleWith`, `textPanel`, `TEXT_CONTRAST`: the colour and layout helpers the built-in styles use (accents that stand out, text colours that stay readable, giving up art for a longer title, a panel for title and author)
 - `svgUtils`: the SVG, colour and noise helpers the built-in styles use
 
 ### TypeScript
@@ -139,14 +155,22 @@ Types are included. `CoverOptions`, `Cover`, `StyleId`, `PaletteId`, `StyleGroup
 ### Export helpers (browser)
 
 ```js
-import { downloadCover, rasterize, copyText, svgToDataUrl } from 'book-cover-generator/browser';
+import { downloadCover, rasterize, copyText, copyImage, zipFiles } from 'book-cover-generator/browser';
 
 await copyText(svg); // copy SVG markup
+await copyImage(svg, { scale: 2 }); // copy a PNG (where canCopyImage() is true)
 await downloadCover(svg, 'svg', 'my-cover'); // my-cover.svg
-await downloadCover(svg, 'png', 'my-cover', { scale: 3 }); // 1800×2700 PNG
-await downloadCover(svg, 'jpeg', 'my-cover', { scale: 2, quality: 0.9 });
-const blob = await rasterize(svg, { type: 'image/webp', scale: 2 });
+await downloadCover(svg, 'png', 'my-cover', { scale: 3, dpi: 300 }); // 1800×2700 PNG that prints at 6 × 9 in
+await downloadCover(svg, 'jpeg', 'my-cover', { width: 1600, quality: 0.9 }); // exactly 1600 px wide
+const name = await downloadCover(svg, 'webp', 'my-cover'); // 'my-cover.png' where WebP can't be made
+const blob = await rasterize(svg, { type: 'image/webp', width: 1600, height: 2560 });
+const zip = await zipFiles([
+  { name: 'cover.png', data: blob },
+  { name: 'cover.svg', data: svg },
+]);
 ```
+
+`setDpi(blob, dpi)` records the pixel density in a PNG or JPEG you made yourself. It and `zipFiles` also work in Node.
 
 ### Custom palette
 
@@ -228,7 +252,7 @@ src/            the library (plain ES modules + .d.ts types)
   styles/       the 34 styles, one file per family
 bin/            the CLI
 site/           the web app (index.html is at the root)
-public/         files served at the site root: headers, 404, icons, manifest
+public/         files served at the site root: headers, 404, icons, manifest, service worker
 test/           unit tests (node --test)
 test-d/         type tests (tsc)
 e2e/            browser tests (Playwright)

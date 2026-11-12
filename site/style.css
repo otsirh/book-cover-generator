@@ -49,6 +49,11 @@
   box-sizing: border-box;
 }
 
+/* Hidden means hidden, whatever display a rule gives the element. */
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -62,7 +67,8 @@ a {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
   color: inherit;
 }
@@ -431,6 +437,119 @@ input::placeholder {
   color: var(--muted);
 }
 
+/* The Custom swatch: your colours once you have some, a colour wheel before. */
+.swatch.custom:not(.has-colors) {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--text);
+  background: var(--surface-2);
+  border-style: dashed;
+  border-color: var(--muted);
+}
+
+/* Background and text side by side, the three accents below them. */
+.custom-colors {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.color:nth-child(-n + 2) {
+  grid-column: span 3;
+}
+
+.color {
+  grid-column: span 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+  cursor: pointer;
+}
+
+.color input {
+  width: 100%;
+  height: 32px;
+  padding: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.color input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.field-note {
+  grid-column: 1 / -1;
+  min-height: 1lh;
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.field-note.warn {
+  color: var(--text);
+}
+
+.custom-size {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.size-inputs {
+  display: flex;
+  align-items: end;
+  gap: 6px;
+}
+
+.mini {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.times,
+.unit {
+  padding-bottom: 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+input[type='number'],
+select {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  padding: 0 10px;
+  /* (Not the small, muted text of the labels around them.) */
+  font-size: 14px;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  font-variant-numeric: tabular-nums;
+}
+
+input[type='number']:focus,
+select:focus {
+  border-color: var(--focus);
+  outline: none;
+}
+
+input[type='number'][aria-invalid='true'] {
+  border-color: var(--accent);
+}
+
 .segmented {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -443,6 +562,11 @@ input::placeholder {
 
 .segmented.compact {
   grid-template-columns: repeat(4, 1fr);
+}
+
+/* Columns as wide as their labels (Paperback is wider than Square). */
+.segmented.fit {
+  grid-template-columns: repeat(4, auto);
 }
 
 .segmented button {
@@ -822,7 +946,14 @@ input::placeholder {
   gap: 12px;
 }
 
-.kept-all {
+.kept-tools {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: end;
+  gap: 4px;
+}
+
+.kept-tool {
   min-height: 24px;
   padding: 2px 10px;
   border: 1px solid var(--line);
@@ -833,9 +964,15 @@ input::placeholder {
   cursor: pointer;
 }
 
-.kept-all[aria-busy='true'] {
+.kept-tool[aria-busy='true'] {
   cursor: progress;
   opacity: 0.6;
+}
+
+.kept-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
 }
 
 .kept-label {

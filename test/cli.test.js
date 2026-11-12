@@ -113,3 +113,69 @@ test(
     assert.doesNotMatch(stderr, /EPIPE|Unhandled/);
   },
 );
+
+test('your own colours, a format and a size', async () => {
+  const custom = await cli(
+    'Bright',
+    '--bg',
+    '0b132b',
+    '--ink',
+    '#f8f9fa',
+    '--accent',
+    'ff6b6b,4ecdc4',
+    '-s',
+    'minimal',
+  );
+  assert.equal(custom.code, 0);
+  assert.match(custom.stdout, /fill="#0b132b"/);
+  const ebook = await cli('T', '--format', 'ebook', '--width', '1600');
+  assert.match(ebook.stdout, /^<svg[^>]*width="1600" height="2560"/);
+  const square = await cli('T', '--format', 'square');
+  assert.match(square.stdout, /^<svg[^>]*width="600" height="600"/);
+  const sized = await cli('T', '--size', '1650x2550');
+  assert.match(sized.stdout, /^<svg[^>]*width="1650" height="2550"/);
+});
+
+test('--json reports the choices, with the SVG unless it went to a file', async () => {
+  const printed = await cli('ガラスの街', '--seed', 's', '--size', '1600x2560', '--json');
+  assert.equal(printed.code, 0);
+  const data = JSON.parse(printed.stdout);
+  assert.equal(data.width, 1600);
+  assert.equal(data.lang, 'ja');
+  assert.match(data.svg, /^<svg[^>]* lang="ja"/);
+  const dir = await mkdtemp(join(tmpdir(), 'book-cover-'));
+  try {
+    const out = join(dir, 'cover.svg');
+    const written = await cli('T', '-s', 'swiss', '-p', 'mint', '--json', '-o', out);
+    assert.equal(written.stderr, '');
+    assert.deepEqual(JSON.parse(written.stdout), {
+      file: out,
+      style: 'swiss',
+      palette: 'mint',
+      seed: 'T␟',
+      width: 600,
+      height: 900,
+      lang: '',
+    });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('conflicting or incomplete options are reported', async () => {
+  for (const [args, message] of [
+    [['T', '--bg', 'fff', '--ink', '000'], /at least one --accent/],
+    [['T', '--bg', 'fff', '--ink', '000', '--accent', 'f00', '-p', 'mint'], /not both/],
+    [['T', '--bg', 'red', '--ink', '000', '--accent', 'f00'], /hex/],
+    [['T', '--size', '1600'], /--size must look like 1600x2560/],
+    [['T', '--size', '1600x2560', '--width', '600'], /without --width/],
+    [['T', '--format', 'a4'], /Unknown format "a4"/],
+    [['T', '--format', 'ebook', '--height', '900'], /use --size/],
+    [['T', '--lang', 'not a tag'], /language tag/],
+  ]) {
+    const { code, stdout, stderr } = await cli(.../** @type {string[]} */ (args));
+    assert.equal(code, 1, args.join(' '));
+    assert.equal(stdout, '');
+    assert.match(stderr, /** @type {RegExp} */ (message));
+  }
+});
