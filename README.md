@@ -1,6 +1,7 @@
 # Book Cover Generator
 
 [![CI](https://github.com/otsirh/book-cover-generator/actions/workflows/ci.yml/badge.svg)](https://github.com/otsirh/book-cover-generator/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/book-cover-generator)](https://www.npmjs.com/package/book-cover-generator)
 [![Website](https://img.shields.io/website?url=https%3A%2F%2Fcovers.otsirh.dev&label=covers.otsirh.dev)](https://covers.otsirh.dev)
 ![Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)
 ![Types](https://img.shields.io/badge/types-included-blue)
@@ -58,7 +59,7 @@ The single-key shortcuts can be turned off under the controls (for example with 
 
 ```html
 <script type="module">
-  import { generateCover } from 'https://cdn.jsdelivr.net/gh/otsirh/book-cover-generator@1/src/index.js';
+  import { generateCover } from 'https://cdn.jsdelivr.net/npm/book-cover-generator@1/src/index.js';
 
   document.body.innerHTML = generateCover({
     title: 'The Lighthouse Keeper',
@@ -74,7 +75,7 @@ The single-key shortcuts can be turned off under the controls (for example with 
 ### Node / bundlers
 
 ```sh
-npm install "github:otsirh/book-cover-generator#semver:^1"
+npm install book-cover-generator
 ```
 
 ```js
@@ -95,17 +96,17 @@ writeFileSync('cover.svg', svg);
 ### CLI
 
 ```sh
-npx github:otsirh/book-cover-generator "The Lighthouse Keeper" "Mara Ellison" --style artdeco -o cover.svg
-npx github:otsirh/book-cover-generator --list   # all styles and palettes
+npx book-cover-generator "The Lighthouse Keeper" "Mara Ellison" --style artdeco -o cover.svg
+npx book-cover-generator --list   # all styles and palettes
 ```
 
 ```sh
 # your own colours (the # is optional), as an eBook 1600 px wide
-npx github:otsirh/book-cover-generator "Bright Machines" --bg 0b132b --ink f8f9fa --accent ff6b6b,4ecdc4 --format ebook --width 1600 -o cover.svg
+npx book-cover-generator "Bright Machines" --bg 0b132b --ink f8f9fa --accent ff6b6b,4ecdc4 --format ebook --width 1600 -o cover.svg
 # any size, and the choices as JSON (with the SVG, when there is no -o)
-npx github:otsirh/book-cover-generator "Neon Tide" --size 1800x2700 --json
+npx book-cover-generator "Neon Tide" --size 1800x2700 --json
 # twelve variations to choose from: ideas/cover-1.svg … ideas/cover-12.svg (seeds 1 to 12)
-npx github:otsirh/book-cover-generator "Salt and Static" --count 12 -o ideas/cover.svg
+npx book-cover-generator "Salt and Static" --count 12 -o ideas/cover.svg
 ```
 
 Options: `-s/--style`, `-p/--palette`, `--bg`, `--ink`, `--accent`, `--subtitle`, `--texture`, `--seed`, `--format` (`paperback`, `ebook` or `square`), `--width`, `--height`, `--size`, `--lang`, `-o/--out`, `--count`, `--json`, `--list`, `--help`.

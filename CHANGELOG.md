@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Changed
+
+- The package is on npm: `npm install book-cover-generator`, `npx book-cover-generator`, and the CDN link `cdn.jsdelivr.net/npm/book-cover-generator@1`.
+
 ## [1.4.0] - 2026-11-12
 
 Your own colours, any size, more ways to export, kept designs that last, and the app offline.

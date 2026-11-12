@@ -427,7 +427,7 @@
         <div>
           <h3>Browser (CDN)</h3>
           <pre tabindex="0"><code>import { generateCover } from
-  'https://cdn.jsdelivr.net/gh/otsirh/book-cover-generator@1/src/index.js';
+  'https://cdn.jsdelivr.net/npm/book-cover-generator@1/src/index.js';
 
 const svg = generateCover({
   title: 'The Lighthouse Keeper',
@@ -439,7 +439,7 @@ document.body.innerHTML = svg;</code></pre>
         </div>
         <div>
           <h3>Node / bundlers</h3>
-          <pre tabindex="0"><code>npm install "github:otsirh/book-cover-generator#semver:^1"
+          <pre tabindex="0"><code>npm install book-cover-generator
 
 import { createCover } from 'book-cover-generator';
 
