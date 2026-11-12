@@ -1735,6 +1735,15 @@ test('a link may name the style, palette and font as the menus do, as the HTTP A
   await expect(page.locator('#texture')).toBeChecked();
 });
 
+test('the first paint takes a link’s format as the app does: the last given, trimmed', async ({ page }) => {
+  await page.goto('/#title=Shape&style=minimal&format=paperback&format=%20square&seed=f');
+  expect(await page.evaluate(() => document.documentElement.dataset.coverFormat)).toBe('square');
+  await page.goto('about:blank');
+  // A size the library can't make isn't painted (the app keeps its own).
+  await page.goto('/#title=Shape&style=minimal&format=10x90&seed=f');
+  expect(await page.evaluate(() => document.documentElement.dataset.coverFormat ?? '')).not.toBe('custom');
+});
+
 test('a Japanese title sets the language of the cover', async ({ page }) => {
   await page.goto(`/#title=${encodeURIComponent('ガラスの街')}&style=minimal&seed=j`);
   expect(await svgOf(page, '#preview')).toMatch(/^<svg [^>]* lang="ja"/);

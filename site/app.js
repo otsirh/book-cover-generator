@@ -265,7 +265,7 @@ function minorOf(v) {
 
 /** Say so when a link was made with an earlier minor version, which may have drawn it differently. @param {string} hash */
 function noteVersion(hash) {
-  const made = new URLSearchParams(hash.replace(/^#/, '')).get('v');
+  const made = lastValues(new URLSearchParams(hash.replace(/^#/, ''))).v ?? null;
   const then = minorOf(made);
   const now = minorOf(version);
   if (then !== null && now !== null && then < now) {

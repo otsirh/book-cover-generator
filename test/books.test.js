@@ -140,3 +140,13 @@ test('a shared pin no style offers is reported for every book, whichever style i
     );
   }
 });
+
+test('shared pins are checked on every call, as they are then', async () => {
+  const { optionsForBook, styleIdFor } = await import('../src/index.js');
+  const shared = { style: 'silhouette', variants: { scene: 'forest' } };
+  optionsForBook({ title: 'A' }, shared);
+  shared.variants.scene = 'desert';
+  assert.throws(() => optionsForBook({ title: 'B', style: 'retro' }, shared), /No style has scene "desert"/);
+  assert.equal(styleIdFor('art deco'), 'artdeco');
+  assert.equal(styleIdFor('nothing'), undefined);
+});

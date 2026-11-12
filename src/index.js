@@ -190,6 +190,15 @@ const paletteList = /** @type {import('./palettes.js').Palette[]} */ (/** @type 
 /** @type {Map<string, import('./palettes.js').Palette>} */
 const builtInPalettes = new Map(paletteList.map((p) => [p.id, p]));
 
+/**
+ * The id of the style that `name` names, by id or name in any case ('Art Deco', 'artdeco'), or
+ * undefined if none does.
+ * @param {string} name
+ */
+export function styleIdFor(name) {
+  return idFor(name, registry.values());
+}
+
 /** Metadata for every available style: [{ id, name, description, group }] */
 export function listStyles() {
   return [...registry.values()].map(({ id, name, description, group, variants, genres: suits }) => ({
@@ -583,9 +592,6 @@ export function generateCover(options = {}) {
 
 export default generateCover;
 
-/** Shared pins optionsForBook has checked already. @type {WeakSet<object>} */
-const checkedPins = new WeakSet();
-
 /**
  * Cover options for a book from a list (see `parseBookList`) over `defaults`, the options every
  * book shares. The book's own values win, and a size it gives replaces both sides of the
@@ -605,12 +611,7 @@ export function optionsForBook(book, defaults = {}) {
     throw new Error(`Unknown style "${String(defaults.style)}". Available: ${[...registry.keys()].join(', ')}`);
   }
   // A shared pin no style offers is reported for every book, whichever style each one gets.
-  // (Checked once for the shared pins of a whole list.)
-  const pins = defaults.variants;
-  if (pins != null && typeof pins === 'object' && !checkedPins.has(pins)) {
-    checkOffered(pinsByName(pins));
-    checkedPins.add(pins);
-  }
+  if (defaults.variants != null && typeof defaults.variants === 'object') checkOffered(pinsByName(defaults.variants));
   const own = unsetStyle(book.style) ? undefined : idFor(book.style, registry.values());
   const genre = idFor(book.genre, genreList);
   const sharedEntry = shared === undefined ? undefined : registry.get(shared);

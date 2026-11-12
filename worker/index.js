@@ -11,10 +11,11 @@ import { createCover, createMockup, formats, version } from '../src/index.js';
 import { CUSTOM_SIZE, customColors, hex } from '../src/shared.js';
 import { LINK, lastValues } from '../src/link.js';
 
-/** A size in px as typed (whole or decimal), else an error naming the parameter. @param {string} key @param {string} raw */
+/** A size in px, as the CLI reads one (the library checks its range), else an error naming the parameter. @param {string} key @param {string} raw */
 function px(key, raw) {
-  if (!/^\s*\d+(?:\.\d+)?\s*$/.test(raw)) throw new RangeError(`${key} must be a number of px, got "${raw}"`);
-  return Number(raw);
+  const value = Number(raw);
+  if (!raw.trim() || !Number.isFinite(value)) throw new RangeError(`${key} must be a number of px, got "${raw}"`);
+  return value;
 }
 
 /**
@@ -50,10 +51,11 @@ export function coverOptions(q) {
     if (colors) o.palette = { bg: colors[0], ink: colors[1], accents: colors.slice(2) };
     else if (read !== 'auto') o.palette = read ?? palette;
   }
-  const titleCase = given('case') ?? given('titleCase');
+  const caseKey = given('case') !== undefined ? 'case' : 'titleCase';
+  const titleCase = given(caseKey);
   if (titleCase !== undefined) {
     o.titleCase = LINK.case(titleCase);
-    if (!o.titleCase) throw new RangeError(`case is upper or normal, got "${titleCase}"`);
+    if (!o.titleCase) throw new RangeError(`${caseKey} is upper or normal, got "${titleCase}"`);
   }
   const texture = given('texture');
   if (texture !== undefined) {
@@ -72,12 +74,12 @@ export function coverOptions(q) {
   const height = given('height') === undefined ? undefined : px('height', /** @type {string} */ (given('height')));
   const format = given('format');
   if (format !== undefined) {
-    const read = LINK.format(format);
-    const size = !read
-      ? null
-      : Object.hasOwn(formats, read)
-        ? formats[/** @type {keyof typeof formats} */ (read)]
-        : CUSTOM_SIZE.exec(read)?.slice(1).map(Number);
+    // A preset, or any WxH shape: a width or height may scale it, and the library checks the size
+    // it comes to (saying what's wrong with it).
+    const read = format.trim();
+    const size = Object.hasOwn(formats, read)
+      ? formats[/** @type {keyof typeof formats} */ (read)]
+      : CUSTOM_SIZE.exec(read)?.slice(1).map(Number);
     if (!size) {
       throw new RangeError(
         `Unknown format "${format}". Use one of ${Object.keys(formats).join(', ')}, or a size such as 1600x2560`,

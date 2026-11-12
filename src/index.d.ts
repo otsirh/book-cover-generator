@@ -49,6 +49,8 @@ export declare function parseBookList(text: string): CoverOptions[];
  * suits it. A shared style that doesn't exist throws.
  */
 export declare function optionsForBook(book: CoverOptions, defaults?: CoverOptions): CoverOptions;
+/** The id of the style that `name` names, by id or name in any case ('Art Deco', 'artdeco'), or undefined. */
+export declare function styleIdFor(name: string): string | undefined;
 /** The cover as a product shot (flat, book, e-reader) or on a social card, as SVG. */
 export declare function createMockup(
   cover: Cover,

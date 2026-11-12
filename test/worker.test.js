@@ -183,3 +183,11 @@ test('the API and the app read one link alike: the last of a repeated key, CRLF,
   assert.equal(bad.status, 400);
   assert.match(await bad.text(), /Unknown style "Art Decco"/);
 });
+
+test('a format is a shape a width or height may scale; the library says what’s wrong with a size', () => {
+  assert.deepEqual(coverOptions(new URLSearchParams('format=10x16&width=1600')), { width: 1600, height: 2560 });
+  assert.deepEqual(coverOptions(new URLSearchParams('format=16x25&height=2500')), { width: 1600, height: 2500 });
+  assert.deepEqual(coverOptions(new URLSearchParams('width=1e3')), { width: 1000 });
+  assert.throws(() => coverOptions(new URLSearchParams('titleCase=bold')), /titleCase is upper or normal, got "bold"/);
+  assert.throws(() => createCover(coverOptions(new URLSearchParams('format=12000x18000'))), /10000/);
+});

@@ -3,7 +3,7 @@
 // design the app stored) and gives the field's value, or undefined for one it can't read: the app
 // drops it, the API says so. (Not part of the library's API.)
 
-import { listStyles, palettes, formats, sizeLimits } from './index.js';
+import { styleIdFor, palettes, formats, sizeLimits } from './index.js';
 import { LINE_BREAK, clipGraphemes } from './text.js';
 import {
   idFor,
@@ -45,7 +45,7 @@ export const LINK = {
   /** A style's id or name, in any case ('random' is left to the title: undefined). @param {unknown} v */
   style: (v) => {
     const t = oneLine(v);
-    return reserved(t, STYLE_WORDS) ? undefined : idFor(t, listStyles());
+    return t == null || reserved(t, STYLE_WORDS) ? undefined : styleIdFor(t);
   },
   /** Pins as name.value pairs joined by '-', in any case. @param {unknown} v */
   variant: (v) => oneOf(oneLine(v)?.trim().toLowerCase(), (t) => VARIANT.test(t)),
