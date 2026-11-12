@@ -199,6 +199,38 @@ test('keyboard shortcuts: R, arrows and brackets, but not while typing', async (
   await expect(page.locator('#seed')).not.toHaveValue('fixed');
 });
 
+test('shortcuts follow the printed key, on any keyboard layout', async ({ page }) => {
+  await page.goto('/#style=minimal&seed=k');
+  await page.locator('.tile[data-style="swiss"]').click();
+  await selected(page, 'swiss');
+  // AZERTY: the key printed "z" sits where QWERTY has "w".
+  await page.evaluate(() =>
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', code: 'KeyW', bubbles: true })),
+  );
+  await selected(page, 'minimal');
+  // Russian layout: "к" on the R key falls back to the key position.
+  await page.evaluate(() =>
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'к', code: 'KeyR', bubbles: true })),
+  );
+  await expect(page.locator('#seed')).not.toHaveValue('k');
+});
+
+test('a hand-edited URL is rewritten to hold the whole design', async ({ page }) => {
+  await page.goto('/#title=Neon+Tide&author=Kai&style=retro&palette=synth&seed=one&format=ebook');
+  await page.evaluate(() => {
+    location.hash = 'style=orbit&seed=two';
+  });
+  await selected(page, 'orbit');
+  await expect(page).toHaveURL(/title=Neon\+Tide.*palette=synth.*seed=two.*format=ebook/);
+});
+
+test('the rail says when every style picks its own palette', async ({ page }) => {
+  await page.goto('/#style=minimal&palette=auto&seed=a');
+  await expect(page.locator('#rail-note')).toContainText('palette picked for it');
+  await page.locator('[data-palette="mint"]').click();
+  await expect(page.locator('#rail-note')).toContainText('In Mint');
+});
+
 test('kept designs are saved, restored and removed', async ({ page }) => {
   await page.goto('/#title=Keeper&style=artdeco&palette=midnight&seed=k');
   await expect(page.locator('#kept')).toBeHidden();

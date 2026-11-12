@@ -70,3 +70,10 @@ test('fails clearly on bad input', async () => {
     assert.ok(stderr.length > 0);
   }
 });
+
+test('--subtitle and --texture', async () => {
+  const { code, stdout } = await cli('Dune', 'Herbert', '--subtitle', 'A Novel', '--texture', '-s', 'minimal');
+  assert.equal(code, 0);
+  assert.match(stdout, /<title>Dune: A Novel by Herbert<\/title>/);
+  assert.match(stdout, /feTurbulence/);
+});

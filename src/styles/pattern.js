@@ -12,6 +12,8 @@ import {
   makeNoise2D,
   fbm,
   ridge,
+  quarterDisc,
+  halfDisc,
   blurFilter,
   shadowFilter,
   linearGradient,
@@ -73,11 +75,7 @@ export const mosaic = {
         s += rect(x, y, size + 0.5, size + 0.5, back);
         const kind = family === 'mixed' ? rng.pick(['quarters', 'triangles', 'half', 'circle']) : family;
         if (kind === 'quarters') {
-          s += path(
-            `M${n(x)} ${n(y + size)}L${n(x)} ${n(y)}A${n(size)} ${n(size)} 0 0 1 ${n(x + size)} ${n(y + size)}Z`,
-            front,
-            rot,
-          );
+          s += path(quarterDisc(x, y, size), front, rot);
         } else if (kind === 'triangles')
           s += path(
             pathD(
@@ -92,11 +90,7 @@ export const mosaic = {
             rot,
           );
         else if (kind === 'half') {
-          s += path(
-            `M${n(x)} ${n(y + size)}A${n(size / 2)} ${n(size / 2)} 0 0 1 ${n(x + size)} ${n(y + size)}Z`,
-            front,
-            rot,
-          );
+          s += path(halfDisc(x, y, size), front, rot);
         } else s += circle(x + size / 2, y + size / 2, size * 0.36, front);
       }
     }
@@ -654,7 +648,7 @@ export const memphis = {
 };
 
 /**
- * A smooth closed blob (Catmull-Rom through wobbly polar points).
+ * A smooth closed blob (Catmull-Rom through wobbly polar points), and the lowest y it reaches.
  * @param {import('../core.js').Rng} rng @param {number} cx @param {number} cy @param {number} rx @param {number} ry @param {number} wobble
  */
 function blob(rng, cx, cy, rx, ry, wobble) {
@@ -680,7 +674,9 @@ function blob(rng, cx, cy, rx, ry, wobble) {
     const p3 = pts[(i + 2) % k];
     d += `C${n(p1[0] + (p2[0] - p0[0]) / 6)} ${n(p1[1] + (p2[1] - p0[1]) / 6)} ${n(p2[0] - (p3[0] - p1[0]) / 6)} ${n(p2[1] - (p3[1] - p1[1]) / 6)} ${n(p2[0])} ${n(p2[1])}`;
   }
-  return d + 'Z';
+  // Catmull-Rom curves overshoot their points slightly; allow for it.
+  const bottom = Math.max(...pts.map(([, y]) => y));
+  return { d: d + 'Z', bottom: bottom + (bottom - cy) * 0.06 };
 }
 
 export const papercut = {
@@ -700,7 +696,10 @@ export const papercut = {
     let s = `<defs>${shadowFilter(shadow, u, { blur: 7, dy: 4, opacity: p.dark ? 0.6 : 0.35 })}</defs>`;
     s += rect(0, 0, W, H, mix(deep, p.night, 0.35));
     // The hole is sized so the title always gets the space below it, whatever the shape.
-    const maxR = Math.min(S * 0.4, Math.max(S * 0.12, (H * 0.6 - cy) / 1.12));
+    // A hole reaches up to ~1.48 r below its centre (ellipse × wobble), plus jitter;
+    // size them so the title keeps the space below.
+    const maxR = Math.min(S * 0.4, Math.max(S * 0.12, (H * 0.6 - cy - S * 0.03) / 1.48));
+    let holeBottom = 0;
     let front = p.bg;
     for (let i = 0; i < layers; i++) {
       const t = i / (layers - 1);
@@ -714,12 +713,13 @@ export const papercut = {
         r * 1.08,
         0.35,
       );
-      s += `<path d="M0 0H${W}V${H}H0Z${hole}" fill="${color}" fill-rule="evenodd" filter="url(#${shadow})"/>`;
+      s += `<path d="M0 0H${W}V${H}H0Z${hole.d}" fill="${color}" fill-rule="evenodd" filter="url(#${shadow})"/>`;
+      holeBottom = Math.max(holeBottom, hole.bottom);
       front = color;
     }
     const a = authorFit(c, { maxSize: S * 0.044 });
     const aY = H - m * 1.2 - a.height;
-    const top = cy + maxR * 1.12 + m * 0.4;
+    const top = holeBottom + m * 0.5;
     const font = rng.pick([FONTS.serif, FONTS.didone, FONTS.geometric]);
     const t = titleBlock(c, {
       font,

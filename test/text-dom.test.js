@@ -14,5 +14,5 @@ Object.assign(globalThis, {
 const { measureText, FONTS } = await import('../src/text.js');
 
 test('measures with a DOM canvas when there is no OffscreenCanvas', () => {
-  assert.equal(measureText('abc', 10, { font: FONTS.sans }), 21);
+  assert.equal(measureText('abc', 100, { font: FONTS.sans }), 21);
 });

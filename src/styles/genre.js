@@ -16,7 +16,7 @@ import {
 } from '../core.js';
 import { FONTS, fitText, drawText } from '../text.js';
 import { titleBlock, authorFit } from '../type.js';
-import { strongAccents } from './util.js';
+import { strongAccents, fitTitleWith, flower } from './util.js';
 
 /** @typedef {import('../index.js').StyleContext} Ctx */
 
@@ -130,16 +130,6 @@ function leaf(x, y, len, angle, color) {
   return `<path d="M0 0Q${n(len * 0.45)} ${n(-w)} ${n(len)} 0Q${n(len * 0.45)} ${n(w)} 0 0Z" fill="${color}" ${tr}/>`;
 }
 
-/** @param {number} x @param {number} y @param {number} r @param {string} petal @param {string} heart @param {number} count */
-function bloom(x, y, r, petal, heart, count) {
-  let o = '';
-  for (let i = 0; i < count; i++) {
-    const a = (i / count) * 360;
-    o += `<ellipse cx="${n(x)}" cy="${n(y - r * 0.55)}" rx="${n(r * 0.32)}" ry="${n(r * 0.55)}" fill="${petal}" transform="rotate(${n(a)} ${n(x)} ${n(y)})"/>`;
-  }
-  return o + circle(x, y, r * 0.3, heart);
-}
-
 export const botanical = {
   id: 'botanical',
   name: 'Botanical',
@@ -185,7 +175,7 @@ export const botanical = {
       const blooms = rng.int(3, 5);
       for (let i = 0; i < blooms; i++) {
         const a0 = rng.float(0.15, 0.85) * Math.PI * 2;
-        s += bloom(
+        s += flower(
           cx + Math.cos(a0) * R,
           cy + Math.sin(a0) * R,
           S * rng.float(0.035, 0.05),
@@ -223,7 +213,7 @@ export const botanical = {
           const ang = Math.atan2(tipY - baseY, tipX - baseX);
           s += leaf(x, y, S * rng.float(0.05, 0.08), ang + (k % 2 ? 0.9 : -0.9), k % 2 ? leafA : leafB);
         }
-        s += bloom(
+        s += flower(
           tipX,
           tipY,
           S * rng.float(0.035, 0.055),
@@ -293,8 +283,11 @@ export const noir = {
     const a = authorFit(c, { font: FONTS.condensed, weight: 700, letterSpacing: 0.26, maxSize: S * 0.044 });
     const font = rng.pick([FONTS.display, FONTS.condensed]);
     const stack = rng.bool(0.6);
-    const fitTitle = (/** @type {number} */ lamp) =>
-      titleBlock(c, {
+    // The lamp stands lower when a long title needs the room.
+    const { block: t, value: lampY } = fitTitleWith(
+      c,
+      [0.5, 0.535, 0.57, 0.605, 0.64].map((k) => H * k),
+      (lamp) => ({
         font,
         weight: 700,
         upper: true,
@@ -307,11 +300,8 @@ export const noir = {
         maxLines: 4,
         subtitleFont: FONTS.condensed,
         subtitleItalic: false,
-      });
-    // The lamp stands lower when a long title needs the room.
-    let lampY = H * 0.5;
-    let t = fitTitle(lampY);
-    while ((t.truncated || t.size < S * 0.06) && lampY < H * 0.64) t = fitTitle((lampY += H * 0.035));
+      }),
+    );
 
     let s = `<defs>${linearGradient(ids.cone, [
       [0, light, 0.5],
@@ -419,9 +409,11 @@ export const blueprint = {
     s += `<path d="${major}" stroke="${ink}" stroke-width="${n(0.8 * u)}" opacity="0.22"/>`;
 
     const blockH = Math.max(H * 0.24, S * 0.3);
+    const blockTop = H - m * 0.8 - blockH;
+    // The drawing, its centre lines and the dimension callout below it all fit above the title block.
     const cx = W / 2;
-    const cy = (H - blockH) / 2 + m * 0.3;
-    const R = Math.min(S * 0.3, (H - blockH) * 0.36);
+    const R = Math.min(S * 0.3, (blockTop - m - S * 0.1) / 2.5);
+    const cy = m + R * 1.25;
     const outline = (/** @type {number} */ w) => `stroke="${ink}" stroke-width="${n(w * u)}"`;
     const stroke = `fill="none" ${outline(1.6)}`;
     const center = `stroke-dasharray="${n(14 * u)} ${n(4 * u)} ${n(3 * u)} ${n(4 * u)}" opacity="0.7"`;
@@ -496,7 +488,7 @@ export const blueprint = {
 
     // Engineering title block.
     const bx = m * 0.8;
-    const by = H - m * 0.8 - blockH;
+    const by = blockTop;
     const bw = W - m * 1.6;
     const labelSize = S * 0.018;
     const labelRow = blockH * 0.18;

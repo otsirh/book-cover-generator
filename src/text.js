@@ -39,15 +39,23 @@ export const FONTS = {
 
 /* ------------------------------------------------------------- measurement */
 
+/** @type {CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null | undefined} */
 let ctx2d;
 function canvasContext() {
   if (ctx2d !== undefined) return ctx2d;
   ctx2d = null;
+  // Prefer OffscreenCanvas, but fall back to a DOM canvas if it is missing or has no 2D context.
   try {
     if (typeof OffscreenCanvas !== 'undefined') ctx2d = new OffscreenCanvas(8, 8).getContext('2d');
-    else if (typeof document !== 'undefined') ctx2d = document.createElement('canvas').getContext('2d');
   } catch {
     ctx2d = null;
+  }
+  if (!ctx2d) {
+    try {
+      if (typeof document !== 'undefined') ctx2d = document.createElement('canvas').getContext('2d');
+    } catch {
+      ctx2d = null;
+    }
   }
   return ctx2d;
 }
@@ -95,8 +103,10 @@ function heuristicWidth(text, spec) {
   return w;
 }
 
+/** @type {Map<string, number>} */
 const widthCache = new Map();
 let lastFont = '';
+const REFERENCE = 100;
 
 /** Width in px of `text` rendered at `size` px with the given font spec. */
 export function measureText(text, size, spec) {
@@ -107,18 +117,22 @@ export function measureText(text, size, spec) {
   } else {
     const c = canvasContext();
     if (c) {
-      const font = `${spec.italic ? 'italic ' : ''}${weight} ${size}px ${spec.font.family}`;
+      // Measure once at a reference size and scale: text width is linear in font size,
+      // so shrinking a title to fit costs no extra canvas work.
+      const font = `${spec.italic ? 'italic ' : ''}${weight} ${REFERENCE}px ${spec.font.family}`;
       const key = `${font}\u0000${text}`;
-      w = widthCache.get(key);
-      if (w === undefined) {
+      let ref = widthCache.get(key);
+      if (ref === undefined) {
         if (font !== lastFont) {
           c.font = font;
           lastFont = font;
         }
-        w = c.measureText(text).width;
+        const measured = c.measureText(text).width;
         if (widthCache.size > 20000) widthCache.clear();
-        widthCache.set(key, w);
+        widthCache.set(key, measured);
+        ref = measured;
       }
+      w = (ref * size) / REFERENCE;
     } else {
       w = heuristicWidth(text, spec) * size;
     }
@@ -331,22 +345,41 @@ export function fitText(text, opts) {
 }
 
 /**
+ * Attributes shared by every line of a text block, for its wrapping `<g>`.
+ * Colours and font names are escaped; `attrs` is raw SVG.
+ * @param {{ font: import('./text.js').FontSpec, fill: string, size?: number, weight?: number, italic?: boolean, letterSpacing?: number, anchor?: 'start' | 'middle' | 'end', opacity?: number, attrs?: string }} o
+ */
+export function textGroupAttrs({ font, fill, size, weight, italic, letterSpacing, anchor = 'start', opacity, attrs }) {
+  let a = `font-family="${escapeXml(font.family)}"`;
+  if (size) a += ` font-size="${n(size)}"`;
+  a += ` fill="${escapeXml(fill)}"`;
+  if (weight && weight !== 400) a += ` font-weight="${weight}"`;
+  if (italic) a += ' font-style="italic"';
+  if (letterSpacing) a += ` letter-spacing="${n(letterSpacing)}"`;
+  if (anchor !== 'start') a += ` text-anchor="${anchor}"`;
+  if (opacity != null && opacity !== 1) a += ` opacity="${opacity}"`;
+  if (attrs) a += ' ' + attrs;
+  return a;
+}
+
+/**
+ * Trailing letter-spacing shifts centred and right-aligned text; this is the x offset that compensates.
+ * @param {'start' | 'middle' | 'end'} anchor @param {number} spacing letter spacing in px
+ */
+export const spacingShift = (anchor, spacing) => (anchor === 'middle' ? spacing / 2 : anchor === 'end' ? spacing : 0);
+
+/**
  * Render a fit as SVG <text> elements.
  * `y` is the top of the block (cap height of the first line).
+ * @param {import('./text.js').TextFit} fit
+ * @param {import('./text.js').DrawOptions} opts
  */
 export function drawText(fit, { x, y, anchor = 'start', fill = '#000', opacity, attrs = '' }) {
   if (!fit.lines.length) return '';
   const { size, font, weight, italic, letterSpacing, lineHeight, cap } = fit;
   const ls = letterSpacing * size;
-  // Trailing letter-spacing shifts centred/right-aligned text; compensate.
-  const dx = anchor === 'middle' ? ls / 2 : anchor === 'end' ? ls : 0;
-  let a = `font-family="${escapeXml(font.family)}" font-size="${n(size)}" fill="${escapeXml(fill)}"`;
-  if (weight && weight !== 400) a += ` font-weight="${weight}"`;
-  if (italic) a += ' font-style="italic"';
-  if (ls) a += ` letter-spacing="${n(ls)}"`;
-  if (anchor !== 'start') a += ` text-anchor="${anchor}"`;
-  if (opacity != null && opacity !== 1) a += ` opacity="${opacity}"`;
-  if (attrs) a += ' ' + attrs;
+  const dx = spacingShift(anchor, ls);
+  const a = textGroupAttrs({ font, size, weight, italic, letterSpacing: ls, fill, anchor, opacity, attrs });
   const rows = fit.lines
     .map((ln, i) => `<text x="${n(x + dx)}" y="${n(y + size * cap + i * size * lineHeight)}">${escapeXml(ln)}</text>`)
     .join('');

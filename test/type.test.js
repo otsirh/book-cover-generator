@@ -56,10 +56,12 @@ test('stacked lowercase lines leave room for descenders', () => {
   assert.match(svg, /fill="#f00">Giants</);
 });
 
-test('drawStack escapes the font family', () => {
+test('drawStack escapes the font family and per-line colours', () => {
   const fit = fitStack('Hello World', { font: { family: '"Fira Sans", serif' }, maxWidth: 400, maxSize: 100 });
   assert.ok(fit);
-  assert.match(drawStack(fit, { x: 0, y: 0 }), /font-family="&quot;Fira Sans&quot;, serif"/);
+  const svg = drawStack(fit, { x: 0, y: 0, lineFills: ['url("#g")'] });
+  assert.match(svg, /font-family="&quot;Fira Sans&quot;, serif"/);
+  assert.match(svg, /fill="url\(&quot;#g&quot;\)"/);
 });
 
 test('titleBlock never exceeds its height budget', () => {

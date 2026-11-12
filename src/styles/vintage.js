@@ -1,7 +1,7 @@
 import { n, rect, circle, line, path, pathD, mix, readable, inkOn, clamp, escapeXml, radialGradient } from '../core.js';
 import { FONTS, fitText, drawText, textBottom, graphemes, measureText } from '../text.js';
 import { titleBlock, authorFit } from '../type.js';
-import { strongAccents } from './util.js';
+import { strongAccents, flower } from './util.js';
 
 /** @typedef {import('../index.js').StyleContext} Ctx */
 
@@ -428,19 +428,6 @@ export const typewriter = {
   },
 };
 
-/**
- * A small rosette: petals around a dot.
- * @param {number} cx @param {number} cy @param {number} r @param {string} color @param {number} petals
- */
-function rosette(cx, cy, r, color, petals = 8) {
-  let o = '';
-  for (let i = 0; i < petals; i++) {
-    const a = (i / petals) * 360;
-    o += `<ellipse cx="${n(cx)}" cy="${n(cy - r * 0.55)}" rx="${n(r * 0.22)}" ry="${n(r * 0.45)}" fill="${color}" transform="rotate(${n(a)} ${n(cx)} ${n(cy)})"/>`;
-  }
-  return o + circle(cx, cy, r * 0.22, color);
-}
-
 export const engraved = {
   id: 'engraved',
   name: 'Engraved',
@@ -492,14 +479,14 @@ export const engraved = {
       [mid, H - mid],
       [W - mid, H - mid],
     ])
-      s += rosette(x, y, band * 0.48, gilt);
+      s += flower(x, y, band * 0.48, gilt, gilt, 8, 0.45);
 
     // Centre medallion.
     const mr = Math.min(S * 0.13, H * 0.1);
     const my = H * 0.56;
     s += circle(W / 2, my, mr, 'none', `stroke="${gilt}" stroke-width="${n(1.6 * u)}"`);
     s += circle(W / 2, my, mr * 0.84, 'none', `stroke="${gilt}" stroke-width="${n(0.8 * u)}"`);
-    s += rosette(W / 2, my, mr * 0.62, gilt, rng.pick([6, 8, 12]));
+    s += flower(W / 2, my, mr * 0.62, gilt, gilt, rng.pick([6, 8, 12]), 0.45);
     for (let i = 0; i < 16; i++) {
       const a = (i / 16) * Math.PI * 2;
       s += circle(W / 2 + Math.cos(a) * mr * 0.92, my + Math.sin(a) * mr * 0.92, 1.4 * u, gilt);

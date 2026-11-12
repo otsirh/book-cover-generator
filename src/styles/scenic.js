@@ -17,7 +17,7 @@ import {
 } from '../core.js';
 import { FONTS, drawText } from '../text.js';
 import { titleBlock, authorFit } from '../type.js';
-import { strongAccents } from './util.js';
+import { strongAccents, fitTitleWith } from './util.js';
 
 /** @typedef {import('../index.js').StyleContext} Ctx */
 
@@ -165,8 +165,12 @@ export const retro = {
     const night = dark ? p.night : p.bg;
     const horizon = H * rng.float(0.56, 0.62);
     const top = m * 1.2;
-    const fitTitle = (/** @type {number} */ r) =>
-      titleBlock(c, {
+    // A smaller sun leaves more sky: shrink it until the title fits comfortably.
+    const R0 = Math.min(S * rng.float(0.26, 0.34), horizon * 0.36);
+    const { block: t, value: R } = fitTitleWith(
+      c,
+      [1, 0.85, 0.72, 0.61, 0.52].map((k) => R0 * k),
+      (r) => ({
         font: FONTS.geometric,
         weight: 800,
         italic: true,
@@ -179,12 +183,8 @@ export const retro = {
         subtitleFont: FONTS.geometric,
         subtitleUpper: true,
         subtitleItalic: false,
-      });
-    // A smaller sun leaves more sky: shrink it until the title fits comfortably.
-    const R0 = Math.min(S * rng.float(0.26, 0.34), horizon * 0.36);
-    let R = R0;
-    let t = fitTitle(R);
-    while ((t.truncated || t.size < S * 0.06) && R > R0 * 0.5) t = fitTitle((R *= 0.85));
+      }),
+    );
     const cx = W / 2;
     const cy = horizon - R * 0.25;
 
@@ -552,11 +552,6 @@ export const silhouette = {
         [0.75, skyLow],
       ])}</defs>` + rect(0, 0, W, H, `url(#${sky})`);
     if (p.dark) s += starfield(c, 60, H * 0.5, p.paper);
-    const mr = S * rng.float(0.06, 0.1);
-    s += circle(W * rng.float(0.2, 0.8), H * rng.float(0.38, 0.47), mr, mix(glowC, '#ffffff', 0.3), 'opacity="0.95"');
-    s += skyline(c, kind, H * 0.72, H * 0.3, far, mix(far, lit, 0.5));
-    s += skyline(c, kind, H * 0.8, H * 0.22, near, lit);
-
     const top = m * 1.3;
     const font = rng.pick([FONTS.condensed, FONTS.serif, FONTS.display]);
     const t = titleBlock(c, {
@@ -570,6 +565,12 @@ export const silhouette = {
       lineHeight: 0.98,
       maxLines: 4,
     });
+    // The moon rises below the title (partly behind the skyline if it must).
+    const mr = S * rng.float(0.06, 0.1);
+    const moonY = Math.max(H * rng.float(0.38, 0.47), top + t.height + mr + S * 0.04);
+    s += circle(W * rng.float(0.2, 0.8), moonY, mr, mix(glowC, '#ffffff', 0.3), 'opacity="0.95"');
+    s += skyline(c, kind, H * 0.72, H * 0.3, far, mix(far, lit, 0.5));
+    s += skyline(c, kind, H * 0.8, H * 0.22, near, lit);
     s += t.draw({ x: W / 2, y: top, anchor: 'middle', fill: inkOn(skyTop, p) });
     const a = authorFit(c, { letterSpacing: 0.2, maxSize: S * 0.044 });
     s += drawText(a, { x: W / 2, y: H - m * 1.1 - a.height, anchor: 'middle', fill: inkOn(near, p) });

@@ -8,6 +8,8 @@ const HELP = `Usage: book-cover "<title>" ["<author>"] [options]
 Options:
   -s, --style <id>      style id or "random" (default: random from seed)
   -p, --palette <id>    palette id or "random" (default: random from seed)
+      --subtitle <text> a subtitle or tagline
+      --texture         add a fine film-grain texture
       --seed <value>    seed for the artwork (default: title + author)
       --width <px>      width  (default 600)
       --height <px>     height (default width * 1.5)
@@ -26,6 +28,8 @@ try {
     options: {
       style: { type: 'string', short: 's' },
       palette: { type: 'string', short: 'p' },
+      subtitle: { type: 'string' },
+      texture: { type: 'boolean' },
       seed: { type: 'string' },
       width: { type: 'string' },
       height: { type: 'string' },
@@ -63,6 +67,8 @@ try {
   const cover = createCover({
     title: positionals[0],
     author: positionals[1] ?? '',
+    subtitle: values.subtitle,
+    texture: values.texture,
     style: values.style,
     palette: values.palette,
     seed: values.seed,

@@ -59,6 +59,10 @@ export declare function line(
 /** `[[x, y], ...]` to a path `d` string. */
 export declare function pathD(points: ReadonlyArray<readonly number[]>, close?: boolean): string;
 export declare function path(d: string, fill: string, extra?: string): string;
+/** Path for a quarter disc filling the square (x, y, size), centred on its bottom-left corner. */
+export declare function quarterDisc(x: number, y: number, size: number): string;
+/** Path for a half disc standing on the bottom edge of the square (x, y, size). */
+export declare function halfDisc(x: number, y: number, size: number): string;
 
 export interface GrainOptions {
   opacity?: number;

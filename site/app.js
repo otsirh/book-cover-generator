@@ -47,6 +47,8 @@ const SAMPLES = [
   ['Under Paper Skies', 'Noor Haddad'],
 ];
 const KEEP_KEY = 'book-cover-generator:kept';
+/** @type {Record<string, string>} */
+const LETTER_CODES = { KeyR: 'r', KeyZ: 'z', KeyY: 'y' };
 const MAX_KEPT = 24;
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
@@ -209,14 +211,16 @@ window.addEventListener('popstate', (e) => {
   replaceTimer = undefined;
   typing = false;
   if (e.state && typeof e.state.i === 'number') historyIndex = e.state.i;
-  else {
+  const edited = !(e.state && typeof e.state.i === 'number');
+  if (edited) {
     // An edited URL: make it the newest entry.
     historyMax += 1;
     historyIndex = historyMax;
     saveHistoryMax();
-    history.replaceState({ i: historyIndex }, '', location.hash);
   }
   Object.assign(design, OPTIONAL, fromHash(location.hash));
+  // Rewrite an edited URL so it always holds the whole design (for Copy link).
+  if (edited) history.replaceState({ i: historyIndex }, '', toHash(design));
   render({ fade: true, announce: true });
   syncHistoryButtons();
 });
@@ -297,7 +301,10 @@ function renderPreview(fade, announce) {
     ...(design.seed ? ['variation ', h('code', {}, design.seed)] : ['variation from the title']),
   );
   $('style-name').textContent = style?.name ?? current.style;
-  $('rail-note').textContent = `In ${palette?.name ?? 'your palette'}. Click one to use it.`;
+  $('rail-note').textContent =
+    design.palette === 'auto'
+      ? 'Each in a palette picked for it. Click one to use it.'
+      : `In ${palette?.name ?? 'your palette'}. Click one to use it.`;
   // Screen readers hear about style and palette changes, not every keystroke.
   const announcement = `Style: ${style?.name ?? current.style}. Palette: ${paletteName}.`;
   if (announce && lastAnnouncement && announcement !== lastAnnouncement) $('announce').textContent = announcement;
@@ -426,20 +433,23 @@ function buildControls() {
   });
 
   document.addEventListener('keydown', (e) => {
-    if (e.metaKey || e.ctrlKey || e.altKey) return;
-    const target = /** @type {HTMLElement | null} */ (e.target);
+    if (e.metaKey || e.repeat) return;
+    // The target can be the document itself (events dispatched by scripts or extensions).
+    const target = e.target instanceof Element ? e.target : null;
     if (target?.closest('input, textarea, select, [contenteditable]')) return;
-    // `code` is the physical key, so the shortcuts work on any keyboard layout.
-    if (e.code === 'KeyR' && !e.repeat) randomizeAll();
-    else if (e.code === 'KeyZ' && !e.repeat) {
+    // Match the character printed on the key (QWERTZ, AZERTY, Dvorak…); on
+    // non-Latin layouts, fall back to the key's position.
+    const letter = /^[a-z]$/i.test(e.key) ? e.key.toLowerCase() : (LETTER_CODES[e.code] ?? '');
+    const plain = !e.ctrlKey && !e.altKey;
+    if (plain && letter === 'r') randomizeAll();
+    else if (plain && letter === 'z') {
       if (e.shiftKey) redo();
       else if (historyIndex > 0) history.back();
-    } else if (e.code === 'KeyY' && !e.repeat) redo();
-    else if ((e.code === 'ArrowLeft' || e.code === 'ArrowRight') && !e.repeat)
-      stepStyle(e.code === 'ArrowLeft' ? -1 : 1);
-    else if ((e.code === 'BracketLeft' || e.code === 'BracketRight') && !e.repeat) {
-      stepPalette(e.code === 'BracketLeft' ? -1 : 1);
-    } else return;
+    } else if (plain && letter === 'y') redo();
+    else if (plain && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) stepStyle(e.key === 'ArrowLeft' ? -1 : 1);
+    // Brackets need AltGr or Option on many layouts, so modifiers are allowed for them.
+    else if (e.key === '[' || e.key === ']') stepPalette(e.key === '[' ? -1 : 1);
+    else return;
     e.preventDefault();
   });
 }
@@ -703,16 +713,27 @@ function toast(msg) {
 
 Object.assign(design, fromHash(location.hash));
 if (typeof history.state?.i === 'number') {
-  // A reload: carry on from the same place in the history.
+  // Back on an entry of ours. After a reload the later entries are still there; after
+  // coming back from another site they may have been replaced by it, so Redo starts
+  // fresh rather than risk navigating away.
   historyIndex = history.state.i;
-  let stored = 0;
-  try {
-    stored = Number(sessionStorage.getItem(MAX_KEY)) || 0;
-  } catch {
-    // Storage blocked.
+  historyMax = historyIndex;
+  const nav = /** @type {PerformanceNavigationTiming | undefined} */ (performance.getEntriesByType('navigation')[0]);
+  if (nav?.type === 'reload') {
+    try {
+      historyMax = Math.max(historyIndex, Number(sessionStorage.getItem(MAX_KEY)) || 0);
+    } catch {
+      // Storage blocked.
+    }
   }
-  historyMax = Math.max(historyIndex, stored);
 }
+// Restored from the back/forward cache after visiting another page: same reasoning.
+window.addEventListener('pageshow', (e) => {
+  if (!e.persisted) return;
+  historyMax = historyIndex;
+  saveHistoryMax();
+  syncHistoryButtons();
+});
 history.replaceState({ i: historyIndex }, '', toHash(design));
 buildControls();
 buildRail();

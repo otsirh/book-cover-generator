@@ -1,7 +1,7 @@
-import { n, rect, circle, path, pathD, inkOn, mix, clamp } from '../core.js';
+import { n, rect, circle, path, pathD, inkOn, mix, clamp, quarterDisc, halfDisc } from '../core.js';
 import { FONTS, drawText } from '../text.js';
 import { titleBlock, authorFit } from '../type.js';
-import { strongAccents } from './util.js';
+import { strongAccents, fitTitleWith } from './util.js';
 
 /** @typedef {import('../index.js').StyleContext} Ctx */
 
@@ -20,17 +20,9 @@ function bauhausShape(type, x, y, size, color, rot) {
     case 'ring':
       return circle(cx, cy, size * 0.31, 'none', `stroke="${color}" stroke-width="${n(size * 0.14)}"`);
     case 'half':
-      return path(
-        `M${n(x)} ${n(y + size)}A${n(size / 2)} ${n(size / 2)} 0 0 1 ${n(x + size)} ${n(y + size)}Z`,
-        color,
-        tr,
-      );
+      return path(halfDisc(x, y, size), color, tr);
     case 'quarter':
-      return path(
-        `M${n(x)} ${n(y + size)}L${n(x)} ${n(y)}A${n(size)} ${n(size)} 0 0 1 ${n(x + size)} ${n(y + size)}Z`,
-        color,
-        tr,
-      );
+      return path(quarterDisc(x, y, size), color, tr);
     case 'triangle':
       return path(
         pathD(
@@ -83,9 +75,12 @@ export const bauhaus = {
     const gridH = H * 0.62 - m;
     const cell = Math.min(gw / (W / H > 0.9 ? 4 : 3), gridH);
     const cols = Math.max(1, Math.floor(gw / cell + 1e-6));
-    let rows = Math.max(1, Math.floor(gridH / cell + 1e-6));
-    const fitFor = (/** @type {number} */ r) =>
-      titleBlock(c, {
+    const maxRows = Math.max(1, Math.floor(gridH / cell + 1e-6));
+    // Long titles get room: drop rows of shapes rather than shrinking the title.
+    const { block: t, value: rows } = fitTitleWith(
+      c,
+      Array.from({ length: maxRows }, (_, i) => maxRows - i),
+      (r) => ({
         font: FONTS.geometric,
         weight: 800,
         upper: true,
@@ -96,10 +91,9 @@ export const bauhaus = {
         maxLines: 5,
         subtitleFont: FONTS.geometric,
         subtitleItalic: false,
-      });
-    let t = fitFor(rows);
-    // Long titles get room: drop a row of shapes rather than shrinking the title.
-    while (rows > 1 && t.size < S * 0.085) t = fitFor(--rows);
+      }),
+      0.085,
+    );
 
     let s = rect(0, 0, W, H, p.bg);
     for (let row = 0; row < rows; row++) {
@@ -212,8 +206,12 @@ export const blocks = {
     const innerW = W - lw - pad * 2;
     const font = rng.pick([FONTS.sans, FONTS.geometric]);
     const a = authorFit(c, { upper: false, letterSpacing: 0, weight: 700, maxWidth: innerW, maxSize: S * 0.05 });
-    const fitTitle = (/** @type {number} */ cellH) =>
-      titleBlock(c, {
+    // The text cell grows (and the art shrinks) until the title fits comfortably.
+    const start = H * rng.float(0.32, 0.38);
+    const { block: t, value: textH } = fitTitleWith(
+      c,
+      Array.from({ length: 7 }, (_, i) => Math.min(start + i * H * 0.04, H * 0.56)),
+      (cellH) => ({
         font,
         weight: 800,
         maxWidth: innerW,
@@ -223,11 +221,8 @@ export const blocks = {
         maxLines: 4,
         subtitleFont: FONTS.sans,
         subtitleItalic: false,
-      });
-    // The text cell grows (and the art shrinks) until the title fits comfortably.
-    let textH = H * rng.float(0.32, 0.38);
-    let t = fitTitle(textH);
-    while ((t.truncated || t.size < S * 0.06) && textH < H * 0.56) t = fitTitle((textH += H * 0.04));
+      }),
+    );
     const textTop = rng.bool(0.5);
     const textRect = textTop ? { x: 0, y: 0, w: W, h: textH } : { x: 0, y: H - textH, w: W, h: textH };
     const art = textTop ? { x: 0, y: textH, w: W, h: H - textH } : { x: 0, y: 0, w: W, h: H - textH };

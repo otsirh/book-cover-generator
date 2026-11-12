@@ -211,6 +211,14 @@ export function pathD(points, close = false) {
 
 export const path = (d, fill, e = '') => `<path d="${d}" fill="${fill}"${extra(e)}/>`;
 
+/** Path for a quarter disc filling the square (x, y, size), centred on its bottom-left corner. */
+export const quarterDisc = (x, y, size) =>
+  `M${n(x)} ${n(y + size)}L${n(x)} ${n(y)}A${n(size)} ${n(size)} 0 0 1 ${n(x + size)} ${n(y + size)}Z`;
+
+/** Path for a half disc standing on the bottom edge of the square (x, y, size). */
+export const halfDisc = (x, y, size) =>
+  `M${n(x)} ${n(y + size)}A${n(size / 2)} ${n(size / 2)} 0 0 1 ${n(x + size)} ${n(y + size)}Z`;
+
 /** Film-grain overlay. Returns { defs, layer }. */
 export function grain(c, { opacity = 0.12, light = false, freq = 0.75, id: name = 'grain', seed = 0 } = {}) {
   const id = c.id(name);

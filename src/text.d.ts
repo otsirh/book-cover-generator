@@ -95,5 +95,19 @@ export interface DrawOptions {
 export declare function fitText(text: unknown, opts: FitOptions): TextFit;
 /** Render a fit as SVG `<text>` elements. */
 export declare function drawText(fit: TextFit, opts: DrawOptions): string;
+/** Attributes shared by every line of a text block (escaped), for its wrapping `<g>`. */
+export declare function textGroupAttrs(o: {
+  font: FontSpec;
+  fill: string;
+  size?: number;
+  weight?: number;
+  italic?: boolean;
+  letterSpacing?: number;
+  anchor?: 'start' | 'middle' | 'end';
+  opacity?: number;
+  attrs?: string;
+}): string;
+/** The x offset that compensates trailing letter-spacing for centred and right-aligned text. */
+export declare function spacingShift(anchor: 'start' | 'middle' | 'end', spacing: number): number;
 /** Visual bottom of a fit placed at `y`, including descenders. */
 export declare function textBottom(fit: TextFit, y: number): number;

@@ -20,16 +20,17 @@ Object.assign(globalThis, { OffscreenCanvas: FakeOffscreenCanvas });
 const { fitText, drawText, measureText, setTextMeasurer, FONTS } = await import('../src/text.js');
 const { graphemes, textBottom } = await import('../src/text.js');
 
-test('measures with a canvas when one exists, caching fonts and widths', () => {
+test('measures with a canvas once per font at a reference size, then scales', () => {
+  // The fake canvas measures 10px per character (at the 100px reference size).
   const spec = { font: FONTS.sans, weight: 700 };
-  assert.equal(measureText('abcd', 20, spec), 40);
-  assert.equal(measureText('abcd', 20, spec), 40);
-  assert.equal(measureText('ab', 20, spec), 20);
-  assert.equal(fontsSet.length, 1, 'font is only set when it changes');
-  assert.match(fontsSet[0], /^700 20px 'Helvetica Neue'/);
+  assert.equal(measureText('abcd', 20, spec), 8);
+  assert.equal(measureText('abcd', 50, spec), 20);
+  assert.equal(measureText('ab', 20, spec), 4);
+  assert.equal(fontsSet.length, 1, 'the font is set once, whatever the size');
+  assert.match(fontsSet[0], /^700 100px 'Helvetica Neue'/);
   measureText('ab', 20, { font: FONTS.serif, italic: true });
-  assert.match(fontsSet[1], /^italic 400 20px Georgia/);
-  assert.equal(measureText('ab', 10, { font: FONTS.sans, letterSpacing: 0.5 }), 20 + 0.5 * 10 * 2);
+  assert.match(fontsSet[1], /^italic 400 100px Georgia/);
+  assert.equal(measureText('ab', 10, { font: FONTS.sans, letterSpacing: 0.5 }), 2 + 0.5 * 10 * 2);
 });
 
 test('a custom measurer overrides the canvas', () => {
@@ -45,12 +46,12 @@ test('a custom measurer overrides the canvas', () => {
   } finally {
     setTextMeasurer(null);
   }
-  assert.equal(measureText('xyz', 2, { font: FONTS.mono }), 30, 'back to the canvas after reset');
+  assert.equal(measureText('xyz', 100, { font: FONTS.mono }), 30, 'back to the canvas after reset');
 });
 
 test('fitText wraps, balances and shrinks to fit', () => {
-  const fit = fitText('one two three four', { font: FONTS.sans, maxWidth: 100, maxSize: 10, lineHeight: 1.2 });
-  // 10px per character at any size in this fake: "one two" is 70, "three four" is 100.
+  const fit = fitText('one two three four', { font: FONTS.sans, maxWidth: 100, maxSize: 100, lineHeight: 1.2 });
+  // The fake measures 0.1 × size per character: at 100px the whole title is 180px, so it must wrap.
   assert.ok(fit.lines.length >= 2);
   for (const line of fit.lines) assert.ok(measureText(line, fit.size, { font: FONTS.sans }) <= 100);
   assert.equal(fit.height, fit.size * (FONTS.sans.cap + (fit.lines.length - 1) * 1.2));

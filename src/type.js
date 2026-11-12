@@ -6,7 +6,7 @@
 // the cover (c.S), so they work at any size and shape.
 
 import { n, clamp, escapeXml } from './core.js';
-import { FONTS, fitText, drawText, measureText, textBottom } from './text.js';
+import { FONTS, fitText, drawText, measureText, textBottom, textGroupAttrs, spacingShift } from './text.js';
 
 const LEAD = /^(the|a|an)\s+(\S.*)$/i;
 
@@ -111,21 +111,15 @@ export function fitStack(text, o) {
  * @param {import('./text.js').DrawOptions & { lineFills?: (string | undefined)[] }} o
  */
 export function drawStack(fit, { x, y, anchor = 'start', fill = '#000', opacity, attrs = '', lineFills = [] }) {
-  let a = `font-family="${escapeXml(fit.font.family)}" fill="${escapeXml(fill)}"`;
-  if (fit.weight !== 400) a += ` font-weight="${fit.weight}"`;
-  if (fit.italic) a += ' font-style="italic"';
-  if (anchor !== 'start') a += ` text-anchor="${anchor}"`;
-  if (opacity != null && opacity !== 1) a += ` opacity="${opacity}"`;
-  if (attrs) a += ' ' + attrs;
+  const a = textGroupAttrs({ font: fit.font, weight: fit.weight, italic: fit.italic, fill, anchor, opacity, attrs });
   let baseline = y;
   const rows = fit.lines.map(({ text, size }, i) => {
     const prev = fit.lines[i - 1];
     baseline += size * fit.cap + (prev ? size * fit.gap + prev.size * prev.descent : 0);
     const ls = fit.letterSpacing * size;
-    const dx = anchor === 'middle' ? ls / 2 : anchor === 'end' ? ls : 0;
     const spacing = ls ? ` letter-spacing="${n(ls)}"` : '';
-    const color = lineFills[i] ? ` fill="${lineFills[i]}"` : '';
-    return `<text x="${n(x + dx)}" y="${n(baseline)}" font-size="${n(size)}"${spacing}${color}>${escapeXml(text)}</text>`;
+    const color = lineFills[i] ? ` fill="${escapeXml(lineFills[i] ?? '')}"` : '';
+    return `<text x="${n(x + spacingShift(anchor, ls))}" y="${n(baseline)}" font-size="${n(size)}"${spacing}${color}>${escapeXml(text)}</text>`;
   });
   return `<g ${a}>${rows.join('')}</g>`;
 }

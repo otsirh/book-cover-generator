@@ -49,6 +49,10 @@ A redesign of the covers and the app, based on a design review.
 - Long titles are never cut off in any common shape: Retro Sun shrinks its sun, Blocks grows its text cell and Noir lowers its lamp when the title needs room (`TextFit` and `TitleBlock` report `truncated`).
 - Paper Cut leaves room for the title on square and wide covers; Pixel reserves space for the subtitle; Noir's author line no longer meets the lamp.
 - Undo and Back restore the subtitle and texture; history survives a reload; redo never navigates away from the app; holding an arrow key no longer floods the browser history.
+- Redo can't reach another site after coming back with Back; keyboard shortcuts follow the printed key (QWERTZ, AZERTY, Dvorak) with a positional fallback for non-Latin layouts; a hand-edited URL is rewritten to hold the whole design.
+- Paper Cut measures its holes so the title never sits on them; Blueprint keeps its dimension callout above the title block; Silhouette's moon rises below the title.
+- Text measurement falls back to a DOM canvas when `OffscreenCanvas` has no 2D context, and measures each string once per font (widths scale with size).
+- The CLI accepts `--subtitle` and `--texture`.
 
 ## [1.1.0] - 2026-11-12
 

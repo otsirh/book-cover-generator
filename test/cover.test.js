@@ -394,3 +394,20 @@ test('Paper Cut gives the title room on square covers', () => {
   const author = sizes.at(-1) ?? 0;
   assert.ok(Math.max(...sizes) > author * 1.5, `title ${Math.max(...sizes)} vs author ${author}`);
 });
+
+test('Blueprint keeps its dimension callout clear of the title block', () => {
+  for (const [width, height] of [
+    [600, 600],
+    [900, 600],
+    [600, 900],
+  ]) {
+    for (const seed of ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']) {
+      const { svg } = createCover({ title: 'Engine', author: 'A. Writer', style: 'blueprint', width, height, seed });
+      const short = Math.min(width, height);
+      const blockTop = height - short * 0.07 * 0.8 - Math.max(height * 0.24, short * 0.3);
+      for (const m of svg.matchAll(/<text [^>]*y="([\d.]+)"[^>]*>(?:Ø )?\d+<\/text>/g)) {
+        assert.ok(Number(m[1]) < blockTop, `${width}x${height} ${seed}: callout at ${m[1]}, block at ${blockTop}`);
+      }
+    }
+  }
+});
