@@ -4,13 +4,17 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [1.9.2] - 2026-11-13
+
+The whole API documented, on JSR and in your editor. Covers are drawn as in 1.9.1.
+
 ### Changed
 
 - The whole API is documented: every function, type and option, with module docs and examples for each entry point (shown on JSR and in your editor). CI keeps it so (`deno doc --lint`).
 
 ### Fixed
 
-- Docs: `TitleBlockOptions.maxSize` says a short one-word title may grow past it; `CoverOptions.seed` says it defaults to the title and author (as `Cover.seed` shows), not a hash of them.
+- Docs: `seed` defaults to the title and author (as `Cover.seed` shows), not a hash of them; `texture` is on for any truthy value; `TitleBlockOptions.maxSize` may be exceeded by a short one-word title; `FitOptions.maxHeight` counts accents above the first line; `textGroupAttrs` takes px and writes `attrs` as given; `svgToBlob`'s type names its charset.
 
 ## [1.9.1] - 2026-11-12
 
@@ -307,7 +311,8 @@ A redesign of the covers and the app, based on a design review.
 
 - First release: 27 styles, 20 palettes, seeded randomizer, text fitting, CLI and the web app with SVG, PNG and JPEG export.
 
-[Unreleased]: https://github.com/otsirh/book-cover-generator/compare/v1.9.1...HEAD
+[Unreleased]: https://github.com/otsirh/book-cover-generator/compare/v1.9.2...HEAD
+[1.9.2]: https://github.com/otsirh/book-cover-generator/compare/v1.9.1...v1.9.2
 [1.9.1]: https://github.com/otsirh/book-cover-generator/compare/v1.9.0...v1.9.1
 [1.9.0]: https://github.com/otsirh/book-cover-generator/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/otsirh/book-cover-generator/compare/v1.7.0...v1.8.0

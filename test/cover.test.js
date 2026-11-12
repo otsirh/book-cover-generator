@@ -1003,6 +1003,21 @@ test('version matches the package', async () => {
   assert.equal(jsr.version, pkg.version);
 });
 
+test('npm and JSR get the types each needs for <book-cover>', async () => {
+  const { readFile } = await import('node:fs/promises');
+  /** @param {string} path */
+  const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
+  const pkg = JSON.parse(await read('package.json'));
+  const jsr = JSON.parse(await read('jsr.json'));
+  // From npm, document.createElement('book-cover') is typed (test-d checks the file itself).
+  assert.equal(pkg.exports['./element'].types, './src/element.d.ts');
+  assert.match(await read('src/element.d.ts'), /interface HTMLElementTagNameMap \{\s*'book-cover': BookCover;/);
+  // JSR refuses global types: it gets the class alone, which element.js names for Deno.
+  assert.match(await read('src/element.js'), /^\/\* @ts-self-types="\.\/element-types\.d\.ts" \*\//);
+  assert.doesNotMatch(await read('src/element-types.d.ts'), /^\s*declare global\b/m);
+  assert.deepEqual(jsr.publish.exclude, ['src/element.d.ts']);
+});
+
 test('sizeLimits and formats describe the sizes covers can have', async () => {
   const { sizeLimits, formats } = await import('../src/index.js');
   assert.deepEqual({ ...sizeLimits }, { min: 50, max: 10000, ratio: 3 });

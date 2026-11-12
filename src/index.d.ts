@@ -160,7 +160,7 @@ export interface CustomPalette {
 
 /**
  * Options for `createCover` and `generateCover`, all optional. An option that isn't valid throws
- * an error that says why.
+ * an error that says why (`texture` excepted: any truthy value turns it on).
  */
 export interface CoverOptions {
   /** Defaults to `'Untitled'`. Up to 300 characters are used. */
@@ -175,7 +175,7 @@ export interface CoverOptions {
   credit?: string;
   /** A seal set in a corner clear of the text, such as `'Winner of the Hugo Award'`. Up to 60 characters. */
   badge?: string;
-  /** Add a fine film-grain texture over the cover. Default `false`. */
+  /** Add a fine film-grain texture over the cover. Default `false`; any truthy value (even `'false'`) turns it on. */
   texture?: boolean;
   /** A style id, a registered custom style, or `'random'` (default; picked from the seed). */
   style?: StyleId | 'random' | (string & {});
@@ -235,7 +235,7 @@ export interface Cover {
   lang: string;
   /** The value of each of the style's variants this cover has, pinned or picked by the seed. */
   variants: Record<string, string>;
-  /** The title as set (line breaks as "\n"), and the author, after cleaning. */
+  /** The title as set, after cleaning (line breaks as "\n"; `'Untitled'` when there is none). */
   title: string;
   /** The author after cleaning, or `''`. */
   author: string;

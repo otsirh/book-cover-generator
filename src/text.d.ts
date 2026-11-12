@@ -99,7 +99,10 @@ export interface FitOptions {
   maxWidth: number;
   /** Largest font size in px. */
   maxSize: number;
-  /** Box height in px (cap height of the first line to the last baseline). */
+  /**
+   * Box height in px: from the top of the first line (its cap height, or its marks when it has
+   * accents or marks above, such as É, Thai or Devanagari) to the last baseline.
+   */
   maxHeight?: number;
   /** Smallest font size in px before words are broken and truncated. */
   minSize?: number;
@@ -181,7 +184,11 @@ export declare function baselineOf(fit: TextFit, y: number, i: number): number;
 export declare function markExtent(text: string): { above: number; below: number };
 /** Room below a line for descenders and marks, in em. */
 export declare function descentOf(line: string): number;
-/** Attributes shared by every line of a text block (escaped), for its wrapping `<g>`. */
+/**
+ * Attributes shared by every line of a text block, for its wrapping `<g>`: the font family and fill
+ * are escaped, `attrs` is written as given (raw SVG). Unlike the fitting options, `size` and
+ * `letterSpacing` are in px here (`drawText` passes a fit's letter-spacing × its size).
+ */
 export declare function textGroupAttrs(o: {
   font: FontSpec;
   fill: string;

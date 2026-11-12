@@ -16,7 +16,7 @@
 
 /** SVG markup as a `data:` URL, for an `<img>`'s `src`. */
 export declare function svgToDataUrl(svg: string): string;
-/** SVG markup as a Blob of type `image/svg+xml`. */
+/** SVG markup as a Blob of type `image/svg+xml;charset=utf-8`. */
 export declare function svgToBlob(svg: string): Blob;
 
 /** Options for `rasterize`. */
