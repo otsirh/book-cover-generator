@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-12
+
+Badges, mockups and many covers at once. Covers that use none of these are drawn exactly as in 1.5.0.
+
 ### Added
 
 - **Many covers at once.** `parseBookList(text)` reads a list of books (CSV with commas, semicolons or tabs and a header row naming a `title` column, JSON lines, or "Title | Author | Subtitle" lines) into cover options. In the app, "Many covers" previews the list in the current design and downloads them all as PNG or SVG in one ZIP, with "A different palette for each" for a set in several colours. In the CLI, `--batch <file|->` writes a cover per book into `--out-dir`, with the other options for every book the list doesn't set (a book that can't be made is reported and the rest are written).
@@ -224,7 +228,8 @@ A redesign of the covers and the app, based on a design review.
 
 - First release: 27 styles, 20 palettes, seeded randomizer, text fitting, CLI and the web app with SVG, PNG and JPEG export.
 
-[Unreleased]: https://github.com/otsirh/book-cover-generator/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/otsirh/book-cover-generator/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/otsirh/book-cover-generator/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/otsirh/book-cover-generator/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/otsirh/book-cover-generator/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/otsirh/book-cover-generator/compare/v1.2.0...v1.3.0
