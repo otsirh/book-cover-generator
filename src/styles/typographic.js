@@ -10,10 +10,11 @@ export const minimal = {
   name: 'Minimal',
   group: 'Typographic',
   description: 'Quiet, generous typography with a single accent rule.',
+  variants: { align: { label: 'Alignment', values: { middle: 'Centred', start: 'Left' } } },
   /** @param {Ctx} c */
   render(c) {
     const { W, H, S, u, m, rng, p } = c;
-    const align = /** @type {'middle' | 'start'} */ (rng.pick(['middle', 'middle', 'start']));
+    const align = c.choose('align', /** @type {const} */ (['middle', 'middle', 'start']));
     const pad = m * 1.4;
     const x = align === 'middle' ? W / 2 : pad;
     const maxWidth = W - pad * 2;
@@ -60,6 +61,7 @@ export const typographic = {
   name: 'Big Letter',
   group: 'Typographic',
   description: 'A giant initial cropped by the edge of the cover.',
+  variants: { letter: { label: 'Letter', values: { solid: 'Solid', outline: 'Outline', duo: 'Two colours' } } },
   /** @param {Ctx} c */
   render(c) {
     const { W, H, S, u, m, rng, p } = c;
@@ -70,7 +72,7 @@ export const typographic = {
     const pair = NARROW_INITIALS.test(first) && chars[1] && /\p{L}/u.test(chars[1]);
     const letters = pair ? first + chars[1] : first;
     const font = rng.pick([FONTS.didone, FONTS.serif, FONTS.didone]);
-    const mode = rng.pick(['solid', 'outline', 'duo']);
+    const mode = c.choose('letter', ['solid', 'outline', 'duo']);
     const [c1, c2] = strongAccents(p, p.bg, 1.4).concat(p.accents);
     // One letter is set wider than the cover and cropped; two letters must both read, so they fit.
     const wide = S * rng.float(1.05, 1.3);

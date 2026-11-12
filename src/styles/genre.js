@@ -139,6 +139,7 @@ export const botanical = {
   name: 'Botanical',
   group: 'Genre',
   description: 'Hand-drawn stems, leaves and blooms around the title.',
+  variants: { arrangement: { label: 'Flowers', values: { wreath: 'Wreath', bouquet: 'Bouquet' } } },
   prefer: 'light',
   /** @param {Ctx} c */
   render(c) {
@@ -148,7 +149,7 @@ export const botanical = {
     const leafA = mix(strong[1] ?? strong[0], p.ink, 0.35);
     const leafB = mix(leafA, p.bg, 0.3);
     const [petal, heart] = [strong[0], mix(strong[2] ?? p.ink, p.ink, 0.2)];
-    const mode = rng.pick(['wreath', 'bouquet']);
+    const mode = c.choose('arrangement', ['wreath', 'bouquet']);
     let s = rect(0, 0, W, H, p.bg);
     const a = authorFit(c, { font: FONTS.serif, weight: 400, letterSpacing: 0.2, maxSize: S * 0.044 });
     const aY = H - m * 1.2 - a.height;
@@ -411,6 +412,7 @@ export const blueprint = {
   name: 'Blueprint',
   group: 'Genre',
   description: 'A technical drawing with dimensions and a title block.',
+  variants: { drawing: { label: 'Drawing', values: { gear: 'Gear', iso: 'Isometric', section: 'Cross-section' } } },
   /** @param {Ctx} c */
   render(c) {
     const { W, H, S, u, m, rng, p } = c;
@@ -441,7 +443,7 @@ export const blueprint = {
     const outline = (/** @type {number} */ w) => `stroke="${ink}" stroke-width="${n(w * u)}"`;
     const stroke = `fill="none" ${outline(1.6)}`;
     const center = `stroke-dasharray="${n(14 * u)} ${n(4 * u)} ${n(3 * u)} ${n(4 * u)}" opacity="0.7"`;
-    const kind = rng.pick(['gear', 'iso', 'section']);
+    const kind = c.choose('drawing', ['gear', 'iso', 'section']);
     if (kind === 'gear') {
       const teeth = rng.int(12, 20);
       const pts = [];

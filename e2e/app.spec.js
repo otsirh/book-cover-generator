@@ -1443,6 +1443,41 @@ test('a variation clicked before its thumbnail is drawn never clears the variati
   await expect(page.locator('#meta')).not.toContainText('from the title');
 });
 
+test('a style’s variants can be pinned, links hold them, and another style starts afresh', async ({ page }) => {
+  await page.goto('/#title=Skyline&style=silhouette&seed=v');
+  const box = page.locator('#style-variants');
+  await expect(box).toBeVisible();
+  await expect(box.locator('[data-variant="scene"][data-value=""]')).toHaveAttribute('aria-pressed', 'true');
+  // Auto outlines what the variation picked.
+  const picked = (await box.locator('.chip.picked').getAttribute('data-value')) ?? '';
+  expect(['city', 'forest']).toContain(picked);
+  const other = picked === 'city' ? 'forest' : 'city';
+  const before = await svgOf(page, '#preview');
+  await box.locator(`[data-value="${other}"]`).click();
+  await expect(page).toHaveURL(new RegExp(`style=silhouette&variant=scene\\.${other}&`));
+  await expect(box.locator(`[data-value="${other}"]`)).toHaveAttribute('aria-pressed', 'true');
+  await expect.poll(() => svgSoon(page, '#preview')).not.toBe(before);
+  await page.locator('#undo').click();
+  await expect(box.locator('[data-value=""]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page).not.toHaveURL(/variant=/);
+  await page.locator('#redo').click();
+  await expect(box.locator(`[data-value="${other}"]`)).toHaveAttribute('aria-pressed', 'true');
+  // Another style: none pinned, and its own choices.
+  await page.locator('.tile[data-style="minimal"]').click();
+  await selected(page, 'minimal');
+  await expect(page).not.toHaveURL(/variant=/);
+  await expect(box.locator('[data-variant="align"]')).toHaveText(['Auto', 'Centred', 'Left']);
+  await page.locator('.tile[data-style="swiss"]').click();
+  await expect(box).toBeHidden();
+  // A link names its pins; ones another style has are ignored.
+  await page.goto('about:blank');
+  await page.goto('/#title=T&style=minimal&variant=align.start-scene.forest&seed=l');
+  await expect(box.locator('[data-variant="align"][data-value="start"]')).toHaveAttribute('aria-pressed', 'true');
+  const left = await svgOf(page, '#preview');
+  await box.locator('[data-variant="align"][data-value="middle"]').click();
+  await expect.poll(() => svgSoon(page, '#preview')).not.toBe(left);
+});
+
 test('a Japanese title sets the language of the cover', async ({ page }) => {
   await page.goto(`/#title=${encodeURIComponent('ガラスの街')}&style=minimal&seed=j`);
   expect(await svgOf(page, '#preview')).toMatch(/^<svg [^>]* lang="ja"/);

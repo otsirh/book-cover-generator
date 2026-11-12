@@ -541,10 +541,11 @@ export const silhouette = {
   name: 'Silhouette',
   group: 'Scenic',
   description: 'A city skyline or a forest tree line against the sky.',
+  variants: { scene: { label: 'Scene', values: { city: 'City', forest: 'Forest' } } },
   /** @param {Ctx} c */
   render(c) {
     const { W, H, S, m, rng, p } = c;
-    const kind = /** @type {'city' | 'forest'} */ (rng.pick(['city', 'forest']));
+    const kind = c.choose('scene', ['city', 'forest']);
     const [glowC, , lit] = strongAccents(p, p.night, 1.2).concat(p.accents);
     const skyTop = p.dark ? mix(p.bg, '#000000', 0.25) : mix(p.bg, p.accents[1], 0.12);
     const skyLow = mix(skyTop, glowC, p.dark ? 0.4 : 0.5);
@@ -677,6 +678,7 @@ export const aurora = {
   name: 'Aurora',
   group: 'Scenic',
   description: 'Soft blurred colour fields with film grain.',
+  variants: { layout: { label: 'Title', values: { top: 'Top', center: 'Middle', bottom: 'Bottom' } } },
   /** @param {Ctx} c */
   render(c) {
     const { W, H, S, u, m, rng, p } = c;
@@ -703,7 +705,7 @@ export const aurora = {
     }
     s += `<g filter="url(#${blur})">${blobs}</g>${g.layer}`;
 
-    const layout = rng.pick(['bottom', 'center', 'top']);
+    const layout = c.choose('layout', ['bottom', 'center', 'top']);
     const font = rng.pick([FONTS.sans, FONTS.serif, FONTS.didone]);
     const a = authorFit(c, { letterSpacing: 0.2, maxSize: S * 0.044 });
     const tOpts = {

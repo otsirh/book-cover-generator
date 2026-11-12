@@ -968,3 +968,109 @@ test('sizeLimits and formats describe the sizes covers can have', async () => {
   }
   assert.ok(Object.isFrozen(formats) && Object.isFrozen(formats.ebook));
 });
+
+test('styles list the variants they let you pin, and choose them in render', () => {
+  const withVariants = Object.fromEntries(
+    listStyles()
+      .filter((s) => s.variants.length)
+      .map((s) => [s.id, s.variants.map((v) => v.name)]),
+  );
+  assert.deepEqual(withVariants, {
+    minimal: ['align'],
+    typographic: ['letter'],
+    split: ['shape'],
+    concentric: ['rings'],
+    stripes: ['stripes', 'layout'],
+    mosaic: ['tiles'],
+    silhouette: ['scene'],
+    aurora: ['layout'],
+    botanical: ['arrangement'],
+    blueprint: ['drawing'],
+    engraved: ['motif'],
+  });
+  for (const style of builtIn) {
+    const declared =
+      listStyles()
+        .find((s) => s.id === style)
+        ?.variants.map((v) => v.name) ?? [];
+    // Every variant a style declares is one its render chooses, and only those.
+    for (const seed of ['a', 'b', 'c']) {
+      assert.deepEqual(
+        Object.keys(createCover({ title: 'x', style, seed }).variants).sort(),
+        [...declared].sort(),
+        style,
+      );
+    }
+  }
+  const silhouette = listStyles().find((s) => s.id === 'silhouette');
+  assert.deepEqual(silhouette?.variants, [
+    {
+      name: 'scene',
+      label: 'Scene',
+      values: [
+        { value: 'city', label: 'City' },
+        { value: 'forest', label: 'Forest' },
+      ],
+    },
+  ]);
+});
+
+test('a pinned variant is drawn as pinned, for every value, and stays well-formed with text on the cover', () => {
+  /** Ids differ between covers; compare the drawing. @param {string} svg */
+  const drawing = (svg) => svg.replace(/bc[0-9a-z]+-/g, 'id-');
+  for (const info of listStyles().filter((s) => s.variants.length)) {
+    for (const variant of info.variants) {
+      for (const { value } of variant.values) {
+        for (const [width, height] of [
+          [600, 900],
+          [600, 600],
+          [1800, 600],
+        ]) {
+          for (const seed of ['a', 'b', 'c']) {
+            const label = `${info.id} ${variant.name}=${value} ${width}x${height} ${seed}`;
+            const options = {
+              title: 'The Lighthouse Keeper',
+              author: 'Mara Ellison',
+              style: info.id,
+              seed,
+              width,
+              height,
+            };
+            const pinned = createCover({ ...options, variants: { [variant.name]: value } });
+            assert.equal(pinned.variants[variant.name], value, label);
+            assertWellFormed(pinned.svg, label);
+            for (const [top, bottom, size] of textLines(pinned.svg)) {
+              if (size > Math.min(width, height) * 0.5) continue;
+              assert.ok(top >= -1 && bottom <= height + 1, `${label}: text at ${top}..${bottom}`);
+            }
+            // Pinning what the seed picks anyway changes nothing but the ids.
+            const free = createCover(options);
+            if (free.variants[variant.name] === value) assert.equal(drawing(pinned.svg), drawing(free.svg), label);
+          }
+        }
+      }
+    }
+  }
+});
+
+test('variants a style lacks are ignored, and a value it lacks throws', () => {
+  const plain = createCover({ title: 'x', style: 'swiss', seed: 's' });
+  assert.equal(createCover({ title: 'x', style: 'swiss', seed: 's', variants: { scene: 'forest' } }).svg, plain.svg);
+  assert.deepEqual(
+    createCover({ title: 'x', style: 'silhouette', variants: { scene: '' } }).variants.scene !== '',
+    true,
+  );
+  assert.throws(
+    () => createCover({ title: 'x', style: 'silhouette', variants: { scene: 'beach' } }),
+    /no scene "beach". Available: city, forest/,
+  );
+  assert.throws(
+    () => createCover({ title: 'x', style: 'silhouette', variants: /** @type {any} */ ('forest') }),
+    TypeError,
+  );
+  // Pinned covers get ids of their own, so a pinned and a free cover can share a page.
+  const free = createCover({ title: 'x', style: 'silhouette', seed: 's' });
+  const other = free.variants.scene === 'city' ? 'forest' : 'city';
+  const pinned = createCover({ title: 'x', style: 'silhouette', seed: 's', variants: { scene: other } });
+  assert.notEqual(/id="(bc[0-9a-z]+)-/.exec(free.svg)?.[1], /id="(bc[0-9a-z]+)-/.exec(pinned.svg)?.[1]);
+});

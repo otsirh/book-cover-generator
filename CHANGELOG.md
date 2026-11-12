@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+
+- **Style variants.** Eleven styles let you pin a choice the variation otherwise makes: Minimal's alignment, Big Letter's letter, Split's shape, Concentric's rings, Stripes' stripes and title, Mosaic's tiles, Silhouette's scene, Aurora's title, Botanical's flowers, Blueprint's drawing and Engraved's border. In the app they are buttons under the style (Auto, or a value; Auto outlines what the variation picked), kept in links as `variant=scene.forest`, and the variations strip keeps them. In the library: `createCover({ variants })`, `Cover.variants`, `variants` in `listStyles()`, and for custom styles a `variants` declaration and `ctx.choose(name, values)`. In the CLI: `--variant scene=forest`. Covers that pin nothing are drawn exactly as before.
+
 ### Changed
 
 - The package is on npm: `npm install book-cover-generator`, `npx book-cover-generator`, and the CDN link `cdn.jsdelivr.net/npm/book-cover-generator@1`.

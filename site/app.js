@@ -29,6 +29,7 @@ import { hashString, contrast } from '../src/core.js';
  * @property {string} author
  * @property {string} subtitle
  * @property {string} style
+ * @property {string} variant   the style's choices pinned, as name.value pairs joined by '-' ('scene.forest')
  * @property {string} palette   a palette id, 'auto', or your own colours ('custom-0b132b-f8f9fa-ff6b6b-…')
  * @property {string} seed      '' means "from the title"
  * @property {string} format    a preset, or a size in px ('1600x2560')
@@ -44,6 +45,8 @@ const CUSTOM_SIZE = /^([1-9]\d{1,4})x([1-9]\d{1,4})$/;
 const MAX_SIDE = sizeLimits.max;
 /** Your own colours: background, text and one to three accents. */
 const CUSTOM_PALETTE = /^custom(?:-[0-9a-f]{6}){3,5}$/;
+/** Pinned variants as a design holds them: name.value pairs joined by '-'. */
+const VARIANT = /^[a-z][a-z0-9]*\.[a-z][a-z0-9]*(?:-[a-z][a-z0-9]*\.[a-z][a-z0-9]*)*$/;
 /** Pixels per inch recorded in PNG and JPEG downloads, so print software sizes them right. */
 const DPI = 300;
 const STYLES = listStyles();
@@ -152,6 +155,7 @@ const design = {
   author: sampleAuthor,
   subtitle: '',
   style: pick(STARTERS),
+  variant: '',
   palette: 'auto',
   seed: randomSeed(),
   format: 'paperback',
@@ -182,6 +186,7 @@ const text = (/** @type {unknown} */ v) => (typeof v === 'string' ? v.replace(/[
  * @property {(v: any) => string} [write]    the value as a link writes it (default: as it is)
  * @property {unknown} empty                 the value of a design that leaves it out (see complete())
  * @property {boolean} [optional]            links may leave it out and still be whole designs
+ * @property {boolean} [omitEmpty]           links leave it out when it is empty
  */
 
 /**
@@ -195,6 +200,8 @@ const FIELDS = {
   // (Optional since 1.2.0: older links left it out when empty.)
   subtitle: { read: (v) => clipText(v, 160), empty: '', optional: true },
   style: { read: (v) => oneOf(text(v), STYLE_IDS.includes.bind(STYLE_IDS)), empty: '' },
+  // (Since 1.5.0.) Checked against the style when used: see pinsFor().
+  variant: { read: (v) => oneOf(text(v), VARIANT.test.bind(VARIANT)), empty: '', optional: true, omitEmpty: true },
   palette: {
     read: (v) => oneOf(text(v)?.toLowerCase(), (p) => PALETTE_IDS.has(p) || CUSTOM_PALETTE.test(p)),
     empty: 'auto',
@@ -253,7 +260,10 @@ function toHash(d) {
   // hand-edited partial one (which changes only the keys it names). Last, the version that drew
   // it: artwork can change between minor versions.
   const q = new URLSearchParams();
-  for (const key of KEYS) q.set(key, FIELDS[key].write?.(d[key]) ?? String(d[key]));
+  for (const key of KEYS) {
+    if (FIELDS[key].omitEmpty && d[key] === FIELDS[key].empty) continue;
+    q.set(key, FIELDS[key].write?.(d[key]) ?? String(d[key]));
+  }
   q.set('v', version);
   return `#${q}`;
 }
@@ -639,10 +649,13 @@ function drain() {
 }
 
 /**
- * @param {Partial<Design>} patch
+ * @param {Partial<Design>} change
  * @param {'discrete' | 'typing'} kind
  */
-function apply(patch, kind) {
+function apply(change, kind) {
+  // Pinned choices belong to a style: another style starts with none.
+  const restyled = change.style !== undefined && change.style !== design.style && !('variant' in change);
+  const patch = restyled ? { ...change, variant: '' } : change;
   const changed = Object.entries(patch).some(([key, value]) => design[/** @type {keyof Design} */ (key)] !== value);
   if (!changed) return;
   const field = kind === 'typing' ? Object.keys(patch).join() : '';
@@ -676,6 +689,7 @@ function optionsFor(d, extra = {}) {
         : d.palette,
     seed: d.seed,
     texture: d.texture,
+    variants: pinsFor(d.variant, extra.style ?? d.style),
     width,
     height,
     ...extra,
@@ -727,6 +741,29 @@ function render({ fade = false, announce = false } = {}) {
     else renderVariations();
   }
 }
+
+/**
+ * The variants a design pins that `style` has (others are left out, as the library would refuse
+ * them: a link may name ones for another style).
+ * @param {string} variant @param {string} style @returns {Record<string, string>}
+ */
+function pinsFor(variant, style) {
+  /** @type {Record<string, string>} */
+  const pins = {};
+  const offered = STYLES.find((s) => s.id === style)?.variants ?? [];
+  for (const pair of variant ? variant.split('-') : []) {
+    const [name, value] = pair.split('.');
+    if (offered.some((v) => v.name === name && v.values.some((x) => x.value === value))) pins[name] = value;
+  }
+  return pins;
+}
+
+/** A design's variant for these pins (sorted by name, so the same pins make the same link). @param {Record<string, string>} pins */
+const variantOf = (pins) =>
+  Object.keys(pins)
+    .sort()
+    .map((name) => `${name}.${pins[name]}`)
+    .join('-');
 
 /** Give the preview and the thumbnails the cover's shape (as site/boot.js does before first paint). */
 function applyShape() {
@@ -942,6 +979,15 @@ function buildControls() {
     syncControls();
   });
 
+  $('style-variants').addEventListener('click', (e) => {
+    const b = /** @type {HTMLElement} */ (e.target).closest('button[data-variant]');
+    if (!(b instanceof HTMLElement)) return;
+    const pins = pinsFor(design.variant, design.style);
+    const name = b.dataset.variant ?? '';
+    if (b.dataset.value) pins[name] = b.dataset.value;
+    else delete pins[name];
+    update({ variant: variantOf(pins) });
+  });
   $('prev-style').addEventListener('click', () => stepStyle(-1));
   $('next-style').addEventListener('click', () => stepStyle(1));
   $('dice-style').addEventListener('click', () => update({ style: pickOther(STYLE_IDS, design.style) }));
@@ -1202,6 +1248,7 @@ function syncControls() {
     b.setAttribute('aria-pressed', String(id === 'custom' ? Boolean(colors) : id === design.palette));
   }
   syncCustomColors(colors);
+  syncVariants();
   const custom = isCustomSize(design.format);
   if (custom) ui.size = design.format;
   for (const b of document.querySelectorAll('[data-format]')) {
@@ -1232,6 +1279,54 @@ function syncControls() {
   $('png-size').textContent = `${pw} × ${ph} px`;
   $('size-hint').textContent = sizeHint(design.format, pw, ph);
   syncPaletteName();
+}
+
+/** The style the variant buttons were built for. */
+let variantsBuiltFor = '';
+
+/** Buttons for the current style's variants: Auto (the seed decides) and each value. */
+function syncVariants() {
+  const box = $('style-variants');
+  const offered = STYLES.find((s) => s.id === design.style)?.variants ?? [];
+  if (variantsBuiltFor !== design.style) {
+    variantsBuiltFor = design.style;
+    box.replaceChildren(
+      ...offered.map((v) => {
+        const labelId = `variant-${v.name}`;
+        return h(
+          'div',
+          { className: 'variant' },
+          h('span', { className: 'variant-label', id: labelId }, v.label),
+          h(
+            'div',
+            { className: 'chips', role: 'group', 'aria-labelledby': labelId },
+            ...[{ value: '', label: 'Auto' }, ...v.values].map((x) =>
+              h(
+                'button',
+                {
+                  type: 'button',
+                  className: 'chip',
+                  'data-variant': v.name,
+                  'data-value': x.value,
+                  title: x.value ? `Always ${x.label.toLowerCase()}` : 'Picked by the variation',
+                },
+                x.label,
+              ),
+            ),
+          ),
+        );
+      }),
+    );
+  }
+  box.hidden = offered.length === 0;
+  const pins = pinsFor(design.variant, design.style);
+  for (const b of box.querySelectorAll('button[data-variant]')) {
+    const name = b.getAttribute('data-variant') ?? '';
+    const value = b.getAttribute('data-value') ?? '';
+    b.setAttribute('aria-pressed', String((pins[name] ?? '') === value));
+    // While Auto is on, the value the variation picked is outlined.
+    b.classList.toggle('picked', !pins[name] && value !== '' && current?.variants[name] === value);
+  }
 }
 
 /** The colour pickers and the Custom swatch. @param {string[] | null} colors the design's own colours, if it has them */

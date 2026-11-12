@@ -104,6 +104,12 @@ export interface CoverOptions {
    * that language's glyphs. Default: `'ja'` for text with kana, `'ko'` for text with Hangul, else none.
    */
   lang?: string;
+  /**
+   * Choices to pin instead of leaving them to the seed, such as `{ scene: 'forest' }` for
+   * Silhouette (see each style's `variants` in `listStyles()`). Names the style doesn't have
+   * are ignored; a value it doesn't offer throws.
+   */
+  variants?: Readonly<Record<string, string>>;
 }
 
 export interface Cover {
@@ -119,6 +125,15 @@ export interface Cover {
   height: number;
   /** The language set on the cover (given or inferred), or `''`. */
   lang: string;
+  /** The value of each of the style's variants this cover has, pinned or picked by the seed. */
+  variants: Record<string, string>;
+}
+
+/** A choice a style lets you pin, such as Silhouette's scene. */
+export interface StyleVariant {
+  name: string;
+  label: string;
+  values: { value: string; label: string }[];
 }
 
 export interface StyleInfo {
@@ -127,6 +142,8 @@ export interface StyleInfo {
   description: string;
   /** The family the style belongs to; `'Custom'` for registered styles without one. */
   group: StyleGroup | (string & {});
+  /** The choices you can pin with `createCover({ variants })`; empty for styles without any. */
+  variants: StyleVariant[];
 }
 
 /** A palette as seen by styles, with derived light/dark colours. */
@@ -160,6 +177,11 @@ export interface StyleContext {
   readonly p: ResolvedPalette;
   /** Make an id that is unique to this cover, for gradients, filters, masks… */
   id(name: string): string;
+  /**
+   * Pick one of `values` for the variant `name`, as `rng.pick(values)` would, unless the cover
+   * pins it (`createCover({ variants: { [name]: value } })`). Repeat a value to make it likelier.
+   */
+  choose<T extends string>(name: string, values: readonly T[]): T;
 }
 
 export interface CoverStyle {
@@ -169,6 +191,11 @@ export interface CoverStyle {
   group?: StyleGroup | (string & {});
   /** Background preference when the palette is picked automatically. */
   prefer?: 'light' | 'dark';
+  /**
+   * The choices `render` makes with `ctx.choose(name, values)` that people can pin, with labels:
+   * `{ scene: { label: 'Scene', values: { city: 'City', forest: 'Forest' } } }`.
+   */
+  variants?: Readonly<Record<string, { label?: string; values: Readonly<Record<string, string>> }>>;
   /** Return SVG markup without the outer `<svg>` element. */
   render(ctx: StyleContext): string;
 }

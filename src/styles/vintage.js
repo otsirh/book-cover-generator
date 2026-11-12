@@ -450,6 +450,7 @@ export const engraved = {
   name: 'Engraved',
   group: 'Vintage',
   description: 'A clothbound classic: ornamental border and a centre medallion.',
+  variants: { motif: { label: 'Border', values: { diamond: 'Diamonds', leaf: 'Leaves', dot: 'Dots' } } },
   /** @param {Ctx} c */
   render(c) {
     const { W, H, S, u, m, rng, p } = c;
@@ -465,7 +466,7 @@ export const engraved = {
     s += rect(o1, o1, W - o1 * 2, H - o1 * 2, 'none', `stroke="${gilt}" stroke-width="${n(2.5 * u)}"`);
     s += rect(o2, o2, W - o2 * 2, H - o2 * 2, 'none', `stroke="${gilt}" stroke-width="${n(1.2 * u)}"`);
     // A repeated motif runs around the border band.
-    const motif = rng.pick(['diamond', 'leaf', 'dot']);
+    const motif = c.choose('motif', ['diamond', 'leaf', 'dot']);
     const step = band * 0.9;
     const mid = (o1 + o2) / 2;
     /** @param {number} x @param {number} y @param {number} rot */

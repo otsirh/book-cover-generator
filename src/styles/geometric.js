@@ -159,13 +159,16 @@ export const split = {
   name: 'Split',
   group: 'Geometric',
   description: 'Two-tone field with an inverted shape on the seam.',
+  variants: {
+    shape: { label: 'Shape', values: { circle: 'Circle', diamond: 'Diamond', square: 'Square', triangle: 'Triangle' } },
+  },
   /** @param {Ctx} c */
   render(c) {
     const { W, H, S, m, rng, p } = c;
     const splitY = H * rng.float(0.52, 0.6);
     const A = rng.pick([...strongAccents(p, p.bg, 1.3), p.ink]);
     const B = p.bg;
-    const kind = rng.pick(['circle', 'circle', 'diamond', 'square', 'triangle']);
+    const kind = c.choose('shape', ['circle', 'circle', 'diamond', 'square', 'triangle']);
     const r = Math.min(S * rng.float(0.18, 0.26), splitY * 0.3, (H - splitY) * 0.4);
     const cx = W * rng.float(0.3, 0.7);
     const top = c.id('top');
@@ -290,13 +293,19 @@ export const concentric = {
   name: 'Concentric',
   group: 'Geometric',
   description: 'Rings, targets and tunnels.',
+  variants: {
+    rings: {
+      label: 'Rings',
+      values: { alternate: 'Alternating', gradient: 'Gradient', tunnel: 'Tunnel', lines: 'Lines' },
+    },
+  },
   /** @param {Ctx} c */
   render(c) {
     const { W, H, S, u, m, rng, p } = c;
     const cx = W * rng.float(0.3, 0.7);
     const cy = H * rng.float(0.25, 0.33);
     const maxR = Math.min(S * rng.float(0.34, 0.46), H * 0.54 - cy);
-    const mode = rng.pick(['alternate', 'gradient', 'tunnel', 'lines']);
+    const mode = c.choose('rings', ['alternate', 'gradient', 'tunnel', 'lines']);
     // The accents that stand out most against the background, so rings never go muddy.
     const strong = strongAccents(p, p.bg, 1.5);
     const c1 = strong[0];
@@ -349,13 +358,17 @@ export const stripes = {
   name: 'Stripes',
   group: 'Geometric',
   description: 'Bold stripes, with the title on a plate or in open space.',
+  variants: {
+    stripes: { label: 'Stripes', values: { even: 'Even', varied: 'Varied', gapped: 'Gapped' } },
+    layout: { label: 'Title', values: { plate: 'On a plate', open: 'In open space' } },
+  },
   /** @param {Ctx} c */
   render(c) {
     const { W, H, S, u, m, rng, p } = c;
     const angle = rng.pick([0, 90, 45, -45, 30, -30, 60]);
     const colors = rng.shuffle([...p.accents, p.ink]).slice(0, rng.int(2, 3));
-    const mode = rng.pick(['even', 'varied', 'gapped']);
-    const layout = rng.pick(['plate', 'plate', 'open']);
+    const mode = c.choose('stripes', ['even', 'varied', 'gapped']);
+    const layout = c.choose('layout', ['plate', 'plate', 'open']);
     const diag = Math.hypot(W, H);
     const base = S * rng.float(0.035, 0.07);
     const stripeH = layout === 'open' ? H * rng.float(0.5, 0.58) : H;

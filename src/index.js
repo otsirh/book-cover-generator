@@ -40,6 +40,35 @@ export const formats = Object.freeze({
 /** An id as registries take it: a string, not empty, without spaces at either end. @param {unknown} id */
 const isId = (id) => typeof id === 'string' && id !== '' && id === id.trim();
 
+/** A name or value as people read it: 'bouquet' → 'Bouquet'. @param {string} id */
+const labelFor = (id) => id.charAt(0).toUpperCase() + id.slice(1);
+
+/**
+ * A style's variants (the choices it lets you pin), checked and in one shape: each with its
+ * name, a label, and its values with theirs.
+ * @param {string} id the style's id, for errors
+ * @param {import('./index.js').CoverStyle['variants']} variants
+ * @returns {import('./index.js').StyleVariant[]}
+ */
+function variantsOf(id, variants) {
+  if (variants == null) return [];
+  if (typeof variants !== 'object') throw new TypeError(`Style "${id}": variants must be an object`);
+  return Object.entries(variants).map(([name, spec]) => {
+    const values = spec && typeof spec === 'object' && !Array.isArray(spec) ? spec.values : null;
+    const entries = values && typeof values === 'object' ? Object.entries(values) : [];
+    if (!isId(name) || !entries.length || !entries.every(([v, l]) => isId(v) && typeof l === 'string')) {
+      throw new TypeError(
+        `Style "${id}": variant "${name}" needs { values: { value: 'Label', … } } with at least one value`,
+      );
+    }
+    return {
+      name,
+      label: typeof spec.label === 'string' ? spec.label : labelFor(name),
+      values: entries.map(([value, label]) => ({ value, label: label || labelFor(value) })),
+    };
+  });
+}
+
 /**
  * A registry entry: the style's details with defaults filled in, and a render that calls
  * the style's own method on the style itself (so class styles keep `this` and private fields).
@@ -52,8 +81,32 @@ const entryFor = (style) => ({
   description: style.description ?? '',
   group: style.group ?? 'Custom',
   prefer: style.prefer,
+  variants: variantsOf(style.id, style.variants),
   render: (/** @type {import('./index.js').StyleContext} */ ctx) => style.render(ctx),
 });
+
+/**
+ * The variants pinned for a style: the given ones it has (others are ignored, so the same
+ * options can go to any style), each checked against the values it offers.
+ * @param {unknown} given @param {ReturnType<typeof entryFor>} style
+ * @returns {Record<string, string>}
+ */
+function pinnedVariants(given, style) {
+  if (given == null) return {};
+  if (typeof given !== 'object') throw new TypeError('variants must be an object such as { scene: "forest" }');
+  /** @type {Record<string, string>} */
+  const pins = {};
+  for (const variant of style.variants) {
+    const value = /** @type {Record<string, unknown>} */ (given)[variant.name];
+    if (value == null || value === '') continue;
+    if (!variant.values.some((v) => v.value === value)) {
+      const offered = variant.values.map((v) => v.value).join(', ');
+      throw new RangeError(`Style "${style.id}" has no ${variant.name} "${String(value)}". Available: ${offered}`);
+    }
+    pins[variant.name] = /** @type {string} */ (value);
+  }
+  return pins;
+}
 
 const builtInStyles = new Map(styleList.map((s) => [s.id, entryFor(s)]));
 const registry = new Map(builtInStyles);
@@ -64,7 +117,13 @@ const builtInPalettes = new Map(paletteList.map((p) => [p.id, p]));
 
 /** Metadata for every available style: [{ id, name, description, group }] */
 export function listStyles() {
-  return [...registry.values()].map(({ id, name, description, group }) => ({ id, name, description, group }));
+  return [...registry.values()].map(({ id, name, description, group, variants }) => ({
+    id,
+    name,
+    description,
+    group,
+    variants: variants.map((v) => ({ ...v, values: v.values.map((x) => ({ ...x })) })),
+  }));
 }
 
 /** Ids of every available style. */
@@ -291,9 +350,27 @@ export function createCover(options = {}) {
   const [paper, night] =
     luminance(palette.bg) >= luminance(palette.ink) ? [palette.bg, palette.ink] : [palette.ink, palette.bg];
 
+  const pins = pinnedVariants(options.variants, style);
   const uid =
     'bc' +
-    hashString(JSON.stringify([title, author, subtitle, seed, styleId, palette, W, H, !!options.texture])).toString(36);
+    hashString(
+      // (Pins only when there are some, so ids of covers without them stay as they were.)
+      JSON.stringify([
+        title,
+        author,
+        subtitle,
+        seed,
+        styleId,
+        palette,
+        W,
+        H,
+        !!options.texture,
+        ...(Object.keys(pins).length ? [pins] : []),
+      ]),
+    ).toString(36);
+  /** The variants the style chose (or was given). @type {Record<string, string>} */
+  const chosen = {};
+  const rng = createRng(`${seed}|${styleId}`);
   const short = Math.min(W, H);
   /** @type {import('./index.js').StyleContext} */
   const ctx = {
@@ -305,9 +382,17 @@ export function createCover(options = {}) {
     S: short,
     u: short / 600,
     m: short * 0.07,
-    rng: createRng(`${seed}|${styleId}`),
+    rng,
     p: { ...palette, paper, night },
     id: (name) => `${uid}-${name}`,
+    // The seed's pick is always drawn, so pinning a variant changes nothing drawn before it.
+    choose: (name, values) => {
+      const picked = rng.pick(values);
+      const pin = pins[name];
+      const value = pin !== undefined && values.includes(/** @type {any} */ (pin)) ? /** @type {any} */ (pin) : picked;
+      chosen[name] = value;
+      return value;
+    },
   };
 
   let body = style.render(ctx);
@@ -324,7 +409,7 @@ export function createCover(options = {}) {
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"${langAttrs} role="img" aria-label="${label}">` +
     `<title>${label}</title>${body}</svg>`;
-  return { svg, body, style: styleId, palette: palette.id, seed, width: W, height: H, lang };
+  return { svg, body, style: styleId, palette: palette.id, seed, width: W, height: H, lang, variants: chosen };
 }
 
 /**

@@ -47,13 +47,19 @@ export const mosaic = {
   name: 'Mosaic',
   group: 'Pattern',
   description: 'Truchet and quarter-circle tiles around a title band.',
+  variants: {
+    tiles: {
+      label: 'Tiles',
+      values: { truchet: 'Arcs', quarters: 'Quarters', triangles: 'Triangles', mixed: 'Mixed' },
+    },
+  },
   /** @param {Ctx} c */
   render(c) {
     const { W, H, S, u, m, rng, p } = c;
     const cols = Math.max(3, Math.round((W / S) * rng.int(5, 8)));
     const size = W / cols;
     const rows = Math.ceil(H / size);
-    const family = rng.pick(['truchet', 'quarters', 'triangles', 'mixed']);
+    const family = c.choose('tiles', ['truchet', 'quarters', 'triangles', 'mixed']);
     const colors = [...p.accents, p.ink];
     const [c1, c2] = rng.shuffle(p.accents);
 

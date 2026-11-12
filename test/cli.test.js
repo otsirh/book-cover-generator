@@ -156,6 +156,7 @@ test('--json reports the choices, with the SVG unless it went to a file', async 
       width: 600,
       height: 900,
       lang: '',
+      variants: {},
     });
   } finally {
     await rm(dir, { recursive: true, force: true });
@@ -234,5 +235,22 @@ test('{n} and {seed} in --out are filled in for one cover too, and a seed never 
     await stat(join(dir, 'Dune-Herbert.svg'));
   } finally {
     await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('--variant pins a style’s choice, and --list shows them', async () => {
+  const forest = await cli('Dune', '-s', 'silhouette', '--seed', 'x', '--variant', 'scene=forest', '--json');
+  assert.deepEqual(JSON.parse(forest.stdout).variants, { scene: 'forest' });
+  const city = await cli('Dune', '-s', 'silhouette', '--seed', 'x', '--variant', 'scene=city', '--json');
+  assert.notEqual(JSON.parse(city.stdout).svg, JSON.parse(forest.stdout).svg);
+  const list = await cli('--list');
+  assert.match(list.stdout, /silhouette[^\n]*\n\s+--variant scene=city\|forest/);
+  for (const [args, message] of [
+    [['Dune', '-s', 'silhouette', '--variant', 'scene=beach'], /no scene "beach"/],
+    [['Dune', '--variant', 'scene'], /--variant must look like scene=forest/],
+  ]) {
+    const { code, stderr } = await cli(...args);
+    assert.equal(code, 1);
+    assert.match(stderr, message);
   }
 });

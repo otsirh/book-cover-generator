@@ -38,7 +38,13 @@ test('a style can be a class instance, and missing details get defaults', () => 
   const frozen = Object.freeze({ id: 'test-undefined', name: undefined, group: undefined, render: () => '' });
   registerStyle(frozen);
   const info = listStyles().find((s) => s.id === 'test-undefined');
-  assert.deepEqual(info, { id: 'test-undefined', name: 'test-undefined', description: '', group: 'Custom' });
+  assert.deepEqual(info, {
+    id: 'test-undefined',
+    name: 'test-undefined',
+    description: '',
+    group: 'Custom',
+    variants: [],
+  });
 });
 
 test('a class style with private fields renders with itself as `this`', () => {
@@ -128,4 +134,32 @@ test('palettes can be registered by id, and built-ins replaced only when asked',
   assert.equal(unregisterPalette('brand'), true);
   assert.throws(() => createCover({ palette: 'brand' }), /Unknown palette "brand"/);
   assert.equal(unregisterPalette('brand'), false);
+});
+
+test('a custom style can offer variants and pick them with choose', () => {
+  registerStyle({
+    id: 'test-moods',
+    variants: { mood: { label: 'Mood', values: { calm: 'Calm', loud: '' } } },
+    render: (c) =>
+      `<rect width="${c.W}" height="${c.H}" fill="${c.choose('mood', ['calm', 'loud']) === 'loud' ? '#ff0000' : '#0000ff'}"/>`,
+  });
+  const info = listStyles().find((s) => s.id === 'test-moods');
+  assert.deepEqual(info?.variants, [
+    {
+      name: 'mood',
+      label: 'Mood',
+      values: [
+        { value: 'calm', label: 'Calm' },
+        { value: 'loud', label: 'Loud' },
+      ],
+    },
+  ]);
+  assert.match(createCover({ style: 'test-moods', variants: { mood: 'loud' } }).svg, /#ff0000/);
+  assert.match(createCover({ style: 'test-moods', variants: { mood: 'calm' } }).svg, /#0000ff/);
+  for (const variants of [{ mood: ['calm'] }, { mood: { values: {} } }, { ' mood': { values: { a: 'A' } } }, 'mood']) {
+    assert.throws(
+      () => registerStyle({ id: 'test-bad', variants: /** @type {any} */ (variants), render: () => '' }),
+      TypeError,
+    );
+  }
 });

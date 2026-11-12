@@ -33,7 +33,7 @@ Generate book covers from a **title** and an **author**. 34 styles, 28 palettes 
 
 On [covers.otsirh.dev](https://covers.otsirh.dev) you type a title and author, then choose:
 
-- **a style**, from a rail that previews your book in all 34 styles;
+- **a style**, from a rail that previews your book in all 34 styles. Eleven styles let you pin a choice the variation otherwise makes, such as Silhouette's city or forest, or where Aurora puts the title;
 - **a palette**, from swatches that show the background, text colour and accents, or **Custom** for your own five colours (it starts from the palette on the cover and shows the text contrast);
 - **a variation**, the seed behind the artwork: the strip under the preview shows six others to click;
 - **a format**: paperback, eBook, square, or **Custom** for any size in pixels, typed in or picked from common sizes (Kindle, print trim sizes at 300 dpi, audiobook, social posts).
@@ -109,7 +109,7 @@ npx book-cover-generator "Neon Tide" --size 1800x2700 --json
 npx book-cover-generator "Salt and Static" --count 12 -o ideas/cover.svg
 ```
 
-Options: `-s/--style`, `-p/--palette`, `--bg`, `--ink`, `--accent`, `--subtitle`, `--texture`, `--seed`, `--format` (`paperback`, `ebook` or `square`), `--width`, `--height`, `--size`, `--lang`, `-o/--out`, `--count`, `--json`, `--list`, `--help`.
+Options: `-s/--style`, `-p/--palette`, `--bg`, `--ink`, `--accent`, `--subtitle`, `--texture`, `--seed`, `--format` (`paperback`, `ebook` or `square`), `--width`, `--height`, `--size`, `--lang`, `--variant name=value` (`--list` shows each style's), `-o/--out`, `--count`, `--json`, `--list`, `--help`.
 
 ## API
 
@@ -133,6 +133,7 @@ Same as `generateCover`, but also tells you which style and palette were chosen.
 | `width`    | `number`           | `600`                  | px, 50–10000; aspect ratio 1:3 to 3:1          |
 | `height`   | `number`           | `width × 1.5`          | px, 50–10000                                   |
 | `lang`     | `string`           | inferred               | language of the text, such as `'ja'`           |
+| `variants` | `object`           | `{}`                   | pin a style's choices: `{ scene: 'forest' }`   |
 
 `lang` is set on the cover so Chinese characters get the right glyphs for the language. Without it, text with kana is marked Japanese and text with Hangul Korean; pass `'zh-Hans'`, `'zh-Hant'` or `'ja'` for text in Chinese characters only.
 
@@ -141,7 +142,7 @@ Titles and subtitles longer than 300 characters (authors: 200) are cut. With `'r
 ### Other exports
 
 - `styles`: array of style ids
-- `listStyles()`: `[{ id, name, description, group }]`
+- `listStyles()`: `[{ id, name, description, group, variants }]`. `variants` lists the choices a style lets you pin, as `[{ name, label, values: [{ value, label }] }]`; pin them with `createCover({ variants: { scene: 'forest' } })`, and `createCover` reports the ones it used in `variants`. Names a style lacks are ignored; a value it lacks throws
 - `palettes`: `[{ id, name, bg, ink, accents, dark? }]`
 - `randomSeed()`: a short random seed string
 - `pickStyle(options)`: the style id `createCover` would use for these options (resolving `'random'` from the seed), without drawing the cover
@@ -199,6 +200,7 @@ generateCover({
 - `rng`: seeded random with `next`, `float`, `int`, `bool`, `pick`, `shuffle`
 - `p`: the palette, with `bg`, `ink`, `accents`, plus `paper` (lighter) and `night` (darker)
 - `id(name)`: makes ids that are unique per cover, for gradients and filters
+- `choose(name, values)`: picks one of `values` as `rng.pick` would, unless the cover pins the variant `name`. Declare what can be pinned in the style's `variants`: `{ mood: { label: 'Mood', values: { calm: 'Calm', loud: 'Loud' } } }`
 
 ```js
 import { registerStyle, titleBlock, authorFit, drawText, FONTS } from 'book-cover-generator';

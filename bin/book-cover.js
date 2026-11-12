@@ -11,6 +11,8 @@ Options:
       --bg <hex>        your own colours instead of a palette: background,
       --ink <hex>       text,
       --accent <hex>    and accents (repeat it, or separate them with commas)
+      --variant <n=v>   pin one of the style's choices, e.g. scene=forest
+                        (repeat it; --list shows each style's)
       --subtitle <text> a subtitle or tagline
       --texture         add a fine film-grain texture
       --seed <value>    seed for the artwork (default: title + author)
@@ -43,6 +45,7 @@ try {
       bg: { type: 'string' },
       ink: { type: 'string' },
       accent: { type: 'string', multiple: true },
+      variant: { type: 'string', multiple: true },
       subtitle: { type: 'string' },
       texture: { type: 'boolean' },
       seed: { type: 'string' },
@@ -72,7 +75,12 @@ if (values.help) {
 
 if (values.list) {
   console.log('Styles:');
-  for (const s of listStyles()) console.log(`  ${s.id.padEnd(14)} ${s.description}`);
+  for (const s of listStyles()) {
+    console.log(`  ${s.id.padEnd(14)} ${s.description}`);
+    for (const v of s.variants) {
+      console.log(`  ${''.padEnd(14)}   --variant ${v.name}=${v.values.map((x) => x.value).join('|')}`);
+    }
+  }
   console.log('\nPalettes:');
   for (const p of palettes) console.log(`  ${p.id.padEnd(14)} ${p.name}${p.dark ? ' (dark)' : ''}`);
   process.exit(0);
@@ -148,6 +156,18 @@ process.stdout.on('error', (err) => {
   throw err;
 });
 
+/** The pinned variants from --variant name=value. */
+function variants() {
+  /** @type {Record<string, string>} */
+  const out = {};
+  for (const pair of values.variant ?? []) {
+    const m = /^\s*([^=\s]+)\s*=\s*(\S+)\s*$/.exec(pair);
+    if (!m) throw new RangeError(`--variant must look like scene=forest, got "${pair}"`);
+    out[m[1]] = m[2];
+  }
+  return out;
+}
+
 /** How many covers to write: --count, 1 by default. */
 function count() {
   if (values.count === undefined) return 1;
@@ -189,6 +209,7 @@ try {
     style: values.style,
     palette: palette(),
     lang: values.lang,
+    variants: variants(),
     ...dimensions(),
   };
   for (let n = 1; n <= total; n++) {
@@ -196,7 +217,7 @@ try {
     const seed = total === 1 ? values.seed : values.seed ? `${values.seed}-${n}` : String(n);
     const cover = createCover({ ...options, seed });
     const { style, palette: paletteId, width, height, lang } = cover;
-    const choices = { style, palette: paletteId, seed: cover.seed, width, height, lang };
+    const choices = { style, palette: paletteId, seed: cover.seed, width, height, lang, variants: cover.variants };
     if (values.out) {
       const file = fileFor(values.out, n, total, cover.seed);
       writeFileSync(file, cover.svg);
