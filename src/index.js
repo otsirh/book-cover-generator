@@ -1,3 +1,4 @@
+/* @ts-self-types="./index.d.ts" */
 // book-cover-generator — generate SVG book covers from a title and an author.
 //
 //   import { generateCover } from 'book-cover-generator';
@@ -399,13 +400,15 @@ function dimension(value, fallback, name) {
   return Math.round(v);
 }
 
+/** @typedef {import('./text.js').FontSpec} FontSpec */
+
 /** Ways to set a title's letters: in capitals, or as typed. */
 const TITLE_CASES = ['upper', 'normal'];
 
 /**
  * The title's font and case, if the options set them (else each style's own).
  * @param {import('./index.js').CoverOptions} options
- * @returns {{ font: import('./text.js').FontSpec | null, fontId: string, titleCase: 'upper' | 'normal' | null }}
+ * @returns {{ font: FontSpec | null, fontId: string, titleCase: 'upper' | 'normal' | null }}
  */
 function typeOptions(options) {
   const font = /** @type {unknown} */ (options.font);

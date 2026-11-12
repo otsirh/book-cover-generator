@@ -65,6 +65,27 @@ jobs:
         if: github.event_name != 'push'
         run: npm pack --dry-run
 
+  # JSR (jsr.io/@otsirh/book-cover-generator), for Deno: npm's version, published with the
+  # repository's identity (the package on jsr.io is linked to it). On when the repository variable
+  # JSR_PUBLISH is 1.
+  jsr:
+    name: Publish to JSR
+    needs: npm
+    if: github.event_name == 'push' && vars.JSR_PUBLISH == '1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - run: npx --yes jsr@0.14.3 publish
+
   github:
     name: GitHub release
     needs: npm

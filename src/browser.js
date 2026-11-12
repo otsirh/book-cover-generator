@@ -1,3 +1,4 @@
+/* @ts-self-types="./browser.d.ts" */
 // Browser helpers for exporting covers: copy, download, rasterise, zip. (`setDpi` and
 // `zipFiles` also work in Node.)
 

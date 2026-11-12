@@ -1,3 +1,4 @@
+/* @ts-self-types="./element.d.ts" */
 // <book-cover>: a cover on any page, from its attributes.
 //
 //   <script type="module" src="https://covers.otsirh.dev/src/element.js"></script>

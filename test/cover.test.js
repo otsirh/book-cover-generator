@@ -965,6 +965,9 @@ test('version matches the package', async () => {
   const { readFile } = await import('node:fs/promises');
   const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
   assert.equal(version, pkg.version);
+  // JSR's too (jsr.json).
+  const jsr = JSON.parse(await readFile(new URL('../jsr.json', import.meta.url), 'utf8'));
+  assert.equal(jsr.version, pkg.version);
 });
 
 test('sizeLimits and formats describe the sizes covers can have', async () => {

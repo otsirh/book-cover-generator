@@ -2,6 +2,8 @@ import { n, circle, contrast, readable, clamp, mix, inkCandidates, hexToRgb } fr
 import { titleBlock } from '../type.js';
 import { graphemes } from '../text.js';
 
+/** @typedef {import('../type.js').TitleBlock} TitleBlock */
+
 /**
  * The title's characters, upper-cased, from the first that isn't punctuation or a
  * space: an initial skips opening quotes, brackets, "¿" and the like (but keeps
@@ -70,7 +72,7 @@ export function tintText(base, toward, k, bg) {
  * @param {readonly V[]} candidates  layout values, from the most to the least room for the art
  * @param {(value: V) => import('../type.js').TitleBlockOptions} optionsFor
  * @param {number} [minSize]  fraction of the short side
- * @returns {{ block: import('../type.js').TitleBlock, value: V }}
+ * @returns {{ block: TitleBlock, value: V }}
  */
 export function fitTitleWith(c, candidates, optionsFor, minSize = 0.06) {
   let block = titleBlock(c, optionsFor(candidates[0]));

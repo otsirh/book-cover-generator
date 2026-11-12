@@ -1,0 +1,13 @@
+{
+  "name": "@otsirh/book-cover-generator",
+  "version": "1.8.0",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.js",
+    "./browser": "./src/browser.js",
+    "./element": "./src/element.js"
+  },
+  "publish": {
+    "include": ["src/**/*.js", "src/**/*.d.ts", "README.md", "LICENSE", "CHANGELOG.md"]
+  }
+}

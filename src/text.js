@@ -74,6 +74,8 @@ export const FONTS = {
   },
 };
 
+/** @typedef {import('./text.js').FontSpec} FontSpec */
+
 /* ------------------------------------------------------------- measurement */
 
 /** @type {CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null | undefined} */
@@ -875,7 +877,7 @@ export function fitText(text, opts) {
 /**
  * Attributes shared by every line of a text block, for its wrapping `<g>`.
  * Colours and font names are escaped; `attrs` is raw SVG.
- * @param {{ font: import('./text.js').FontSpec, fill: string, size?: number, weight?: number, italic?: boolean, letterSpacing?: number, anchor?: 'start' | 'middle' | 'end', opacity?: number, attrs?: string }} o
+ * @param {{ font: FontSpec, fill: string, size?: number, weight?: number, italic?: boolean, letterSpacing?: number, anchor?: 'start' | 'middle' | 'end', opacity?: number, attrs?: string }} o
  */
 export function textGroupAttrs({ font, fill, size, weight, italic, letterSpacing, anchor = 'start', opacity, attrs }) {
   let a = `font-family="${escapeXml(font.family)}"`;
