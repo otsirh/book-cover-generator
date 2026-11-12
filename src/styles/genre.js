@@ -15,7 +15,7 @@ import {
   linearGradient,
   radialGradient,
 } from '../core.js';
-import { FONTS, fitText, drawText, textGroupAttrs } from '../text.js';
+import { FONTS, fitText, drawText, textGroupAttrs, typedLines } from '../text.js';
 import { titleBlock, authorFit } from '../type.js';
 import { strongAccents, fitTitleWith, flower, textColor } from './util.js';
 
@@ -108,9 +108,10 @@ export const thriller = {
         upper: true,
         letterSpacing: 0.14,
         maxWidth: W - m * 2,
-        maxHeight: S * 0.08,
+        // (A credit is a line of its own after the subtitle.)
+        maxHeight: S * 0.08 * (1 + (typedLines(c.subtitle) - 1) * 0.5),
         maxSize: S * 0.03,
-        maxLines: 2,
+        maxLines: 1 + typedLines(c.subtitle),
       });
       s += drawText(tag, { x: W / 2, y: barY - S * 0.03 - tag.height, anchor: 'middle', fill: light, opacity: 0.85 });
     }

@@ -334,6 +334,12 @@ export function clipGraphemes(str, max, { units = false } = {}) {
 
 /** @typedef {{ text: string, space: boolean, hard?: boolean }} Token  A wrap unit; `space` means a space comes before it, `hard` a line break the text asks for. */
 
+/** Typed lines are kept whole when that sets them at least this share of the size wrapping gives. */
+const TYPED_SHARE = 0.8;
+
+/** The number of lines text was typed on (1 without line breaks). @param {string} text */
+export const typedLines = (text) => Math.max(1, text.split(LINE_BREAK).filter((line) => line.trim()).length);
+
 /** A line break in the text itself (a title typed on two lines): lines always break there. */
 export const LINE_BREAK = /\r\n|[\r\n\u2028\u2029]/;
 
@@ -659,13 +665,7 @@ export function fitText(text, opts) {
   const cap = font.cap ?? 0.72;
   // With `descent`, the budget also covers the descenders below the last line.
   const descent = Boolean(opts.descent);
-  // (Text typed on more lines than that gets them all: it shrinks to fit rather than lose one.)
-  const maxLines = Math.max(
-    opts.maxLines ?? 5,
-    String(text ?? '')
-      .split(LINE_BREAK)
-      .filter((l) => l.trim()).length,
-  );
+  const maxLines = opts.maxLines ?? 5;
   const maxWidth = Math.max(1, opts.maxWidth);
   const maxHeight = opts.maxHeight ?? Infinity;
   const maxSize = opts.maxSize;
@@ -754,19 +754,25 @@ export function fitText(text, opts) {
     };
   };
 
-  // Text typed on several lines keeps those lines while they fit at a fair size: shrink rather
-  // than wrap inside one. (Else it wraps as usual, still breaking where it was typed to.)
+  // Text typed on several lines may keep those lines whole, shrinking rather than wrapping inside
+  // one, while that costs little: at least TYPED_SHARE of the size wrapping gives. (Wrapping
+  // still breaks where the text was typed to.)
+  /** @type {{ lines: string[], size: number } | null} */
+  let typed = null;
   if (tokens.some((token) => token.hard)) {
-    const typed = str.split('\n');
-    const perPx = Math.max(...typed.map((line) => measureText(line, REFERENCE, spec) / REFERENCE));
-    const l = layoutOf(typed);
-    const fit = Math.min(
+    const lines = str.split('\n');
+    const perPx = Math.max(...lines.map((line) => measureText(line, REFERENCE, spec) / REFERENCE));
+    const l = layoutOf(lines);
+    const size = Math.min(
       maxSize,
       maxWidth / perPx,
-      maxHeight / (l.above + cap + (typed.length - 1) * l.pitch + (descent ? l.below : 0)),
+      maxHeight / (l.above + cap + (lines.length - 1) * l.pitch + (descent ? l.below : 0)),
     );
-    if (typed.length <= maxLines && fit >= minSize) return finish(typed, fit);
+    if (lines.length <= maxLines && size >= minSize) typed = { lines, size };
   }
+  /** The wrapped fit at `size`, unless the typed lines come close to it. @param {string[]} lines @param {number} size */
+  const typedOr = (lines, size) =>
+    typed && typed.size >= size * TYPED_SHARE ? finish(typed.lines, typed.size) : finish(lines, size);
 
   // Shrink 5% at a time down to minSize (which is positive, so this ends however far apart the two are).
   let size = maxSize;
@@ -779,11 +785,14 @@ export function fitText(text, opts) {
         const even = balance(tokens, lines.length, maxWidth, measure);
         if (fitsHeight(even, size)) lines = even;
       }
-      return finish(lines, size);
+      return typedOr(lines, size);
     }
     if (size <= minSize) break;
     size = Math.max(minSize, size * 0.95);
   }
+
+  // Nothing wraps at minSize or larger: the typed lines, if they fit.
+  if (typed) return finish(typed.lines, typed.size);
 
   // Fallback: smallest size (or smaller, if even one line won't fit the height),
   // break long words, truncate with an ellipsis.

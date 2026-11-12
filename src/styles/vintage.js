@@ -12,7 +12,17 @@ import {
   radialGradient,
   contrast,
 } from '../core.js';
-import { FONTS, fitText, drawText, textBottom, graphemes, measureText, textGroupAttrs, baselineOf } from '../text.js';
+import {
+  FONTS,
+  fitText,
+  drawText,
+  textBottom,
+  graphemes,
+  measureText,
+  textGroupAttrs,
+  baselineOf,
+  typedLines,
+} from '../text.js';
 import { titleBlock, authorFit } from '../type.js';
 import { strongAccents, flower, initialChars, textPanel, textColor } from './util.js';
 
@@ -350,14 +360,29 @@ export const typewriter = {
       maxSize: S * 0.1,
       minSize: S * 0.03,
       lineHeight: 1.3,
-      maxLines: 5,
+      // (A title typed on more lines gets them all.)
+      maxLines: Math.max(5, typedLines(c.title)),
     });
     const sub = c.subtitle
       ? fitText(c.subtitle, {
           font: FONTS.mono,
           maxWidth: maxW,
-          maxHeight: S * 0.1,
+          // (A credit is a line of its own after the subtitle.)
+          maxHeight: S * 0.1 * (1 + (typedLines(c.subtitle) - 1) * 0.5),
           maxSize: S * 0.036,
+          maxLines: 1 + typedLines(c.subtitle),
+          lineHeight: 1.3,
+        })
+      : null;
+    // The series, typed above the title.
+    const series = c.series
+      ? fitText(c.series, {
+          font: FONTS.mono,
+          upper: true,
+          letterSpacing: 0.08,
+          maxWidth: maxW,
+          maxHeight: S * 0.08,
+          maxSize: S * 0.028,
           maxLines: 2,
           lineHeight: 1.3,
         })
@@ -376,9 +401,20 @@ export const typewriter = {
       : null;
     const gap = S * 0.05;
     const underline = 8 * u;
+    const seriesH = series?.lines.length ? textBottom(series, 0) + gap * 0.6 : 0;
     const blockH =
-      textBottom(t, 0) + underline + (sub ? gap * 0.6 + textBottom(sub, 0) : 0) + (by ? gap + textBottom(by, 0) : 0);
+      seriesH +
+      textBottom(t, 0) +
+      underline +
+      (sub ? gap * 0.6 + textBottom(sub, 0) : 0) +
+      (by ? gap + textBottom(by, 0) : 0);
     let y = H * 0.42 - blockH / 2;
+    if (series && seriesH) {
+      series.lines.forEach((ln, i) => {
+        s += typedLine(ln, W / 2, baselineOf(series, y, i), series.size, 400, rng, ink, 'middle');
+      });
+      y += seriesH;
+    }
     t.lines.forEach((ln, i) => {
       s += typedLine(ln, W / 2, baselineOf(t, y, i), t.size, 700, rng, ink, 'middle');
     });

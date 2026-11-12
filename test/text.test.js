@@ -275,3 +275,15 @@ test('line breaks in the text always break lines, and typed lines stay whole whi
   // Capitals and stacks follow the lines too.
   assert.deepEqual(fitText('Salt and\nStatic', { ...opts, upper: true }).lines, ['SALT AND', 'STATIC']);
 });
+
+test('fitText keeps to maxLines, even for text typed on more lines', () => {
+  const fit = fitText('One\nTwo\nThree', {
+    font: FONTS.serif,
+    maxWidth: 400,
+    maxSize: 40,
+    maxHeight: 400,
+    maxLines: 1,
+  });
+  assert.equal(fit.lines.length, 1);
+  assert.ok(fit.truncated);
+});

@@ -54,6 +54,8 @@ export declare function trackingFor(text: string, spacing: number): number;
 export declare const BREAKING_SPACE: RegExp;
 /** A line break in text (CR, LF, CRLF, U+2028, U+2029): `fitText` always breaks lines there. */
 export declare const LINE_BREAK: RegExp;
+/** The number of lines text was typed on: 1 without line breaks. */
+export declare function typedLines(text: string): number;
 /** The start of a string, cut between user-perceived characters (`units`: count UTF-16 code units). */
 export declare function clipGraphemes(str: string, max: number, options?: { units?: boolean }): string;
 /** Split a string into user-perceived characters. */

@@ -1210,14 +1210,84 @@ test('a series line and a credit, in every style', () => {
       const title = runs.find((r) => /lighthouse|keeper/i.test(r.text));
       const series = runs.find((r) => /ember cycle/i.test(r.text));
       if (title && series) assert.ok(series.size < title.size, `${label}: series as large as the title`);
-      if (style !== 'typewriter' && style !== 'pixel' && width === 600 && height === 900 && !series)
-        missing.push(style);
+      // (Typewriter types each letter on its own: read the cover's text run together.)
+      const typed = svg.replace(/<title>[^<]*<\/title>/, '').replace(/<[^>]+>|\s/g, '');
+      if (!series && !/BOOKTWOOFTHEEMBERCYCLE/i.test(typed)) missing.push(label);
       assert.match(svg, /<title>[^<]*\(Book Two of the Ember Cycle\)\. Translated by Edith Grossman<\/title>/, label);
     }
   }
-  // Every style that sets its title with titleBlock sets the series on a paperback cover.
+  // Every style sets the series, at every shape.
   assert.deepEqual(missing, []);
   // Without them, nothing changes.
   const plain = createCover({ title: 'x', style: 'minimal', seed: 's' });
   assert.equal(createCover({ title: 'x', style: 'minimal', seed: 's', series: ' ', credit: '' }).svg, plain.svg);
+});
+
+test('a typed line break costs the title little; else it wraps inside the long line', () => {
+  for (const style of builtIn) {
+    const sizeOf = (/** @type {string} */ title) => {
+      const { svg } = createCover({ title, author: 'A', style, seed: 's' });
+      return Math.max(
+        0,
+        ...textRuns(svg)
+          .filter((r) => /lighthouse|northern/i.test(r.text))
+          .map((r) => r.size),
+      );
+    };
+    const broken = sizeOf('The Lighthouse Keeper of the Northern Coast\nStories');
+    const whole = sizeOf('The Lighthouse Keeper of the Northern Coast Stories');
+    if (broken && whole) assert.ok(broken >= whole * 0.75, `${style}: ${broken} with the break, ${whole} without`);
+  }
+});
+
+test('a credit leaves the subtitle its two lines', () => {
+  const subtitle = 'An Extraordinarily Long Subtitle About the Secret History of Absolutely Everything Here';
+  const size = (/** @type {string} */ credit) => {
+    const { svg } = createCover({ title: 'T', subtitle, credit, style: 'minimal', seed: 's' });
+    return Math.max(
+      ...textRuns(svg)
+        .filter((r) => /extraordinarily|everything/i.test(r.text))
+        .map((r) => r.size),
+    );
+  };
+  assert.ok(size('Translated by Edith Grossman') >= size('') * 0.85);
+});
+
+test('the series line is never set larger than the title', () => {
+  for (const style of builtIn) {
+    const { svg } = createCover({
+      title: 'Supercalifragilisticexpialidocious Antidisestablishmentarianism',
+      series: 'Book Two of the Ember Cycle',
+      style,
+      seed: 's',
+    });
+    const runs = textRuns(svg);
+    const title = Math.max(0, ...runs.filter((r) => /super|anti/i.test(r.text)).map((r) => r.size));
+    const series = Math.max(0, ...runs.filter((r) => /ember/i.test(r.text)).map((r) => r.size));
+    if (title && series) assert.ok(series <= title, `${style}: series ${series}, title ${title}`);
+  }
+});
+
+test('typed line breaks and the styles with their own lettering', () => {
+  // Big Letter takes the main word's initial, past a typed break too.
+  const initial = (/** @type {string} */ title) =>
+    /font-size="(\d+(?:\.\d+)?)"[^>]*>([^<]+)<\/text>/.exec(
+      createCover({ title, style: 'typographic', seed: 's' }).svg,
+    )?.[2];
+  assert.equal(initial('The Lighthouse\nKeeper'), initial('The Lighthouse Keeper'));
+  // Pixel keeps its own lettering whether or not the title can be drawn in pixel letters.
+  for (const title of ['Cafe Society', 'Café Society']) {
+    const { svg } = createCover({
+      title,
+      series: 'Book Two',
+      style: 'pixel',
+      seed: 's',
+      font: 'didone',
+      titleCase: 'normal',
+    });
+    assert.doesNotMatch(svg, /Didot/, title);
+    assert.match(svg, /BOOK TWO/, title);
+  }
+  // The language counts the series and credit too.
+  assert.equal(createCover({ title: '東京物語', series: 'シリーズ第二巻' }).lang, 'ja');
 });

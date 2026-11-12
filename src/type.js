@@ -8,6 +8,7 @@
 import { n, clamp, escapeXml } from './core.js';
 import {
   FONTS,
+  typedLines,
   fitText,
   drawText,
   measureText,
@@ -24,7 +25,8 @@ import {
 } from './text.js';
 
 // Leading articles (English, French, Spanish, Italian, German). "Die" is left out: "Die Hard".
-const LEAD = /^(the|an|a|les|los|las|der|das|une|un|eine|ein|el|la|le|il|lo) +(\S.*)$/i;
+// (After the article, spaces or a typed line break; the rest may run over several typed lines.)
+const LEAD = /^(the|an|a|les|los|las|der|das|une|un|eine|ein|el|la|le|il|lo)[ \n]+(\S[\s\S]*)$/i;
 
 /**
  * Split a leading article off a title: "The Lighthouse Keeper" →
@@ -226,8 +228,8 @@ export function titleBlock(c, o) {
   const letterSpacing = upper === !!o.upper ? (o.letterSpacing ?? 0) : upper ? Math.max(o.letterSpacing ?? 0, 0.03) : 0;
   const whole = (o.text ?? c.title).trim();
   // A title typed on several lines is set on those lines: no lead line of its own, and room for all.
-  const typedLines = whole.split('\n').length;
-  const split = o.lead === false || typedLines > 1 ? { lead: '', main: whole } : splitLead(whole);
+  const titleLines = typedLines(whole);
+  const split = o.lead === false || titleLines > 1 ? { lead: '', main: whole } : splitLead(whole);
   // Only a lead of three letters or more gets its own small line: a lone "A" or "La" up there
   // reads as a stray mark, so short ones stay with the title.
   const { lead, main } = graphemes(split.lead).length >= 3 ? split : { lead: '', main: whole };
@@ -236,7 +238,7 @@ export function titleBlock(c, o) {
   const seriesFit =
     o.series === false || !c.series
       ? null
-      : fitText(c.series, {
+      : fitSubtitle(c, c.series, {
           font: o.subtitleFont ?? font,
           weight: Math.min(weight, 600),
           upper: true,
@@ -247,10 +249,7 @@ export function titleBlock(c, o) {
           lineHeight: 1.25,
         });
   const seriesH = seriesFit?.lines.length ? seriesFit.height + seriesFit.size * 1.2 : 0;
-  // Never at the title's expense beyond a quarter of the room: else it is left out.
-  const kicker = seriesH && seriesH <= o.maxHeight * 0.25 ? seriesFit : null;
-  const kickerH = kicker ? seriesH : 0;
-  const maxHeight = o.maxHeight - kickerH;
+  const maxHeight = o.maxHeight;
 
   const sub = subtitle
     ? fitSubtitle(c, subtitle, {
@@ -260,9 +259,10 @@ export function titleBlock(c, o) {
         letterSpacing: o.subtitleUpper ? 0.12 : 0,
         weight: 400,
         maxWidth: o.maxWidth,
-        maxHeight: c.S * 0.1,
+        // (A credit is a line of its own after the subtitle: room for it too.)
+        maxHeight: c.S * 0.1 * (1 + (typedLines(subtitle) - 1) * 0.5),
         maxSize: o.subtitleSize ?? c.S * 0.036,
-        maxLines: 2,
+        maxLines: 1 + typedLines(subtitle),
         lineHeight: 1.25,
       })
     : null;
@@ -280,7 +280,7 @@ export function titleBlock(c, o) {
     maxWidth: o.maxWidth,
     maxSize: o.maxSize,
     minSize: o.minSize,
-    maxLines: Math.max(o.maxLines ?? 5, typedLines),
+    maxLines: Math.max(o.maxLines ?? 5, titleLines),
   };
 
   /** Visual bottom of a main-title fit, including descenders. @param {import('./text.js').TextFit | StackFit} f */
@@ -297,18 +297,23 @@ export function titleBlock(c, o) {
     );
   };
 
-  /** Lay out with or without the lead line and subtitle. @param {boolean} useLead @param {boolean} useSub */
-  const layout = (useLead, useSub) => {
+  /**
+   * Lay out with or without the lead line, the subtitle and the series line.
+   * @param {boolean} useLead @param {boolean} useSub @param {boolean} useSeries
+   */
+  const layout = (useLead, useSub, useSeries) => {
     const text = useLead ? main : (o.text ?? c.title).trim();
     const leadText = useLead ? lead : '';
     const subFit = useSub ? sub : null;
+    const kickerL = useSeries && seriesH ? seriesFit : null;
+    const kickerHL = kickerL ? seriesH : 0;
     const subGapL = subFit?.lines.length ? subFit.size * 0.9 : 0;
     const subHL = subFit?.lines.length ? subGapL + textBottom(subFit, 0) : 0;
     /** @type {import('./text.js').TextFit | null} */
     let leadFitL = null;
     let leadGapL = 0;
     let reserve = leadText ? o.maxSize * 0.3 : 0;
-    let f = fitMain(text, Math.max(1, maxHeight - subHL - reserve));
+    let f = fitMain(text, Math.max(1, maxHeight - kickerHL - subHL - reserve));
     /** The lead line for a title of `size`: its fit and the room it takes with its gap. @param {number} size */
     const leadFor = (size) => {
       const fit = fitText(leadText, {
@@ -332,7 +337,7 @@ export function titleBlock(c, o) {
         let hi = reserve;
         for (let k = 0; k < 4 && hi - lo > 1; k++) {
           const mid = (lo + hi) / 2;
-          const bigger = fitMain(text, Math.max(1, maxHeight - subHL - mid));
+          const bigger = fitMain(text, Math.max(1, maxHeight - kickerHL - subHL - mid));
           const itsLead = leadFor(bigger.size);
           if (itsLead.needed <= mid + 0.5) {
             hi = mid;
@@ -344,7 +349,7 @@ export function titleBlock(c, o) {
         break;
       }
       reserve = leadLine.needed;
-      f = fitMain(text, Math.max(1, maxHeight - subHL - reserve));
+      f = fitMain(text, Math.max(1, maxHeight - kickerHL - subHL - reserve));
     }
     const leadHL = leadFitL ? leadFitL.height + leadGapL : 0;
     return {
@@ -353,7 +358,9 @@ export function titleBlock(c, o) {
       leadH: leadHL,
       sub: subFit,
       subGap: subGapL,
-      height: leadHL + bottomOf(f) + subHL,
+      kicker: kickerL,
+      kickerH: kickerHL,
+      height: kickerHL + leadHL + bottomOf(f) + subHL,
     };
   };
 
@@ -361,8 +368,8 @@ export function titleBlock(c, o) {
   const truncatedIn = (l) => !('kind' in l.fit) && l.fit.truncated;
   /** The title's size, for a stack its smallest line. @param {ReturnType<typeof layout>} l */
   const titleSize = (l) => ('kind' in l.fit ? Math.min(...l.fit.lines.map((line) => line.size)) : l.fit.size);
-  /** The title is at least as large as its subtitle and its lead. @param {ReturnType<typeof layout>} l */
-  const inOrder = (l) => titleSize(l) >= Math.max(l.sub?.size ?? 0, l.leadFit?.size ?? 0);
+  /** The title is at least as large as its subtitle, its lead and its series line. @param {ReturnType<typeof layout>} l */
+  const inOrder = (l) => titleSize(l) >= Math.max(l.sub?.size ?? 0, l.leadFit?.size ?? 0, l.kicker?.size ?? 0);
   /** Fits the height, the title is whole, at its minimum or larger, and in order. @param {ReturnType<typeof layout>} l */
   const fits = (l) => l.height <= maxHeight + 0.5 && !truncatedIn(l) && titleSize(l) >= minMain * 0.999 && inOrder(l);
   /**
@@ -379,14 +386,19 @@ export function titleBlock(c, o) {
     return truncatedIn(b) && !truncatedIn(a);
   };
 
-  // Shrink first; if the title still doesn't fit, fold the lead back into it, then drop the subtitle.
+  // Shrink first; if the title still doesn't fit, fold the lead back into it, then drop the
+  // subtitle, then the series line.
   const hasLead = Boolean(lead);
   const hasSub = Boolean(sub?.lines.length);
-  /** @type {[boolean, boolean][]} */
-  const tries = [[hasLead, hasSub]];
-  if (hasLead) tries.push([false, hasSub]);
-  if (hasSub) tries.push([hasLead, false]);
-  if (hasLead && hasSub) tries.push([false, false]);
+  const hasSeries = Boolean(seriesH);
+  /** @type {[boolean, boolean, boolean][]} */
+  const tries = [];
+  for (const useSeries of hasSeries ? [true, false] : [false]) {
+    tries.push([hasLead, hasSub, useSeries]);
+    if (hasLead) tries.push([false, hasSub, useSeries]);
+    if (hasSub) tries.push([hasLead, false, useSeries]);
+    if (hasLead && hasSub) tries.push([false, false, useSeries]);
+  }
   let L = layout(...tries[0]);
   let best = L;
   for (let i = 1; i < tries.length && !fits(L); i++) {
@@ -394,12 +406,12 @@ export function titleBlock(c, o) {
     if (better(L, best)) best = L;
   }
   if (!fits(L)) L = best;
-  const { fit, leadFit, leadH } = L;
+  const { fit, leadFit, leadH, kicker, kickerH } = L;
   const mainBottom = bottomOf(fit);
   const width = Math.max(fit.width, leadFit?.width ?? 0, L.sub?.width ?? 0, kicker?.width ?? 0);
 
   return {
-    height: L.height + kickerH,
+    height: L.height,
     width,
     size: fit.size,
     smallest: titleSize(L),

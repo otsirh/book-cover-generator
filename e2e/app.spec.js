@@ -1522,6 +1522,21 @@ test('a series line and a credit: typed in, on the cover and in the link', async
   await expect.poll(() => svgSoon(page, '#preview')).toContain('BOOK TWO OF THE EMBER CYCLE');
   expect(await svgOf(page, '#preview')).toContain('Translated by Edith Grossman');
   await expect(page).toHaveURL(/series=Book\+Two\+of\+the\+Ember\+Cycle&credit=Translated\+by\+Edith\+Grossman/);
+  // Closed, it stays closed while you work.
+  await page.locator('#more-text summary').click();
+  await expect(page.locator('#more-text')).not.toHaveAttribute('open');
+  await page.locator('.tile[data-style="swiss"]').click();
+  await selected(page, 'swiss');
+  await page.locator('#title').fill('Another Title');
+  await expect(page.locator('#more-text')).not.toHaveAttribute('open');
+  // Undo brings back what was typed there: the section opens to show it.
+  await page.locator('#more-text summary').click();
+  await page.locator('#series').fill('');
+  await page.locator('#series').blur();
+  await page.locator('#more-text summary').click();
+  await expect(page.locator('#more-text')).not.toHaveAttribute('open');
+  await page.locator('#undo').click();
+  await expect(page.locator('#more-text')).toHaveAttribute('open');
   // A link with them opens the section that holds them.
   const link = new URL(page.url()).hash;
   await page.goto('about:blank');

@@ -18,7 +18,7 @@ import {
   shadowFilter,
   linearGradient,
 } from '../core.js';
-import { FONTS, fitText, drawText, textBottom } from '../text.js';
+import { FONTS, fitText, drawText, textBottom, typedLines } from '../text.js';
 import { titleBlock, authorFit } from '../type.js';
 import { strongAccents, textPanel } from './util.js';
 
@@ -939,19 +939,36 @@ export const pixel = {
             font: FONTS.mono,
             weight: 700,
             maxWidth: box.w,
-            maxHeight: S * 0.08,
+            // (A credit is a line of its own after the subtitle.)
+            maxHeight: S * 0.08 * (1 + (typedLines(c.subtitle) - 1) * 0.5),
             maxSize: S * 0.032,
-            maxLines: 2,
+            maxLines: 1 + typedLines(c.subtitle),
           })
         : null;
     const subH = sfit ? sfit.height : sText ? textBottom(sText, 0) : 0;
     const reserve = subH ? subH + g * 2.5 : 0;
-    const pfit = drawable ? fitPixelText(title, box.w, box.h - reserve, S * 0.022) : null;
+    // The series, in small capitals above the pixel title.
+    const series =
+      drawable && c.series
+        ? fitText(c.series, {
+            font: FONTS.mono,
+            weight: 700,
+            upper: true,
+            letterSpacing: 0.1,
+            maxWidth: box.w,
+            maxSize: S * 0.026,
+            maxLines: 2,
+          })
+        : null;
+    const seriesH = series?.lines.length ? textBottom(series, 0) + g * 2 : 0;
+    const pfit = drawable ? fitPixelText(title, box.w, box.h - reserve - seriesH, S * 0.022) : null;
     // The text goes on top of everything (scanlines included); `textEnd` is where it ends.
     let text = '';
     let textEnd;
     if (pfit) {
-      const y = m * 1.3;
+      if (series && seriesH)
+        text += drawText(series, { x: W / 2, y: m * 1.3, anchor: 'middle', fill: ink, opacity: 0.85 });
+      const y = m * 1.3 + seriesH;
       // A drop shadow only on dark skies: on light ones it smudges the letters.
       if (p.dark) text += drawPixelText(pfit, W / 2 + g * 0.6, y + g * 0.6, 'middle', mix(skyTop, '#000000', 0.5));
       text += drawPixelText(pfit, W / 2, y, 'middle', ink);
@@ -965,19 +982,23 @@ export const pixel = {
         textEnd = textBottom(sText, subY);
       }
     } else {
-      const t = titleBlock(c, {
-        font: FONTS.mono,
-        weight: 700,
-        upper: true,
-        lead: false,
-        subtitleFont: FONTS.mono,
-        subtitleItalic: false,
-        maxWidth: box.w,
-        maxHeight: box.h,
-        maxSize: S * 0.11,
-        lineHeight: 1.1,
-        maxLines: 5,
-      });
+      // Its own lettering, whatever font or case the cover asks for, as in pixel letters.
+      const t = titleBlock(
+        { ...c, titleFont: null, titleCase: null },
+        {
+          font: FONTS.mono,
+          weight: 700,
+          upper: true,
+          lead: false,
+          subtitleFont: FONTS.mono,
+          subtitleItalic: false,
+          maxWidth: box.w,
+          maxHeight: box.h,
+          maxSize: S * 0.11,
+          lineHeight: 1.1,
+          maxLines: 5,
+        },
+      );
       text += t.draw({ x: W / 2, y: m * 1.3, anchor: 'middle', fill: ink });
       textEnd = m * 1.3 + t.height;
     }

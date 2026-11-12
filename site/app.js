@@ -20,7 +20,7 @@ import {
   zipFiles,
   extensionOf,
 } from '../src/browser.js';
-import { clipGraphemes } from '../src/text.js';
+import { clipGraphemes, LINE_BREAK } from '../src/text.js';
 import { hashString, contrast } from '../src/core.js';
 
 /** @typedef {keyof typeof formats} Preset */
@@ -187,9 +187,9 @@ let current;
 /* ------------------------------------------------------------ URL & history */
 
 // Line breaks become spaces: the single-line inputs would drop them, and the cover spaces them.
-const text = (/** @type {unknown} */ v) => (typeof v === 'string' ? v.replace(/[\r\n\u2028\u2029]+/g, ' ') : null);
+const text = (/** @type {unknown} */ v) => (typeof v === 'string' ? v.split(LINE_BREAK).join(' ') : null);
 /** Text that may hold line breaks (the title, typed on several lines), each as "\n". @param {unknown} v */
-const lines = (v) => (typeof v === 'string' ? v.replace(/\r\n?|[\u2028\u2029]/g, '\n') : null);
+const lines = (v) => (typeof v === 'string' ? v.split(LINE_BREAK).join('\n') : null);
 /** A title as one line, for labels and file names. @param {string} title */
 const oneLine = (title) => title.replace(/\s*\n\s*/g, ' ').trim();
 
@@ -1280,11 +1280,15 @@ function syncSize(always = false) {
 
 function syncControls() {
   const input = (/** @type {string} */ id) => /** @type {HTMLInputElement} */ ($(id));
+  // A series or credit that comes from elsewhere (a link, Undo, a kept design) opens their section,
+  // so it is never hidden; one typed there leaves it as it is, and closing it is up to you.
+  const arrived =
+    (design.series && input('series').value !== design.series) ||
+    (design.credit && input('credit').value !== design.credit);
+  if (arrived) /** @type {HTMLDetailsElement} */ ($('more-text')).open = true;
   for (const key of /** @type {const} */ (['title', 'author', 'subtitle', 'series', 'credit'])) {
     if (input(key).value !== design[key]) input(key).value = design[key];
   }
-  // (Opened when the design has either, so they are never hidden; closing it is up to you.)
-  if (design.series || design.credit) /** @type {HTMLDetailsElement} */ ($('more-text')).open = true;
   // (Compared trimmed, as the field's input handler trims: typing a space doesn't get undone.)
   if (input('seed').value.trim() !== design.seed) input('seed').value = design.seed;
   input('texture').checked = design.texture;

@@ -373,7 +373,7 @@ export function createCover(options = {}) {
   const credit = cleanText(options.credit, 120);
   const W = dimension(options.width, 600, 'width');
   const H = dimension(options.height, W * 1.5, 'height');
-  const lang = resolveLang(options.lang, `${title} ${subtitle} ${author}`);
+  const lang = resolveLang(options.lang, `${title} ${subtitle} ${author} ${series} ${credit}`);
   const { ratio } = sizeLimits;
   if (W / H > ratio || H / W > ratio) {
     throw new RangeError(`The aspect ratio must be between 1:${ratio} and ${ratio}:1, got ${W}×${H}`);
