@@ -24,6 +24,7 @@ export {
 export { titleBlock, authorFit, fitStack, drawStack, splitLead } from './type.js';
 export { strongAccents, textColor, tintText, fitTitleWith, textPanel, TEXT_CONTRAST } from './styles/util.js';
 export * as svgUtils from './core.js';
+export { createMockup, mockupKinds } from './mockups.js';
 
 /** This version of the library (artwork for a seed can change between minor versions). */
 export const version = '1.5.0';
@@ -458,7 +459,21 @@ export function createCover(options = {}) {
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"${langAttrs} role="img" aria-label="${label}">` +
     `<title>${label}</title>${body}</svg>`;
-  return { svg, body, style: styleId, palette: palette.id, seed, width: W, height: H, lang, variants: chosen };
+  const colors = { bg: palette.bg, ink: palette.ink, accents: [...palette.accents], dark: palette.dark };
+  return {
+    svg,
+    body,
+    style: styleId,
+    palette: palette.id,
+    colors,
+    seed,
+    width: W,
+    height: H,
+    lang,
+    variants: chosen,
+    title,
+    author,
+  };
 }
 
 /**

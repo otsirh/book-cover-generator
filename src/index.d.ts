@@ -22,6 +22,23 @@ export { titleBlock, authorFit, fitStack, drawStack, splitLead } from './type.js
 export { strongAccents, textColor, tintText, fitTitleWith, textPanel, TEXT_CONTRAST } from './styles/util.js';
 export * as svgUtils from './core.js';
 
+export type MockupKind = 'flat' | 'book' | 'ereader' | 'card' | 'square' | 'story';
+/** The kinds of mockup `createMockup` makes. */
+export declare const mockupKinds: readonly MockupKind[];
+export interface MockupOptions {
+  /** Default `'book'`. `card` is 1200 × 630, `square` 1080 × 1080, `story` 1080 × 1920; the others follow the cover's size. */
+  kind?: MockupKind;
+  /** A hex colour behind it. Product shots default to a light studio grey, social cards to the cover's colours. */
+  background?: string;
+  /** A line for social cards, such as `'Out now'` (up to 80 characters). */
+  text?: string;
+}
+/** The cover as a product shot (flat, book, e-reader) or on a social card, as SVG. */
+export declare function createMockup(
+  cover: Cover,
+  options?: MockupOptions,
+): { svg: string; width: number; height: number };
+
 /** This version of the library, such as `'1.4.0'`. Artwork for a seed can change between minor versions. */
 export declare const version: string;
 /** The sizes a cover can have: each side `min` to `max` px, and neither more than `ratio` times the other. */
@@ -134,6 +151,8 @@ export interface Cover {
   style: string;
   /** The palette that was used (`'custom'` for a custom palette). */
   palette: string;
+  /** The palette's colours, as the cover used them. */
+  colors: { bg: string; ink: string; accents: string[]; dark: boolean };
   seed: string;
   width: number;
   height: number;
@@ -141,6 +160,9 @@ export interface Cover {
   lang: string;
   /** The value of each of the style's variants this cover has, pinned or picked by the seed. */
   variants: Record<string, string>;
+  /** The title as set (line breaks as "\n"), and the author, after cleaning. */
+  title: string;
+  author: string;
 }
 
 /** A choice a style lets you pin, such as Silhouette's scene. */

@@ -1332,3 +1332,29 @@ test('a badge goes in the first corner clear of the text, in every style', async
     createCover({ title: 'x', style: 'minimal', seed: 's' }).svg,
   );
 });
+
+test('mockups: every kind is a well-formed SVG with the cover in it, at its size', async () => {
+  const { createMockup, mockupKinds } = await import('../src/index.js');
+  const cover = createCover({ title: 'Fish & Chips\nTonight', author: "O'Brien & Sons", style: 'aurora', seed: 'm' });
+  /** @type {Record<string, [number, number] | null>} */
+  const sizes = { card: [1200, 630], square: [1080, 1080], story: [1080, 1920], flat: null, book: null, ereader: null };
+  for (const kind of mockupKinds) {
+    const m = createMockup(cover, { kind, text: 'Out now <soon>' });
+    assertWellFormed(m.svg, kind);
+    assert.ok(m.svg.includes(cover.body), `${kind}: the cover is nested whole`);
+    assert.match(m.svg, new RegExp(`^<svg xmlns="http://www.w3.org/2000/svg" width="${m.width}" height="${m.height}"`));
+    assert.match(m.svg, /<title>Fish &amp; Chips Tonight by O&apos;Brien &amp; Sons<\/title>/, kind);
+    const fixed = sizes[kind];
+    if (fixed) {
+      assert.deepEqual([m.width, m.height], fixed, kind);
+      assert.match(m.svg, /Out now &lt;soon&gt;/, kind);
+    } else assert.ok(m.width > cover.width && m.height > cover.height, kind);
+    // Two mockups on one page don't share ids with each other or the cover.
+    const ids = [...m.svg.matchAll(/id="(mk[^"]+)"/g)].map((x) => x[1]);
+    assert.equal(new Set(ids).size, ids.length, kind);
+  }
+  assert.throws(() => createMockup(cover, { kind: /** @type {any} */ ('poster') }), /Unknown mockup "poster"/);
+  assert.throws(() => createMockup(cover, { background: 'red' }), /hex colour/);
+  assert.throws(() => createMockup(/** @type {any} */ ({ svg: '' })), /a cover from createCover/);
+  assert.match(createMockup(cover, { kind: 'flat', background: '#123456' }).svg, /fill="#123456"/);
+});

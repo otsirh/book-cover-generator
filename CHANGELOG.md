@@ -6,6 +6,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
+- **Mockups.** `createMockup(cover, { kind, background, text })` shows a cover as a product shot (`flat`, `book` turned with its spine showing, `ereader`) or on a social card (`card` 1200 × 630, `square` 1080 × 1080, `story` 1080 × 1920) with its title, author and a line such as "Out now". In the app, the Mockup row under the export buttons previews and downloads them as PNG. `createCover` also returns the cover's `colors`, `title` and `author`.
 - **Badges.** `badge` ("Winner of the Hugo Award", "10th Anniversary Edition") is set as a star-edged seal in the first corner (then side) of the cover clear of its text, smaller if it must be. The text styles draw is recorded for this (`drawText`, `drawStack`, `titleBlock`, and `noteText` and `recordText` for styles that write their own). In the app it sits with the series and credit; in the CLI, `--badge`.
 
 ## [1.5.0] - 2026-11-12

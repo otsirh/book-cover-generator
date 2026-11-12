@@ -1071,6 +1071,49 @@ input[type='number'][aria-invalid='true'] {
   text-align: center;
 }
 
+/* Mockups: a small preview, the kind, and a download. */
+.mockup {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.mockup-preview {
+  flex: 0 0 auto;
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+}
+
+.mockup-controls {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.mockup-controls button {
+  align-self: start;
+  height: 34px;
+  padding: 0 13px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.mockup-controls button[aria-busy='true'] {
+  cursor: progress;
+  opacity: 0.6;
+}
+
 .kept {
   width: min(100%, 520px);
 }

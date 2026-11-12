@@ -41,6 +41,8 @@ On [covers.otsirh.dev](https://covers.otsirh.dev) you type a title and author (p
 
 **Store size** shrinks the preview to the size a store lists covers at, to check the title still reads. **Randomize** reshuffles everything, except what you've locked. Undo and redo step back and forth through your designs, and so do the browser's Back and Forward buttons. **Copy link** shares the exact design, because the URL holds every setting. The export panel tells you which size suits Kindle, print or audiobook covers.
 
+**Mockup** shows and downloads the cover as a 3D book, a flat shot, on an e-reader, or on a social card (a 1200 × 630 link preview, a square post or a story, with a line such as "Out now").
+
 **Keep** saves a design to a tray under the preview, together with the cover as it was drawn, so a later version of the app can't change it. **Download all** saves every kept design as a PNG in one ZIP file. **Export** saves the kept designs to a file, and **Import** adds them in another browser.
 
 The app works offline once it has loaded.
@@ -118,7 +120,7 @@ Options: `-s/--style`, `-p/--palette`, `--bg`, `--ink`, `--accent`, `--subtitle`
 
 Returns the SVG markup.
 
-### `createCover(options) → { svg, body, style, palette, seed, width, height, lang }`
+### `createCover(options) → { svg, body, style, palette, colors, seed, width, height, lang, variants, title, author }`
 
 Same as `generateCover`, but also tells you which style and palette were chosen. This is useful when either one was random. `body` is the markup inside the outer `<svg>`, for nesting the cover in a larger SVG (its ids are unique to the cover, so several can share a document).
 
@@ -164,6 +166,18 @@ Titles and subtitles longer than 300 characters (authors: 200) are cut. With `'r
 ### TypeScript
 
 Types are included. `CoverOptions`, `Cover`, `StyleId`, `PaletteId`, `StyleGroup`, `StyleContext`, `CoverStyle`, `TitleBlock` and the rest are exported from the main entry point, and style and palette ids autocomplete.
+
+### Mockups
+
+```js
+import { createCover, createMockup } from 'book-cover-generator';
+
+const cover = createCover({ title: 'Neon Tide', author: 'Kai Moreno' });
+const { svg, width, height } = createMockup(cover, { kind: 'book' }); // or 'flat', 'ereader'
+const card = createMockup(cover, { kind: 'card', text: 'Out now' }); // 1200 × 630; also 'square', 'story'
+```
+
+Product shots (`flat`, `book`, `ereader`) follow the cover's size on a light backdrop (`background` to change it); social cards have fixed sizes and take the cover's colours. `mockupKinds` lists them.
 
 ### Export helpers (browser)
 

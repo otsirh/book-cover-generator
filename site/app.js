@@ -8,6 +8,7 @@ import {
   formats,
   sizeLimits,
   FONTS,
+  createMockup,
 } from '../src/index.js';
 import {
   svgToDataUrl,
@@ -886,6 +887,7 @@ function renderPreview(fade, announce) {
     prev.classList.add('fading');
   }
   img.src = svgToDataUrl(current.svg);
+  renderMockup();
   const title = oneLine(design.title) || 'Untitled';
   img.alt = `Cover preview: “${title}”${design.author.trim() ? ` by ${design.author.trim()}` : ''}, ${style?.name} style`;
   const paletteName = `${palette?.name ?? 'Custom'}${design.palette === 'auto' ? ' (auto)' : ''}`;
@@ -1102,6 +1104,26 @@ function buildControls() {
   }
   const mobileDownload = /** @type {HTMLButtonElement} */ ($('m-download'));
   mobileDownload.addEventListener('click', () => exportAs('png', mobileDownload));
+  const mockupKind = /** @type {HTMLSelectElement} */ ($('mockup-kind'));
+  const mockupText = /** @type {HTMLInputElement} */ ($('mockup-text'));
+  mockupKind.addEventListener('change', renderMockup);
+  mockupText.addEventListener('input', renderMockup);
+  const mockupButton = /** @type {HTMLButtonElement} */ ($('dl-mockup'));
+  mockupButton.addEventListener('click', () =>
+    busyWhile(mockupButton, async () => {
+      const kind = /** @type {import('../src/index.js').MockupKind} */ (mockupKind.value);
+      const m = createMockup(current, { kind, text: mockupText.value });
+      // Product shots follow the cover's size: twice it, for sharpness. Cards have theirs.
+      const scale = ['card', 'square', 'story'].includes(kind) ? 1 : 2;
+      try {
+        await downloadCover(m.svg, 'png', `${slug(oneLine(design.title))}-${kind}`, { scale, dpi: DPI });
+        toast(`Saved the mockup · ${m.width * scale} × ${m.height * scale} px`);
+      } catch (err) {
+        console.error(err);
+        toast('Export failed. Try again.');
+      }
+    }),
+  );
   $('thumb-toggle').addEventListener('click', () => {
     const on = $('book').classList.toggle('store-size');
     $('thumb-toggle').setAttribute('aria-pressed', String(on));
@@ -1925,6 +1947,18 @@ async function shareCover() {
       toast('Could not share. Try Download PNG.');
     }
   }
+}
+
+/** The mockup preview, and the card's line shown only for the kinds that have one. */
+function renderMockup() {
+  const kind = /** @type {import('../src/index.js').MockupKind} */ (
+    /** @type {HTMLSelectElement} */ ($('mockup-kind')).value
+  );
+  const words = /** @type {HTMLInputElement} */ ($('mockup-text'));
+  words.hidden = !['card', 'square', 'story'].includes(kind);
+  /** @type {HTMLImageElement} */ ($('mockup-preview')).src = svgToDataUrl(
+    createMockup(current, { kind, text: words.value }).svg,
+  );
 }
 
 /** @type {ReturnType<typeof setTimeout> | undefined} */

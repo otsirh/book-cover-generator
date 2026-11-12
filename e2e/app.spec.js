@@ -1548,6 +1548,27 @@ test('a series line and a credit: typed in, on the cover and in the link', async
   await expect(page.locator('#series')).toHaveValue('Book Two of the Ember Cycle');
 });
 
+test('mockups: a preview, a line for cards, and a PNG at the mockup’s size', async ({ page }) => {
+  await page.goto('/#title=Mock&author=Up&style=artdeco&seed=m');
+  await expect(page.locator('#mockup-preview')).toHaveAttribute('src', /^data:image\/svg\+xml/);
+  await expect(page.locator('#mockup-text')).toBeHidden();
+  await page.locator('#mockup-kind').selectOption('card');
+  await expect(page.locator('#mockup-text')).toBeVisible();
+  await page.locator('#mockup-text').fill('Out now');
+  await expect.poll(() => svgSoon(page, '#mockup-preview')).toContain('Out now');
+  const [download] = await Promise.all([page.waitForEvent('download'), page.locator('#dl-mockup').click()]);
+  expect(download.suggestedFilename()).toBe('mock-card.png');
+  const png = await readFile(/** @type {string} */ (await download.path()));
+  expect(pngSize(png)).toEqual([1200, 630]);
+  await expect(page.locator('#toast')).toContainText('1200 × 630');
+  // Product shots are twice the mockup's own size.
+  await page.locator('#mockup-kind').selectOption('book');
+  const [book] = await Promise.all([page.waitForEvent('download'), page.locator('#dl-mockup').click()]);
+  expect(book.suggestedFilename()).toBe('mock-book.png');
+  const [w] = pngSize(await readFile(/** @type {string} */ (await book.path())));
+  expect(w).toBeGreaterThan(1200);
+});
+
 test('a Japanese title sets the language of the cover', async ({ page }) => {
   await page.goto(`/#title=${encodeURIComponent('ガラスの街')}&style=minimal&seed=j`);
   expect(await svgOf(page, '#preview')).toMatch(/^<svg [^>]* lang="ja"/);
