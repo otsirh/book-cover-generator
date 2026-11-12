@@ -290,6 +290,18 @@ test('--badge sets a seal', async () => {
   assert.match(stdout, />BESTSELLER</);
 });
 
+test('-o makes the folder it writes into', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'book-cover-'));
+  try {
+    const made = await cli('Salt and Static', '--count', '2', '-o', join(dir, 'ideas', 'cover.svg'));
+    assert.equal(made.code, 0, made.stderr);
+    const { readdir } = await import('node:fs/promises');
+    assert.deepEqual((await readdir(join(dir, 'ideas'))).sort(), ['cover-1.svg', 'cover-2.svg']);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('--batch writes a cover per book, with the other options for every book', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'book-cover-'));
   try {

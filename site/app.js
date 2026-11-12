@@ -1286,8 +1286,19 @@ function syncPaletteName() {
 const colorInputs = () =>
   ['color-bg', 'color-ink', 'color-a1', 'color-a2', 'color-a3'].map((id) => /** @type {HTMLInputElement} */ ($(id)));
 
-/** The largest export scale for a format: the long side stays within 10,000 px. @param {string} format */
-const maxScale = (format) => Math.max(1, Math.min(4, Math.floor(MAX_SIDE / Math.max(...sizeOf(format)))));
+/** iPhones and iPads draw a canvas of at most about 16.7 million pixels; other browsers far more. */
+const CANVAS_PIXELS =
+  /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Mac/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
+    ? 16_777_216
+    : Infinity;
+/** The largest export scale for a format: the long side stays within 10,000 px, and the image within what the device can draw. @param {string} format */
+const maxScale = (format) => {
+  const [w, hgt] = sizeOf(format);
+  return Math.max(
+    1,
+    Math.min(4, Math.floor(MAX_SIDE / Math.max(w, hgt)), Math.floor(Math.sqrt(CANVAS_PIXELS / (w * hgt)))),
+  );
+};
 /** The export scale chosen for a format (custom sizes have their own, 1× by default). @param {string} format */
 const scaleFor = (format) => Math.min(isCustomSize(format) ? ui.customScale : ui.scale, maxScale(format));
 
@@ -1346,10 +1357,10 @@ function syncControls() {
   for (const b of document.querySelectorAll('[data-scale]')) {
     const value = Number(b.getAttribute('data-scale'));
     b.setAttribute('aria-pressed', String(value === scale));
-    // Larger than 10,000 px: more than browsers can reliably draw.
+    // Larger than 10,000 px, or than this device's canvas: more than it can reliably draw.
     if (value > most) {
       b.setAttribute('aria-disabled', 'true');
-      b.setAttribute('title', 'Too large to export');
+      b.setAttribute('title', 'Too large to export on this device');
     } else {
       b.removeAttribute('aria-disabled');
       b.removeAttribute('title');

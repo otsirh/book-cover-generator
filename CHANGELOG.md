@@ -19,6 +19,9 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 
+- A plain book list line ("Title | Author") is split at the first kind of separator it uses, so a dash in a title stays in it ("Harry Potter – The Philosopher’s Stone | J. K. Rowling"). A size in a list that isn't a number is reported as written.
+- The CLI's `-o` makes the folder it writes into (as `--out-dir` does).
+- On an iPhone or iPad, the export sizes the device can't draw (over its canvas's 16.7 megapixels) are unavailable, instead of failing.
 - With a random style, a pinned variant that another style names alike (Aurora's and Stripes' `layout`) no longer throws when the seed picks the other one: a style picked at random takes only the pins it can. A value no style offers throws whichever style the seed picks, and a style you name still says when it lacks a value.
 
 ## [1.6.0] - 2026-11-12

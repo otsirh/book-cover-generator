@@ -392,7 +392,9 @@ function dimension(value, fallback, name) {
   const v = Number(value);
   const { min, max } = sizeLimits;
   if (!Number.isFinite(v) || v < min || v > max) {
-    throw new RangeError(`${name} must be a number from ${min} to ${max}, got ${String(value)}`);
+    throw new RangeError(
+      `${name} must be a number from ${min} to ${max}, got ${typeof value === 'string' ? JSON.stringify(value) : String(value)}`,
+    );
   }
   return Math.round(v);
 }
@@ -598,11 +600,15 @@ export default generateCover;
  * defaults'. A book that names another style than the defaults' drops their pinned variants (with
  * no shared style, it keeps the ones its own style offers); one that names a genre the defaults'
  * style doesn't suit gets a style that suits it instead. A shared style that doesn't exist throws.
- * @param {import('./index.js').CoverOptions} book
+ * @param {import('./index.js').CoverOptions} listed the book
  * @param {import('./index.js').CoverOptions} [defaults]
  * @returns {import('./index.js').CoverOptions}
  */
-export function optionsForBook(book, defaults = {}) {
+export function optionsForBook(listed, defaults = {}) {
+  // A key a book leaves undefined (an empty cell) is a key it doesn't set.
+  const book = /** @type {import('./index.js').CoverOptions} */ (
+    Object.fromEntries(Object.entries(listed).filter(([, value]) => value !== undefined))
+  );
   // The styles as ids (undefined: picked by the seed, or for the book's, not one that exists,
   // which createCover reports). A shared style that doesn't exist is reported for every book.
   const sharedGiven = !unsetStyle(defaults.style);

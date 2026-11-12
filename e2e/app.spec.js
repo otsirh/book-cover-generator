@@ -1744,6 +1744,19 @@ test('the first paint takes a link’s format as the app does: the last given, t
   expect(await page.evaluate(() => document.documentElement.dataset.coverFormat ?? '')).not.toBe('custom');
 });
 
+test.describe('on an iPhone', () => {
+  test.use({
+    userAgent:
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
+  });
+  test('export scales stay within what its canvas can draw', async ({ page }) => {
+    // 1800 × 2700 is 4.9 MP: 2× would be 19.4, over the iPhone's 16.7.
+    await page.goto('/#title=Print&style=minimal&format=1800x2700&seed=p');
+    await expect(page.locator('[data-scale="2"]')).toHaveAttribute('aria-disabled', 'true');
+    await expect(page.locator('[data-scale="1"]')).not.toHaveAttribute('aria-disabled', 'true');
+  });
+});
+
 test('a Japanese title sets the language of the cover', async ({ page }) => {
   await page.goto(`/#title=${encodeURIComponent('ガラスの街')}&style=minimal&seed=j`);
   expect(await svgOf(page, '#preview')).toMatch(/^<svg [^>]* lang="ja"/);

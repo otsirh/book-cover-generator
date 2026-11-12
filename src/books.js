@@ -22,8 +22,12 @@ const COLUMNS = /** @type {const} */ ({
   texture: 'texture',
 });
 
-/** Separators of a plain line: a tab, or a bar or dash with spaces around it. */
-const LINE_SEPARATOR = /\t| \| | — | – /;
+/**
+ * Separators of a plain line, by precedence: a tab, a bar, or a dash, with spaces around it. A line
+ * is split at the first kind it uses only, so "Harry Potter – The Stone | J. K. Rowling" keeps
+ * its dash in the title.
+ */
+const LINE_SEPARATORS = ['\t', ' | ', ' — ', ' – '];
 
 /**
  * Split CSV (or TSV) text into rows of fields: quoted fields may hold the delimiter, quotes ("")
@@ -85,7 +89,8 @@ function optionsFrom(named) {
     // (Numbers stay numbers for sizes and the seed; any other column is text, a title of 1984 too.)
     const value = typeof raw === 'number' && option !== 'title' ? raw : String(raw).trim();
     if (value === '') continue;
-    if (option === 'width' || option === 'height') out[option] = Number(value);
+    // (A size that isn't a number is kept as written, so the error says what the list says.)
+    if (option === 'width' || option === 'height') out[option] = Number.isFinite(Number(value)) ? Number(value) : value;
     else out[option] = option === 'seed' ? value : String(value);
   }
   return /** @type {import('./index.js').CoverOptions} */ (out);
@@ -135,7 +140,8 @@ export function parseBookList(text) {
       books = rows.map((row) => optionsFrom(Object.fromEntries(names.map((name, i) => [name, row[i] ?? '']))));
     } else {
       books = lines.map(({ line }) => {
-        const [title, author, subtitle] = line.split(LINE_SEPARATOR);
+        const separator = LINE_SEPARATORS.find((sep) => line.includes(sep));
+        const [title, author, subtitle] = separator ? line.split(separator) : [line];
         return optionsFrom({ title, author, subtitle });
       });
     }

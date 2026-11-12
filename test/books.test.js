@@ -150,3 +150,20 @@ test('shared pins are checked on every call, as they are then', async () => {
   assert.equal(styleIdFor('art deco'), 'artdeco');
   assert.equal(styleIdFor('nothing'), undefined);
 });
+
+test('a plain line is split at the first kind of separator it uses, and a size keeps what it says', async () => {
+  assert.deepEqual(parseBookList('Harry Potter – The Philosopher’s Stone | J. K. Rowling'), [
+    { title: 'Harry Potter – The Philosopher’s Stone', author: 'J. K. Rowling' },
+  ]);
+  assert.deepEqual(parseBookList('Sapiens — Yuval Noah Harari'), [{ title: 'Sapiens', author: 'Yuval Noah Harari' }]);
+  const [book] = parseBookList('title;width\nDune;1600 px');
+  assert.equal(book.width, /** @type {any} */ ('1600 px'));
+  assert.throws(() => createCover(book), /width must be a number from 50 to 10000, got "1600 px"/);
+  // An undefined key (an empty cell) leaves the shared value alone.
+  const { optionsForBook } = await import('../src/index.js');
+  const o = optionsForBook(
+    { title: 'Dune', style: undefined, width: undefined, palette: undefined },
+    { style: 'retro', palette: 'mint', width: 1600, height: 2560 },
+  );
+  assert.deepEqual(o, { style: 'retro', palette: 'mint', width: 1600, height: 2560, title: 'Dune' });
+});

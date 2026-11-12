@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { createCover, listStyles, palettes, formats, parseBookList, optionsForBook, genres } from '../src/index.js';
 import { hex, slug } from '../src/shared.js';
@@ -322,6 +322,7 @@ function run() {
       const choices = { style, palette: paletteId, seed: cover.seed, width, height, lang, variants: cover.variants };
       if (values.out) {
         const file = fileFor(values.out, n, total, cover.seed);
+        mkdirSync(dirname(file), { recursive: true });
         writeFileSync(file, cover.svg);
         if (values.json) process.stdout.write(JSON.stringify({ file, ...choices }) + '\n');
         else console.error(`Wrote ${file} (style: ${style}, palette: ${paletteId}, ${width}x${height})`);
