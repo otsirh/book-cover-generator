@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { createInterface } from 'node:readline';
 import { parseArgs } from 'node:util';
 import { createCover, listStyles, palettes, formats, parseBookList, optionsForBook, genres } from '../src/index.js';
 import { hex, slug } from '../src/shared.js';
+import { handleMessage } from '../src/mcp.js';
 
 const HELP = `Usage: book-cover "<title>" ["<author>"] [options]
 
@@ -45,6 +47,8 @@ Options:
       --json            print the choices (and the SVG, without --out) as JSON,
                         one line per cover
       --list            list styles and palettes
+      --mcp             serve the Model Context Protocol on stdin and stdout, so an
+                        AI assistant can make covers (see the README)
       --help            show this help
 
 Examples:
@@ -86,6 +90,7 @@ try {
       json: { type: 'boolean' },
       list: { type: 'boolean' },
       help: { type: 'boolean' },
+      mcp: { type: 'boolean' },
     },
   });
 } catch (err) {
@@ -100,6 +105,10 @@ const { values, positionals } = args;
  * set, not exited with, so output piped elsewhere is written in full first.)
  */
 function preflight() {
+  if (values.mcp) {
+    serveMcp();
+    return false;
+  }
   if (values.help) {
     console.log(HELP);
     return false;
@@ -336,6 +345,36 @@ function run() {
     console.error(err instanceof Error ? err.message : String(err));
     process.exitCode = 1;
   }
+}
+
+/**
+ * Serve MCP over stdio: a JSON-RPC message per line in, an answer per line out (nothing else on
+ * stdout). A cover can be saved to a file, relative to where it runs.
+ */
+function serveMcp() {
+  const lines = createInterface({ input: process.stdin });
+  /** @param {string} path @param {string} data */
+  const writeFile = (path, data) => {
+    const file = resolve(path);
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, data);
+    return file;
+  };
+  /** @param {unknown} message */
+  const answer = (message) => {
+    if (message) process.stdout.write(`${JSON.stringify(message)}\n`);
+  };
+  lines.on('line', (line) => {
+    if (!line.trim()) return;
+    let message;
+    try {
+      message = JSON.parse(line);
+    } catch {
+      answer({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } });
+      return;
+    }
+    answer(handleMessage(message, { writeFile }));
+  });
 }
 
 if (preflight()) run();

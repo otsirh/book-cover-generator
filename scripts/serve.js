@@ -5,12 +5,12 @@
 //
 // Serves files from the given roots in order (default: the repo root, then
 // public/), applies the Cloudflare-style `_headers` file found in a root and
-// answers unknown paths with 404.html, so local runs behave like production. /api/* is the
-// Worker's HTTP API (worker/index.js), as in production.
+// answers unknown paths with 404.html, so local runs behave like production. /api/* and /mcp
+// are the Worker's (worker/index.js), as in production.
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, resolve, sep } from 'node:path';
-import { api } from '../worker/index.js';
+import { api, mcp } from '../worker/index.js';
 
 const [portArg, ...rootArgs] = process.argv.slice(2);
 const port = Number(portArg ?? 4173);
@@ -99,6 +99,24 @@ async function handle(req, res) {
   } catch {
     res.writeHead(400).end('Bad request');
     return;
+  }
+  if (urlPath === '/mcp') {
+    // The MCP endpoint, as the Worker answers it (with the request's body).
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    const body = ['GET', 'HEAD'].includes(req.method ?? 'GET') ? undefined : Buffer.concat(chunks);
+    const answer = await mcp(
+      new Request(new URL(req.url ?? '/', `http://127.0.0.1:${port}`), {
+        method: req.method,
+        headers: /** @type {Record<string, string>} */ (req.headers),
+        body,
+      }),
+    );
+    if (answer) {
+      res.writeHead(answer.status, Object.fromEntries(answer.headers));
+      res.end(Buffer.from(await answer.arrayBuffer()));
+      return;
+    }
   }
   if (urlPath.startsWith('/api/')) {
     // (Its own headers only: in production the Worker's answers don't get _headers.)

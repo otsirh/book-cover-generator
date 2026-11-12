@@ -83,6 +83,30 @@ The query takes the options' own names (`title`, `author`, `subtitle`, `series`,
 
 A title breaks its line at `%0A`. Anyone may embed the answers (CORS and `Cross-Origin-Resource-Policy` allow it), and the headers `X-Cover-Style`, `X-Cover-Palette` and `X-Cover-Version` say what was drawn. The same URL always draws the same cover in a version of the library, so answers are cached for a day. Options the library rejects get a `400` with the reason as plain text.
 
+## From an AI assistant (MCP)
+
+Book Cover Generator is a [Model Context Protocol](https://modelcontextprotocol.io) server, so an assistant such as Claude can make covers for you: "a cover for my horror novel _The Hollow Night_, in red". It answers with a link to the image and one that opens the cover in the app to change and download.
+
+Add it to Claude Code:
+
+```sh
+claude mcp add book-covers -- npx -y book-cover-generator --mcp
+# or, with nothing installed, the hosted server:
+claude mcp add --transport http book-covers https://covers.otsirh.dev/mcp
+```
+
+Or to any client that takes a JSON configuration (Claude Desktop, Cursor and others):
+
+```json
+{
+  "mcpServers": {
+    "book-covers": { "command": "npx", "args": ["-y", "book-cover-generator", "--mcp"] }
+  }
+}
+```
+
+The tools: `create_cover` (a title, and any of author, subtitle, style, genre, palette or your own colours, seed, format, font, pins), `create_mockup` (the same, as a 3D book, on an e-reader or on a social card), `list_styles` and `list_palettes`. Run locally, `create_cover` can also save the SVG to a file (`output`).
+
 ## Library usage
 
 ### Browser (no install)

@@ -191,3 +191,15 @@ test('a format is a shape a width or height may scale; the library says what’s
   assert.throws(() => coverOptions(new URLSearchParams('titleCase=bold')), /titleCase is upper or normal, got "bold"/);
   assert.throws(() => createCover(coverOptions(new URLSearchParams('format=12000x18000'))), /10000/);
 });
+
+test('the app’s format and texture readers: presets, sizes it can make, on and off', async () => {
+  const { LINK, fits } = await import('../src/link.js');
+  assert.equal(LINK.format(' ebook '), 'ebook');
+  assert.equal(LINK.format('1600x2560'), '1600x2560');
+  for (const f of ['10x90', '20000x30000', '0x0', 'huge']) assert.equal(LINK.format(f), undefined, f);
+  assert.equal(fits(600, 900), true);
+  assert.equal(fits(600.5, 900), false);
+  assert.equal(LINK.texture(' TRUE '), true);
+  assert.equal(LINK.texture(false), false);
+  assert.equal(LINK.texture('yes'), undefined);
+});

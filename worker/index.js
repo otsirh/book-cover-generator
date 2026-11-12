@@ -7,113 +7,13 @@
 // measured with the built-in fonts' widths (src/metrics.js), as macOS draws them, so it can break
 // a little differently from the app on another system, which measures with its own fonts.
 
-import { createCover, createMockup, formats, version } from '../src/index.js';
-import { CUSTOM_SIZE, customColors, hex } from '../src/shared.js';
-import { LINK, lastValues } from '../src/link.js';
+import { createCover, createMockup, version } from '../src/index.js';
+import { hex } from '../src/shared.js';
+import { optionsFromLink } from '../src/link.js';
+import { handleMessage } from '../src/mcp.js';
 
-/** A size in px, as the CLI reads one (the library checks its range), else an error naming the parameter. @param {string} key @param {string} raw */
-function px(key, raw) {
-  const value = Number(raw);
-  if (!raw.trim() || !Number.isFinite(value)) throw new RangeError(`${key} must be a number of px, got "${raw}"`);
-  return value;
-}
-
-/**
- * Cover options from a query string. The app's link parameters are read as the app reads them
- * (src/link.js), the last of a repeated one too, except that a value the app would drop is an
- * error here. Also the library's option names (`titleCase`, `genre`, `lang`, `width`, `height`)
- * and your own colours as `bg`, `ink` and `accent` (hex, the # optional, accents separated by
- * commas).
- * @param {URLSearchParams} q
- * @returns {import('../src/index.js').CoverOptions}
- */
-export function coverOptions(q) {
-  const v = lastValues(q);
-  /** A parameter's value, if it has one. @param {string} key */
-  const given = (key) => (v[key] != null && v[key] !== '' ? v[key] : undefined);
-  /** @type {Record<string, unknown>} */
-  const o = {};
-  for (const key of /** @type {const} */ (['title', 'author', 'subtitle', 'series', 'credit', 'badge', 'seed'])) {
-    const value = given(key) === undefined ? undefined : LINK[key](v[key]);
-    if (value) o[key] = value;
-  }
-  // Styles, fonts and palettes the reader doesn't know go to the library as typed: it picks for
-  // 'random', and says what's wrong with the others.
-  for (const key of /** @type {const} */ (['style', 'font'])) {
-    const raw = given(key);
-    if (raw !== undefined) o[key] = LINK[key](raw) ?? raw;
-  }
-  for (const key of ['genre', 'lang']) if (given(key) !== undefined) o[key] = given(key);
-  const palette = given('palette');
-  if (palette !== undefined) {
-    const read = LINK.palette(palette);
-    const colors = read ? customColors(read) : null;
-    if (colors) o.palette = { bg: colors[0], ink: colors[1], accents: colors.slice(2) };
-    else if (read !== 'auto') o.palette = read ?? palette;
-  }
-  const caseKey = given('case') !== undefined ? 'case' : 'titleCase';
-  const titleCase = given(caseKey);
-  if (titleCase !== undefined) {
-    o.titleCase = LINK.case(titleCase);
-    if (!o.titleCase) throw new RangeError(`${caseKey} is upper or normal, got "${titleCase}"`);
-  }
-  const texture = given('texture');
-  if (texture !== undefined) {
-    o.texture = LINK.texture(texture);
-    if (o.texture === undefined) throw new RangeError('texture is 1 (on) or 0 (off)');
-  }
-  const variant = given('variant');
-  if (variant !== undefined) {
-    const pairs = LINK.variant(variant);
-    if (!pairs) {
-      throw new RangeError('variant is name.value pairs joined by "-", such as scene.forest or field.pale-emblem.sun');
-    }
-    o.variants = Object.fromEntries(pairs.split('-').map((pair) => pair.split('.')));
-  }
-  const width = given('width') === undefined ? undefined : px('width', /** @type {string} */ (given('width')));
-  const height = given('height') === undefined ? undefined : px('height', /** @type {string} */ (given('height')));
-  const format = given('format');
-  if (format !== undefined) {
-    // A preset, or any WxH shape: a width or height may scale it, and the library checks the size
-    // it comes to (saying what's wrong with it).
-    const read = format.trim();
-    const size = Object.hasOwn(formats, read)
-      ? formats[/** @type {keyof typeof formats} */ (read)]
-      : CUSTOM_SIZE.exec(read)?.slice(1).map(Number);
-    if (!size) {
-      throw new RangeError(
-        `Unknown format "${format}". Use one of ${Object.keys(formats).join(', ')}, or a size such as 1600x2560`,
-      );
-    }
-    // A format's shape, at the width or height asked for (as the CLI's --format --width).
-    if (width !== undefined && height !== undefined) {
-      throw new RangeError('format sets the shape: give it a width or a height, not both');
-    }
-    const [w, h] = size;
-    [o.width, o.height] =
-      width !== undefined
-        ? [width, Math.round((width * h) / w)]
-        : height !== undefined
-          ? [Math.round((height * w) / h), height]
-          : [w, h];
-  } else {
-    if (width !== undefined) o.width = width;
-    if (height !== undefined) o.height = height;
-  }
-  const [bg, ink, accent] = [given('bg'), given('ink'), given('accent')];
-  if (bg || ink || accent) {
-    if (!bg || !ink || !accent) throw new RangeError('Your own colours need bg, ink and accent');
-    o.palette = {
-      bg: hex(bg),
-      ink: hex(ink),
-      accents: accent
-        .split(',')
-        .filter((c) => c.trim())
-        .map(hex),
-    };
-  }
-  return /** @type {import('../src/index.js').CoverOptions} */ (o);
-}
+// (The query is read by src/link.js, as the app reads its links; the name the tests use.)
+export { optionsFromLink as coverOptions };
 
 /** Headers every answer has: anyone may embed it, and it's never taken for anything but what it is. */
 const COMMON = {
@@ -152,7 +52,7 @@ export function api(request) {
   }
   try {
     const q = url.searchParams;
-    const cover = createCover(coverOptions(q));
+    const cover = createCover(optionsFromLink(q));
     const svg =
       kind === 'cover'
         ? cover.svg
@@ -196,6 +96,61 @@ function cacheKey(request, deployment) {
   return new Request(url.href, { method: 'GET' });
 }
 
+/** Headers of the MCP endpoint's answers: any page or client may call it. */
+const MCP_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'X-Content-Type-Options': 'nosniff',
+  'Strict-Transport-Security': 'max-age=63072000; includeSubDomains; preload',
+};
+
+/**
+ * The MCP endpoint at /mcp (Streamable HTTP, without sessions or streams): POST a JSON-RPC message
+ * (or a batch), get the answer as JSON; a notification gets 202. Covers it draws link to this
+ * site. Null for any other path.
+ * @param {Request} request
+ * @returns {Promise<Response | null>}
+ */
+export async function mcp(request) {
+  const url = new URL(request.url);
+  if (url.pathname !== '/mcp') return null;
+  if (request.method === 'OPTIONS') {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        ...MCP_HEADERS,
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Accept, Authorization, Mcp-Protocol-Version, Mcp-Session-Id',
+        'Access-Control-Max-Age': '86400',
+      },
+    });
+  }
+  /** @param {number} status @param {unknown} body */
+  const json = (status, body) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...MCP_HEADERS, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+    });
+  if (request.method !== 'POST') {
+    return new Response('POST JSON-RPC messages here (this server streams nothing).\n', {
+      status: 405,
+      headers: { ...MCP_HEADERS, Allow: 'POST, OPTIONS', 'Content-Type': 'text/plain; charset=utf-8' },
+    });
+  }
+  if (Number(request.headers.get('content-length') ?? 0) > 1_000_000) {
+    return json(413, { jsonrpc: '2.0', id: null, error: { code: -32600, message: 'Request too large' } });
+  }
+  let message;
+  try {
+    message = await request.json();
+  } catch {
+    return json(400, { jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } });
+  }
+  const ctx = { base: url.origin };
+  const answers = (Array.isArray(message) ? message : [message]).map((m) => handleMessage(m, ctx)).filter(Boolean);
+  if (!answers.length) return new Response(null, { status: 202, headers: MCP_HEADERS });
+  return json(200, Array.isArray(message) ? answers : answers[0]);
+}
+
 export default {
   /**
    * @param {Request} request
@@ -203,6 +158,8 @@ export default {
    * @param {{ waitUntil(promise: Promise<unknown>): void }} ctx
    */
   async fetch(request, env, ctx) {
+    const mcpAnswer = await mcp(request);
+    if (mcpAnswer) return mcpAnswer;
     const cache = request.method === 'GET' ? /** @type {any} */ (globalThis).caches?.default : undefined;
     const key = cache ? cacheKey(request, env.CF_VERSION_METADATA?.id ?? 'dev') : null;
     if (cache && key) {

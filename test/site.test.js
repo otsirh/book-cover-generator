@@ -50,6 +50,8 @@ test('the page preloads every module of the library', async () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   const modules = readdirSync(new URL('../src/', import.meta.url), { recursive: true })
     .map((f) => `src/${String(f).replaceAll('\\', '/')}`)
-    .filter((f) => f.endsWith('.js'));
+    .filter((f) => f.endsWith('.js'))
+    // (The MCP server is the CLI's and the Worker's: the app never loads it.)
+    .filter((f) => f !== 'src/mcp.js');
   for (const file of modules) assert.ok(html.includes(`rel="modulepreload" href="${file}"`), `${file} isn't preloaded`);
 });

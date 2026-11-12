@@ -6,6 +6,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
+- **MCP server**, so AI assistants can make covers: `book-cover --mcp` speaks the Model Context Protocol over stdio (`claude mcp add book-covers -- npx -y book-cover-generator --mcp`), and the site at `https://covers.otsirh.dev/mcp` over HTTP. Its tools draw a cover or a mockup and answer with links to the image and to the app, and list the styles and palettes.
 - Deno and Bun: the library runs in both, and CI checks that Node, Deno and Bun draw the same covers byte for byte.
 - Each GitHub release carries the npm package and its build provenance, signed with Sigstore: check a download with `gh attestation verify book-cover-generator-X.Y.Z.tgz --repo otsirh/book-cover-generator`. (The package on npm has had provenance since 1.7.0.)
 
