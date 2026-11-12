@@ -298,6 +298,79 @@ test('a fragment that is not a design keeps the design, and Undo skips its entry
   await selected(page, 'bauhaus');
 });
 
+test('a quick double Undo steps twice and never leaves the app', async ({ page }) => {
+  await page.goto('about:blank');
+  await page.goto('/#title=T&style=minimal&seed=d');
+  await page.locator('.tile[data-style="swiss"]').click();
+  await page.locator('.tile[data-style="bauhaus"]').click();
+  await page.locator('#undo').dblclick();
+  await selected(page, 'minimal');
+  // At the first entry: a double click must not go back to the page before.
+  await page.locator('.tile[data-style="swiss"]').click();
+  await page.locator('#undo').dblclick();
+  await selected(page, 'minimal');
+  await page.waitForTimeout(500);
+  expect(new URL(page.url()).pathname).toBe('/');
+  await selected(page, 'minimal');
+});
+
+test('Undo never scrolls the page to where it was when that design was made', async ({ page }) => {
+  await page.goto('/#style=minimal&palette=mint&seed=s');
+  await page.evaluate(() => window.scrollTo(0, 300));
+  await page.locator('body').press('BracketRight');
+  await expect(page.locator('[data-palette="mint"]')).toHaveAttribute('aria-pressed', 'false');
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.locator('body').press('KeyZ');
+  await expect(page.locator('[data-palette="mint"]')).toHaveAttribute('aria-pressed', 'true');
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+});
+
+test('opening a section link in a new tab scrolls to that section', async ({ page }) => {
+  await page.goto('/#usage');
+  await expect(page.locator('#usage')).toBeInViewport();
+  await expect(page).toHaveURL(/title=/);
+});
+
+test('shortcuts work while the texture switch has focus', async ({ page }) => {
+  await page.goto('/#style=minimal&seed=t');
+  await page.locator('#texture').focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('#style-name')).not.toHaveText('Minimal');
+});
+
+test('modifier clicks on section links are left to the browser', async ({ page }) => {
+  await page.goto('/#style=minimal&seed=m');
+  const prevented = await page.evaluate(() => {
+    const link = /** @type {HTMLElement} */ (document.querySelector('header a[href="#usage"]'));
+    /** @type {boolean[]} */
+    const seen = [];
+    const record = (/** @type {Event} */ e) => {
+      seen.push(e.defaultPrevented);
+      e.preventDefault();
+    };
+    window.addEventListener('click', record);
+    link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true }));
+    link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, metaKey: true }));
+    link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    window.removeEventListener('click', record);
+    return seen;
+  });
+  expect(prevented).toEqual([false, false, true]);
+});
+
+test('the rail renders a few tiles ahead of its scroll position', async ({ page }) => {
+  await page.setViewportSize({ width: 1400, height: 800 });
+  await page.goto('/#style=minimal&seed=r');
+  const below = await page.evaluate(() => {
+    const rail = /** @type {HTMLElement} */ (document.getElementById('styles'));
+    const bottom = rail.getBoundingClientRect().bottom;
+    const tile = [...document.querySelectorAll('.tile')].find((t) => t.getBoundingClientRect().top > bottom);
+    return tile ? /** @type {HTMLElement} */ (tile).dataset.style : null;
+  });
+  expect(below).toBeTruthy();
+  await expect(page.locator(`.tile[data-style="${below}"] img`)).toHaveAttribute('src', /^data:image\/svg\+xml/);
+});
+
 test('the Variation field follows Back even while it has focus', async ({ page }) => {
   await page.goto('/#title=T&style=minimal&seed=xyz');
   const seed = page.locator('#seed');
@@ -369,6 +442,29 @@ test('the rail says when every style picks its own palette', async ({ page }) =>
   await expect(page.locator('#rail-note')).toContainText('palette picked for it');
   await page.locator('[data-palette="mint"]').click();
   await expect(page.locator('#rail-note')).toContainText('In Mint');
+});
+
+test('a kept design from another version keeps its look and can be removed', async ({ page }) => {
+  await page.addInitScript(() => {
+    if (!sessionStorage.getItem('seeded')) {
+      sessionStorage.setItem('seeded', '1');
+      const old = [
+        { title: 'Old', author: 'A', style: 'retired-style', palette: 'mint', seed: 'k', format: 'paperback' },
+      ];
+      localStorage.setItem('book-cover-generator:kept', JSON.stringify(old));
+    }
+  });
+  await page.goto('/#title=Now&style=minimal&seed=n');
+  await expect(page.locator('#kept-list li')).toHaveCount(1);
+  const before = await svgOf(page, '.kept-open img');
+  await page.locator('.tile[data-style="swiss"]').click();
+  await selected(page, 'swiss');
+  await page.locator('#title').fill('Changed');
+  await page.locator('#title').blur();
+  await page.reload();
+  expect(await svgOf(page, '.kept-open img')).toBe(before);
+  await page.locator('.kept-remove').click();
+  await expect(page.locator('#kept')).toBeHidden();
 });
 
 test('kept designs are saved, restored and removed', async ({ page }) => {

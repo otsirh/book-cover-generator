@@ -67,6 +67,8 @@ A redesign of the covers and the app, based on a design review.
 - A long word shrinks the text a little (to 60% of `minSize`) instead of breaking mid-word, so Big Type sets "Cartographer" whole.
 - Big Letter's initial and Classic's emblem skip opening quotes, brackets and other punctuation; Typewriter types the word count it measured.
 - The app's Undo and Redo pass over entries that show the same design; the Variation field follows Back and buttons even while focused; the phone's PNG button shows its own busy state; shared-link fields are clipped to the inputs' maxlength between whole characters; download names are cut between whole characters and never end in a hyphen.
+- No-break spaces (U+00A0, U+2007, U+202F, U+FEFF) are kept and never become line breaks; the CLI rejects extra arguments (an unquoted title) instead of dropping them; Big Letter pairs a narrow initial only with a letter of the same word.
+- The app: a quick double-click on Undo steps twice and never leaves the app; Undo and Back no longer scroll the page; a section link opened in a new tab scrolls to its section; shortcuts work while the texture switch has focus; Cmd/Ctrl-clicking a section link opens a new tab; Copy link always copies the design on screen; kept designs saved by another version keep their look; the style rail renders a few tiles ahead of its scroll position.
 
 ## [1.1.0] - 2026-11-12
 

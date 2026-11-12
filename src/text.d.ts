@@ -42,6 +42,8 @@ export type TextMeasurer = (
  */
 export declare function setTextMeasurer(fn: TextMeasurer | null): void;
 export declare function measureText(text: string, size: number, spec: TextSpec): number;
+/** Runs of whitespace a line may break at (every kind except the no-break spaces). */
+export declare const BREAKING_SPACE: RegExp;
 /** The start of a string, cut between user-perceived characters (`units`: count UTF-16 code units). */
 export declare function clipGraphemes(str: string, max: number, options?: { units?: boolean }): string;
 /** Split a string into user-perceived characters. */

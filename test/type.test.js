@@ -21,6 +21,11 @@ const ctx = (o = {}) =>
     ...o,
   });
 
+test('splitLead and stackLines keep words joined by a no-break space', () => {
+  assert.deepEqual(splitLead('The\u00A0Road'), { lead: '', main: 'The\u00A0Road' });
+  assert.deepEqual(stackLines('Big\u00A0Sur Nights'), ['Big\u00A0Sur', 'Nights']);
+});
+
 test('splitLead takes a leading English article off', () => {
   assert.deepEqual(splitLead('The Lighthouse Keeper'), { lead: 'The', main: 'Lighthouse Keeper' });
   assert.deepEqual(splitLead('a little life'), { lead: 'a', main: 'little life' });

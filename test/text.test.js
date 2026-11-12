@@ -175,3 +175,23 @@ test('clipGraphemes can count UTF-16 code units, as maxlength does', async () =>
   assert.equal(clipGraphemes('a𠮷b', 2, { units: true }), 'a');
   assert.equal(clipGraphemes('abc', 5, { units: true }), 'abc');
 });
+
+test('lines never break at a no-break space', () => {
+  for (const nbsp of [' ', ' ', ' ', '﻿']) {
+    const fit = fitText(`Mr.${nbsp}Penumbra and the 24${nbsp}Hour Bookstore`, {
+      font: FONTS.sans,
+      maxWidth: 120,
+      maxSize: 10,
+      minSize: 10,
+      maxLines: 8,
+    });
+    assert.ok(
+      fit.lines.some((line) => line.includes(`Mr.${nbsp}Penumbra`)),
+      fit.lines.join(' | '),
+    );
+    assert.ok(
+      fit.lines.some((line) => line.includes(`24${nbsp}Hour`)),
+      fit.lines.join(' | '),
+    );
+  }
+});

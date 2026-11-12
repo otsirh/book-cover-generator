@@ -63,12 +63,24 @@ test('--list and --help', async () => {
 });
 
 test('fails clearly on bad input', async () => {
-  for (const args of [[], ['T', '--width', 'abc'], ['T', '--style', 'nope'], ['T', '--bogus']]) {
+  for (const args of [
+    [],
+    ['T', '--width', 'abc'],
+    ['T', '--style', 'nope'],
+    ['T', '--bogus'],
+    ['The', 'Lighthouse', 'Keeper'],
+  ]) {
     const { code, stdout, stderr } = await cli(...args);
     assert.equal(code, 1, `exit code for ${args.join(' ')}`);
     assert.equal(stdout, '');
     assert.ok(stderr.length > 0);
   }
+});
+
+test('an unquoted title is caught, not silently cut', async () => {
+  const { code, stderr } = await cli('The', 'Lighthouse', 'Keeper', '-o', 'never.svg');
+  assert.equal(code, 1);
+  assert.match(stderr, /Quote values with spaces/);
 });
 
 test('--subtitle and --texture', async () => {

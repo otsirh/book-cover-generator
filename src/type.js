@@ -8,7 +8,7 @@
 import { n, clamp, escapeXml } from './core.js';
 import { FONTS, fitText, drawText, measureText, textBottom, textGroupAttrs, spacingShift } from './text.js';
 
-const LEAD = /^(the|a|an)\s+(\S.*)$/i;
+const LEAD = /^(the|a|an) +(\S.*)$/i;
 
 /**
  * Split a leading English article off a title: "The Lighthouse Keeper" →
@@ -30,7 +30,8 @@ export function stackLines(text) {
   /** @type {string[]} */
   const lines = [];
   let pending = '';
-  for (const word of text.split(/\s+/).filter(Boolean)) {
+  // Split at spaces only: words joined by a no-break space stay on one line.
+  for (const word of text.split(' ').filter(Boolean)) {
     if (SMALL_WORDS.has(word.toLowerCase())) pending += `${word} `;
     else {
       lines.push(pending + word);

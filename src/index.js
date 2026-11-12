@@ -5,7 +5,7 @@
 
 import { createRng, hashString, isHex, luminance, escapeXml, stripInvalidXml, grain } from './core.js';
 import { palettes } from './palettes.js';
-import { clipGraphemes } from './text.js';
+import { BREAKING_SPACE, clipGraphemes } from './text.js';
 import { styleList } from './styles/index.js';
 
 export { palettes } from './palettes.js';
@@ -87,7 +87,7 @@ function resolvePalette(palette, rng, style) {
 function cleanText(value, max) {
   // eslint-disable-next-line no-control-regex -- matching control characters is the point
   const text = stripInvalidXml(String(value ?? '').replace(/[\u0000-\u001F\u007F-\u009F]/g, ' '))
-    .replace(/\s+/g, ' ')
+    .replace(BREAKING_SPACE, ' ')
     .trim();
   // Cut between visible characters (segmenting lazily), so an emoji or accented letter is never split.
   return text.length > max ? clipGraphemes(text, max).trimEnd() : text;

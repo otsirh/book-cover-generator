@@ -798,7 +798,7 @@ const pixelable = (text) => [...text].every((ch) => ch === ' ' || PIXEL_FONT[ch]
  * @param {string} text @param {number} maxWidth @param {number} maxHeight @param {number} maxQ
  */
 function fitPixelText(text, maxWidth, maxHeight, maxQ) {
-  const words = text.split(/\s+/).filter(Boolean);
+  const words = text.split(' ').filter(Boolean);
   const widthOf = (/** @type {string} */ s) => s.length * 6 - 1;
   for (let q = maxQ; q >= 1.5; q -= 0.5) {
     const perLine = Math.floor((maxWidth / q + 1) / 6);

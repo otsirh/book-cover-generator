@@ -62,6 +62,12 @@ if (!positionals.length) {
   console.error(HELP);
   process.exit(1);
 }
+if (positionals.length > 2) {
+  console.error(
+    `Expected a title and an author, got ${positionals.length} arguments. Quote values with spaces: book-cover "The Lighthouse Keeper" "Mara Ellison"`,
+  );
+  process.exit(1);
+}
 
 try {
   const cover = createCover({

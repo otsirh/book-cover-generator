@@ -82,7 +82,10 @@ const FULL_WIDTH =
 
 /** @param {string} ch */
 function latinWidth(ch) {
-  if (ch === ' ' || NARROW.has(ch)) return 0.28;
+  if (ch === ' ' || ch === '\u00A0' || NARROW.has(ch)) return 0.28;
+  if (ch === '\uFEFF') return 0;
+  if (ch === '\u202F') return 0.2;
+  if (ch === '\u2007') return 0.56;
   if (SEMI.has(ch)) return 0.38;
   if (WIDE.has(ch)) return 0.88;
   if (ch >= '0' && ch <= '9') return 0.56;
@@ -238,7 +241,8 @@ function tokenize(str) {
   const tokens = [];
   let space = false;
   for (const { segment } of wordSegmenter.segment(str)) {
-    if (segment.trim() === '') {
+    // (Breaking whitespace is a single space by now; a no-break space joins its neighbours.)
+    if (segment === ' ') {
       space = tokens.length > 0;
       continue;
     }
@@ -331,6 +335,12 @@ function hardWrap(tokens, maxWidth, measure) {
   return wrapGreedy(pieces, maxWidth, measure) ?? pieces.map((piece) => piece.text);
 }
 
+/**
+ * Runs of whitespace a line may break at: all of it except the no-break spaces
+ * (U+00A0, U+2007, U+202F and U+FEFF), which JavaScript's \\s also matches.
+ */
+export const BREAKING_SPACE = /[^\S\u00A0\u2007\u202F\uFEFF]+/g;
+
 /** Room below the last baseline for descenders, as a fraction of the size. */
 const DESCENT = 0.22;
 /** How far below `minSize` text may shrink so that a long word fits whole. */
@@ -368,7 +378,7 @@ export function fitText(text, opts) {
   const minSize = Math.min(maxSize, opts.minSize ?? Math.max(6, maxSize * 0.22));
 
   let str = String(text ?? '')
-    .replace(/\s+/g, ' ')
+    .replace(BREAKING_SPACE, ' ')
     .trim();
   if (opts.upper) str = str.toUpperCase();
   const base = { ...spec, lineHeight, cap };

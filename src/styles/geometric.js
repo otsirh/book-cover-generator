@@ -210,7 +210,7 @@ export const blocks = {
     const start = H * rng.float(0.32, 0.38);
     const { block: t, value: textH } = fitTitleWith(
       c,
-      Array.from({ length: 7 }, (_, i) => Math.min(start + i * H * 0.04, H * 0.56)),
+      [...new Set(Array.from({ length: 7 }, (_, i) => Math.min(start + i * H * 0.04, H * 0.56)))],
       (cellH) => ({
         font,
         weight: 800,

@@ -14,7 +14,7 @@ import { clipGraphemes } from '../src/text.js';
  * @property {Format} format
  * @property {boolean} texture
  */
-/** @typedef {{ button: HTMLButtonElement, img: HTMLImageElement, visible: boolean, dirty: boolean }} Tile */
+/** @typedef {{ button: HTMLButtonElement, img: HTMLImageElement, visible: boolean, dirty: boolean }} Tile  visible: on screen or close to it */
 
 /** @type {Record<Format, [number, number]>} */
 const FORMATS = { paperback: [600, 900], ebook: [600, 960], square: [600, 600] };
@@ -161,6 +161,9 @@ function saveHistoryMax() {
 let typing = false;
 /** Direction of an Undo (-1) or Redo (1) in flight, until its popstate arrives. */
 let stepping = 0;
+let steppingSince = 0;
+/** Undo/Redo presses made while a step was in flight, net (-2: two more undos). */
+let queuedSteps = 0;
 /** @type {ReturnType<typeof setTimeout> | undefined} */
 let typingTimer;
 /** @type {ReturnType<typeof setTimeout> | undefined} */
@@ -252,11 +255,12 @@ window.addEventListener('popstate', (e) => {
   clearTimeout(replaceTimer);
   replaceTimer = undefined;
   typing = false;
-  const step = stepping;
+  const dir = stepping;
   stepping = 0;
   const ours = Boolean(e.state) && typeof e.state.i === 'number';
   if (ours) historyIndex = e.state.i;
   const linked = ours ? null : fromHash(location.hash);
+  if (!ours) queuedSteps = 0;
   if (linked && !Object.keys(linked).length) {
     // A fragment that isn't a design (say #usage, typed to jump to the docs): keep the
     // design, and make this entry the newest step (the browser dropped the ones ahead).
@@ -268,10 +272,9 @@ window.addEventListener('popstate', (e) => {
     return;
   }
   // Undo and Redo pass over entries that show the same design, so every press changes something.
-  if (ours && step && toHash({ ...design, ...OPTIONAL, ...fromHash(location.hash) }) === toHash(design)) {
-    if (step < 0 ? historyIndex > 0 : historyIndex < historyMax) {
-      stepping = step;
-      history.go(step);
+  if (ours && dir && toHash({ ...design, ...OPTIONAL, ...fromHash(location.hash) }) === toHash(design)) {
+    if (dir < 0 ? historyIndex > 0 : historyIndex < historyMax) {
+      go(dir);
       return;
     }
   }
@@ -286,6 +289,12 @@ window.addEventListener('popstate', (e) => {
   if (!ours) safely(() => history.replaceState({ i: historyIndex }, '', toHash(design)));
   render({ fade: true, announce: true });
   syncHistoryButtons();
+  // Presses that came in while this step was in flight.
+  if (queuedSteps) {
+    const next = Math.sign(queuedSteps);
+    queuedSteps -= next;
+    go(next);
+  }
 });
 
 /**
@@ -306,21 +315,47 @@ function update(patch, kind = 'discrete') {
 
 /* ------------------------------------------------------------------ render */
 
-/** @param {Partial<import('../src/index.js').CoverOptions>} [extra] */
-function options(extra = {}) {
-  const [width, height] = FORMATS[design.format];
+/** Cover options for a design. @param {Design} d @param {Partial<import('../src/index.js').CoverOptions>} [extra] */
+function optionsFor(d, extra = {}) {
+  const [width, height] = FORMATS[d.format];
   return {
-    title: design.title,
-    author: design.author,
-    subtitle: design.subtitle,
-    style: design.style,
-    palette: design.palette === 'auto' ? 'random' : design.palette,
-    seed: design.seed,
-    texture: design.texture,
+    title: d.title,
+    author: d.author,
+    subtitle: d.subtitle,
+    style: d.style,
+    palette: d.palette === 'auto' ? 'random' : d.palette,
+    seed: d.seed,
+    texture: d.texture,
     width,
     height,
     ...extra,
   };
+}
+
+/** Cover options for the current design. @param {Partial<import('../src/index.js').CoverOptions>} [extra] */
+const options = (extra = {}) => optionsFor(design, extra);
+
+/**
+ * A whole design from a partial one (a shared link, or a kept design saved by another
+ * version). What it leaves out gets neutral, deterministic values, never the current
+ * design's, so it always opens the same cover. A missing style follows from the title.
+ * @param {Partial<Design>} partial
+ * @returns {Design}
+ */
+function complete(partial) {
+  /** @type {Design} */
+  const d = {
+    title: '',
+    author: '',
+    style: '',
+    palette: 'auto',
+    seed: '',
+    format: 'paperback',
+    ...OPTIONAL,
+    ...partial,
+  };
+  if (!partial.style) d.style = createCover(optionsFor(d, { style: 'random' })).style;
+  return d;
 }
 
 let lastAnnouncement = '';
@@ -471,7 +506,8 @@ function buildControls() {
   $('copy-link').addEventListener('click', async () => {
     flushReplace();
     try {
-      await copyText(location.href);
+      // From the design itself: a history write the browser refused would leave the URL behind.
+      await copyText(new URL(toHash(design), location.href).href);
       toast('Link copied: it opens this exact design');
     } catch {
       toast('Could not access the clipboard');
@@ -487,6 +523,8 @@ function buildControls() {
 
   // In-page links scroll without touching the URL, which holds the design.
   document.addEventListener('click', (e) => {
+    // Cmd/Ctrl/Shift-clicks open the link in a new tab or window, as usual.
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     const a = /** @type {HTMLElement} */ (e.target).closest('a[href^="#"]');
     if (!(a instanceof HTMLAnchorElement)) return;
     const target = document.getElementById(a.hash.slice(1));
@@ -504,7 +542,9 @@ function buildControls() {
     if (e.metaKey || e.repeat) return;
     // The target can be the document itself (events dispatched by scripts or extensions).
     const target = e.target instanceof Element ? e.target : null;
-    if (target?.closest('input, textarea, select, [contenteditable]')) return;
+    // Text fields keep their keys; the texture switch (a checkbox) has no use for them.
+    const field = target?.closest('input, textarea, select, [contenteditable]');
+    if (field && !(field instanceof HTMLInputElement && (field.type === 'checkbox' || field.type === 'radio'))) return;
     // Match the character printed on the key (QWERTZ, AZERTY, Dvorak…); on
     // non-Latin layouts, fall back to the key's position.
     const letter = /^[a-z]$/i.test(e.key) ? e.key.toLowerCase() : (LETTER_CODES[e.code] ?? '');
@@ -524,22 +564,41 @@ function buildControls() {
   });
 }
 
-// Both save pending keystrokes to the current entry before moving through history.
-function undo() {
+/**
+ * Move one entry through this app's own history, never past its first or last entry
+ * (so never back or forward to another site).
+ * @param {number} dir -1 or 1
+ */
+function go(dir) {
+  if (dir < 0 ? historyIndex > 0 : historyIndex < historyMax) {
+    stepping = dir;
+    steppingSince = performance.now();
+    history.go(dir);
+  } else queuedSteps = 0;
+}
+
+/**
+ * Undo or Redo. The index only moves when popstate arrives, so a press made before
+ * then waits its turn rather than check a stale index (a double-click on Undo
+ * could otherwise step off the first entry). Pending keystrokes are saved first.
+ * @param {number} dir -1 or 1
+ */
+function step(dir) {
   flushReplace();
-  if (historyIndex > 0) {
-    stepping = -1;
-    history.back();
+  // (A step whose popstate never came, after a second, no longer holds presses back.)
+  if (stepping && performance.now() - steppingSince < 1000) queuedSteps += dir;
+  else {
+    queuedSteps = 0;
+    go(dir);
   }
 }
 
-/** Redo only within this app's own history, never forward to another site. */
+function undo() {
+  step(-1);
+}
+
 function redo() {
-  flushReplace();
-  if (historyIndex < historyMax) {
-    stepping = 1;
-    history.forward();
-  }
+  step(1);
 }
 
 /** @param {number} dir */
@@ -614,13 +673,30 @@ function sizeHint(format, w, hgt) {
 const tiles = new Map();
 let galleryFrame = 0;
 
+/** Styles whose tiles are on screen (or within the observer's margin). */
+const onScreen = new Set();
+/** Styles in rail order, to render a few tiles ahead of what is on screen. */
+let railOrder = /** @type {string[]} */ ([]);
+// The rail (desktop) and the strips (phones) scroll on their own, and they clip the
+// observer's margin, so look ahead by position in the rail instead.
+const LOOKAHEAD = 6;
+
 function buildRail() {
   const observer = new IntersectionObserver(
     (entries) => {
       for (const entry of entries) {
-        const tile = tiles.get(/** @type {HTMLElement} */ (entry.target).dataset.style ?? '');
-        if (tile) tile.visible = entry.isIntersecting;
+        const style = /** @type {HTMLElement} */ (entry.target).dataset.style ?? '';
+        if (entry.isIntersecting) onScreen.add(style);
+        else onScreen.delete(style);
       }
+      const near = new Set();
+      for (const style of onScreen) {
+        const i = railOrder.indexOf(style);
+        for (let k = Math.max(0, i - LOOKAHEAD); k <= Math.min(railOrder.length - 1, i + LOOKAHEAD); k++) {
+          near.add(railOrder[k]);
+        }
+      }
+      for (const [style, tile] of tiles) tile.visible = near.has(style);
       scheduleGallery();
     },
     { rootMargin: '400px' },
@@ -649,6 +725,7 @@ function buildRail() {
     observer.observe(button);
     grid.append(button);
   }
+  railOrder = Array.from(rail.querySelectorAll('.tile'), (b) => /** @type {HTMLElement} */ (b).dataset.style ?? '');
 }
 
 function invalidateGallery() {
@@ -660,12 +737,13 @@ function scheduleGallery() {
   if (!galleryFrame) galleryFrame = requestAnimationFrame(pumpGallery);
 }
 
-/** Render dirty, visible tiles, yielding to the browser every ~8 ms. */
+/** Render dirty tiles near the screen, those on it first, yielding to the browser every ~8 ms. */
 function pumpGallery() {
   galleryFrame = 0;
   const start = performance.now();
-  for (const [style, tile] of tiles) {
-    if (!tile.dirty || !tile.visible) continue;
+  const queue = [...tiles].filter(([, tile]) => tile.dirty && tile.visible);
+  queue.sort(([a], [b]) => Number(onScreen.has(b)) - Number(onScreen.has(a)));
+  for (const [style, tile] of queue) {
     tile.img.src = svgToDataUrl(createCover(options({ style })).svg);
     tile.dirty = false;
     if (performance.now() - start > 8) {
@@ -686,9 +764,7 @@ function loadKept() {
   try {
     const raw = JSON.parse(localStorage.getItem(KEEP_KEY) || '[]');
     if (!Array.isArray(raw)) return [];
-    return raw
-      .map((item) => ({ ...design, ...sanitize(item && typeof item === 'object' ? item : {}) }))
-      .slice(0, MAX_KEPT);
+    return raw.map((item) => complete(sanitize(item && typeof item === 'object' ? item : {}))).slice(0, MAX_KEPT);
   } catch {
     return [];
   }
@@ -823,12 +899,18 @@ function toast(msg) {
 
 /* -------------------------------------------------------------------- boot */
 
-// A shared link fills in what it leaves out with neutral, deterministic values
-// (not the random sample title), so it opens the same cover every time.
+// A shared link opens the same cover every time (see complete()); with no link, the sample stays.
 const linked = fromHash(location.hash);
-if (Object.keys(linked).length) {
-  Object.assign(design, { title: '', author: '', palette: 'auto', seed: '', format: 'paperback' }, OPTIONAL, linked);
-  if (!linked.style) design.style = createCover({ ...options(), style: 'random' }).style;
+if (Object.keys(linked).length) Object.assign(design, complete(linked));
+// A fragment that isn't a design (#usage, from a header link opened in a new tab) is a place on
+// the page. The URL is about to hold the design instead, so scroll there once the page is built.
+let anchor = /** @type {HTMLElement | null} */ (null);
+if (!Object.keys(linked).length && location.hash.length > 1) {
+  try {
+    anchor = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+  } catch {
+    // A malformed fragment: nothing to scroll to.
+  }
 }
 if (typeof history.state?.i === 'number') {
   // Back on an entry of ours. After a reload the later entries are still there; after
@@ -854,9 +936,13 @@ window.addEventListener('pageshow', (e) => {
   saveHistoryMax();
   syncHistoryButtons();
 });
-history.replaceState({ i: historyIndex }, '', toHash(design));
+// History entries are designs, not places on the page: Undo and Back must not scroll the page
+// to where it was when that design was made.
+history.scrollRestoration = 'manual';
+safely(() => history.replaceState({ i: historyIndex }, '', toHash(design)));
 buildControls();
 buildRail();
 render();
 renderKept();
 syncHistoryButtons();
+anchor?.scrollIntoView();

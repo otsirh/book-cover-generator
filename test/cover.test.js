@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createCover, generateCover, styles, palettes, registerStyle, listStyles } from '../src/index.js';
 
-// The built-in styles, captured before any test registers a custom one.
+// The built-in styles (registration is tested in its own process, in register.test.js).
 const builtIn = [...styles];
 
 /** Minimal XML well-formedness check: balanced tags, no stray `<` or `&`. */
@@ -101,18 +101,6 @@ test('unknown style or palette throws a helpful error', () => {
   assert.throws(() => createCover({ title: 'x', palette: 'nope' }), /Unknown palette "nope"/);
 });
 
-test('custom styles can be registered', () => {
-  registerStyle({
-    id: 'test-plain',
-    name: 'Plain',
-    render: (c) => `<rect width="${c.W}" height="${c.H}" fill="${c.p.bg}"/>`,
-  });
-  assert.ok(styles.includes('test-plain'));
-  assert.ok(listStyles().some((s) => s.id === 'test-plain'));
-  const { svg } = createCover({ title: 'x', style: 'test-plain', palette: 'noir' });
-  assert.ok(svg.includes('fill="#121212"'));
-});
-
 test('width and height are respected', () => {
   const { svg, width, height } = createCover({ title: 'x', width: 1600, height: 2560 });
   assert.equal(width, 1600);
@@ -144,28 +132,41 @@ test('invalid sizes throw instead of producing NaN, hanging or changing shape', 
 });
 
 /**
- * Vertical extent of every line of text: [top of capitals, bottom of descenders, font size].
- * Tracks font-size through nested <g>/<text>/<tspan> elements.
+ * Every <g>, <text> and <tspan>: its own text, its y (if set) and its font size, inherited
+ * through nested elements.
  * @param {string} svg
  */
-function textLines(svg) {
+function textElements(svg) {
   /** @type {number[]} */
   const sizes = [];
-  /** @type {[number, number, number][]} */
+  /** @type {{ text: string, y: number | null, size: number }[]} */
   const out = [];
-  for (const m of svg.matchAll(/<(\/?)(g|text|tspan)\b([^>]*?)(\/?)>/g)) {
-    const [, closing, , attrs, selfClosing] = m;
+  for (const [, closing, attrs, selfClosing, content] of svg.matchAll(
+    /<(\/?)(?:g|text|tspan)\b([^>]*?)(\/?)>([^<]*)/g,
+  )) {
     if (closing) {
       sizes.pop();
       continue;
     }
     const size = Number(/font-size="([\d.]+)"/.exec(attrs)?.[1] ?? sizes.at(-1) ?? 0);
     const y = /\by="(-?[\d.]+)"/.exec(attrs)?.[1];
-    if (y != null && size) out.push([Number(y) - size * 0.8, Number(y) + size * 0.3, size]);
+    out.push({ text: content, y: y == null ? null : Number(y), size });
     if (!selfClosing) sizes.push(size);
   }
   return out;
 }
+
+/**
+ * Vertical extent of every line of text: [top of capitals, bottom of descenders, font size].
+ * @param {string} svg
+ */
+const textLines = (svg) =>
+  textElements(svg).flatMap(({ y, size }) =>
+    y != null && size ? [/** @type {[number, number, number]} */ ([y - size * 0.8, y + size * 0.3, size])] : [],
+  );
+
+/** Every run of visible text with its font size. @param {string} svg */
+const textRuns = (svg) => textElements(svg).filter((el) => el.text.trim());
 
 test('every style keeps its text inside the cover, from 1:3 to 3:1', () => {
   const shapes = [
@@ -477,24 +478,6 @@ test('Blueprint hatches the whole section ring', () => {
   assert.ok(checked > 0, 'no seed drew a section');
 });
 
-/** Font size of every text run in an SVG, inherited from enclosing groups. @param {string} svg */
-function textRuns(svg) {
-  /** @type {{ text: string, size: number }[]} */
-  const runs = [];
-  /** @type {number[]} */
-  const sizes = [];
-  for (const [, close, attrs, self, content] of svg.matchAll(/<(\/?)(?:g|text|tspan)\b([^>]*?)(\/?)>([^<]*)/g)) {
-    if (close) {
-      sizes.pop();
-      continue;
-    }
-    const size = Number(/font-size="([\d.]+)"/.exec(attrs)?.[1] ?? sizes.at(-1) ?? 0);
-    if (!self) sizes.push(size);
-    if (content.trim()) runs.push({ text: content, size });
-  }
-  return runs;
-}
-
 test('a title is never set smaller than its subtitle', () => {
   for (const subtitle of ['A Novel', 'The Definitive Edition with a Long Subtitle'])
     for (const style of builtIn) {
@@ -549,5 +532,28 @@ test('Typewriter places its word count from the text it types', async () => {
     }
   } finally {
     setTextMeasurer(null);
+  }
+});
+
+test('no-break spaces keep words together', () => {
+  const title = 'Mr. Penumbra and the 24 Hour Bookstore';
+  for (const width of [300, 400, 600]) {
+    const { svg } = createCover({ title, style: 'minimal', seed: 'n', width, height: width * 1.5 });
+    assert.ok(svg.includes('Mr. Penumbra'), `${width}: ${textRuns(svg).map((r) => r.text)}`);
+    assert.ok(svg.includes('24 Hour'));
+  }
+});
+
+test('a narrow initial pairs only with a letter of the same word', () => {
+  for (const [title, initial] of [
+    ['I Am Legend', 'I'],
+    ['1 Up', '1'],
+    ['Ivanhoe', 'IV'],
+  ]) {
+    for (const seed of ['a', 'b', 'c']) {
+      const runs = textRuns(createCover({ title, style: 'typographic', seed }).svg);
+      const glyph = runs.reduce((a, b) => (b.size > a.size ? b : a));
+      assert.equal(glyph.text, initial, `${title} ${seed}`);
+    }
   }
 });

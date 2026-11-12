@@ -3,14 +3,15 @@ import { titleBlock } from '../type.js';
 import { graphemes } from '../text.js';
 
 /**
- * The title's visible characters, upper-cased, from the first that isn't punctuation:
- * an initial skips opening quotes, brackets, "¿" and the like (but keeps letters,
- * digits, symbols and emoji). All of them if the title is only punctuation.
+ * The title's characters, upper-cased, from the first that isn't punctuation or a
+ * space: an initial skips opening quotes, brackets, "¿" and the like (but keeps
+ * letters, digits, symbols and emoji). Spaces inside are kept, so callers can tell
+ * where the first word ends. All of it if the title is only punctuation.
  * @param {string} title
  */
 export function initialChars(title) {
-  const chars = graphemes(title.trim().toUpperCase()).filter((ch) => ch.trim());
-  const start = chars.findIndex((ch) => !/^\p{P}+$/u.test(ch));
+  const chars = graphemes(title.trim().toUpperCase());
+  const start = chars.findIndex((ch) => ch.trim() && !/^\p{P}+$/u.test(ch));
   return start > 0 ? chars.slice(start) : chars;
 }
 
