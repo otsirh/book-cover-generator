@@ -591,7 +591,8 @@ export const shelf = {
     const left = m * 0.8;
     const right = W - m * 0.8;
     const lean = rng.bool(0.6);
-    const stop = lean ? right - S * 0.26 : right;
+    // The leaning book reaches at most h·sin(22°) + w·cos(22°) past its neighbour, and h scales with H.
+    const stop = lean ? right - Math.max(S * 0.26, H * 0.12 + S * 0.09) : right;
     const colors = [
       ...p.accents,
       mix(p.accents[0], p.ink, 0.35),

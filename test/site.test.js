@@ -34,4 +34,11 @@ test('_headers sets a strict CSP and keeps the library importable cross-origin',
     headers,
     /\/src\/\*\n {2}! Cross-Origin-Resource-Policy\n {2}Cross-Origin-Resource-Policy: cross-origin\n {2}Access-Control-Allow-Origin: \*/,
   );
+  // Link previews and icons are shown by other sites.
+  for (const path of ['/icons/*', '/og.png']) {
+    assert.ok(
+      headers.includes(`${path}\n  ! Cross-Origin-Resource-Policy\n  Cross-Origin-Resource-Policy: cross-origin\n`),
+      path,
+    );
+  }
 });

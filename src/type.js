@@ -203,17 +203,9 @@ export function titleBlock(c, o) {
   /** Visual bottom of a main-title fit, including descenders. @param {import('./text.js').TextFit | StackFit} f */
   const bottomOf = (f) => ('kind' in f ? f.height + f.descent : textBottom(f, 0));
   /** Fit the main title so its visual bottom stays inside `avail`. @param {string} text @param {number} avail */
-  const fitMain = (text, avail) => {
-    let budget = avail;
-    for (let k = 0; ; k++) {
-      const f =
-        (o.stack && fitStack(text, { ...mainOpts, maxHeight: budget })) ||
-        fitText(text, { ...mainOpts, maxHeight: budget });
-      const over = bottomOf(f) - avail;
-      if (over <= 0.5 || k === 4) return f;
-      budget = Math.max(1, budget - over - 1);
-    }
-  };
+  const fitMain = (text, avail) =>
+    (o.stack && fitStack(text, { ...mainOpts, maxHeight: avail })) ||
+    fitText(text, { ...mainOpts, maxHeight: avail, descent: true });
 
   /** Lay out with or without the lead line and subtitle. @param {boolean} useLead @param {boolean} useSub */
   const layout = (useLead, useSub) => {

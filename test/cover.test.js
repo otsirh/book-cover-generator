@@ -421,3 +421,58 @@ test('long inputs are cut between visible characters', () => {
     assert.equal(flags.length % 2, 0, `a lone regional indicator after ${pad} letters`);
   }
 });
+
+test('long inputs are cut between visible characters, however long each one is', async () => {
+  const { clipGraphemes } = await import('../src/text.js');
+  // 41 code units per character: more than any fixed pre-cut would allow for.
+  const accented = ('e' + '\u0301'.repeat(40)).repeat(300);
+  assert.equal(clipGraphemes(accented, 300), accented);
+  assert.equal(clipGraphemes(accented + 'x', 300), accented);
+  assert.equal(clipGraphemes('😀😀😀', 2), '😀😀');
+  // Astral combining marks: a cut through one would leave a lone surrogate.
+  const astral = ('a' + '\u{1D165}'.repeat(20)).repeat(320);
+  const { svg } = createCover({ title: astral, style: 'minimal', seed: 's' });
+  const label = /aria-label="([^"]*)"/.exec(svg)?.[1] ?? '';
+  assert.equal(label.match(/a/g)?.length, 300);
+  assert.equal(label.match(/\u{1D165}/gu)?.length, 300 * 20);
+});
+
+test('Bookshelf keeps the leaning book on the cover, from 1:3 to 3:1', () => {
+  for (const [width, height] of [
+    [600, 1800],
+    [600, 1500],
+    [600, 900],
+    [600, 600],
+    [1800, 600],
+  ]) {
+    const right = width - Math.min(width, height) * 0.07 * 0.8;
+    for (let seed = 0; seed < 40; seed++) {
+      const { svg } = createCover({ title: 'Shelf Life', author: 'A. Reader', style: 'shelf', width, height, seed });
+      const lean =
+        /<g transform="rotate\((-?[\d.]+) ([\d.]+) [\d.]+\)"><rect x="[\d.]+" y="[\d.]+" width="([\d.]+)"/.exec(svg);
+      if (!lean) continue;
+      const rad = (-Number(lean[1]) * Math.PI) / 180;
+      const edge = Number(lean[2]) + Number(lean[3]) * Math.cos(rad);
+      assert.ok(
+        edge <= right + 0.5,
+        `${width}x${height} seed ${seed}: book reaches ${edge.toFixed(1)}, margin ${right}`,
+      );
+    }
+  }
+});
+
+test('Blueprint hatches the whole section ring', () => {
+  let checked = 0;
+  for (let seed = 0; seed < 60; seed++) {
+    const { svg } = createCover({ title: 'Engine', style: 'blueprint', width: 600, height: 900, seed });
+    const ring = /<mask id="([^"]*ring[^"]*)"><circle cx="([\d.]+)" cy="[\d.]+" r="([\d.]+)"/.exec(svg);
+    if (!ring) continue;
+    const [, id, cx, r] = ring;
+    const hatch = new RegExp(`<path d="M(-?[\\d.]+) [^"]*" [^>]*mask="url\\(#${id}\\)"`).exec(svg);
+    assert.ok(hatch, `seed ${seed}: no hatch`);
+    // Each diagonal runs one radius right over the ring's height, so they must start 2R to its left.
+    assert.ok(Number(hatch[1]) <= Number(cx) - 1.9 * Number(r), `seed ${seed}: hatch starts at ${hatch[1]}`);
+    checked++;
+  }
+  assert.ok(checked > 0, 'no seed drew a section');
+});

@@ -16,8 +16,13 @@
   Cross-Origin-Resource-Policy: cross-origin
   Access-Control-Allow-Origin: *
 
+# The social preview image and icons are embedded by other sites.
 /icons/*
+  ! Cross-Origin-Resource-Policy
+  Cross-Origin-Resource-Policy: cross-origin
   Cache-Control: public, max-age=604800
 
 /og.png
+  ! Cross-Origin-Resource-Policy
+  Cross-Origin-Resource-Policy: cross-origin
   Cache-Control: public, max-age=86400

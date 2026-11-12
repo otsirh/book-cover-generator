@@ -78,7 +78,7 @@ const SEMI = new Set('frt()[]-/"“”'.split(''));
 const WIDE = new Set('mwMW@%&'.split(''));
 // Glyphs that are about 1em wide in any font: CJK, kana, Hangul, full-width forms, emoji.
 const FULL_WIDTH =
-  /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\u3000-\u303f\uff01-\uff60\uffe0-\uffe6]|\p{Extended_Pictographic}/u;
+  /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\u3000-\u303f\uff01-\uff60\uffe0-\uffe6\p{Emoji_Presentation}]|\uFE0F/u;
 
 /** @param {string} ch */
 function latinWidth(ch) {
@@ -141,21 +141,58 @@ function referenceWidth(text, spec) {
   return w;
 }
 
+/** @type {Map<string, number>} */
+const graphemeCounts = new Map();
+/** @param {string} text */
+function graphemeCount(text) {
+  let count = graphemeCounts.get(text);
+  if (count === undefined) {
+    count = graphemes(text).length;
+    if (graphemeCounts.size > 20000) graphemeCounts.clear();
+    graphemeCounts.set(text, count);
+  }
+  return count;
+}
+
 /** Width in px of `text` rendered at `size` px with the given font spec. */
 export function measureText(text, size, spec) {
   const w = (referenceWidth(text, spec) * size) / REFERENCE;
   // SVG adds letter-spacing after every visible character (grapheme), not every code point.
-  return spec.letterSpacing ? w + spec.letterSpacing * size * graphemes(text).length : w;
+  return spec.letterSpacing ? w + spec.letterSpacing * size * graphemeCount(text) : w;
 }
 
+/** @type {Intl.Segmenter | null | undefined} */
 let segmenter;
-/** Split a string into user-perceived characters (grapheme clusters). */
-export function graphemes(str) {
+/** A grapheme segmenter, or null where `Intl.Segmenter` is missing. */
+function graphemeSegmenter() {
   if (segmenter === undefined) {
     segmenter =
       typeof Intl !== 'undefined' && Intl.Segmenter ? new Intl.Segmenter('en', { granularity: 'grapheme' }) : null;
   }
-  return segmenter ? Array.from(segmenter.segment(str), (s) => s.segment) : [...str];
+  return segmenter;
+}
+
+/** Split a string into user-perceived characters (grapheme clusters). */
+export function graphemes(str) {
+  const seg = graphemeSegmenter();
+  return seg ? Array.from(seg.segment(str), (s) => s.segment) : [...str];
+}
+
+/**
+ * The first `max` user-perceived characters of a string. Segments lazily, so a
+ * huge string costs no more than its first `max` characters.
+ * @param {string} str @param {number} max
+ */
+export function clipGraphemes(str, max) {
+  const seg = graphemeSegmenter();
+  if (!seg) return Array.from(str).slice(0, max).join('');
+  let out = '';
+  let count = 0;
+  for (const { segment } of seg.segment(str)) {
+    if (count++ === max) break;
+    out += segment;
+  }
+  return out;
 }
 
 /* ----------------------------------------------------------------- fitting */
@@ -164,7 +201,7 @@ export function graphemes(str) {
 
 // Scripts written without spaces between words: lines may break between their words.
 const NO_SPACE =
-  /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}\p{Extended_Pictographic}]/u;
+  /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}\p{Emoji_Presentation}]|\uFE0F/u;
 // Never start a line with closing punctuation, or end one with opening punctuation.
 const NO_BREAK_BEFORE = /^[)\]}»›’”、。，．・：；！？‼⁇⁈⁉ーゝゞヽヾ々〉》」』】〕〗〙〛）］｝｠｡｣､･]/u;
 const NO_BREAK_AFTER = /[([{«‹‘“〈《「『【〔〖〘〚（［｛｟｢]$/u;
@@ -281,6 +318,9 @@ function hardWrap(tokens, maxWidth, measure) {
   return wrapGreedy(pieces, maxWidth, measure) ?? pieces.map((piece) => piece.text);
 }
 
+/** Room below the last baseline for descenders, as a fraction of the size. */
+const DESCENT = 0.22;
+
 const blockHeight = (count, size, lineHeight, cap) => (count ? size * (cap + (count - 1) * lineHeight) : 0);
 
 /**
@@ -299,6 +339,8 @@ export function fitText(text, opts) {
   };
   const lineHeight = opts.lineHeight ?? 1.15;
   const cap = font.cap ?? 0.72;
+  // With `descent`, the budget also covers the descenders below the last line.
+  const descent = opts.descent ? DESCENT : 0;
   const maxLines = opts.maxLines ?? 5;
   const maxWidth = Math.max(1, opts.maxWidth);
   const maxHeight = opts.maxHeight ?? Infinity;
@@ -334,7 +376,11 @@ export function fitText(text, opts) {
   for (let guard = 0; guard < 120; guard++) {
     const measure = (s) => measureText(s, size, spec);
     let lines = wrapGreedy(tokens, maxWidth, measure, maxLines);
-    if (lines && lines.length <= maxLines && blockHeight(lines.length, size, lineHeight, cap) <= maxHeight) {
+    if (
+      lines &&
+      lines.length <= maxLines &&
+      blockHeight(lines.length, size, lineHeight, cap) + descent * size <= maxHeight
+    ) {
       if (opts.balance !== false && lines.length > 1) lines = balance(tokens, lines.length, maxWidth, measure);
       return finish(lines, size);
     }
@@ -345,10 +391,13 @@ export function fitText(text, opts) {
   // Fallback: smallest size (or smaller, if even one line won't fit the height),
   // break long words, truncate with an ellipsis.
   if (maxHeight <= 0) return { ...base, lines: [], size: 0, width: 0, height: 0, truncated: true };
-  size = Math.min(minSize, maxHeight / cap);
+  size = Math.min(minSize, maxHeight / (cap + descent));
   const measure = (s) => measureText(s, size, spec);
   let lines = hardWrap(tokens, maxWidth, measure);
-  const fitCount = Math.max(1, Math.min(maxLines, Math.floor((maxHeight / size - cap) / lineHeight + 1e-9) + 1));
+  const fitCount = Math.max(
+    1,
+    Math.min(maxLines, Math.floor((maxHeight / size - cap - descent) / lineHeight + 1e-9) + 1),
+  );
   if (lines.length <= fitCount) return finish(lines, size);
   lines = lines.slice(0, fitCount);
   const chars = graphemes(lines[fitCount - 1]);
@@ -400,4 +449,4 @@ export function drawText(fit, { x, y, anchor = 'start', fill = '#000', opacity, 
 }
 
 /** Visual bottom of a fit placed at `y`, including descenders. */
-export const textBottom = (fit, y) => (fit.lines.length ? y + fit.height + fit.size * 0.22 : y);
+export const textBottom = (fit, y) => (fit.lines.length ? y + fit.height + fit.size * DESCENT : y);

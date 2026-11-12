@@ -58,6 +58,11 @@ A redesign of the covers and the app, based on a design review.
 - Every style escapes font names in attributes; long inputs are cut between whole characters; letter-spacing is measured per visible character; text fitting honours even tiny height budgets and validates `minSize`.
 - `rasterize` reads SVG sizes with units or from the `viewBox`; the export toast reports the size actually exported; removing a kept design removes that exact design.
 - Measurements are cached for every backend (custom measurer, canvas and the Node estimate); `setTextMeasurer` is called once per string and font at 100 px.
+- Bookshelf keeps its leaning book on tall covers; Blueprint's hatching fills the whole section ring.
+- ™, © and ‼ stay with the word before them (only emoji-style symbols break like CJK and measure 1em wide); inputs are capped between whole characters however many combining marks each has.
+- `fitText` takes a `descent` option that counts the descenders in `maxHeight`, so title blocks fit in one pass; letter-spaced widths reuse their character count.
+- The app saves a typing burst's last keystrokes before the browser's own Back (Alt+←, ⌘[, mouse buttons) and when the page is hidden; a fragment that isn't a design (say `#usage`) leaves the design alone; arrow keys scroll a focused code sample instead of changing the style; kept-design thumbnails are drawn once each, a few per frame.
+- The link-preview image and icons can be shown by other sites (`Cross-Origin-Resource-Policy: cross-origin`).
 
 ## [1.1.0] - 2026-11-12
 

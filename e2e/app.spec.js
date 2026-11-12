@@ -22,12 +22,21 @@ test.afterEach(async ({ page }, info) => {
 });
 
 /**
- * The SVG an <img> shows, or '' while it has none yet (so it works inside expect.poll).
+ * The SVG an <img> shows, or '' while it has none yet. For expect.poll, which retries until it has one.
+ * @param {Page} page @param {string} selector
+ */
+async function svgSoon(page, selector) {
+  const src = (await page.locator(selector).getAttribute('src')) ?? '';
+  return src.startsWith('data:image/svg+xml') ? decodeURIComponent(src.slice(src.indexOf(',') + 1)) : '';
+}
+
+/**
+ * The SVG an <img> shows; fails if it shows none, so checks for what is absent can't pass vacuously.
  * @param {Page} page @param {string} selector
  */
 async function svgOf(page, selector) {
-  const src = (await page.locator(selector).getAttribute('src')) ?? '';
-  return src.startsWith('data:image/svg+xml') ? decodeURIComponent(src.slice(src.indexOf(',') + 1)) : '';
+  await expect(page.locator(selector)).toHaveAttribute('src', /^data:image\/svg\+xml/);
+  return svgSoon(page, selector);
 }
 
 /** @param {Page} page */
@@ -53,14 +62,14 @@ test('typing updates the preview, the rail and the URL', async ({ page }) => {
   await page.locator('#title').fill('Salt and Static');
   await page.locator('#author').fill('J. R. Okafor');
   await page.locator('#subtitle').fill('Stories');
-  await expect.poll(() => svgOf(page, '#preview')).toContain('Salt and Static: Stories by J. R. Okafor');
+  await expect.poll(() => svgSoon(page, '#preview')).toContain('Salt and Static: Stories by J. R. Okafor');
   await expect(page).toHaveURL(/title=Salt\+and\+Static.*subtitle=Stories/);
   await expect(page.locator('#preview')).toHaveAttribute('alt', /Salt and Static.*J\. R\. Okafor/);
   const tile = page.locator('.tile[data-style="swiss"]');
   await tile.scrollIntoViewIfNeeded();
   // Thumbnails render lazily once visible; wait for it, then for the new title.
   await expect(tile.locator('img')).toHaveAttribute('src', /^data:image\/svg\+xml/);
-  await expect.poll(() => svgOf(page, '.tile[data-style="swiss"] img')).toContain('Salt and Static');
+  await expect.poll(() => svgSoon(page, '.tile[data-style="swiss"] img')).toContain('Salt and Static');
 });
 
 test('a shared link restores the design', async ({ page }) => {
@@ -142,7 +151,7 @@ test('undo reverts the subtitle and the texture too', async ({ page }) => {
   await expect(page.locator('#texture')).not.toBeChecked();
   expect(await svgOf(page, '#preview')).not.toContain('feTurbulence');
   await page.locator('#subtitle').fill('Gone Soon');
-  await expect.poll(() => svgOf(page, '#preview')).toContain('Gone Soon');
+  await expect.poll(() => svgSoon(page, '#preview')).toContain('Gone Soon');
   await page.locator('#subtitle').blur();
   await page.locator('#undo').click();
   await expect(page.locator('#subtitle')).toHaveValue('');
@@ -171,7 +180,7 @@ test('a burst of typing is one undo step', async ({ page }) => {
   await page.goto('/#title=Before&style=minimal&seed=t');
   await page.locator('#title').fill('');
   await page.locator('#title').pressSequentially('After', { delay: 20 });
-  await expect.poll(() => svgOf(page, '#preview')).toContain('After');
+  await expect.poll(() => svgSoon(page, '#preview')).toContain('After');
   await page.locator('#undo').click();
   await expect(page.locator('#title')).toHaveValue('Before');
 });
@@ -211,6 +220,8 @@ test('a partial share link opens the same cover every time', async ({ page }) =>
   await page.goto('about:blank');
   await page.goto('/#title=Dune');
   await expect(page.locator('.tile[aria-pressed="true"]')).toHaveAttribute('data-style', style ?? '');
+  // A fresh load, not a fragment change on the page already open.
+  await page.goto('about:blank');
   await page.goto('/#title=Dune&style=minimal');
   expect(await svgOf(page, '#preview')).toBe(first);
 });
@@ -258,6 +269,68 @@ test('shortcuts follow the printed key, on any keyboard layout', async ({ page }
   await expect(page.locator('#seed')).not.toHaveValue('k');
 });
 
+test('arrow keys scroll a focused code sample instead of changing the style', async ({ page }) => {
+  await page.goto('/#style=minimal&seed=a');
+  await page.locator('pre').first().focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('#style-name')).toHaveText('Minimal');
+});
+
+test('a fragment that is not a design keeps the design', async ({ page }) => {
+  await page.goto('/#title=T&subtitle=A+Novel&style=minimal&seed=s&texture=1');
+  await expect(page.locator('#texture')).toBeChecked();
+  await page.evaluate(() => {
+    location.hash = 'usage';
+  });
+  await expect(page).toHaveURL(/subtitle=A\+Novel.*texture=1/);
+  await expect(page.locator('#subtitle')).toHaveValue('A Novel');
+  await expect(page.locator('#texture')).toBeChecked();
+  await expect(page.locator('#undo')).toBeDisabled();
+});
+
+test("the browser's back shortcuts and mouse button save the last keystrokes first", async ({ page }) => {
+  await page.goto('/#title=Before&style=minimal&seed=t');
+  const title = page.locator('#title');
+  /** @type {[string, () => Promise<void>][]} */
+  const triggers = [
+    [
+      'Alt+←',
+      () =>
+        title.evaluate((el) =>
+          el.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', altKey: true, bubbles: true })),
+        ),
+    ],
+    [
+      'mouse back',
+      () =>
+        page.evaluate(() => document.body.dispatchEvent(new PointerEvent('pointerdown', { button: 3, bubbles: true }))),
+    ],
+  ];
+  for (const [name, trigger] of triggers) {
+    await title.fill('');
+    await title.pressSequentially(name === 'Alt+←' ? 'Hello' : 'World');
+    await trigger();
+    await page.goBack();
+    await page.goForward();
+    await expect(title, name).toHaveValue(name === 'Alt+←' ? 'Hello' : 'World');
+  }
+});
+
+test('coming back from another page and reloading never enables a stale Redo', async ({ page }) => {
+  await page.goto('/#style=minimal&seed=m');
+  await page.locator('.tile[data-style="swiss"]').click();
+  await page.locator('.tile[data-style="bauhaus"]').click();
+  await page.locator('#undo').click();
+  await page.locator('#undo').click();
+  await selected(page, 'minimal');
+  await page.goto('about:blank');
+  await page.goBack();
+  await selected(page, 'minimal');
+  await page.reload();
+  await selected(page, 'minimal');
+  await expect(page.locator('#redo')).toBeDisabled();
+});
+
 test('a hand-edited URL is rewritten to hold the whole design', async ({ page }) => {
   await page.goto('/#title=Neon+Tide&author=Kai&style=retro&palette=synth&seed=one&format=ebook');
   await page.evaluate(() => {
@@ -279,8 +352,14 @@ test('kept designs are saved, restored and removed', async ({ page }) => {
   await expect(page.locator('#kept')).toBeHidden();
   await page.locator('#keep').click();
   await expect(page.locator('#kept-list li')).toHaveCount(1);
+  const thumb = await svgOf(page, '.kept-open img');
+  expect(thumb).toContain('Keeper');
   await page.locator('.tile[data-style="pixel"]').click();
   await selected(page, 'pixel');
+  await page.locator('#keep').click();
+  await expect(page.locator('#kept-list li')).toHaveCount(2);
+  expect(await svgOf(page, '#kept-list li:nth-child(2) img')).toBe(thumb);
+  await page.locator('.kept-remove').first().click();
   await page.reload();
   await expect(page.locator('#kept-list li')).toHaveCount(1);
   await page.locator('.kept-open').first().click();
@@ -390,6 +469,9 @@ test('serves security headers', async ({ request }) => {
   const lib = await request.get('/src/index.js');
   expect(lib.headers()['access-control-allow-origin']).toBe('*');
   expect(lib.headers()['cross-origin-resource-policy']).toBe('cross-origin');
+  for (const path of ['/og.png', '/icons/icon-192.png']) {
+    expect((await request.get(path)).headers()['cross-origin-resource-policy'], path).toBe('cross-origin');
+  }
 });
 
 test('unknown pages get the 404 page', async ({ page }) => {

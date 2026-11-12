@@ -76,6 +76,10 @@ registerStyle({ id: 'broken' });
 registerStyle({ id: 'x', prefer: 'grey', render: () => '' });
 // @ts-expect-error maxSize is required
 fitText('x', { maxWidth: 10 });
+const fitted: boolean = fitText('Gg', { maxWidth: 10, maxSize: 10, maxHeight: 12, descent: true }).truncated;
+void fitted;
+// @ts-expect-error descent is a boolean
+fitText('x', { maxWidth: 10, maxSize: 10, descent: 0.2 });
 // @ts-expect-error anchor must be start | middle | end
 drawText(fitText('x', { maxWidth: 10, maxSize: 10 }), { x: 0, y: 0, anchor: 'center' });
 

@@ -42,6 +42,8 @@ export type TextMeasurer = (
  */
 export declare function setTextMeasurer(fn: TextMeasurer | null): void;
 export declare function measureText(text: string, size: number, spec: TextSpec): number;
+/** The first `max` user-perceived characters of a string. */
+export declare function clipGraphemes(str: string, max: number): string;
 /** Split a string into user-perceived characters. */
 export declare function graphemes(str: string): string[];
 
@@ -65,6 +67,8 @@ export interface FitOptions {
   upper?: boolean;
   /** Even out line lengths (default `true`). */
   balance?: boolean;
+  /** Count the descenders below the last line in `maxHeight`. */
+  descent?: boolean;
 }
 
 export interface TextFit {

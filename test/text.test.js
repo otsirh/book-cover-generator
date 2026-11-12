@@ -131,3 +131,27 @@ test('fitText honours tiny height budgets and validates minSize', () => {
   assert.equal(fitText('Anything', { maxWidth: 500, maxHeight: 0, maxSize: 100 }).lines.length, 0);
   assert.throws(() => fitText('x', { maxWidth: 10, maxSize: 20, minSize: 0 }), /minSize/);
 });
+
+test('fitText can count the descenders below the last line in the height', () => {
+  for (const maxHeight of [400, 60, 12, 3]) {
+    const fit = fitText('Glossy pages of quiet typography', {
+      font: FONTS.sans,
+      maxWidth: 80,
+      maxHeight,
+      maxSize: 100,
+      minSize: 8,
+      descent: true,
+    });
+    assert.ok(textBottom(fit, 0) <= maxHeight + 1e-9, `${maxHeight}: bottom at ${textBottom(fit, 0)}`);
+  }
+  const without = fitText('Gg', { font: FONTS.sans, maxWidth: 500, maxHeight: 50, maxSize: 100 });
+  const withDescent = fitText('Gg', { font: FONTS.sans, maxWidth: 500, maxHeight: 50, maxSize: 100, descent: true });
+  assert.ok(withDescent.size < without.size);
+});
+
+test('letter-spaced widths stay exact when measured again', () => {
+  const spec = { font: FONTS.sans, letterSpacing: 0.2 };
+  const first = measureText('Café 🧑‍🚀', 10, spec);
+  assert.equal(measureText('Café 🧑‍🚀', 10, spec), first);
+  assert.equal(first, measureText('Café 🧑‍🚀', 10, { font: FONTS.sans }) + 0.2 * 10 * 6);
+});

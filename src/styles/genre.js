@@ -471,7 +471,8 @@ export const blueprint = {
       // Hatched section between the outer rings.
       const clip = c.id('ring');
       let hatch = '';
-      for (let x = -R; x <= R; x += 7 * u) hatch += `M${n(cx + x)} ${n(cy - R)}l${n(R)} ${n(R * 2)}`;
+      // Each diagonal runs R to the right over the ring's height, so start 2R left to cover all of it.
+      for (let x = -2 * R; x <= R; x += 7 * u) hatch += `M${n(cx + x)} ${n(cy - R)}l${n(R)} ${n(R * 2)}`;
       s += `<defs><mask id="${clip}">${circle(cx, cy, R, '#fff')}${circle(cx, cy, R * 0.8, '#000')}</mask></defs>`;
       s += `<path d="${hatch}" stroke="${ink}" stroke-width="${n(u)}" opacity="0.6" mask="url(#${clip})"/>`;
       s += dimension(

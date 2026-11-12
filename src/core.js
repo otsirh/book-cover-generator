@@ -247,14 +247,21 @@ export function blurFilter(id, std) {
   return `<filter id="${id}" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="${n(std)}"/></filter>`;
 }
 
-/** Vertical/linear gradient definition. stops: [[offset 0..1, colour, opacity?], ...] */
-export function linearGradient(id, stops, { x1 = 0, y1 = 0, x2 = 0, y2 = 1 } = {}) {
-  const s = stops
+/**
+ * The `<stop>` elements of a gradient.
+ * @param {ReadonlyArray<readonly [number, string, number?]>} stops  [[offset 0..1, colour, opacity?], ...]
+ */
+const stopsMarkup = (stops) =>
+  stops
     .map(
       ([o, col, op]) =>
         `<stop offset="${+o.toFixed(3)}" stop-color="${col}"${op != null ? ` stop-opacity="${op}"` : ''}/>`,
     )
     .join('');
+
+/** Vertical/linear gradient definition. stops: [[offset 0..1, colour, opacity?], ...] */
+export function linearGradient(id, stops, { x1 = 0, y1 = 0, x2 = 0, y2 = 1 } = {}) {
+  const s = stopsMarkup(stops);
   return `<linearGradient id="${id}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}">${s}</linearGradient>`;
 }
 
@@ -264,12 +271,7 @@ export function linearGradient(id, stops, { x1 = 0, y1 = 0, x2 = 0, y2 = 1 } = {
  * @param {{ cx?: number, cy?: number, r?: number, fx?: number, fy?: number }} [geometry]
  */
 export function radialGradient(id, stops, { cx = 0.5, cy = 0.5, r = 0.5, fx, fy } = {}) {
-  const s = stops
-    .map(
-      ([o, col, op]) =>
-        `<stop offset="${+o.toFixed(3)}" stop-color="${col}"${op != null ? ` stop-opacity="${op}"` : ''}/>`,
-    )
-    .join('');
+  const s = stopsMarkup(stops);
   const f = (fx != null ? ` fx="${fx}"` : '') + (fy != null ? ` fy="${fy}"` : '');
   return `<radialGradient id="${id}" cx="${cx}" cy="${cy}" r="${r}"${f}>${s}</radialGradient>`;
 }

@@ -219,21 +219,57 @@ function syncHistoryButtons() {
   /** @type {HTMLButtonElement} */ ($('redo')).disabled = historyIndex >= historyMax;
 }
 
+// The browser's own Back and Forward leave the entry before popstate fires, too
+// late to save a typing burst's last keystrokes into it. Save them on the
+// shortcuts and mouse buttons that navigate, and when the page is hidden.
+document.addEventListener(
+  'keydown',
+  (e) => {
+    const nav =
+      e.key === 'BrowserBack' ||
+      e.key === 'BrowserForward' ||
+      ((e.altKey || e.metaKey) && ['ArrowLeft', 'ArrowRight', '[', ']'].includes(e.key));
+    if (nav) flushReplace();
+  },
+  { capture: true },
+);
+window.addEventListener(
+  'pointerdown',
+  (e) => {
+    if (e.button === 3 || e.button === 4) flushReplace();
+  },
+  { capture: true },
+);
+window.addEventListener('pagehide', flushReplace);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') flushReplace();
+});
+
 window.addEventListener('popstate', (e) => {
   clearTimeout(replaceTimer);
   replaceTimer = undefined;
   typing = false;
-  if (e.state && typeof e.state.i === 'number') historyIndex = e.state.i;
-  const edited = !(e.state && typeof e.state.i === 'number');
-  if (edited) {
+  const ours = Boolean(e.state) && typeof e.state.i === 'number';
+  if (ours) historyIndex = e.state.i;
+  const linked = ours ? null : fromHash(location.hash);
+  if (linked && !Object.keys(linked).length) {
+    // A fragment that isn't a design (say #usage, typed to jump to the docs): keep the
+    // design. The browser dropped the entries ahead of this one, so nothing is left to redo.
+    historyMax = historyIndex;
+    saveHistoryMax();
+    safely(() => history.replaceState({ i: historyIndex }, '', toHash(design)));
+    syncHistoryButtons();
+    return;
+  }
+  if (!ours) {
     // An edited URL: make it the newest entry.
     historyMax += 1;
     historyIndex = historyMax;
     saveHistoryMax();
   }
-  Object.assign(design, OPTIONAL, fromHash(location.hash));
+  Object.assign(design, OPTIONAL, linked ?? fromHash(location.hash));
   // Rewrite an edited URL so it always holds the whole design (for Copy link).
-  if (edited) safely(() => history.replaceState({ i: historyIndex }, '', toHash(design)));
+  if (!ours) safely(() => history.replaceState({ i: historyIndex }, '', toHash(design)));
   render({ fade: true, announce: true });
   syncHistoryButtons();
 });
@@ -463,7 +499,9 @@ function buildControls() {
       if (e.shiftKey) redo();
       else undo();
     } else if (plain && letter === 'y') redo();
-    else if (plain && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) stepStyle(e.key === 'ArrowLeft' ? -1 : 1);
+    // (Not in the code samples: they are focusable so arrow keys can scroll them.)
+    else if (plain && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !target?.closest('pre'))
+      stepStyle(e.key === 'ArrowLeft' ? -1 : 1);
     // Brackets need AltGr or Option on many layouts, so modifiers are allowed for them.
     else if (e.key === '[' || e.key === ']') stepPalette(e.key === '[' ? -1 : 1);
     else return;
@@ -656,19 +694,28 @@ function keepDesign() {
   toast('Kept. It’s under the preview.');
 }
 
+/** Kept thumbnails by design, so Keep and Remove only draw the one that changed. */
+/** @type {Map<string, string>} */
+const keptThumbs = new Map();
+/** @type {{ img: HTMLImageElement, design: Design, hash: string }[]} */
+let keptQueue = [];
+let keptFrame = 0;
+
 function renderKept() {
   const list = loadKept();
+  const hashes = list.map(toHash);
+  for (const hash of keptThumbs.keys()) if (!hashes.includes(hash)) keptThumbs.delete(hash);
+  keptQueue = [];
   $('kept').hidden = list.length === 0;
   $('kept-list').replaceChildren(
-    ...list.map((d) => {
-      const [width, height] = FORMATS[d.format];
-      const { svg } = createCover({ ...d, palette: d.palette === 'auto' ? 'random' : d.palette, width, height });
+    ...list.map((d, i) => {
+      const hash = hashes[i];
+      const img = /** @type {HTMLImageElement} */ (h('img', { alt: '' }));
+      const thumb = keptThumbs.get(hash);
+      if (thumb) img.src = thumb;
+      else keptQueue.push({ img, design: d, hash });
       const label = `${d.title || 'Untitled'}, ${STYLES.find((s) => s.id === d.style)?.name ?? d.style}`;
-      const open = h(
-        'button',
-        { type: 'button', className: 'kept-open', 'aria-label': `Open ${label}` },
-        h('img', { src: svgToDataUrl(svg), alt: '' }),
-      );
+      const open = h('button', { type: 'button', className: 'kept-open', 'aria-label': `Open ${label}` }, img);
       open.addEventListener('click', () => update({ ...d }));
       const remove = h(
         'button',
@@ -677,13 +724,31 @@ function renderKept() {
       );
       remove.addEventListener('click', () => {
         // Remove this exact design (another tab may have changed the list since it was drawn).
-        const hash = toHash(d);
         saveKept(loadKept().filter((k) => toHash(k) !== hash));
         renderKept();
       });
       return h('li', {}, open, remove);
     }),
   );
+  if (keptQueue.length && !keptFrame) keptFrame = requestAnimationFrame(pumpKept);
+}
+
+/** Draw queued kept thumbnails, yielding to the browser every ~8 ms. */
+function pumpKept() {
+  keptFrame = 0;
+  const start = performance.now();
+  for (let item = keptQueue.shift(); item; item = keptQueue.shift()) {
+    const { img, design: d, hash } = item;
+    const [width, height] = FORMATS[d.format];
+    const { svg } = createCover({ ...d, palette: d.palette === 'auto' ? 'random' : d.palette, width, height });
+    const url = svgToDataUrl(svg);
+    keptThumbs.set(hash, url);
+    img.src = url;
+    if (keptQueue.length && performance.now() - start > 8) {
+      keptFrame = requestAnimationFrame(pumpKept);
+      return;
+    }
+  }
 }
 
 /* ------------------------------------------------------------------ export */
@@ -759,6 +824,8 @@ if (typeof history.state?.i === 'number') {
     }
   }
 }
+// Store the max settled on, so a later reload can't bring back a stale, larger one.
+saveHistoryMax();
 // Restored from the back/forward cache after visiting another page: same reasoning.
 window.addEventListener('pageshow', (e) => {
   if (!e.persisted) return;
