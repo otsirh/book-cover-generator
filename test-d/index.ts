@@ -7,6 +7,7 @@ import generateDefault, {
   listStyles,
   registerStyle,
   randomSeed,
+  pickStyle,
   fitText,
   drawText,
   FONTS,
@@ -34,6 +35,8 @@ const svg: string = generateCover({ title: cover.style });
 const fromDefault: string = generateDefault();
 createCover({ palette: { bg: '#000', ink: '#fff', accents: ['#f00'] } });
 createCover({ style: 'random', palette: 'auto', seed: randomSeed() });
+const picked: string = pickStyle({ title: 'Dune', author: 'Frank Herbert' });
+void picked;
 createCover({ style: 'my-registered-style' });
 createCover({ title: 'T', subtitle: 'A Novel', texture: true, style: 'botanical', palette: 'riso' });
 // @ts-expect-error texture is a boolean

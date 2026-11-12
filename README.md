@@ -124,6 +124,7 @@ Titles and subtitles longer than 300 characters (authors: 200) are cut. With `'r
 - `listStyles()`: `[{ id, name, description, group }]`
 - `palettes`: `[{ id, name, bg, ink, accents, dark? }]`
 - `randomSeed()`: a short random seed string
+- `pickStyle(options)`: the style id `createCover` would use for these options (resolving `'random'` from the seed), without drawing the cover
 - `registerStyle({ id, name, description, group, prefer, render(ctx) })`: add your own style (see below)
 - `titleBlock`, `authorFit`: the typography the built-in styles use (a title with its lead line and subtitle, and the author line)
 - `fitText`, `drawText`, `fitStack`, `drawStack`, `splitLead`, `measureText`, `setTextMeasurer`, `FONTS`: lower-level text helpers

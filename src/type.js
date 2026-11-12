@@ -311,7 +311,6 @@ export function titleBlock(c, o) {
 
   /** @param {ReturnType<typeof layout>} l */
   const truncatedIn = (l) => !('kind' in l.fit) && l.fit.truncated;
-  /** Fits the height, the title is whole and at least as large as its minimum, its lead and its subtitle. @param {ReturnType<typeof layout>} l */
   /** The title's size, for a stack its smallest line. @param {ReturnType<typeof layout>} l */
   const titleSize = (l) => ('kind' in l.fit ? Math.min(...l.fit.lines.map((line) => line.size)) : l.fit.size);
   /** The title is at least as large as its subtitle and its lead. @param {ReturnType<typeof layout>} l */

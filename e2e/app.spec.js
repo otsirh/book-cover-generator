@@ -283,6 +283,25 @@ test('single-key shortcuts can be turned off, and stay off', async ({ page }) =>
   await expect(page.locator('#seed')).not.toHaveValue('keys');
 });
 
+test('accented letters and dead keys never trigger shortcuts by position', async ({ page }) => {
+  await page.goto('/#style=minimal&seed=k');
+  await page.locator('.tile[data-style="swiss"]').click();
+  await selected(page, 'swiss');
+  for (const [key, code] of [
+    ['à', 'KeyZ'], // BÉPO
+    ['Dead', 'KeyY'],
+    ['ı', 'KeyR'], // Turkish-F
+  ]) {
+    await page.evaluate(
+      ([k, c]) => document.dispatchEvent(new KeyboardEvent('keydown', { key: k, code: c, bubbles: true })),
+      [key, code],
+    );
+  }
+  await page.waitForTimeout(200);
+  await selected(page, 'swiss');
+  await expect(page.locator('#seed')).toHaveValue('k');
+});
+
 test('shortcuts follow the printed key, on any keyboard layout', async ({ page }) => {
   await page.goto('/#style=minimal&seed=k');
   await page.locator('.tile[data-style="swiss"]').click();
@@ -328,6 +347,54 @@ test('a fragment that is not a design keeps the design, and Undo skips its entry
   await selected(page, 'bauhaus');
 });
 
+test('loading the same URL again (Enter in the address bar) adds no Undo step', async ({ page }) => {
+  await page.goto('about:blank');
+  await page.goto('/#title=Again&author=A&subtitle=&style=minimal&palette=mint&seed=s&format=paperback&texture=0');
+  await expect(page.locator('#undo')).toBeDisabled();
+  await page.evaluate(() => {
+    location.href = location.href; // eslint-disable-line no-self-assign
+  });
+  await page.waitForTimeout(300);
+  await expect(page.locator('#undo')).toBeDisabled();
+  await page.locator('.tile[data-style="swiss"]').click();
+  await selected(page, 'swiss');
+  for (let i = 0; i < 3; i++) {
+    await page.locator('body').press('KeyZ');
+    await page.waitForTimeout(200);
+  }
+  expect(new URL(page.url()).pathname).toBe('/');
+  await selected(page, 'minimal');
+  await expect(page.locator('#undo')).toBeDisabled();
+});
+
+test('a write refused for an edited URL is not retried onto a later entry', async ({ page }) => {
+  await page.goto('/#title=T&style=minimal&seed=w');
+  await page.locator('.tile[data-style="swiss"]').click();
+  await selected(page, 'swiss');
+  await page.evaluate(() => {
+    const real = history.replaceState.bind(history);
+    let refuse = true;
+    history.replaceState = (...args) => {
+      if (refuse) {
+        refuse = false;
+        throw new DOMException('Too many calls', 'SecurityError');
+      }
+      return real(...args);
+    };
+    location.hash = 'style=orbit&seed=w2';
+  });
+  await selected(page, 'orbit');
+  // Within the retry's second: a click adds the next entry.
+  await page.locator('.tile[data-style="bauhaus"]').click();
+  await selected(page, 'bauhaus');
+  await page.waitForTimeout(1500);
+  await page.locator('#undo').click();
+  await selected(page, 'orbit');
+  await expect(page.locator('#redo')).toBeEnabled();
+  await page.locator('#redo').click();
+  await selected(page, 'bauhaus');
+});
+
 test('a quick double Undo steps twice and never leaves the app', async ({ page }) => {
   await page.goto('about:blank');
   await page.goto('/#title=T&style=minimal&seed=d');
@@ -353,6 +420,14 @@ test('Undo never scrolls the page to where it was when that design was made', as
   await page.locator('body').press('KeyZ');
   await expect(page.locator('[data-palette="mint"]')).toHaveAttribute('aria-pressed', 'true');
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
+});
+
+test('a section link moves keyboard focus to its section', async ({ page }) => {
+  await page.goto('/#style=minimal&seed=l');
+  await page.locator('header a[href="#usage"]').focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#usage')).toBeFocused();
+  await expect(page.locator('#usage')).toBeInViewport();
 });
 
 test('opening a section link in a new tab scrolls to that section', async ({ page }) => {
@@ -551,6 +626,33 @@ test('Copy link falls back when the clipboard API refuses', async ({ page, brows
   await expect(page.locator('#copy-link')).toBeFocused();
 });
 
+test('a whole link with an unknown style opens the same cover in an open tab as in a new one', async ({ page }) => {
+  const link =
+    '#title=Shared&author=Someone&subtitle=&style=futurestyle&palette=noir&seed=abc&format=paperback&texture=0';
+  await page.goto(`/${link}`);
+  const fresh = (await page.locator('.tile[aria-pressed="true"]').getAttribute('data-style')) ?? '';
+  await page.goto('about:blank');
+  await page.goto('/#title=Busy&author=B&subtitle=&style=retro&palette=synth&seed=x&format=ebook&texture=0');
+  await selected(page, 'retro');
+  await page.evaluate((hash) => {
+    location.hash = hash;
+  }, link);
+  await expect(page.locator('#title')).toHaveValue('Shared');
+  await selected(page, fresh);
+});
+
+test('line breaks in a shared link become spaces', async ({ page }) => {
+  await page.goto('/#title=Line%0ABreak&style=minimal&seed=n');
+  await expect(page.locator('#title')).toHaveValue('Line Break');
+  await page.locator('#title').focus();
+  await page.locator('#title').evaluate((el) => {
+    const input = /** @type {HTMLInputElement} */ (el);
+    input.setSelectionRange(input.value.length, input.value.length);
+  });
+  await page.keyboard.type('s');
+  await expect(page).toHaveURL(/title=Line\+Breaks/);
+});
+
 test('a link from before 1.2.0 pasted into an open tab opens that design', async ({ page }) => {
   await page.goto('/#title=Busy&author=B&subtitle=A+Novel&style=retro&palette=synth&seed=x&format=ebook&texture=1');
   await expect(page.locator('#texture')).toBeChecked();
@@ -704,12 +806,16 @@ test('downloads SVG, PNG and JPEG at the chosen size', async ({ page }) => {
 
 test('file names are cut between whole characters and never end in a separator', async ({ page }) => {
   for (const [title, name] of [
+    ['ガラスの街', 'ガラスの街'],
+    ['हिन्दी कहानी', 'हिन्दी-कहानी'],
+    ['Café Society', 'cafe-society'],
     ['a' + '𠮷'.repeat(70), 'a' + '𠮷'.repeat(59)],
     ['a'.repeat(59) + ' b', 'a'.repeat(59)],
   ]) {
     await page.goto(`/#title=${encodeURIComponent(title)}&style=minimal&seed=f`);
     const [download] = await Promise.all([page.waitForEvent('download'), page.locator('#dl-svg').click()]);
-    expect(download.suggestedFilename()).toBe(`${name}-minimal.svg`);
+    // (Compared in NFC: WebKit on macOS reports file names decomposed.)
+    expect(download.suggestedFilename().normalize('NFC')).toBe(`${name}-minimal.svg`);
     await page.goto('about:blank');
   }
 });

@@ -1,4 +1,4 @@
-import { createCover, listStyles, palettes, randomSeed } from '../src/index.js';
+import { createCover, listStyles, palettes, pickStyle, randomSeed } from '../src/index.js';
 import { svgToDataUrl, downloadCover, copyText } from '../src/browser.js';
 import { clipGraphemes } from '../src/text.js';
 
@@ -101,7 +101,8 @@ let current;
 function sanitize(raw) {
   /** @type {Partial<Design>} */
   const out = {};
-  const str = (/** @type {unknown} */ v) => (typeof v === 'string' ? v : null);
+  // Line breaks become spaces: the single-line inputs would drop them, and the cover spaces them.
+  const str = (/** @type {unknown} */ v) => (typeof v === 'string' ? v.replace(/[\r\n\u2028\u2029]+/g, ' ') : null);
   const title = str(raw.title);
   if (title != null) out.title = clip(title, 200);
   const author = str(raw.author);
@@ -196,20 +197,28 @@ function safely(write) {
 
 /** @type {ReturnType<typeof setTimeout> | undefined} */
 let stampTimer;
+/** Counts entry changes (pushes and traversals), so a delayed write can tell it is stale. */
+let entryGen = 0;
+/** The URL fragment of the current entry, as last written or visited. */
+let entryHash = '';
 /**
  * Write the design and the index into the current entry. A write the browser refuses
  * (rate-limited) is retried, so an entry is not left without its index, which would make
  * a later visit to it look like a new entry.
  */
-function stamp() {
+function stamp(gen = entryGen) {
   clearTimeout(stampTimer);
   stampTimer = undefined;
+  // Another entry is current now (a click or Back since): this write was for the old one.
+  if (gen !== entryGen) return;
   if (
     !safely(() => history.replaceState({ i: historyIndex }, '', toHash(design))) ||
     history.state?.i !== historyIndex
   ) {
-    stampTimer = setTimeout(stamp, 1000);
+    stampTimer = setTimeout(() => stamp(gen), 1000);
+    return;
   }
+  entryHash = location.hash;
 }
 
 /** Write the current design into the current entry. */
@@ -255,6 +264,8 @@ function commit() {
     safely(() => history.pushState({ i: historyIndex + 1 }, '', toHash(design))) &&
     history.state?.i === historyIndex + 1;
   if (pushed) {
+    entryGen += 1;
+    entryHash = location.hash;
     historyIndex += 1;
     historyMax = historyIndex;
     saveHistoryMax();
@@ -318,6 +329,7 @@ window.addEventListener('popstate', (e) => {
   replaceDirty = false;
   clearTimeout(stampTimer);
   stampTimer = undefined;
+  entryGen += 1;
   typing = false;
   const dir = stepping;
   stepping = 0;
@@ -325,13 +337,19 @@ window.addEventListener('popstate', (e) => {
   if (ours) historyIndex = e.state.i;
   const linked = ours ? null : fromHash(location.hash);
   if (!ours) {
-    // A new entry (an edited URL, a pasted link, or a fragment like #usage): the browser put
-    // it right after the one we were on and dropped any ahead of it.
     queuedSteps = 0;
-    historyIndex += 1;
-    historyMax = historyIndex;
-    saveHistoryMax();
-  }
+    if (dir) {
+      // Undo or Redo landed on an entry whose index was never written (the browser refused).
+      historyIndex += dir;
+    } else if (location.hash !== entryHash) {
+      // A new entry (an edited URL, a pasted link, or a fragment like #usage): the browser put
+      // it right after the one we were on and dropped any ahead of it.
+      historyIndex += 1;
+      historyMax = historyIndex;
+      saveHistoryMax();
+    }
+    // Otherwise the same URL again (Enter in the address bar): the browser replaced this entry.
+  } else entryHash = location.hash;
   if (linked && !Object.keys(linked).length) {
     // A fragment that isn't a design (say #usage, typed to jump to the docs): keep the design.
     stamp();
@@ -348,8 +366,13 @@ window.addEventListener('popstate', (e) => {
   // The app's own entries hold whole designs (older ones leave out empty optional keys); an
   // edited URL changes just the keys it names, and a pasted link names them all. A link from
   // before 1.2.0 names every key but the optional ones, which it left out when empty or off.
-  const whole = !linked || WHOLE_KEYS.every((key) => key in linked);
-  Object.assign(design, whole ? { ...OPTIONAL, ...(linked ?? fromHash(location.hash)) } : linked);
+  if (!linked) Object.assign(design, OPTIONAL, fromHash(location.hash));
+  else {
+    // (Judged by the keys the URL names: an unknown value is dropped, but the link is still whole,
+    // and opens as it would in a new tab.)
+    const named = new URLSearchParams(location.hash.slice(1));
+    Object.assign(design, WHOLE_KEYS.every((key) => named.has(key)) ? complete(linked) : linked);
+  }
   // Rewrite an edited URL so it always holds the whole design (for Copy link).
   if (!ours) stamp();
   render({ fade: true, announce: true });
@@ -405,10 +428,6 @@ function optionsFor(d, extra = {}) {
 /** Cover options for the current design. @param {Partial<import('../src/index.js').CoverOptions>} [extra] */
 const options = (extra = {}) => optionsFor(design, extra);
 
-/** Completed designs by their partial input: picking a missing style renders a cover. */
-/** @type {Map<string, Design>} */
-const completed = new Map();
-
 /**
  * A whole design from a partial one (a shared link, or a kept design saved by another
  * version). What it leaves out gets neutral, deterministic values, never the current
@@ -417,9 +436,6 @@ const completed = new Map();
  * @returns {Design}
  */
 function complete(partial) {
-  const key = JSON.stringify(partial);
-  const known = completed.get(key);
-  if (known) return { ...known };
   /** @type {Design} */
   const d = {
     title: '',
@@ -431,10 +447,8 @@ function complete(partial) {
     ...OPTIONAL,
     ...partial,
   };
-  if (!partial.style) d.style = createCover(optionsFor(d, { style: 'random' })).style;
-  if (completed.size > 100) completed.clear();
-  completed.set(key, d);
-  return { ...d };
+  if (!partial.style) d.style = pickStyle({ ...d, style: 'random' });
+  return d;
 }
 
 let lastAnnouncement = '';
@@ -619,7 +633,12 @@ function buildControls() {
       tiles.get(design.style)?.button.scrollIntoView({ behavior, block: 'center' });
       tiles.get(design.style)?.button.focus({ preventScroll: true });
     } else if (a.hash === '#controls') $('title').focus();
-    else target.scrollIntoView({ behavior });
+    else {
+      target.scrollIntoView({ behavior });
+      // Move keyboard focus there too, as following the link would, so Tab continues from it.
+      if (!target.hasAttribute('tabindex')) target.setAttribute('tabindex', '-1');
+      target.focus({ preventScroll: true });
+    }
   });
 
   // Single-key shortcuts can be turned off (WCAG 2.1.4), e.g. for speech input; the choice is remembered.
@@ -663,7 +682,9 @@ function buildControls() {
     if (field && !(field instanceof HTMLInputElement && (field.type === 'checkbox' || field.type === 'radio'))) return;
     // Match the character printed on the key (QWERTZ, AZERTY, Dvorak…); on
     // non-Latin layouts, fall back to the key's position.
-    const letter = /^[a-z]$/i.test(e.key) ? e.key.toLowerCase() : (LETTER_CODES[e.code] ?? '');
+    // (Not for Latin letters like à or ı, nor dead keys: those are characters of their own.)
+    const nonLatin = /^\p{L}$/u.test(e.key) && !/\p{Script=Latin}/u.test(e.key);
+    const letter = /^[a-z]$/i.test(e.key) ? e.key.toLowerCase() : nonLatin ? (LETTER_CODES[e.code] ?? '') : '';
     const plain = !e.ctrlKey && !e.altKey;
     if (plain && letter === 'r') randomizeAll();
     else if (plain && letter === 'z') {
@@ -787,7 +808,6 @@ function sizeHint(format, w, hgt) {
 
 /** @type {Map<string, Tile>} */
 const tiles = new Map();
-let galleryFrame = 0;
 
 /** Styles whose tiles are on screen (or within the observer's margin). */
 const onScreen = new Set();
@@ -849,25 +869,43 @@ function invalidateGallery() {
   scheduleGallery();
 }
 
-function scheduleGallery() {
-  if (!galleryFrame) galleryFrame = requestAnimationFrame(pumpGallery);
+/**
+ * Run `work` in slices of about 8 ms, one animation frame each, until it reports there is
+ * nothing left. Returns a function that starts it (if it isn't already running).
+ * @param {() => boolean} work  does one unit; false when there was nothing to do
+ */
+function sliced(work) {
+  let frame = 0;
+  const tick = () => {
+    frame = 0;
+    const start = performance.now();
+    while (work()) {
+      if (performance.now() - start > 8) {
+        frame = requestAnimationFrame(tick);
+        return;
+      }
+    }
+  };
+  return () => {
+    if (!frame) frame = requestAnimationFrame(tick);
+  };
 }
 
-/** Render dirty tiles near the screen, those on it first, yielding to the browser every ~8 ms. */
-function pumpGallery() {
-  galleryFrame = 0;
-  const start = performance.now();
-  const queue = [...tiles].filter(([, tile]) => tile.dirty && tile.visible);
-  queue.sort(([a], [b]) => Number(onScreen.has(b)) - Number(onScreen.has(a)));
-  for (const [style, tile] of queue) {
-    tile.img.src = svgToDataUrl(createCover(options({ style })).svg);
-    tile.dirty = false;
-    if (performance.now() - start > 8) {
-      scheduleGallery();
-      return;
-    }
+/** Render the next dirty tile near the screen, those on it first. */
+const scheduleGallery = sliced(() => {
+  /** @type {[string, Tile] | null} */
+  let next = null;
+  for (const [style, tile] of tiles) {
+    if (!tile.dirty || !tile.visible) continue;
+    next = [style, tile];
+    if (onScreen.has(style)) break;
   }
-}
+  if (!next) return false;
+  const [style, tile] = next;
+  tile.img.src = svgToDataUrl(createCover(options({ style })).svg);
+  tile.dirty = false;
+  return true;
+});
 
 function markRail() {
   for (const [style, tile] of tiles) tile.button.setAttribute('aria-pressed', String(style === design.style));
@@ -915,7 +953,6 @@ function keepDesign() {
 const keptThumbs = new Map();
 /** @type {{ img: HTMLImageElement, design: Design, hash: string }[]} */
 let keptQueue = [];
-let keptFrame = 0;
 
 /** @param {Design[]} [list] the kept designs, if already loaded */
 function renderKept(list = loadKept()) {
@@ -951,34 +988,31 @@ function renderKept(list = loadKept()) {
       return h('li', {}, open, remove);
     }),
   );
-  if (keptQueue.length && !keptFrame) keptFrame = requestAnimationFrame(pumpKept);
+  scheduleKept();
 }
 
-/** Draw queued kept thumbnails, yielding to the browser every ~8 ms. */
-function pumpKept() {
-  keptFrame = 0;
-  const start = performance.now();
-  for (let item = keptQueue.shift(); item; item = keptQueue.shift()) {
-    const { img, design: d, hash } = item;
-    const url = svgToDataUrl(createCover(optionsFor(d)).svg);
-    keptThumbs.set(hash, url);
-    img.src = url;
-    if (keptQueue.length && performance.now() - start > 8) {
-      keptFrame = requestAnimationFrame(pumpKept);
-      return;
-    }
-  }
-}
+/** Draw the next queued kept thumbnail. */
+const scheduleKept = sliced(() => {
+  const item = keptQueue.shift();
+  if (!item) return false;
+  const url = svgToDataUrl(createCover(optionsFor(item.design)).svg);
+  keptThumbs.set(item.hash, url);
+  item.img.src = url;
+  return true;
+});
 
 /* ------------------------------------------------------------------ export */
 
 /** @param {string} str */
 function slug(str) {
   const words = str
+    // Drop Latin accents only (é → e); other marks, like Japanese voicing marks and Indic
+    // vowel signs, are part of the letter and come back together under NFC.
     .normalize('NFKD')
-    .replace(/\p{M}/gu, '')
+    .replace(/[\u0300-\u036f]/g, '')
+    .normalize('NFC')
     .toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, '-')
+    .replace(/[^\p{L}\p{M}\p{N}]+/gu, '-')
     .replace(/^-+/, '');
   // Cut between whole characters first, so the trim also catches a separator at the cut.
   return clipGraphemes(words, 60).replace(/-+$/, '') || 'cover';
@@ -1063,6 +1097,7 @@ window.addEventListener('pageshow', (e) => {
 // to where it was when that design was made.
 history.scrollRestoration = 'manual';
 stamp();
+entryHash = location.hash;
 buildControls();
 buildRail();
 render();

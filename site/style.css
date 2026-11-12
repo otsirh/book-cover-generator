@@ -550,6 +550,11 @@ input::placeholder {
   flex: 1;
 }
 
+/* Sections that in-page links move focus to (tabindex=-1): no focus box around a whole section. */
+[tabindex='-1']:focus {
+  outline: none;
+}
+
 .hint {
   margin: -4px 0 0;
   font-size: 12px;

@@ -130,23 +130,39 @@ function dimension(value, fallback, name) {
 }
 
 /**
+ * The cleaned title and author, the seed, and the style id a cover with these options uses.
+ * @param {Pick<import('./index.js').CoverOptions, 'title' | 'author' | 'seed' | 'style'>} options
+ */
+function resolveText(options) {
+  const title = cleanText(options.title, 300) || 'Untitled';
+  const author = cleanText(options.author, 200);
+  const seed = options.seed == null || options.seed === '' ? `${title}␟${author}` : String(options.seed);
+  return { title, author, seed, styleId: resolveStyle(options.style, createRng(`${seed}|style`)) };
+}
+
+/**
+ * The style id `createCover` would use for these options (resolving `'random'` or a missing
+ * style from the seed), without drawing the cover.
+ * @param {Pick<import('./index.js').CoverOptions, 'title' | 'author' | 'seed' | 'style'>} [options]
+ */
+export function pickStyle(options = {}) {
+  return resolveText(options).styleId;
+}
+
+/**
  * Generate a cover and return it together with the resolved choices.
  *
  * @param {import('./index.js').CoverOptions} [options]
  * @returns {import('./index.js').Cover}
  */
 export function createCover(options = {}) {
-  const title = cleanText(options.title, 300) || 'Untitled';
-  const author = cleanText(options.author, 200);
+  const { title, author, seed, styleId } = resolveText(options);
   const subtitle = cleanText(options.subtitle, 300);
   const W = dimension(options.width, 600, 'width');
   const H = dimension(options.height, W * 1.5, 'height');
   if (W / H > 3 || H / W > 3) {
     throw new RangeError(`The aspect ratio must be between 1:3 and 3:1, got ${W}×${H}`);
   }
-  const seed = options.seed == null || options.seed === '' ? `${title}␟${author}` : String(options.seed);
-
-  const styleId = resolveStyle(options.style, createRng(`${seed}|style`));
   const style = /** @type {ReturnType<typeof entryFor>} */ (registry.get(styleId)); // resolveStyle checked it
   const palette = resolvePalette(options.palette, createRng(`${seed}|palette`), style);
   const [paper, night] =

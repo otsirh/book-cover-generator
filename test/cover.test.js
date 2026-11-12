@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createCover, generateCover, styles, palettes, registerStyle, listStyles } from '../src/index.js';
+import { createCover, generateCover, styles, palettes, registerStyle, listStyles, pickStyle } from '../src/index.js';
 import { contrast, mix } from '../src/core.js';
 
 // The built-in styles (registration is tested in its own process, in register.test.js).
@@ -675,4 +675,15 @@ test('Typewriter sets scripts with conjuncts as one run', () => {
       );
     }
   }
+});
+
+test('pickStyle names the style createCover would use, without drawing', () => {
+  for (const [title, author] of titles) {
+    for (const seed of ['', 'a', 'b']) {
+      assert.equal(pickStyle({ title, author, seed }), createCover({ title, author, seed }).style, `${title} ${seed}`);
+      assert.equal(pickStyle({ title, author, seed, style: 'random' }), createCover({ title, author, seed }).style);
+    }
+  }
+  assert.equal(pickStyle({ style: 'noir' }), 'noir');
+  assert.throws(() => pickStyle({ style: 'nope' }), /Unknown style "nope"/);
 });

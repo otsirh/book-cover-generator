@@ -149,6 +149,8 @@ export declare function listStyles(): StyleInfo[];
 export declare function registerStyle(style: CoverStyle): void;
 /** A short random seed, e.g. for a "randomize" button. */
 export declare function randomSeed(): string;
+/** The style id `createCover` would use for these options (resolving `'random'` from the seed), without drawing. */
+export declare function pickStyle(options?: Pick<CoverOptions, 'title' | 'author' | 'seed' | 'style'>): string;
 /** Generate a cover and report the style and palette that were chosen. */
 export declare function createCover(options?: CoverOptions): Cover;
 /** Generate a cover and return the SVG markup. */
