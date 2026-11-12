@@ -31,7 +31,7 @@ Generate book covers from a **title** and an **author**. 34 styles, 28 palettes 
 
 ## The web app
 
-On [covers.otsirh.dev](https://covers.otsirh.dev) you type a title and author, then choose:
+On [covers.otsirh.dev](https://covers.otsirh.dev) you type a title and author (press Enter in the title to break its line where you want), then choose:
 
 - **a style**, from a rail that previews your book in all 34 styles. Eleven styles let you pin a choice the variation otherwise makes, such as Silhouette's city or forest, or where Aurora puts the title;
 - **title type**: any of the nine fonts instead of the style's, and the title in capitals or as typed. It stays when you change style, so the rail shows every style in your type;
@@ -122,21 +122,21 @@ Returns the SVG markup.
 
 Same as `generateCover`, but also tells you which style and palette were chosen. This is useful when either one was random. `body` is the markup inside the outer `<svg>`, for nesting the cover in a larger SVG (its ids are unique to the cover, so several can share a document).
 
-| option      | type               | default                | notes                                          |
-| ----------- | ------------------ | ---------------------- | ---------------------------------------------- |
-| `title`     | `string`           | `'Untitled'`           |                                                |
-| `author`    | `string`           | `''`                   | optional                                       |
-| `subtitle`  | `string`           | `''`                   | optional subtitle or tagline                   |
-| `texture`   | `boolean`          | `false`                | adds a fine film grain                         |
-| `style`     | `string`           | `'random'`             | a style id, see `styles`                       |
-| `palette`   | `string \| object` | `'random'`             | a palette id, or `{ bg, ink, accents: [...] }` |
-| `seed`      | `string \| number` | hash of title + author | controls every random choice                   |
-| `width`     | `number`           | `600`                  | px, 50–10000; aspect ratio 1:3 to 3:1          |
-| `height`    | `number`           | `width × 1.5`          | px, 50–10000                                   |
-| `lang`      | `string`           | inferred               | language of the text, such as `'ja'`           |
-| `variants`  | `object`           | `{}`                   | pin a style's choices: `{ scene: 'forest' }`   |
-| `font`      | `string`           | the style's            | the title's font, one of `FONTS`               |
-| `titleCase` | `string`           | the style's            | `'upper'` (capitals) or `'normal'` (as typed)  |
+| option      | type               | default                | notes                                             |
+| ----------- | ------------------ | ---------------------- | ------------------------------------------------- |
+| `title`     | `string`           | `'Untitled'`           | a line break (`\n`) breaks the title's line there |
+| `author`    | `string`           | `''`                   | optional                                          |
+| `subtitle`  | `string`           | `''`                   | optional subtitle or tagline                      |
+| `texture`   | `boolean`          | `false`                | adds a fine film grain                            |
+| `style`     | `string`           | `'random'`             | a style id, see `styles`                          |
+| `palette`   | `string \| object` | `'random'`             | a palette id, or `{ bg, ink, accents: [...] }`    |
+| `seed`      | `string \| number` | hash of title + author | controls every random choice                      |
+| `width`     | `number`           | `600`                  | px, 50–10000; aspect ratio 1:3 to 3:1             |
+| `height`    | `number`           | `width × 1.5`          | px, 50–10000                                      |
+| `lang`      | `string`           | inferred               | language of the text, such as `'ja'`              |
+| `variants`  | `object`           | `{}`                   | pin a style's choices: `{ scene: 'forest' }`      |
+| `font`      | `string`           | the style's            | the title's font, one of `FONTS`                  |
+| `titleCase` | `string`           | the style's            | `'upper'` (capitals) or `'normal'` (as typed)     |
 
 `lang` is set on the cover so Chinese characters get the right glyphs for the language. Without it, text with kana is marked Japanese and text with Hangul Korean; pass `'zh-Hans'`, `'zh-Hant'` or `'ja'` for text in Chinese characters only.
 
