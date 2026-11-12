@@ -5,6 +5,7 @@ import { spawn } from 'node:child_process';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { handleMessage } from '../src/mcp.js';
 import { optionsFromLink } from '../src/link.js';
 import { createCover, createMockup, version } from '../src/index.js';
@@ -147,7 +148,7 @@ test('create_mockup, the lists, and errors the assistant can fix', () => {
 test('book-cover --mcp: a message a line, and a cover saved to a file', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'book-cover-mcp-'));
   try {
-    const child = spawn(process.execPath, [new URL('../bin/book-cover.js', import.meta.url).pathname, '--mcp'], {
+    const child = spawn(process.execPath, [fileURLToPath(new URL('../bin/book-cover.js', import.meta.url)), '--mcp'], {
       cwd: dir,
     });
     let out = '';
