@@ -18,7 +18,7 @@ import {
   shadowFilter,
   linearGradient,
 } from '../core.js';
-import { FONTS, fitText, drawText, textBottom, typedLines } from '../text.js';
+import { FONTS, fitText, drawText, textBottom, typedLines, noteText } from '../text.js';
 import { titleBlock, authorFit } from '../type.js';
 import { strongAccents, textPanel } from './util.js';
 
@@ -849,6 +849,7 @@ function drawPixelText(fit, x, y, anchor, color) {
     const w = (ln.length * 6 - 1) * q;
     const x0 = anchor === 'middle' ? x - w / 2 : x;
     const y0 = y + li * 10 * q;
+    noteText(x0, y0, x0 + w, y0 + 7 * q);
     [...ln].forEach((ch, ci) => {
       const glyph = PIXEL_FONT[ch];
       if (!glyph) return;

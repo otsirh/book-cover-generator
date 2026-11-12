@@ -31,6 +31,7 @@ import { hashString, contrast } from '../src/core.js';
  * @property {string} subtitle
  * @property {string} series    a series line above the title
  * @property {string} credit    a credit under the subtitle ("Translated by …")
+ * @property {string} badge     a seal set in a corner ("Bestseller")
  * @property {string} style
  * @property {string} variant   the style's choices pinned, as name.value pairs joined by '-' ('scene.forest')
  * @property {string} font      the title's font (a FONTS key), or '' for the style's
@@ -161,6 +162,7 @@ const design = {
   subtitle: '',
   series: '',
   credit: '',
+  badge: '',
   style: pick(STARTERS),
   variant: '',
   font: '',
@@ -216,6 +218,8 @@ const FIELDS = {
   // (Since 1.5.0.)
   series: { read: (v) => clipText(v, 120), empty: '', optional: true, omitEmpty: true },
   credit: { read: (v) => clipText(v, 120), empty: '', optional: true, omitEmpty: true },
+  // (Since 1.6.0.)
+  badge: { read: (v) => clipText(v, 60), empty: '', optional: true, omitEmpty: true },
   style: { read: (v) => oneOf(text(v), STYLE_IDS.includes.bind(STYLE_IDS)), empty: '' },
   // (Since 1.5.0.) Checked against the style when used: see pinsFor().
   variant: { read: (v) => oneOf(text(v), VARIANT.test.bind(VARIANT)), empty: '', optional: true, omitEmpty: true },
@@ -711,6 +715,7 @@ function optionsFor(d, extra = {}) {
     subtitle: d.subtitle,
     series: d.series,
     credit: d.credit,
+    badge: d.badge,
     style: d.style,
     palette: colors
       ? { bg: colors[0], ink: colors[1], accents: colors.slice(2) }
@@ -915,6 +920,7 @@ function buildControls() {
   $('subtitle').addEventListener('input', (e) => update({ subtitle: value(e) }, 'typing'));
   $('series').addEventListener('input', (e) => update({ series: value(e) }, 'typing'));
   $('credit').addEventListener('input', (e) => update({ credit: value(e) }, 'typing'));
+  $('badge').addEventListener('input', (e) => update({ badge: value(e) }, 'typing'));
   $('seed').addEventListener('input', (e) => update({ seed: value(e).trim() }, 'typing'));
   $('texture').addEventListener('change', (e) =>
     update({ texture: /** @type {HTMLInputElement} */ (e.target).checked }),
@@ -1282,11 +1288,11 @@ function syncControls() {
   const input = (/** @type {string} */ id) => /** @type {HTMLInputElement} */ ($(id));
   // A series or credit that comes from elsewhere (a link, Undo, a kept design) opens their section,
   // so it is never hidden; one typed there leaves it as it is, and closing it is up to you.
-  const arrived =
-    (design.series && input('series').value !== design.series) ||
-    (design.credit && input('credit').value !== design.credit);
+  const arrived = /** @type {const} */ (['series', 'credit', 'badge']).some(
+    (key) => design[key] && input(key).value !== design[key],
+  );
   if (arrived) /** @type {HTMLDetailsElement} */ ($('more-text')).open = true;
-  for (const key of /** @type {const} */ (['title', 'author', 'subtitle', 'series', 'credit'])) {
+  for (const key of /** @type {const} */ (['title', 'author', 'subtitle', 'series', 'credit', 'badge'])) {
     if (input(key).value !== design[key]) input(key).value = design[key];
   }
   // (Compared trimmed, as the field's input handler trims: typing a space doesn't get undone.)

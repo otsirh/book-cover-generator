@@ -864,6 +864,8 @@ export const baselineOf = (fit, y, i) => y + fit.size * ((fit.above ?? 0) + fit.
  */
 export function drawText(fit, { x, y, anchor = 'start', fill = '#000', opacity, attrs = '' }) {
   if (!fit.lines.length) return '';
+  const left = anchor === 'middle' ? x - fit.width / 2 : anchor === 'end' ? x - fit.width : x;
+  noteText(left, y, left + fit.width, textBottom(fit, y));
   const { size, font, weight, italic, letterSpacing } = fit;
   const ls = letterSpacing * size;
   const dx = spacingShift(anchor, ls);
@@ -872,6 +874,35 @@ export function drawText(fit, { x, y, anchor = 'start', fill = '#000', opacity, 
     .map((ln, i) => `<text x="${n(x + dx)}" y="${n(baselineOf(fit, y, i))}">${escapeXml(ln)}</text>`)
     .join('');
   return `<g ${a}>${rows}</g>`;
+}
+
+/** @typedef {{ x0: number, y0: number, x1: number, y1: number }} TextBox  where some text was drawn */
+
+/** The text drawn while a cover renders (see recordText), or null when nothing records it. @type {TextBox[] | null} */
+let textBoxes = null;
+
+/**
+ * Note that text was drawn in this box, so a badge can be placed clear of it. drawText and
+ * drawStack do this themselves; styles that write their own text elements call it.
+ * @param {number} x0 @param {number} y0 @param {number} x1 @param {number} y1
+ */
+export function noteText(x0, y0, x1, y1) {
+  if (textBoxes && [x0, y0, x1, y1].every(Number.isFinite)) textBoxes.push({ x0, y0, x1, y1 });
+}
+
+/**
+ * Run `draw` and collect the boxes of the text it draws.
+ * @template T @param {() => T} draw @returns {{ result: T, boxes: TextBox[] }}
+ */
+export function recordText(draw) {
+  const outer = textBoxes;
+  textBoxes = [];
+  try {
+    const result = draw();
+    return { result, boxes: textBoxes };
+  } finally {
+    textBoxes = outer;
+  }
 }
 
 /** Visual bottom of a fit placed at `y`, including descenders (and marks below). */

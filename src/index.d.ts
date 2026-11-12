@@ -92,6 +92,8 @@ export interface CoverOptions {
   series?: string;
   /** A credit set on a line of its own under the subtitle, such as `'Translated by Edith Grossman'`. Up to 120 characters. */
   credit?: string;
+  /** A seal set in a corner clear of the text, such as `'Winner of the Hugo Award'`. Up to 60 characters. */
+  badge?: string;
   /** Add a fine film-grain texture over the cover. Default `false`. */
   texture?: boolean;
   /** A style id, a registered custom style, or `'random'` (default; picked from the seed). */

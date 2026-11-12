@@ -56,6 +56,17 @@ export declare const BREAKING_SPACE: RegExp;
 export declare const LINE_BREAK: RegExp;
 /** The number of lines text was typed on: 1 without line breaks. */
 export declare function typedLines(text: string): number;
+/** Where some text was drawn. */
+export interface TextBox {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+/** Note that text was drawn in this box (drawText and drawStack do it), so a badge can be placed clear of it. */
+export declare function noteText(x0: number, y0: number, x1: number, y1: number): void;
+/** Run `draw` and collect the boxes of the text it draws. */
+export declare function recordText<T>(draw: () => T): { result: T; boxes: TextBox[] };
 /** The start of a string, cut between user-perceived characters (`units`: count UTF-16 code units). */
 export declare function clipGraphemes(str: string, max: number, options?: { units?: boolean }): string;
 /** Split a string into user-perceived characters. */

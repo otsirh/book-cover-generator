@@ -14,6 +14,7 @@ import {
   measureText,
   textBottom,
   textGroupAttrs,
+  noteText,
   spacingShift,
   defaultMinSize,
   checkBox,
@@ -142,6 +143,8 @@ export function fitStack(text, o) {
  * @param {import('./text.js').DrawOptions & { lineFills?: (string | undefined)[] }} o
  */
 export function drawStack(fit, { x, y, anchor = 'start', fill = '#000', opacity, attrs = '', lineFills = [] }) {
+  const left = anchor === 'middle' ? x - fit.width / 2 : anchor === 'end' ? x - fit.width : x;
+  noteText(left, y, left + fit.width, y + fit.height + fit.descent);
   const a = textGroupAttrs({ font: fit.font, weight: fit.weight, italic: fit.italic, fill, anchor, opacity, attrs });
   let baseline = y;
   const rows = fit.lines.map(({ text, size, above = 0 }, i) => {

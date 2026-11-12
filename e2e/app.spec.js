@@ -1522,6 +1522,9 @@ test('a series line and a credit: typed in, on the cover and in the link', async
   await expect.poll(() => svgSoon(page, '#preview')).toContain('BOOK TWO OF THE EMBER CYCLE');
   expect(await svgOf(page, '#preview')).toContain('Translated by Edith Grossman');
   await expect(page).toHaveURL(/series=Book\+Two\+of\+the\+Ember\+Cycle&credit=Translated\+by\+Edith\+Grossman/);
+  await page.locator('#badge').fill('Bestseller');
+  await expect.poll(() => svgSoon(page, '#preview')).toContain('aria-label="Bestseller"');
+  await expect(page).toHaveURL(/badge=Bestseller/);
   // Closed, it stays closed while you work.
   await page.locator('#more-text summary').click();
   await expect(page.locator('#more-text')).not.toHaveAttribute('open');

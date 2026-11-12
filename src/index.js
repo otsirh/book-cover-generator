@@ -5,7 +5,8 @@
 
 import { createRng, hashString, isHex, luminance, escapeXml, stripInvalidXml, grain } from './core.js';
 import { palettes } from './palettes.js';
-import { BREAKING_SPACE, FONTS, LINE_BREAK, clipGraphemes } from './text.js';
+import { BREAKING_SPACE, FONTS, LINE_BREAK, clipGraphemes, recordText } from './text.js';
+import { drawBadge } from './badge.js';
 import { styleList } from './styles/index.js';
 
 export { palettes } from './palettes.js';
@@ -371,6 +372,7 @@ export function createCover(options = {}) {
   const subtitle = cleanText(options.subtitle, 300);
   const series = cleanText(options.series, 120);
   const credit = cleanText(options.credit, 120);
+  const badge = cleanText(options.badge, 60);
   const W = dimension(options.width, 600, 'width');
   const H = dimension(options.height, W * 1.5, 'height');
   const lang = resolveLang(options.lang, `${title} ${subtitle} ${author} ${series} ${credit}`);
@@ -402,6 +404,7 @@ export function createCover(options = {}) {
         ...(Object.keys(pins).length ? [pins] : []),
         ...(titleType.font || titleType.titleCase ? [options.font ?? '', titleType.titleCase ?? ''] : []),
         ...(series || credit ? [series, credit] : []),
+        ...(badge ? [badge] : []),
       ]),
     ).toString(36);
   /** The variants the style chose (or was given). @type {Record<string, string>} */
@@ -435,7 +438,10 @@ export function createCover(options = {}) {
     },
   };
 
-  let body = style.render(ctx);
+  // The text the style draws is recorded, so a badge can go where there is none.
+  const { result: drawn, boxes } = recordText(() => style.render(ctx));
+  let body = drawn;
+  if (badge) body += drawBadge(ctx, badge, boxes);
   if (options.texture) {
     // Film grain over the whole cover. Styles paint their own backgrounds, so lay
     // dark and light specks (from different noise) to show on any colour.
@@ -445,7 +451,7 @@ export function createCover(options = {}) {
   }
   const label = escapeXml(
     `${title.replace(/\n/g, ' ')}${subtitle ? `: ${subtitle}` : ''}${author ? ` by ${author}` : ''}` +
-      `${series ? ` (${series})` : ''}${credit ? `. ${credit}` : ''}`,
+      `${series ? ` (${series})` : ''}${credit ? `. ${credit}` : ''}${badge ? `. ${badge}` : ''}`,
   );
   // (Both spellings: `lang` is SVG 2's, `xml:lang` what older renderers read.)
   const langAttrs = lang ? ` lang="${lang}" xml:lang="${lang}"` : '';

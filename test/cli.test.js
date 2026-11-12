@@ -283,3 +283,9 @@ test('--series and --credit', async () => {
   assert.match(stdout, /<title>Dune by Frank Herbert \(Dune Chronicles 1\)\. Foreword by Brian Herbert<\/title>/);
   assert.match(stdout, />DUNE CHRONICLES 1</);
 });
+
+test('--badge sets a seal', async () => {
+  const { stdout } = await cli('Dune', '-s', 'minimal', '--badge', 'Bestseller');
+  assert.match(stdout, /aria-label="Bestseller"/);
+  assert.match(stdout, />BESTSELLER</);
+});

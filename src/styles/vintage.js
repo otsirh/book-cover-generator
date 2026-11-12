@@ -22,6 +22,7 @@ import {
   textGroupAttrs,
   baselineOf,
   typedLines,
+  noteText,
 } from '../text.js';
 import { titleBlock, authorFit } from '../type.js';
 import { strongAccents, flower, initialChars, textPanel, textColor } from './util.js';
@@ -283,6 +284,8 @@ const TYPED_BY_LETTER =
 function typedLine(str, x, y, size, weight, rng, color, anchor = 'start') {
   const spec = { font: FONTS.mono, weight };
   const width = measureText(str, size, spec);
+  const left = anchor === 'middle' ? x - width / 2 : x;
+  noteText(left, y - size * 0.8, left + width, y + size * 0.3);
   if (!TYPED_BY_LETTER.test(str)) {
     // Keep joining, conjuncts and direction intact: one run of text, no per-letter jitter.
     return `<text x="${n(x)}" y="${n(y)}" ${textGroupAttrs({ ...spec, size, fill: color, anchor })}>${escapeXml(str)}</text>`;

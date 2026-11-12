@@ -19,6 +19,7 @@ Options:
       --subtitle <text> a subtitle or tagline
       --series <text>   a series line above the title ("Book Two of …")
       --credit <text>   a credit under the subtitle ("Translated by …")
+      --badge <text>    a seal in a corner clear of the text ("Bestseller")
       --texture         add a fine film-grain texture
       --seed <value>    seed for the artwork (default: title + author)
       --format <shape>  paperback (2:3, the default), ebook (5:8) or square
@@ -56,6 +57,7 @@ try {
       subtitle: { type: 'string' },
       series: { type: 'string' },
       credit: { type: 'string' },
+      badge: { type: 'string' },
       texture: { type: 'boolean' },
       seed: { type: 'string' },
       format: { type: 'string' },
@@ -216,6 +218,7 @@ try {
     subtitle: values.subtitle,
     series: values.series,
     credit: values.credit,
+    badge: values.badge,
     texture: values.texture,
     style: values.style,
     palette: palette(),

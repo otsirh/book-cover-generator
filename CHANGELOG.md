@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+
+- **Badges.** `badge` ("Winner of the Hugo Award", "10th Anniversary Edition") is set as a star-edged seal in the first corner (then side) of the cover clear of its text, smaller if it must be. The text styles draw is recorded for this (`drawText`, `drawStack`, `titleBlock`, and `noteText` and `recordText` for styles that write their own). In the app it sits with the series and credit; in the CLI, `--badge`.
+
 ## [1.5.0] - 2026-11-12
 
 Control over the cover: pin a style's choices, set the title's font and case and where its lines break, and add a series line and a credit. Covers that use none of these are drawn exactly as in 1.4.0.

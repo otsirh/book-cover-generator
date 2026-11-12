@@ -1291,3 +1291,44 @@ test('typed line breaks and the styles with their own lettering', () => {
   // The language counts the series and credit too.
   assert.equal(createCover({ title: '東京物語', series: 'シリーズ第二巻' }).lang, 'ja');
 });
+
+test('a badge goes in the first corner clear of the text, in every style', async () => {
+  const { drawBadge } = await import('../src/badge.js');
+  const { createRng } = await import('../src/core.js');
+  const c = /** @type {import('../src/index.js').StyleContext} */ ({
+    W: 600,
+    H: 900,
+    S: 600,
+    u: 1,
+    m: 42,
+    p: { ...palettes[0], dark: false, paper: palettes[0].bg, night: palettes[0].ink },
+    rng: createRng('x'),
+  });
+  const centre = (/** @type {string} */ svg) => /rotate\(-8 ([\d.]+) ([\d.]+)\)/.exec(svg)?.slice(1).map(Number);
+  // Nothing in the way: the top right corner.
+  const [x1, y1] = /** @type {number[]} */ (centre(drawBadge(c, 'Bestseller', [])));
+  assert.ok(x1 > 450 && y1 < 150, `${x1},${y1}`);
+  // Text across the top: a bottom corner.
+  const [, y2] = /** @type {number[]} */ (centre(drawBadge(c, 'Bestseller', [{ x0: 0, y0: 0, x1: 600, y1: 300 }])));
+  assert.ok(y2 > 700, `${y2}`);
+  // Text everywhere: still drawn, where it covers least.
+  assert.match(drawBadge(c, 'Bestseller', [{ x0: 0, y0: 0, x1: 600, y1: 900 }]), /BESTSELLER/);
+
+  for (const style of builtIn) {
+    const { svg } = createCover({
+      title: 'The Lighthouse Keeper',
+      author: 'Mara Ellison',
+      badge: 'Winner of the Hugo Award',
+      style,
+      seed: 's',
+    });
+    assertWellFormed(svg, style);
+    assert.match(svg, /aria-label="Winner of the Hugo Award"/, style);
+    assert.match(svg, /<title>The Lighthouse Keeper by Mara Ellison\. Winner of the Hugo Award<\/title>/, style);
+  }
+  // Without one, nothing changes.
+  assert.equal(
+    createCover({ title: 'x', style: 'minimal', seed: 's', badge: ' ' }).svg,
+    createCover({ title: 'x', style: 'minimal', seed: 's' }).svg,
+  );
+});
