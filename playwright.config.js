@@ -28,6 +28,7 @@ export default defineConfig({
         // Its own port, so a running `npm run dev` (port 4173, source tree) or another local server is never mistaken for the build.
         command: 'npm run build && node scripts/serve.js 41730 dist',
         url: 'http://127.0.0.1:41730',
-        reuseExistingServer: !CI,
+        // Never reuse one: a server left on the port would serve an old build.
+        reuseExistingServer: false,
       },
 });

@@ -223,12 +223,14 @@ const MS_SEGMENTS = /** @type {Record<number, [string, string][]>} */ ({
  * @param {Float32Array} values @param {number} cols @param {number} rows @param {number} res @param {number} level
  */
 function contours(values, cols, rows, res, level) {
-  /** @type {Map<string, [number, number]>} */
+  // Edge points are keyed by number: horizontal edge (i, j) is 2k, vertical edge (i, j) is
+  // 2k + 1, with k = j * (cols + 1) + i. Each is interpolated once and shared by its cells.
+  /** @type {Map<number, [number, number]>} */
   const pts = new Map();
-  /** @type {[string, string][]} */
+  /** @type {[number, number][]} */
   const segs = [];
-  const at = (/** @type {number} */ i, /** @type {number} */ j) => values[j * (cols + 1) + i];
-  /** @param {string} key @param {number} ax @param {number} ay @param {number} av @param {number} bx @param {number} by @param {number} bv */
+  const stride = cols + 1;
+  /** @param {number} key @param {number} ax @param {number} ay @param {number} av @param {number} bx @param {number} by @param {number} bv */
   const edgePoint = (key, ax, ay, av, bx, by, bv) => {
     if (!pts.has(key)) {
       const t = (level - av) / (bv - av || 1e-9);
@@ -238,24 +240,27 @@ function contours(values, cols, rows, res, level) {
   };
   for (let j = 0; j < rows; j++) {
     for (let i = 0; i < cols; i++) {
-      const a = at(i, j);
-      const b = at(i + 1, j);
-      const cc = at(i + 1, j + 1);
-      const d = at(i, j + 1);
+      const k = j * stride + i;
+      const a = values[k];
+      const b = values[k + 1];
+      const cc = values[k + stride + 1];
+      const d = values[k + stride];
       const code = (a > level ? 8 : 0) | (b > level ? 4 : 0) | (cc > level ? 2 : 0) | (d > level ? 1 : 0);
       const list = MS_SEGMENTS[code];
       if (!list) continue;
-      /** @type {Record<string, () => string>} */
-      const edge = {
-        t: () => edgePoint(`h${i},${j}`, i, j, a, i + 1, j, b),
-        b: () => edgePoint(`h${i},${j + 1}`, i, j + 1, d, i + 1, j + 1, cc),
-        l: () => edgePoint(`v${i},${j}`, i, j, a, i, j + 1, d),
-        r: () => edgePoint(`v${i + 1},${j}`, i + 1, j, b, i + 1, j + 1, cc),
-      };
-      for (const [e1, e2] of list) segs.push([edge[e1](), edge[e2]()]);
+      /** @param {string} e top, bottom, left or right edge of this cell */
+      const edge = (e) =>
+        e === 't'
+          ? edgePoint(2 * k, i, j, a, i + 1, j, b)
+          : e === 'b'
+            ? edgePoint(2 * (k + stride), i, j + 1, d, i + 1, j + 1, cc)
+            : e === 'l'
+              ? edgePoint(2 * k + 1, i, j, a, i, j + 1, d)
+              : edgePoint(2 * (k + 1) + 1, i + 1, j, b, i + 1, j + 1, cc);
+      for (const [e1, e2] of list) segs.push([edge(e1), edge(e2)]);
     }
   }
-  /** @type {Map<string, number[]>} */
+  /** @type {Map<number, number[]>} */
   const adj = new Map();
   segs.forEach(([k1, k2], idx) => {
     for (const k of [k1, k2]) {
@@ -266,7 +271,7 @@ function contours(values, cols, rows, res, level) {
   const used = new Uint8Array(segs.length);
   /** @type {string[]} */
   const out = [];
-  /** @param {string[]} chain @param {string} start */
+  /** @param {number[]} chain @param {number} start */
   const extend = (chain, start) => {
     let key = start;
     for (;;) {
@@ -282,7 +287,7 @@ function contours(values, cols, rows, res, level) {
     used[idx] = 1;
     const fwd = [segs[idx][0], segs[idx][1]];
     extend(fwd, fwd[1]);
-    /** @type {string[]} */
+    /** @type {number[]} */
     const back = [];
     extend(back, fwd[0]);
     const chain = back.reverse().concat(fwd);
@@ -300,11 +305,10 @@ function openText(c, atTop, opts) {
   const { W, H, S, m } = c;
   const t = titleBlock(c, { maxWidth: W - m * 2, maxHeight: H * 0.34, ...opts });
   const a = authorFit(c, { maxSize: S * 0.044 });
-  const gap = a.lines.length ? m * 0.7 : 0;
-  const blockH = t.height + gap + a.height;
-  const y = atTop ? m * 1.2 : H - m * 1.2 - blockH;
+  const edge = atTop ? { top: m * 1.2 } : { bottom: H - m * 1.2 };
+  const { y, h, gap } = textPanel(c, t, a, { pad: 0, gap: m * 0.7, ...edge });
   const width = Math.max(t.width, a.width);
-  return { t, a, y, gap, box: { x: m, y, w: width, h: blockH } };
+  return { t, a, y, gap, box: { x: m, y, w: width, h } };
 }
 
 export const topographic = {

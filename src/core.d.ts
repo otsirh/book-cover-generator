@@ -32,6 +32,8 @@ export declare function contrast(a: string, b: string): number;
 /** The candidate with the highest contrast against `bg`. */
 export declare function readable(bg: string, candidates?: readonly string[]): string;
 /** Best text colour on `bg`: the palette's ink or background, or white / near-black. */
+/** The colours text can always fall back to: the palette's ink and background, white and near-black. */
+export declare function inkCandidates(p: { readonly ink: string; readonly bg: string }): string[];
 export declare function inkOn(bg: string, p: { readonly ink: string; readonly bg: string }): string;
 
 export type Noise2D = (x: number, y: number) => number;

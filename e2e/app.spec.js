@@ -474,6 +474,81 @@ test('a long typing session slows its history writes, inside browser rate limits
   expect(total).toBeLessThan(70);
 });
 
+test('a history write the browser ignores silently is retried', async ({ page }) => {
+  await page.goto('/#title=T&style=minimal&seed=q');
+  // Chrome may drop pushState and replaceState without throwing when rate-limited.
+  await page.evaluate(() => {
+    const push = history.pushState.bind(history);
+    const replace = history.replaceState.bind(history);
+    let dropPush = true;
+    let dropReplace = true;
+    history.pushState = (...args) => {
+      if (dropPush) dropPush = false;
+      else push(...args);
+    };
+    history.replaceState = (...args) => {
+      if (dropReplace) dropReplace = false;
+      else replace(...args);
+    };
+  });
+  await page.locator('.tile[data-style="swiss"]').click();
+  await selected(page, 'swiss');
+  await expect(page).toHaveURL(/style=swiss/, { timeout: 3000 });
+});
+
+test("the toolbar's Back onto an entry whose write was refused finds its place", async ({ page }) => {
+  await page.goto('/#title=T&style=minimal&seed=b');
+  await page.locator('.tile[data-style="swiss"]').click();
+  await selected(page, 'swiss');
+  await page.evaluate(() => {
+    const real = history.replaceState.bind(history);
+    let refuse = true;
+    history.replaceState = (...args) => {
+      if (refuse) {
+        refuse = false;
+        throw new DOMException('Too many calls', 'SecurityError');
+      }
+      return real(...args);
+    };
+    location.hash = 'style=orbit&seed=b2';
+  });
+  await selected(page, 'orbit');
+  await page.locator('.tile[data-style="bauhaus"]').click();
+  await selected(page, 'bauhaus');
+  await page.waitForTimeout(1500);
+  await page.goBack();
+  await selected(page, 'orbit');
+  await expect(page.locator('#redo')).toBeEnabled();
+  await page.locator('#redo').click();
+  await selected(page, 'bauhaus');
+});
+
+test("presses queued for a dropped step don't undo the toolbar's Back", async ({ page }) => {
+  await page.goto('/#title=T&style=minimal&seed=d');
+  for (const style of ['swiss', 'bauhaus']) {
+    await page.locator(`.tile[data-style="${style}"]`).click();
+    await selected(page, style);
+  }
+  await page.locator('#undo').click();
+  await selected(page, 'swiss');
+  // The browser drops the next history.go; a second Redo is pressed while it is "in flight".
+  await page.evaluate(() => {
+    const real = history.go.bind(history);
+    let drop = true;
+    history.go = (delta) => {
+      if (drop) drop = false;
+      else real(delta);
+    };
+  });
+  await page.locator('#redo').click();
+  await page.locator('#redo').click();
+  await page.waitForTimeout(1200);
+  await page.goBack();
+  await selected(page, 'minimal');
+  await page.waitForTimeout(500);
+  await selected(page, 'minimal');
+});
+
 test('a write refused for an edited URL is not retried onto a later entry', async ({ page }) => {
   await page.goto('/#title=T&style=minimal&seed=w');
   await page.locator('.tile[data-style="swiss"]').click();
@@ -915,6 +990,8 @@ test('file names are cut between whole characters and never end in a separator',
   await page.goto('/#title=x&style=minimal&seed=f');
   for (const [title, name] of [
     ['ガラスの街', 'ガラスの街'],
+    ['Война и мир', 'война-и-мир'],
+    ['Ζορμπάς', 'ζορμπάς'],
     ['हिन्दी कहानी', 'हिन्दी-कहानी'],
     ['Café Society', 'cafe-society'],
     ['a' + '𠮷'.repeat(70), 'a' + '𠮷'.repeat(59)],

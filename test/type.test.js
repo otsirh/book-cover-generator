@@ -191,3 +191,11 @@ test('a title block reports its smallest line, which is the size for an unstacke
   const plain = titleBlock(ctx(), { maxWidth: 400, maxHeight: 600, maxSize: 60 });
   assert.equal(plain.smallest, plain.size);
 });
+
+test('textColor falls back exactly like inkOn for a single background', async () => {
+  const { textColor } = await import('../src/styles/util.js');
+  const { inkOn } = await import('../src/core.js');
+  const p = /** @type {any} */ ({ ink: '#1a1a1a', bg: '#f4e9d8', accents: ['#f4e0d0', '#e8d8c8', '#c00000'] });
+  for (const bg of ['#ffffff', '#000000', '#7f7f7f', '#f4e9d8']) assert.equal(textColor(p, bg), inkOn(bg, p), bg);
+  assert.equal(textColor(p, '#ffffff', ['#c00000']), '#c00000');
+});

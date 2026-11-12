@@ -105,8 +105,14 @@ export function readable(bg, candidates = ['#ffffff', '#111111']) {
   return candidates.reduce((best, c) => (contrast(bg, c) > contrast(bg, best) ? c : best));
 }
 
+/**
+ * The colours text can always fall back to: the palette's ink and background, white and near-black.
+ * @param {{ readonly ink: string, readonly bg: string }} p
+ */
+export const inkCandidates = (p) => [p.ink, p.bg, '#ffffff', '#111111'];
+
 /** Best text colour on `bg`: the palette's ink/background, or white/near-black. */
-export const inkOn = (bg, p) => readable(bg, [p.ink, p.bg, '#ffffff', '#111111']);
+export const inkOn = (bg, p) => readable(bg, inkCandidates(p));
 
 /* ------------------------------------------------------------------- noise */
 

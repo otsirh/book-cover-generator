@@ -69,7 +69,10 @@ let customMeasure = null;
  * restore the default.
  */
 export function setTextMeasurer(fn) {
-  customMeasure = fn;
+  if (fn != null && typeof fn !== 'function') {
+    throw new TypeError('setTextMeasurer: pass a function (text, size, font) => width in px, or null');
+  }
+  customMeasure = fn ?? null;
   widthCache.clear();
 }
 
@@ -212,8 +215,15 @@ function referenceWidth(text, spec) {
   const cached = widths.get(text);
   if (cached !== undefined) return cached;
   let w;
-  if (customMeasure) w = customMeasure(text, REFERENCE, { family: spec.font.family, weight, italic: !!spec.italic });
-  else {
+  if (customMeasure) {
+    w = customMeasure(text, REFERENCE, { family: spec.font.family, weight, italic: !!spec.italic });
+    // Say so here, rather than let a bad width surface later as NaN or a misleading error.
+    if (typeof w !== 'number' || !Number.isFinite(w) || w < 0) {
+      throw new TypeError(
+        `setTextMeasurer: the measurer returned ${String(w)} for "${text}"; it must return a width in px`,
+      );
+    }
+  } else {
     const c = canvasContext();
     const shorthand = c && canvasFont(c, font, spec);
     if (c && shorthand) {

@@ -241,3 +241,15 @@ test('a spec changed between measurements is measured with its new font', () => 
     fontsSet.join(' | '),
   );
 });
+
+test('a custom measurer must be a function and return a width', () => {
+  assert.throws(() => setTextMeasurer(/** @type {any} */ ('nope')), /setTextMeasurer: pass a function/);
+  setTextMeasurer(/** @type {any} */ (() => ({ width: 10 })));
+  try {
+    assert.throws(() => measureText('bad', 10, { font: FONTS.sans }), /measurer returned \[object Object\]/);
+    setTextMeasurer(() => NaN);
+    assert.throws(() => measureText('bad2', 10, { font: FONTS.sans }), /measurer returned NaN/);
+  } finally {
+    setTextMeasurer(null);
+  }
+});

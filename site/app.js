@@ -168,11 +168,16 @@ function saveHistoryMax() {
 let typing = false;
 /** The field of the current typing burst: typing in another field starts a new step. */
 let typingField = '';
-/** Direction of an Undo (-1) or Redo (1) in flight, until its popstate arrives. */
-let stepping = 0;
-let steppingSince = 0;
+/**
+ * The Undo (-1) or Redo (1) in flight until its popstate arrives: the index it left and when.
+ * A popstate is that step only if it lands on `from + dir`; anything else is the browser's own.
+ * @type {{ from: number, dir: number, at: number } | null}
+ */
+let pending = null;
 /** Undo/Redo presses made while a step was in flight, net (-2: two more undos). */
 let queuedSteps = 0;
+/** A step still expected (its popstate can be dropped by the browser: then, after a second, not). */
+const inFlight = () => pending !== null && performance.now() - pending.at < 1000;
 /** @type {ReturnType<typeof setTimeout> | undefined} */
 let typingTimer;
 /** @type {ReturnType<typeof setTimeout> | undefined} */
@@ -187,7 +192,11 @@ const REPLACE_MS = 300;
  * @param {() => void} write
  */
 function safely(write) {
-  recentWrites.push(performance.now());
+  const now = performance.now();
+  // (Keep only the last 30 s, pruned here so a long session without typing can't pile them up.)
+  const cut = recentWrites.findIndex((time) => now - time <= 30_000);
+  recentWrites.splice(0, cut === -1 ? recentWrites.length : cut);
+  recentWrites.push(now);
   try {
     write();
     return true;
@@ -203,17 +212,40 @@ const recentWrites = [];
 /** How long a typing burst waits between history writes: longer once many were made recently. */
 function replaceInterval() {
   const now = performance.now();
-  while (recentWrites.length && now - recentWrites[0] > 30_000) recentWrites.shift();
-  return recentWrites.length > 40 ? 2000 : REPLACE_MS;
+  return recentWrites.filter((time) => now - time <= 30_000).length > 40 ? 2000 : REPLACE_MS;
 }
 
 /** @type {ReturnType<typeof setTimeout> | undefined} */
 let stampTimer;
 /** Counts entry changes (pushes and traversals), so a delayed write can tell it is stale. */
 let entryGen = 0;
-/** Each entry's design by index, for an entry whose state the browser refused to store. */
-/** @type {Map<number, Design>} */
-const designs = new Map();
+/**
+ * Each entry this tab made, by index: its URL fragment and design. For an entry whose state
+ * the browser refused to store, this is how a later visit to it is recognised and shown.
+ * @type {Map<number, { hash: string, design: Design }>}
+ */
+const known = new Map();
+
+/** Forget entries past the last one (the browser dropped them). */
+function forgetAhead() {
+  for (const index of known.keys()) if (index > historyMax) known.delete(index);
+}
+
+/** The index of an entry this tab made with this URL fragment, nearest the current one. @param {string} hash */
+function knownIndex(hash) {
+  /** @type {number | null} */
+  let found = null;
+  for (const [index, entry] of known) {
+    if (entry.hash === hash && (found === null || Math.abs(index - historyIndex) < Math.abs(found - historyIndex))) {
+      found = index;
+    }
+  }
+  return found;
+}
+
+/** Whether the URL holds this fragment (compared as parameters, whatever the encoding). @param {string} hash */
+const urlHolds = (hash) =>
+  new URLSearchParams(location.hash.slice(1)).toString() === new URLSearchParams(hash.slice(1)).toString();
 /** The URL fragment of the current entry, as last written or visited. */
 let entryHash = '';
 /**
@@ -226,15 +258,19 @@ function stamp(gen = entryGen) {
   stampTimer = undefined;
   // Another entry is current now (a click or Back since): this write was for the old one.
   if (gen !== entryGen) return;
-  designs.set(historyIndex, { ...design });
+  known.set(historyIndex, { hash: location.hash, design: { ...design } });
+  const hash = toHash(design);
+  // A write can fail silently (Chrome ignores some when rate-limited): check both the state and the URL.
   if (
-    !safely(() => history.replaceState({ i: historyIndex }, '', toHash(design))) ||
-    history.state?.i !== historyIndex
+    !safely(() => history.replaceState({ i: historyIndex }, '', hash)) ||
+    history.state?.i !== historyIndex ||
+    !urlHolds(hash)
   ) {
     stampTimer = setTimeout(() => stamp(gen), 1000);
     return;
   }
   entryHash = location.hash;
+  known.set(historyIndex, { hash: entryHash, design: { ...design } });
 }
 
 /** Write the current design into the current entry. */
@@ -282,9 +318,10 @@ function commit() {
   if (pushed) {
     entryGen += 1;
     entryHash = location.hash;
-    designs.set(historyIndex + 1, { ...design });
+    known.set(historyIndex + 1, { hash: entryHash, design: { ...design } });
     historyIndex += 1;
     historyMax = historyIndex;
+    forgetAhead();
     saveHistoryMax();
   } else {
     // Rate-limited: update the current entry instead (which may also be refused).
@@ -348,12 +385,15 @@ window.addEventListener('popstate', (e) => {
   stampTimer = undefined;
   entryGen += 1;
   typing = false;
-  // (A step whose popstate never came, after a second, says nothing about this one.)
-  const dir = performance.now() - steppingSince < 1000 ? stepping : 0;
-  stepping = 0;
+  const arrived = pending;
+  pending = null;
   const ours = Boolean(e.state) && typeof e.state.i === 'number';
+  /** Which way our Undo or Redo moved, if this popstate is that step; 0 for the browser's own. */
+  let dir = 0;
   if (ours) {
+    if (arrived && e.state.i === arrived.from + arrived.dir) dir = arrived.dir;
     historyIndex = e.state.i;
+    entryHash = location.hash;
     // An entry of ours that is reachable again (toolbar Forward after the max was lowered).
     if (historyIndex > historyMax) {
       historyMax = historyIndex;
@@ -361,23 +401,32 @@ window.addEventListener('popstate', (e) => {
     }
   }
   const linked = ours ? null : fromHash(location.hash);
-  /** The design of an entry whose state was never stored, if this tab saw it. @type {Design | null} */
+  /** The design of an entry whose state was never stored, if this tab made it. @type {Design | null} */
   let remembered = null;
   if (!ours) {
-    if (dir) {
+    const seen = knownIndex(location.hash);
+    if (arrived && performance.now() - arrived.at < 1000) {
       // Undo or Redo landed on an entry whose index was never written (the browser refused).
-      historyIndex += dir;
-      remembered = designs.get(historyIndex) ?? null;
-    } else if (location.hash !== entryHash) {
+      dir = arrived.dir;
+      historyIndex = arrived.from + arrived.dir;
+      remembered = known.get(historyIndex)?.design ?? null;
+    } else if (location.hash === entryHash) {
+      // The same URL again (Enter in the address bar): the browser replaced this entry.
+    } else if (seen !== null) {
+      // The toolbar's Back or Forward onto such an entry: recognised by its URL.
+      historyIndex = seen;
+      remembered = known.get(seen)?.design ?? null;
+    } else {
       // A new entry (an edited URL, a pasted link, or a fragment like #usage): the browser put
       // it right after the one we were on and dropped any ahead of it.
-      queuedSteps = 0;
       historyIndex += 1;
       historyMax = historyIndex;
+      forgetAhead();
       saveHistoryMax();
     }
-    // Otherwise the same URL again (Enter in the address bar): the browser replaced this entry.
-  } else entryHash = location.hash;
+  }
+  // Presses queued for an Undo or Redo don't carry over to the browser's own navigation.
+  if (!dir) queuedSteps = 0;
   if (linked && !remembered && !Object.keys(linked).length) {
     // A fragment that isn't a design (say #usage, typed to jump to the docs): keep the design.
     stamp();
@@ -407,7 +456,7 @@ window.addEventListener('popstate', (e) => {
   render({ fade: true, announce: true });
   syncHistoryButtons();
   // Presses that came in while this step was in flight.
-  if (queuedSteps) {
+  if (dir && queuedSteps) {
     const next = Math.sign(queuedSteps);
     queuedSteps -= next;
     go(next);
@@ -737,10 +786,12 @@ function buildControls() {
  */
 function go(dir) {
   if (dir < 0 ? historyIndex > 0 : historyIndex < historyMax) {
-    stepping = dir;
-    steppingSince = performance.now();
+    pending = { from: historyIndex, dir, at: performance.now() };
     history.go(dir);
-  } else queuedSteps = 0;
+  } else {
+    pending = null;
+    queuedSteps = 0;
+  }
 }
 
 /**
@@ -752,7 +803,7 @@ function go(dir) {
 function step(dir) {
   flushReplace();
   // (A step whose popstate never came, after a second, no longer holds presses back.)
-  if (stepping && performance.now() - steppingSince < 1000) queuedSteps += dir;
+  if (inFlight()) queuedSteps += dir;
   else {
     queuedSteps = 0;
     go(dir);
@@ -1035,10 +1086,10 @@ const scheduleKept = sliced(() => {
 /** @param {string} str */
 function slug(str) {
   const words = str
-    // Drop Latin accents only (é → e); other marks, like Japanese voicing marks and Indic
-    // vowel signs, are part of the letter and come back together under NFC.
+    // Drop accents from Latin letters only (é → e); other marks (й, ά, Japanese voicing
+    // marks, Indic vowel signs) are part of the letter and come back together under NFC.
     .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/(\p{Script=Latin})[\u0300-\u036f]+/gu, '$1')
     .normalize('NFC')
     .toLowerCase()
     .replace(/[^\p{L}\p{M}\p{N}]+/gu, '-')

@@ -1,4 +1,4 @@
-import { n, circle, contrast, readable, clamp, mix } from '../core.js';
+import { n, circle, contrast, readable, clamp, mix, inkCandidates } from '../core.js';
 import { titleBlock } from '../type.js';
 import { graphemes } from '../text.js';
 
@@ -44,7 +44,7 @@ export function textColor(p, bg, preferred = []) {
   const worst = (/** @type {string} */ col) => Math.min(...bgs.map((b) => contrast(col, b)));
   const good = preferred.find((col) => worst(col) >= TEXT_CONTRAST);
   if (good) return good;
-  return [p.ink, p.bg, '#ffffff', '#111111'].reduce((best, col) => (worst(col) > worst(best) ? col : best));
+  return inkCandidates(p).reduce((best, col) => (worst(col) > worst(best) ? col : best));
 }
 
 /**
@@ -96,19 +96,19 @@ export function flower(x, y, r, petal, heart, count, width = 0.58) {
 }
 
 /**
- * A panel holding the title above the author (mosaic, stripes, memphis, sunburst): its top
- * `y` and height `h`, centred on `centerY` (or starting at `top`) and kept inside the
- * margins. A panel taller than the room between the margins is centred on the cover.
+ * A panel holding the title above the author (mosaic, stripes, memphis, sunburst, and the
+ * open text of topographic and flow field): its top `y` and height `h`, centred on
+ * `centerY` (or starting at `top`, or ending at `bottom`) and kept inside the margins. A panel taller than the room between the margins is centred on the cover.
  * `gap` is the space between title and author (none without an author); `extra` adds to
  * the height, e.g. for a frame.
  * @param {import('../index.js').StyleContext} c
  * @param {import('../type.js').TitleBlock} t @param {import('../text.js').TextFit} a
- * @param {{ pad: number, gap: number, extra?: number, centerY?: number, top?: number }} o
+ * @param {{ pad: number, gap: number, extra?: number, centerY?: number, top?: number, bottom?: number }} o
  */
-export function textPanel(c, t, a, { pad, gap, extra = 0, centerY = c.H / 2, top }) {
+export function textPanel(c, t, a, { pad, gap, extra = 0, centerY = c.H / 2, top, bottom }) {
   const space = a.lines.length ? gap : 0;
   const h = pad * 2 + t.height + space + a.height + extra;
-  const want = top ?? centerY - h / 2;
+  const want = top ?? (bottom != null ? bottom - h : centerY - h / 2);
   const y = h > c.H - c.m * 2 ? (c.H - h) / 2 : clamp(want, c.m, c.H - c.m - h);
   return { y, h, gap: space };
 }

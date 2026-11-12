@@ -52,7 +52,8 @@ export const minimal = {
   },
 };
 
-const NARROW_INITIALS = /^[Iijl1!|.:;'"]$/;
+// (initialChars upper-cases the title and skips punctuation, so these are all that can occur.)
+const NARROW_INITIALS = /^[I1|]$/;
 
 export const typographic = {
   id: 'typographic',
