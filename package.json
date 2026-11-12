@@ -33,6 +33,10 @@
       "types": "./src/browser.d.ts",
       "default": "./src/browser.js"
     },
+    "./element": {
+      "types": "./src/element.d.ts",
+      "default": "./src/element.js"
+    },
     "./package.json": "./package.json"
   },
   "main": "./src/index.js",

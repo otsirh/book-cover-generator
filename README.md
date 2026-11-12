@@ -83,6 +83,18 @@ The query takes the options' own names (`title`, `author`, `subtitle`, `series`,
 
 A title breaks its line at `%0A`. Anyone may embed the answers (CORS and `Cross-Origin-Resource-Policy` allow it), and the headers `X-Cover-Style`, `X-Cover-Palette` and `X-Cover-Version` say what was drawn. The same URL always draws the same cover in a version of the library, so answers are cached for a day. Options the library rejects get a `400` with the reason as plain text.
 
+## On any page: `<book-cover>`
+
+One script, then a cover wherever you write the element:
+
+```html
+<script type="module" src="https://covers.otsirh.dev/src/element.js"></script>
+
+<book-cover title="Dune" author="Frank Herbert" cover-style="retro" seed="1"></book-cover>
+```
+
+Its attributes are the app's link parameters, except the style, which is `cover-style` (`style` is HTML's own): `title`, `author`, `subtitle`, `series`, `credit`, `badge`, `cover-style`, `genre`, `palette`, `seed`, `format`, `font`, `case`, `variant` and `texture` (present: on). Styles, palettes and fonts may be named as the app's menus name them. The cover is 240 px wide unless you style the element's `width`; it draws again when an attribute changes, and fires `cover` (with the cover) or `cover-error` (with what's wrong). It is drawn in the page, so the text fits the fonts there, and shown as an image, so a page with Trusted Types can show it (its CSP must allow `data:` images). From npm: `import 'book-cover-generator/element'`.
+
 ## From an AI assistant (MCP)
 
 Book Cover Generator is a [Model Context Protocol](https://modelcontextprotocol.io) server, so an assistant such as Claude can make covers for you: "a cover for my horror novel _The Hollow Night_, in red". It answers with a link to the image and one that opens the cover in the app to change and download.

@@ -44,6 +44,9 @@ import {
   zipFiles,
   svgToDataUrl,
 } from '../src/browser.js';
+import type { BookCover } from '../src/element.js';
+const typed: BookCover | null = null;
+void typed;
 
 const cover: Cover = createCover({
   title: 'T',
@@ -145,7 +148,25 @@ const listed: string = createCover(optionsForBook({ title: 'A', genre: 'horror' 
 // @ts-expect-error a book is cover options
 void optionsForBook('Dune');
 const named: string | undefined = styleIdFor('Art Deco');
+const element = document.createElement('book-cover');
+const elementStyle: string | undefined = element.cover?.style;
+void element.options().title;
 // @ts-expect-error copyImage always makes a PNG
 void copyImage(svg, { type: 'image/jpeg' });
 
-export { fromDefault, ids, info, firstPalette, blob, group, lead, body, coverLang, saved, zip, listed, named };
+export {
+  fromDefault,
+  ids,
+  info,
+  firstPalette,
+  blob,
+  group,
+  lead,
+  body,
+  coverLang,
+  saved,
+  zip,
+  listed,
+  named,
+  elementStyle,
+};

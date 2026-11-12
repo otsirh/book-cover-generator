@@ -1758,6 +1758,45 @@ test.describe('on an iPhone', () => {
   });
 });
 
+test('<book-cover> draws a cover on a page from its attributes', async ({ page }) => {
+  // (On the app's page, whose CSP allows no inline styles and requires Trusted Types.)
+  await page.goto('/#title=Host&style=minimal&seed=h');
+  const result = await page.evaluate(async () => {
+    await import('/src/element.js');
+    const el = /** @type {import('../src/element.js').BookCover} */ (document.createElement('book-cover'));
+    el.setAttribute('title', 'Dune');
+    el.setAttribute('author', 'Frank Herbert');
+    el.setAttribute('cover-style', 'Art Deco');
+    el.setAttribute('seed', 'e');
+    el.style.width = '300px';
+    const drawn = new Promise((resolve) => el.addEventListener('cover', resolve, { once: true }));
+    document.body.append(el);
+    await drawn;
+    const img = /** @type {HTMLImageElement} */ (el.shadowRoot?.querySelector('img'));
+    await img.decode();
+    const box = img.getBoundingClientRect();
+    const first = {
+      style: el.cover?.style,
+      alt: img.alt,
+      width: Math.round(box.width),
+      height: Math.round(box.height),
+    };
+    // An attribute changed draws again; one that can't make a cover says so.
+    el.setAttribute('title', 'Arrakis');
+    await new Promise((resolve) => el.addEventListener('cover', resolve, { once: true }));
+    const retitled = img.alt;
+    const failed = new Promise((resolve) =>
+      el.addEventListener('cover-error', (e) => resolve(String(/** @type {CustomEvent} */ (e).detail)), { once: true }),
+    );
+    el.setAttribute('cover-style', 'nope');
+    return { first, retitled, error: await failed, src: img.getAttribute('src') };
+  });
+  expect(result.first).toEqual({ style: 'artdeco', alt: 'Cover: Dune by Frank Herbert', width: 300, height: 450 });
+  expect(result.retitled).toBe('Cover: Arrakis by Frank Herbert');
+  expect(result.error).toContain('Unknown style "nope"');
+  expect(result.src).toBeNull();
+});
+
 test('a Japanese title sets the language of the cover', async ({ page }) => {
   await page.goto(`/#title=${encodeURIComponent('ガラスの街')}&style=minimal&seed=j`);
   expect(await svgOf(page, '#preview')).toMatch(/^<svg [^>]* lang="ja"/);
