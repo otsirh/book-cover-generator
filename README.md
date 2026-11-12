@@ -34,9 +34,9 @@ On [covers.otsirh.dev](https://covers.otsirh.dev) you type a title and author, t
 
 - **a style**, from a rail that previews your book in all 34 styles;
 - **a palette**, from swatches that show the background, text colour and accents;
-- **a variation**, the seed behind the artwork.
+- **a variation**, the seed behind the artwork: the strip under the preview shows six others to click.
 
-**Randomize** reshuffles everything, except what you've locked. Undo and redo step back and forth through your designs, and so do the browser's Back and Forward buttons. **Keep** saves a design to a tray under the preview. **Copy link** shares the exact design, because the URL holds every setting. The export panel tells you which size suits Kindle, print or audiobook covers.
+**Randomize** reshuffles everything, except what you've locked. Undo and redo step back and forth through your designs, and so do the browser's Back and Forward buttons. **Keep** saves a design to a tray under the preview, and **Download all** saves every kept design as a PNG. **Copy link** shares the exact design, because the URL holds every setting. The export panel tells you which size suits Kindle, print or audiobook covers.
 
 Keyboard shortcuts:
 
@@ -44,6 +44,8 @@ Keyboard shortcuts:
 - `←` and `→` step through styles.
 - `[` and `]` step through palettes.
 - `Z` undoes and `Shift+Z` redoes.
+
+The single-key shortcuts can be turned off under the controls (for example with speech input).
 
 ## Library usage
 
@@ -127,7 +129,7 @@ Titles and subtitles longer than 300 characters (authors: 200) are cut. With `'r
 - `pickStyle(options)`: the style id `createCover` would use for these options (resolving `'random'` from the seed), without drawing the cover
 - `registerStyle({ id, name, description, group, prefer, render(ctx) })`: add your own style (see below)
 - `titleBlock`, `authorFit`: the typography the built-in styles use (a title with its lead line and subtitle, and the author line)
-- `fitText`, `drawText`, `fitStack`, `drawStack`, `splitLead`, `measureText`, `setTextMeasurer`, `FONTS`: lower-level text helpers
+- `fitText`, `drawText`, `fitStack`, `drawStack`, `splitLead`, `measureText`, `setTextMeasurer`, `FONTS`: lower-level text helpers (`fitText` can hyphenate one long word with `hyphenate: px`)
 - `svgUtils`: the SVG, colour and noise helpers the built-in styles use
 
 ### TypeScript
@@ -194,7 +196,7 @@ registerStyle({
 
 ## Notes
 
-- **Fonts.** Covers only use system font stacks (Georgia, Helvetica, Futura, Didot, Impact, Courier and others, with fallbacks). This is because an SVG drawn into a canvas for PNG/JPEG export can't load web fonts. In the browser, text is measured with a canvas, so it fits exactly. In Node, widths are estimated; plug in a real font engine with `setTextMeasurer` if you need exact fits there.
+- **Fonts.** Covers only use system font stacks (Georgia, Helvetica, Futura, Didot, Impact, Courier and others), each with close matches on Windows, Android and Linux. This is because an SVG drawn into a canvas for PNG/JPEG export can't load web fonts. In the browser, text is measured with a canvas, so it fits exactly. In Node, widths are estimated; plug in a real font engine with `setTextMeasurer` if you need exact fits there.
 - **Deterministic.** The same options always give the same artwork. In Node the SVG is identical every time. In the browser, text is measured with the fonts installed on that computer, so line breaks can differ slightly between machines. Registering a custom style changes which style `style: 'random'` picks for a given seed.
 - **Versioning.** Artwork for a given seed can change in minor releases (a style gets better). Pin an exact version if you need byte-identical covers forever.
 - **Browser support.** Current Chrome, Edge, Firefox and Safari. Every release is tested in Chromium, Firefox and WebKit, including PNG and JPEG export.

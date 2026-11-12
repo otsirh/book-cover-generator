@@ -473,12 +473,15 @@ export const lowpoly = {
         }
       }
     }
-    const light = '#ffffff';
+    // The text sits on a scrim of the palette's background (light or dark), in its readable ink.
+    const scrim = p.bg;
+    const light = inkOn(scrim, p);
     const a = authorFit(c, { maxSize: S * 0.046 });
     const aY = H - m * 1.2 - a.height;
+    const font = rng.pick([FONTS.sans, FONTS.geometric, FONTS.serif]);
     const t = titleBlock(c, {
-      font: FONTS.sans,
-      weight: 800,
+      font,
+      weight: font === FONTS.serif ? 600 : 800,
       maxWidth: W - m * 2,
       maxHeight: H * 0.36,
       maxSize: S * 0.2,
@@ -489,16 +492,15 @@ export const lowpoly = {
     });
     const tY = aY - m * 0.8 - t.height;
     const ruleY = tY - m * 0.6;
-    // A dark shade under the white text: it fades in above the rule, and is at least 60% from
-    // the rule down, so even the lightest facets keep white text readable.
+    // The scrim fades in just above the rule and is nearly opaque from the rule down, so the
+    // facets keep their colour above the text and the text reads on any facet.
     const shade = c.id('shade');
-    const night = mix(p.night, '#000000', 0.3);
-    const top = Math.max(0, Math.min(H * 0.35, ruleY - m * 1.5));
+    const top = Math.max(0, ruleY - m * 1.5);
     const full = (ruleY - top) / (H - top);
     s = `<defs>${linearGradient(shade, [
-      [0, night, 0],
-      [full, night, 0.6],
-      [1, night, 0.92],
+      [0, scrim, 0],
+      [full, scrim, 0.86],
+      [1, scrim, 0.94],
     ])}</defs>${s}`;
     s += rect(0, top, W, H - top, `url(#${shade})`);
     s += t.draw({ x: m, y: tY, fill: light });
@@ -877,10 +879,11 @@ export const pixel = {
       const y1 = Math.round(((horizon / bands) * (i + 1)) / g) * g;
       s += rect(0, y0, W, y1 - y0 + 0.5, mix(skyTop, skyLow, i / (bands - 1)));
     }
-    // Stars.
-    for (let i = 0; i < cols * 0.8; i++) {
-      s += rect(rng.int(0, cols) * g, rng.int(0, Math.floor((horizon * 0.5) / g)) * g, g, g, p.paper, 'opacity="0.7"');
-    }
+    // Stars (drawn later, around the title rather than through it).
+    /** @type {[number, number][]} */
+    const stars = [];
+    for (let i = 0; i < cols * 0.8; i++)
+      stars.push([rng.int(0, cols) * g, rng.int(0, Math.floor((horizon * 0.5) / g)) * g]);
     // Sun: a rasterised disc with scan gaps.
     const sr = Math.round(rng.float(5, 8));
     const scx = Math.round((W * rng.float(0.3, 0.7)) / g);
@@ -932,13 +935,23 @@ export const pixel = {
     const subH = sfit ? sfit.height : sText ? textBottom(sText, 0) : 0;
     const reserve = subH ? subH + g * 2.5 : 0;
     const pfit = drawable ? fitPixelText(title, box.w, box.h - reserve, S * 0.022) : null;
+    // The text goes on top of everything (scanlines included); `textEnd` is where it ends.
+    let text = '';
+    let textEnd;
     if (pfit) {
       const y = m * 1.3;
-      s += drawPixelText(pfit, W / 2 + g * 0.6, y + g * 0.6, 'middle', mix(skyTop, '#000000', 0.5));
-      s += drawPixelText(pfit, W / 2, y, 'middle', ink);
+      // A drop shadow only on dark skies: on light ones it smudges the letters.
+      if (p.dark) text += drawPixelText(pfit, W / 2 + g * 0.6, y + g * 0.6, 'middle', mix(skyTop, '#000000', 0.5));
+      text += drawPixelText(pfit, W / 2, y, 'middle', ink);
       const subY = y + pfit.height + g * 2.5;
-      if (sfit) s += drawPixelText(sfit, W / 2, subY, 'middle', ink);
-      else if (sText) s += drawText(sText, { x: W / 2, y: subY, anchor: 'middle', fill: ink });
+      textEnd = y + pfit.height;
+      if (sfit) {
+        text += drawPixelText(sfit, W / 2, subY, 'middle', ink);
+        textEnd = subY + sfit.height;
+      } else if (sText) {
+        text += drawText(sText, { x: W / 2, y: subY, anchor: 'middle', fill: ink });
+        textEnd = textBottom(sText, subY);
+      }
     } else {
       const t = titleBlock(c, {
         font: FONTS.mono,
@@ -953,20 +966,26 @@ export const pixel = {
         lineHeight: 1.1,
         maxLines: 5,
       });
-      s += t.draw({ x: W / 2, y: m * 1.3, anchor: 'middle', fill: ink });
+      text += t.draw({ x: W / 2, y: m * 1.3, anchor: 'middle', fill: ink });
+      textEnd = m * 1.3 + t.height;
     }
+    // A solid band of the top sky colour behind the title (like a game's title bar), and no
+    // stars inside it, so the letters always read.
+    const bandEnd = Math.min(horizon, Math.ceil((textEnd + g * 1.5) / g) * g);
+    s += rect(0, 0, W, bandEnd, skyTop);
+    for (const [x, y] of stars) if (y >= bandEnd) s += rect(x, y, g, g, p.paper, 'opacity="0.7"');
     const author = c.author.toUpperCase();
     const groundInk = inkOn(ground, p);
     const afit = author && pixelable(author) ? fitPixelText(author, W - m * 2, H - horizon - m * 2, S * 0.007) : null;
-    if (afit) s += drawPixelText(afit, W / 2, H - m * 1.2 - afit.height, 'middle', groundInk);
+    if (afit) text += drawPixelText(afit, W / 2, H - m * 1.2 - afit.height, 'middle', groundInk);
     else if (author) {
       const a = authorFit(c, { font: FONTS.mono, weight: 700, letterSpacing: 0.05, maxSize: S * 0.042 });
-      s += drawText(a, { x: W / 2, y: H - m * 1.2 - a.height, anchor: 'middle', fill: groundInk });
+      text += drawText(a, { x: W / 2, y: H - m * 1.2 - a.height, anchor: 'middle', fill: groundInk });
     }
-    // CRT scanlines over everything.
+    // CRT scanlines over the picture, under the lettering.
     let scan = '';
     for (let y = 0; y < H; y += g * 2) scan += rect(0, y, W, g * 0.45, '#000');
     s += `<g opacity="0.12">${scan}</g>`;
-    return s;
+    return s + text;
   },
 };

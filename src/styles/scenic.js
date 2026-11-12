@@ -41,10 +41,13 @@ export const landscape = {
   /** @param {Ctx} c */
   render(c) {
     const { W, H, S, m, rng, p } = c;
-    const [sunC, , farC] = rng.shuffle(p.accents);
+    const [sunC, , hillC] = rng.shuffle(p.accents);
     const skyTop = p.dark ? p.bg : mix(p.bg, p.accents[1], 0.1);
     const horizon = mix(skyTop, sunC, 0.45);
-    const dark = p.dark ? mix(p.bg, '#000000', 0.45) : mix(p.ink, farC, 0.3);
+    // The ranges ramp through one hue, from a hazy tint far away to a deep shade in front
+    // (ramping between two different hues went brown or grey on light palettes).
+    const far = mix(horizon, hillC, 0.5);
+    const near = mix(hillC, p.dark ? mix(p.bg, '#000000', 0.45) : p.night, 0.7);
     const sky = c.id('sky');
 
     let s = `<defs>${linearGradient(sky, [
@@ -62,14 +65,14 @@ export const landscape = {
     s += circle(sunX, sunY, sunR, mix(sunC, '#ffffff', 0.15));
 
     const layers = rng.int(4, 6);
-    let front = dark;
+    let front = near;
     for (let i = 0; i < layers; i++) {
       const k = i / (layers - 1);
       const baseY = H * (0.52 + 0.33 * k);
       const amp = H * (0.11 - 0.06 * k);
       const pts = ridge(rng, 64, rng.float(0.45, 0.6));
       const coords = pts.map((v, j) => [(j / 64) * W, baseY - amp * (v * 0.5 + 0.5)]);
-      front = mix(horizon, dark, ((i + 1) / layers) ** 0.85);
+      front = mix(far, near, (i / (layers - 1)) ** 0.85);
       s += path(pathD([[0, H], ...coords, [W, H]], true), front);
     }
 

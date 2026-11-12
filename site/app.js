@@ -1,6 +1,7 @@
 import { createCover, listStyles, palettes, pickStyle, randomSeed } from '../src/index.js';
 import { svgToDataUrl, downloadCover, copyText } from '../src/browser.js';
 import { clipGraphemes } from '../src/text.js';
+import { hashString } from '../src/core.js';
 
 /** @typedef {'paperback' | 'ebook' | 'square'} Format */
 /**
@@ -548,6 +549,63 @@ function render({ fade = false, announce = false } = {}) {
     if (typing) galleryTimer = setTimeout(invalidateGallery, 200);
     else invalidateGallery();
   }
+  const variantsKey = JSON.stringify(design);
+  if (variantsKey !== lastVariantsKey) {
+    lastVariantsKey = variantsKey;
+    clearTimeout(variantsTimer);
+    if (typing) variantsTimer = setTimeout(renderVariations, 200);
+    else renderVariations();
+  }
+}
+
+/* -------------------------------------------------------------- variations */
+
+// Six other variations of the current design (same style and palette, other seeds), so the
+// seed is something to look at and click, not only a text box.
+const VARIANTS = 6;
+/** @type {{ button: HTMLElement, img: HTMLImageElement, seed: string }[]} */
+const variants = [];
+/** @type {typeof variants} */
+let variantQueue = [];
+let lastVariantsKey = '';
+/** @type {ReturnType<typeof setTimeout> | undefined} */
+let variantsTimer;
+
+function buildVariations() {
+  const strip = $('variations');
+  for (let k = 0; k < VARIANTS; k++) {
+    const img = /** @type {HTMLImageElement} */ (h('img', { alt: '' }));
+    const button = h('button', { type: 'button', className: 'variation' }, img);
+    const variant = { button, img, seed: '' };
+    button.addEventListener('click', () => update({ seed: variant.seed }));
+    variants.push(variant);
+    strip.append(button);
+  }
+}
+
+/** Seeds for the strip, derived from the current one: the same design always shows the same six. */
+function variantSeeds() {
+  const base = design.seed || `${design.title}\u241f${design.author}`;
+  return Array.from({ length: VARIANTS }, (_, k) => hashString(`${base}|${k}`).toString(36).slice(0, 6));
+}
+
+/** Draw the next queued variation thumbnail. */
+const scheduleVariants = sliced(() => {
+  const variant = variantQueue.shift();
+  if (!variant) return false;
+  variant.img.src = svgToDataUrl(createCover(options({ seed: variant.seed })).svg);
+  return true;
+});
+
+function renderVariations() {
+  variantSeeds().forEach((seed, k) => {
+    const variant = variants[k];
+    variant.seed = seed;
+    variant.button.setAttribute('aria-label', `Variation ${seed}`);
+    variant.button.title = `Variation ${seed}`;
+  });
+  variantQueue = [...variants];
+  scheduleVariants();
 }
 
 /** @param {boolean} fade @param {boolean} announce */
@@ -696,6 +754,7 @@ function buildControls() {
   const mobileDownload = /** @type {HTMLButtonElement} */ ($('m-download'));
   mobileDownload.addEventListener('click', () => exportAs('png', mobileDownload));
   $('keep').addEventListener('click', keepDesign);
+  $('kept-all').addEventListener('click', downloadKept);
 
   // In-page links scroll without touching the URL, which holds the design.
   document.addEventListener('click', (e) => {
@@ -925,7 +984,14 @@ function buildRail() {
     if (!grid) {
       grid = h('div', { className: 'rail-grid' });
       groups.set(s.group, grid);
-      rail.append(h('section', { className: 'rail-group' }, h('h3', {}, s.group), grid));
+      const section = h('section', { className: 'rail-group' }, h('h3', {}, s.group), grid);
+      rail.append(section);
+      // A jump link per family in the rail's header: 34 styles are a long scroll.
+      const jump = h('button', { type: 'button', className: 'rail-jump' }, s.group);
+      jump.addEventListener('click', () =>
+        section.scrollIntoView({ behavior: reducedMotion.matches ? 'auto' : 'smooth', block: 'start' }),
+      );
+      $('rail-groups').append(jump);
     }
     const img = /** @type {HTMLImageElement} */ (h('img', { alt: '', decoding: 'async', width: 150, height: 225 }));
     const button = /** @type {HTMLButtonElement} */ (
@@ -1047,8 +1113,19 @@ function renderKept(list = loadKept()) {
       const thumb = keptThumbs.get(hash);
       if (thumb) img.src = thumb;
       else keptQueue.push({ img, design: d, hash });
-      const label = `${d.title || 'Untitled'}, ${STYLES.find((s) => s.id === d.style)?.name ?? d.style}`;
-      const open = h('button', { type: 'button', className: 'kept-open', 'aria-label': `Open ${label}` }, img);
+      const styleName = STYLES.find((s) => s.id === d.style)?.name ?? d.style;
+      const paletteName = d.palette === 'auto' ? 'Auto' : (palettes.find((x) => x.id === d.palette)?.name ?? d.palette);
+      const label = `${d.title || 'Untitled'}, ${styleName}`;
+      const open = h(
+        'button',
+        {
+          type: 'button',
+          className: 'kept-open',
+          'aria-label': `Open ${label}`,
+          title: `${styleName} · ${paletteName}`,
+        },
+        img,
+      );
       open.addEventListener('click', () => update({ ...d }));
       const remove = h(
         'button',
@@ -1065,10 +1142,36 @@ function renderKept(list = loadKept()) {
         const next = /** @type {HTMLElement | undefined} */ (buttons[Math.min(i, buttons.length - 1)]);
         (next ?? $('keep')).focus();
       });
-      return h('li', {}, open, remove);
+      return h('li', {}, open, remove, h('span', { className: 'kept-label', 'aria-hidden': 'true' }, styleName));
     }),
   );
   scheduleKept();
+}
+
+/** Download every kept design as a PNG at the chosen size, one after another. */
+async function downloadKept() {
+  const button = $('kept-all');
+  if (button.getAttribute('aria-busy') === 'true') return;
+  const list = loadKept();
+  button.setAttribute('aria-busy', 'true');
+  button.setAttribute('aria-disabled', 'true');
+  let saved = 0;
+  try {
+    for (const d of list) {
+      const cover = createCover(optionsFor(d));
+      await downloadCover(cover.svg, 'png', `${slug(d.title)}-${cover.style}`, { scale: ui.scale });
+      saved += 1;
+      // A short pause between files, so browsers take them as separate downloads.
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    toast(`Saved ${saved} PNG${saved === 1 ? '' : 's'}`);
+  } catch (err) {
+    console.error(err);
+    toast(saved ? `Saved ${saved} of ${list.length}; the rest failed` : 'Export failed. Try one at a time.');
+  } finally {
+    button.removeAttribute('aria-busy');
+    button.removeAttribute('aria-disabled');
+  }
 }
 
 /** Draw the next queued kept thumbnail. */
@@ -1180,6 +1283,7 @@ stamp();
 entryHash = location.hash;
 buildControls();
 buildRail();
+buildVariations();
 render();
 renderKept();
 syncHistoryButtons();

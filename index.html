@@ -163,6 +163,34 @@
           <input id="subtitle" name="subtitle" type="text" maxlength="160" enterkeyhint="done" placeholder="A Novel" />
         </label>
 
+        <div class="randomize-row">
+          <button type="button" class="primary" id="randomize" aria-keyshortcuts="R">
+            <svg aria-hidden="true"><use href="#i-dice" /></svg> Randomize
+          </button>
+          <button
+            type="button"
+            class="icon-btn boxed"
+            id="undo"
+            aria-label="Undo"
+            title="Undo (Z)"
+            aria-keyshortcuts="Z"
+            aria-disabled="true"
+          >
+            <svg aria-hidden="true"><use href="#i-undo" /></svg>
+          </button>
+          <button
+            type="button"
+            class="icon-btn boxed"
+            id="redo"
+            aria-label="Redo"
+            title="Redo (Shift+Z)"
+            aria-keyshortcuts="Shift+Z"
+            aria-disabled="true"
+          >
+            <svg aria-hidden="true"><use href="#i-redo" /></svg>
+          </button>
+        </div>
+
         <div class="field">
           <div class="label-row">
             <span class="label" id="style-label">Style</span>
@@ -265,33 +293,6 @@
           <span>Paper texture</span>
         </label>
 
-        <div class="randomize-row">
-          <button type="button" class="primary" id="randomize" aria-keyshortcuts="R">
-            <svg aria-hidden="true"><use href="#i-dice" /></svg> Randomize
-          </button>
-          <button
-            type="button"
-            class="icon-btn boxed"
-            id="undo"
-            aria-label="Undo"
-            title="Undo (Z)"
-            aria-keyshortcuts="Z"
-            aria-disabled="true"
-          >
-            <svg aria-hidden="true"><use href="#i-undo" /></svg>
-          </button>
-          <button
-            type="button"
-            class="icon-btn boxed"
-            id="redo"
-            aria-label="Redo"
-            title="Redo (Shift+Z)"
-            aria-keyshortcuts="Shift+Z"
-            aria-disabled="true"
-          >
-            <svg aria-hidden="true"><use href="#i-redo" /></svg>
-          </button>
-        </div>
         <p class="hint" id="shortcut-hint">
           <span class="hint-keys">
             <kbd>R</kbd> randomize · <kbd>←</kbd><kbd>→</kbd> style · <kbd>[</kbd><kbd>]</kbd> palette ·
@@ -310,6 +311,10 @@
           </figure>
         </div>
         <p class="meta" id="meta"></p>
+        <div class="variations-row">
+          <span class="variations-label" id="variations-label">Variations</span>
+          <div class="variations" id="variations" role="group" aria-labelledby="variations-label"></div>
+        </div>
         <p class="visually-hidden" id="announce" aria-live="polite"></p>
 
         <div class="export">
@@ -339,7 +344,10 @@
         </div>
 
         <section class="kept" id="kept" aria-labelledby="kept-heading" hidden>
-          <h2 id="kept-heading">Kept designs</h2>
+          <div class="kept-head">
+            <h2 id="kept-heading">Kept designs</h2>
+            <button type="button" class="kept-all" id="kept-all">Download all</button>
+          </div>
           <ul class="kept-list" id="kept-list"></ul>
         </section>
       </section>
@@ -348,6 +356,7 @@
         <div class="rail-head">
           <h2 id="rail-heading">Styles</h2>
           <p id="rail-note"></p>
+          <nav class="rail-groups" id="rail-groups" aria-label="Style families"></nav>
         </div>
         <div class="rail-body" id="rail"></div>
       </aside>

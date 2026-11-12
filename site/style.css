@@ -355,8 +355,8 @@ input::placeholder {
 /* Palette swatches: a mini cover of background, ink and accents. */
 .swatches {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 6px;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 5px;
 }
 
 .swatch {
@@ -365,11 +365,11 @@ input::placeholder {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  height: 40px;
+  gap: 2px;
+  height: 32px;
   padding: 0;
   border: 1px solid rgb(0 0 0 / 0.14);
-  border-radius: 8px;
+  border-radius: 7px;
   transition: transform 0.12s ease;
 }
 
@@ -378,7 +378,7 @@ input::placeholder {
 }
 
 .sw-aa {
-  font: 600 13px/1 var(--display);
+  font: 600 11px/1 var(--display);
 }
 
 .sw-dots {
@@ -387,13 +387,13 @@ input::placeholder {
 }
 
 .sw-dots i {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
 }
 
 .swatch.auto {
-  font-size: 11px;
+  font-size: 9.5px;
   font-weight: 700;
   color: #1d1b18;
   background: conic-gradient(from 40deg, #f2b705, #d62828, #7b5ea7, #1d4e89, #2a9d8f, #f2b705);
@@ -667,6 +667,50 @@ input::placeholder {
   );
 }
 
+/* Other variations of the design: small covers to click. */
+.variations-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  max-width: 100%;
+}
+
+.variations-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.variations {
+  display: grid;
+  grid-template-columns: repeat(6, 36px);
+  gap: 6px;
+}
+
+.variation {
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--surface-2);
+  aspect-ratio: var(--cover-w) / var(--cover-h);
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+
+.variation:hover {
+  transform: translateY(-2px);
+}
+
+.variation img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 .meta {
   min-height: 1lh;
   margin: 0;
@@ -764,6 +808,41 @@ input::placeholder {
   width: min(100%, 520px);
 }
 
+.kept-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.kept-all {
+  min-height: 24px;
+  padding: 2px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.kept-all[aria-busy='true'] {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+.kept-label {
+  display: block;
+  margin-top: 4px;
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 1.2;
+  color: var(--muted);
+  text-align: center;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .kept h2 {
   margin: 8px 0 8px;
   font-size: 13px;
@@ -844,6 +923,33 @@ input::placeholder {
   margin: 2px 0 0;
   font-size: 13px;
   color: var(--muted);
+}
+
+.rail-groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.rail-jump {
+  min-height: 24px;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.rail-jump:hover {
+  border-color: var(--muted);
+}
+
+/* Room for the sticky rail header when a family is jumped to. */
+.rail-group {
+  scroll-margin-top: 130px;
 }
 
 .rail-body {
@@ -1009,6 +1115,15 @@ pre {
   transform: translate(-50%, 0);
 }
 
+/* Wider screens: at the top, clear of the export buttons (which can sit at the bottom edge). */
+@media (min-width: 760px) {
+  .toast {
+    top: 20px;
+    bottom: auto;
+    transform: translate(-50%, -20px);
+  }
+}
+
 /* --------------------------------------------------------------------- 404 */
 
 .not-found {
@@ -1045,6 +1160,15 @@ pre {
 /* -------------------------------------------------------------- responsive */
 
 /* Tablets and small laptops: two columns, the style rail below. */
+/* Wider screens: the preview stays in view while the controls (or the page) scroll. */
+@media (min-width: 760px) {
+  .stage {
+    position: sticky;
+    top: 16px;
+    align-self: start;
+  }
+}
+
 @media (max-width: 1199px) {
   .app {
     grid-template-columns: 290px minmax(0, 1fr);

@@ -1,4 +1,4 @@
-import { n, rect, circle, path, pathD, inkOn, mix, quarterDisc, halfDisc } from '../core.js';
+import { n, rect, circle, path, pathD, inkOn, mix, quarterDisc, halfDisc, clamp } from '../core.js';
 import { FONTS, drawText } from '../text.js';
 import { titleBlock, authorFit } from '../type.js';
 import { strongAccents, fitTitleWith, textPanel } from './util.js';
@@ -206,23 +206,24 @@ export const blocks = {
     const innerW = W - lw - pad * 2;
     const font = rng.pick([FONTS.sans, FONTS.geometric]);
     const a = authorFit(c, { upper: false, letterSpacing: 0, weight: 700, maxWidth: innerW, maxSize: S * 0.05 });
-    // The text cell grows (and the art shrinks) until the title fits comfortably.
-    const start = H * rng.float(0.32, 0.38);
-    const { block: t, value: textH } = fitTitleWith(
-      c,
-      [...new Set(Array.from({ length: 7 }, (_, i) => Math.min(start + i * H * 0.04, H * 0.56)))],
-      (cellH) => ({
-        font,
-        weight: 800,
-        maxWidth: innerW,
-        maxHeight: cellH - lw - pad * 2.6 - a.height,
-        maxSize: S * 0.2,
-        lineHeight: 1.0,
-        maxLines: 4,
-        subtitleFont: FONTS.sans,
-        subtitleItalic: false,
-      }),
-    );
+    // One size rule for the title: as large as the width (and S × 0.2) allow, in a text cell up
+    // to 0.56 H. The cell is then made just tall enough for it, and never shorter than a varied
+    // 0.32–0.38 H, so the art gets the rest.
+    /** @param {number} cellH */
+    const optionsFor = (cellH) => ({
+      font,
+      weight: 800,
+      maxWidth: innerW,
+      maxHeight: cellH - lw - pad * 2.6 - a.height,
+      maxSize: S * 0.2,
+      lineHeight: 1.0,
+      maxLines: 4,
+      subtitleFont: FONTS.sans,
+      subtitleItalic: false,
+    });
+    const largest = titleBlock(c, optionsFor(H * 0.56));
+    const textH = clamp(largest.height + lw + pad * 2.6 + a.height + 1, H * rng.float(0.32, 0.38), H * 0.56);
+    const t = titleBlock(c, optionsFor(textH));
     const textTop = rng.bool(0.5);
     const textRect = textTop ? { x: 0, y: 0, w: W, h: textH } : { x: 0, y: H - textH, w: W, h: textH };
     const art = textTop ? { x: 0, y: textH, w: W, h: H - textH } : { x: 0, y: 0, w: W, h: H - textH };
@@ -255,10 +256,20 @@ export const blocks = {
     const lines = p.night;
     const order = rng.shuffle(leaves.map((_, i) => i));
     const fills = new Array(leaves.length).fill(paper);
-    order.forEach((idx, k) => {
-      if (k < p.accents.length) fills[idx] = p.accents[k];
-      else if (rng.bool(0.15)) fills[idx] = rng.pick([...p.accents, lines]);
-    });
+    // Colour 30–45% of the art in at least three blocks (every accent once before repeating),
+    // then the odd black block for rhythm.
+    const artArea = art.w * art.h;
+    let colored = 0;
+    let k = 0;
+    for (const idx of order) {
+      if (colored >= artArea * 0.3 && k >= Math.min(3, p.accents.length)) break;
+      const area = leaves[idx].w * leaves[idx].h;
+      if (colored + area > artArea * 0.45) continue;
+      fills[idx] = p.accents[k % p.accents.length];
+      k += 1;
+      colored += area;
+    }
+    for (const idx of order) if (fills[idx] === paper && rng.bool(0.12)) fills[idx] = lines;
 
     let s = rect(0, 0, W, H, lines);
     leaves.forEach((r, i) => {

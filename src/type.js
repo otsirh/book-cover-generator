@@ -16,13 +16,15 @@ import {
   spacingShift,
   defaultMinSize,
   checkBox,
+  graphemes,
 } from './text.js';
 
-const LEAD = /^(the|a|an) +(\S.*)$/i;
+// Leading articles (English, French, Spanish, Italian, German). "Die" is left out: "Die Hard".
+const LEAD = /^(the|an|a|les|los|las|der|das|une|un|eine|ein|el|la|le|il|lo) +(\S.*)$/i;
 
 /**
- * Split a leading English article off a title: "The Lighthouse Keeper" →
- * { lead: 'The', main: 'Lighthouse Keeper' }.
+ * Split a leading article off a title: "The Lighthouse Keeper" →
+ * { lead: 'The', main: 'Lighthouse Keeper' }; also "Les", "La", "El", "Der"….
  * @param {string} title
  */
 export function splitLead(title) {
@@ -42,7 +44,9 @@ export function stackLines(text) {
   let pending = '';
   // Split at spaces only: words joined by a no-break space stay on one line.
   for (const word of text.split(' ').filter(Boolean)) {
-    if (SMALL_WORDS.has(word.toLowerCase())) pending += `${word} `;
+    // Short words (in any language: и, de, y, et, og…) join the word after them, so a
+    // one- or two-letter word never stands alone as the stack's largest line.
+    if (SMALL_WORDS.has(word.toLowerCase()) || graphemes(word).length <= 2) pending += `${word} `;
     else {
       lines.push(pending + word);
       pending = '';
@@ -208,8 +212,11 @@ export function titleBlock(c, o) {
   if (!Number.isFinite(o.maxHeight)) throw new TypeError('titleBlock: `maxHeight` must be a number of pixels');
   const font = o.font ?? FONTS.serif;
   const weight = o.weight ?? 400;
-  const { lead, main } =
-    o.lead === false ? { lead: '', main: (o.text ?? c.title).trim() } : splitLead(o.text ?? c.title);
+  const whole = (o.text ?? c.title).trim();
+  const split = o.lead === false ? { lead: '', main: whole } : splitLead(whole);
+  // Only a lead of three letters or more gets its own small line: a lone "A" or "La" up there
+  // reads as a stray mark, so short ones stay with the title.
+  const { lead, main } = graphemes(split.lead).length >= 3 ? split : { lead: '', main: whole };
   const subtitle = o.subtitle === false ? '' : c.subtitle;
 
   const sub = subtitle
@@ -246,9 +253,16 @@ export function titleBlock(c, o) {
   /** Visual bottom of a main-title fit, including descenders. @param {import('./text.js').TextFit | StackFit} f */
   const bottomOf = (f) => ('kind' in f ? f.height + f.descent : textBottom(f, 0));
   /** Fit the main title so its visual bottom stays inside `avail`. @param {string} text @param {number} avail */
-  const fitMain = (text, avail) =>
-    (o.stack && fitStack(text, { ...mainOpts, maxHeight: avail })) ||
-    fitText(text, { ...mainOpts, maxHeight: avail, descent: true });
+  const fitMain = (text, avail) => {
+    // A short one-word title ("Dune") may grow past the style's usual cap, up to the box.
+    const short = !/\s/.test(text) && graphemes(text).length <= 8;
+    const maxSize = mainOpts.maxSize * (short ? 1.6 : 1);
+    return (
+      (o.stack && fitStack(text, { ...mainOpts, maxSize, maxHeight: avail })) ||
+      // A long single word is hyphenated rather than shrunk below 7% of the short side.
+      fitText(text, { ...mainOpts, maxSize, maxHeight: avail, descent: true, hyphenate: c.S * 0.07 })
+    );
+  };
 
   /** Lay out with or without the lead line and subtitle. @param {boolean} useLead @param {boolean} useSub */
   const layout = (useLead, useSub) => {
@@ -388,7 +402,7 @@ export function titleBlock(c, o) {
  * @param {Partial<import('./text.js').FitOptions>} [o]
  */
 export function authorFit(c, o = {}) {
-  return fitText(c.author, {
+  const opts = {
     font: FONTS.sans,
     weight: 600,
     upper: true,
@@ -397,7 +411,15 @@ export function authorFit(c, o = {}) {
     maxHeight: c.S * 0.13,
     maxSize: c.S * 0.048,
     maxLines: 2,
-    lineHeight: 1.15,
     ...o,
-  });
+  };
+  // Tracked capitals need more room between lines when the name wraps.
+  const tracked = opts.upper && (opts.letterSpacing ?? 0) > 0.05;
+  const lineHeight = o.lineHeight ?? (tracked ? 1.35 : 1.15);
+  // A name in a script without capitals (村上春樹) would be set at the small size meant for
+  // tracked caps: a third larger, untracked.
+  if (/\p{L}/u.test(c.author) && !/[\p{Lu}\p{Ll}]/u.test(c.author)) {
+    return fitText(c.author, { ...opts, lineHeight, maxSize: opts.maxSize * 1.35, letterSpacing: 0 });
+  }
+  return fitText(c.author, { ...opts, lineHeight });
 }

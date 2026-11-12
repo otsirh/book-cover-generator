@@ -31,7 +31,10 @@ export const thriller = {
   render(c) {
     const { W, H, S, u, m, rng, p } = c;
     const dark = p.dark;
-    const base = dark ? mix(p.bg, '#000000', 0.3) : p.bg;
+    // Dark palettes: a blurred night "photograph". Light palettes: a flat field in one of the
+    // palette's strongest accents, with soft ink shadows (several accents mixed into a light
+    // background only made grey fog).
+    const base = dark ? mix(p.bg, '#000000', 0.3) : rng.pick(strongAccents(p, p.bg, 1.6).slice(0, 2));
     const light = inkOn(base, p);
     const bar = strongAccents(p, base, 1.6).sort((a, b) => redness(b) - redness(a))[0];
     const tint = rng.pick(p.accents);
@@ -49,13 +52,13 @@ export const thriller = {
     )}${g.defs}</defs>`;
     s += rect(0, 0, W, H, base);
     let shapes = '';
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < (dark ? 6 : 2); i++) {
       shapes += circle(
         rng.float(0, W),
         rng.float(0, H * 0.75),
-        S * rng.float(0.15, 0.4),
-        mix(tint, base, rng.float(0.3, 0.8)),
-        `opacity="${rng.float(0.4, 0.8).toFixed(2)}"`,
+        S * rng.float(dark ? 0.15 : 0.25, dark ? 0.4 : 0.45),
+        dark ? mix(tint, base, rng.float(0.3, 0.8)) : p.ink,
+        `opacity="${(dark ? rng.float(0.4, 0.8) : rng.float(0.15, 0.25)).toFixed(2)}"`,
       );
     }
     for (let i = 0; i < 4; i++) {
@@ -279,30 +282,45 @@ export const noir = {
     const accent = rng.pick(strongAccents(p, bg, 2));
     const ids = { cone: c.id('cone'), blur: c.id('blur') };
     const g = grain(c, { opacity: dark ? 0.2 : 0.14, light: dark });
-    const lampX = W * rng.pick([0.2, 0.78]);
+    // Wide covers: the title on the left at full height, the lamp scene on the right.
+    const wide = W / H > 1.4;
+    const lampSide = W * rng.pick([0.2, 0.78]);
+    const lampX = wide ? W * 0.8 : lampSide;
     const groundY = H * 0.94;
-    const a = authorFit(c, { font: FONTS.condensed, weight: 700, letterSpacing: 0.26, maxSize: S * 0.044 });
+    const textW = wide ? W * 0.56 - m : W - m * 2;
+    const a = authorFit(c, {
+      font: FONTS.condensed,
+      weight: 700,
+      letterSpacing: 0.26,
+      maxSize: S * 0.044,
+      maxWidth: textW,
+    });
+    const authorRoom = a.lines.length ? a.height + m * 0.7 : 0;
     const font = rng.pick([FONTS.display, FONTS.condensed]);
     const stack = rng.bool(0.6);
-    // The lamp stands lower when a long title needs the room.
-    const { block: t, value: lampY } = fitTitleWith(
-      c,
-      [0.5, 0.535, 0.57, 0.605, 0.64].map((k) => H * k),
-      (lamp) => ({
-        font,
-        weight: 700,
-        upper: true,
-        stack,
-        maxWidth: W - m * 2,
-        // The author sits under the title, so the title leaves room for it above the lamp.
-        maxHeight: lamp - S * 0.1 - m * 1.6 - (a.lines.length ? a.height + m * 0.7 : 0),
-        maxSize: S * 0.26,
-        lineHeight: 0.94,
-        maxLines: 4,
-        subtitleFont: FONTS.condensed,
-        subtitleItalic: false,
-      }),
-    );
+    /** @param {number} maxHeight @param {number} maxSize */
+    const titleOptions = (maxHeight, maxSize) => ({
+      font,
+      weight: 700,
+      upper: true,
+      stack,
+      maxWidth: textW,
+      maxHeight,
+      maxSize,
+      lineHeight: 0.94,
+      maxLines: 4,
+      subtitleFont: FONTS.condensed,
+      subtitleItalic: false,
+    });
+    // Otherwise the lamp stands lower when a long title needs the room above it.
+    const { block: t, value: lampY } = wide
+      ? { block: titleBlock(c, titleOptions(H - m * 2.6 - authorRoom, S * 0.32)), value: H * 0.42 }
+      : fitTitleWith(
+          c,
+          [0.5, 0.535, 0.57, 0.605, 0.64].map((k) => H * k),
+          // The author sits under the title, so the title leaves room for it above the lamp.
+          (lamp) => titleOptions(lamp - S * 0.1 - m * 1.6 - authorRoom, S * 0.26),
+        );
 
     let s = `<defs>${linearGradient(ids.cone, [
       [0, light, 0.5],
@@ -346,7 +364,7 @@ export const noir = {
     const figure = FIGURE.map(([x, y]) => [fx + x * fw, groundY - fh + y * fh]);
     s += path(pathD(figure, true), dark ? '#000000' : mix(p.ink, '#000000', 0.4));
 
-    const tY = m * 1.3;
+    const tY = wide ? Math.max(m * 1.3, (H - t.height - authorRoom) / 2) : m * 1.3;
     s += t.draw({ x: m, y: tY, fill: light });
     // Venetian-blind shadows fall across everything above the lamp, title included.
     const ang = rng.float(-24, -12);
@@ -409,11 +427,16 @@ export const blueprint = {
     s += `<path d="${minor}" stroke="${ink}" stroke-width="${n(0.5 * u)}" opacity="0.12"/>`;
     s += `<path d="${major}" stroke="${ink}" stroke-width="${n(0.8 * u)}" opacity="0.22"/>`;
 
-    const blockH = Math.max(H * 0.24, S * 0.3);
-    const blockTop = H - m * 0.8 - blockH;
-    // The drawing, its centre lines and the dimension callout below it all fit above the title block.
-    const cx = W / 2;
-    const R = Math.min(S * 0.3, (blockTop - m - S * 0.1) / 2.5);
+    // Wide covers put the drawing on the left and a full-height title block on the right; others
+    // have the drawing above a title block along the bottom.
+    const wide = W / H > 1.4;
+    const blockH = wide ? H - m * 1.6 : Math.max(H * 0.24, S * 0.3);
+    const blockTop = wide ? m * 0.8 : H - m * 0.8 - blockH;
+    // The drawing, its centre lines and the dimension callout below it all fit beside or above the block.
+    const cx = wide ? W * 0.25 : W / 2;
+    const R = wide
+      ? Math.min(S * 0.3, (H - m * 2 - S * 0.1) / 2.5, W * 0.17)
+      : Math.min(S * 0.3, (blockTop - m - S * 0.1) / 2.5);
     const cy = m + R * 1.25;
     const outline = (/** @type {number} */ w) => `stroke="${ink}" stroke-width="${n(w * u)}"`;
     const stroke = `fill="none" ${outline(1.6)}`;
@@ -489,9 +512,9 @@ export const blueprint = {
     s += line(cx, cy - R * 1.25, cx, cy + R * 1.25, ink, u, center);
 
     // Engineering title block.
-    const bx = m * 0.8;
+    const bx = wide ? W * 0.5 : m * 0.8;
     const by = blockTop;
-    const bw = W - m * 1.6;
+    const bw = wide ? W * 0.5 - m * 0.8 : W - m * 1.6;
     const labelSize = S * 0.018;
     const labelRow = blockH * 0.18;
     s += rect(bx, by, bw, blockH, bg, `stroke="${ink}" stroke-width="${n(2 * u)}"`);
@@ -510,9 +533,9 @@ export const blueprint = {
       letterSpacing: 0.04,
       maxWidth: bw - m * 0.8,
       maxHeight: blockH * 0.68 - labelRow - m * 0.45,
-      maxSize: S * 0.11,
+      maxSize: S * (wide ? 0.16 : 0.11),
       lineHeight: 1.0,
-      maxLines: 3,
+      maxLines: wide ? 4 : 3,
       subtitleFont: FONTS.mono,
       subtitleItalic: false,
     });

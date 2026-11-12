@@ -63,7 +63,8 @@ export function tintText(base, toward, k, bg) {
 
 /**
  * Try layouts in order until the title fits comfortably: not truncated, and at
- * least `minSize` × the short side. The last layout wins if none does.
+ * least `minSize` × the short side. A later layout (less art) is taken only when it
+ * actually sets the title larger or whole.
  * @template V
  * @param {import('../index.js').StyleContext} c
  * @param {readonly V[]} candidates  layout values, from the most to the least room for the art
@@ -75,8 +76,13 @@ export function fitTitleWith(c, candidates, optionsFor, minSize = 0.06) {
   let block = titleBlock(c, optionsFor(candidates[0]));
   let value = candidates[0];
   for (let i = 1; i < candidates.length && (block.truncated || block.smallest < c.S * minSize); i++) {
-    value = candidates[i];
-    block = titleBlock(c, optionsFor(value));
+    const next = titleBlock(c, optionsFor(candidates[i]));
+    // Give up art only for a real gain: a title no longer cut, or clearly larger. (A title held
+    // back by its width, like one long word, gains nothing from a taller box.)
+    if ((block.truncated && !next.truncated) || next.smallest > block.smallest * 1.08) {
+      block = next;
+      value = candidates[i];
+    }
   }
   return { block, value };
 }

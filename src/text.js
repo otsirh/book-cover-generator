@@ -5,36 +5,60 @@
 
 import { escapeXml, n } from './core.js';
 
+// Each stack starts with the macOS face the style was drawn with, then close matches on
+// Windows, Android and Linux (where Futura, Didot or Gill Sans are rarely installed), so
+// the look survives other systems and SVGs opened elsewhere.
 export const FONTS = {
-  serif: { family: "Georgia, 'Times New Roman', Times, serif", widthFactor: 1.1, cap: 0.7 },
-  didone: { family: "Didot, 'Bodoni 72', 'Bodoni MT', Georgia, serif", widthFactor: 1.04, cap: 0.68 },
+  serif: {
+    family: "Georgia, 'Times New Roman', Times, 'Noto Serif', 'DejaVu Serif', serif",
+    widthFactor: 1.1,
+    cap: 0.7,
+  },
+  didone: {
+    family: "Didot, 'Bodoni 72', 'Bodoni MT', 'Sitka Display', 'Noto Serif Display', Constantia, Georgia, serif",
+    widthFactor: 1.04,
+    cap: 0.68,
+  },
   garamond: {
-    family: "Garamond, 'EB Garamond', 'Hoefler Text', Baskerville, 'Palatino Linotype', Palatino, Georgia, serif",
+    family:
+      "Garamond, 'EB Garamond', 'Hoefler Text', Baskerville, 'Palatino Linotype', Palatino, 'URW Palladio L', Georgia, serif",
     widthFactor: 0.98,
     cap: 0.66,
   },
-  sans: { family: "'Helvetica Neue', Helvetica, Arial, sans-serif", widthFactor: 1.0, cap: 0.72 },
+  sans: {
+    family: "'Helvetica Neue', Helvetica, Arial, Roboto, 'Liberation Sans', sans-serif",
+    widthFactor: 1.0,
+    cap: 0.72,
+  },
   geometric: {
-    family: "Futura, 'Century Gothic', 'Avenir Next', Avenir, 'Trebuchet MS', sans-serif",
+    family:
+      "Futura, 'Century Gothic', 'Avenir Next', Avenir, 'URW Gothic', 'TeX Gyre Adventor', 'Trebuchet MS', sans-serif",
     widthFactor: 1.06,
     cap: 0.72,
   },
   humanist: {
-    family: "'Gill Sans', 'Gill Sans MT', Seravek, Calibri, 'Trebuchet MS', sans-serif",
+    family: "'Gill Sans', 'Gill Sans MT', Seravek, Calibri, 'Segoe UI', 'Trebuchet MS', 'Noto Sans', sans-serif",
     widthFactor: 0.96,
     cap: 0.69,
   },
   condensed: {
-    family: "'Avenir Next Condensed', 'Arial Narrow', 'Roboto Condensed', 'Helvetica Neue', sans-serif",
+    family:
+      "'Avenir Next Condensed', 'Arial Narrow', 'Bahnschrift Condensed', 'Roboto Condensed', sans-serif-condensed, 'Liberation Sans Narrow', 'Helvetica Neue', sans-serif",
     widthFactor: 0.84,
     cap: 0.7,
   },
   display: {
-    family: "Impact, Haettenschweiler, 'Arial Narrow Bold', 'Franklin Gothic Bold', sans-serif",
+    family:
+      "Impact, Haettenschweiler, 'Arial Narrow Bold', 'Franklin Gothic Bold', Anton, Oswald, sans-serif-condensed, sans-serif",
     widthFactor: 0.82,
     cap: 0.79,
   },
-  mono: { family: "'Courier New', Courier, monospace", mono: true, widthFactor: 1, cap: 0.6 },
+  mono: {
+    family: "'Courier New', Courier, 'Liberation Mono', 'Noto Mono', monospace",
+    mono: true,
+    widthFactor: 1,
+    cap: 0.6,
+  },
 };
 
 /* ------------------------------------------------------------- measurement */
@@ -331,7 +355,7 @@ function tokenize(str) {
     wordSegmenter =
       typeof Intl !== 'undefined' && Intl.Segmenter ? new Intl.Segmenter('en', { granularity: 'word' }) : null;
   }
-  if (!wordSegmenter) return str.split(' ').map((text, i) => ({ text, space: i > 0 }));
+  if (!wordSegmenter) return joinSingleLetters(str.split(' ').map((text, i) => ({ text, space: i > 0 })));
   /** @type {Token[]} */
   const tokens = [];
   let space = false;
@@ -352,7 +376,7 @@ function tokenize(str) {
     else prev.text += segment;
     space = false;
   }
-  return tokens;
+  return joinSingleLetters(tokens);
 }
 
 /** @param {string} line @param {Token} token */
@@ -381,6 +405,21 @@ function wrapGreedy(tokens, maxWidth, measure, maxLines = Infinity) {
   }
   if (cur) lines.push(cur);
   return lines;
+}
+
+/**
+ * A one-letter word (и, в, a, y, o…) never ends a line, as typesetters keep it with the
+ * word after it. Also used when there is no Intl.Segmenter.
+ * @param {Token[]} tokens
+ */
+function joinSingleLetters(tokens) {
+  for (let i = tokens.length - 2; i >= 0; i--) {
+    if (tokens[i + 1].space && /^\p{L}$/u.test(tokens[i].text)) {
+      tokens[i].text += ` ${tokens[i + 1].text}`;
+      tokens.splice(i + 1, 1);
+    }
+  }
+  return tokens;
 }
 
 /**
@@ -416,19 +455,37 @@ function hardWrap(tokens, maxWidth, measure) {
       pieces.push(token);
       continue;
     }
-    let cur = '';
+    // Break the word into pieces that fit. Alphabetic words get a hyphen at each break,
+    // placed after a vowel where one is close (INTERNATIO- → INTERNA-TIONAL…).
+    const chars = graphemes(token.text);
+    const hyphen = HYPHENABLE.test(token.text) ? '-' : '';
     let space = token.space;
-    for (const g of graphemes(token.text)) {
-      if (cur && measure(cur + g) > maxWidth) {
-        pieces.push({ text: cur, space });
-        space = false;
-        cur = g;
-      } else cur += g;
+    for (let start = 0; start < chars.length;) {
+      const piece = (/** @type {number} */ end) =>
+        chars.slice(start, end).join('') + (end < chars.length ? hyphen : '');
+      let end = start + 1;
+      while (end < chars.length && measure(piece(end + 1)) <= maxWidth) end++;
+      if (hyphen && end < chars.length) {
+        for (let k = end; k >= Math.max(start + 2, end - 3); k--) {
+          if (k <= chars.length - 2 && syllableBreak(chars, k)) {
+            end = k;
+            break;
+          }
+        }
+      }
+      pieces.push({ text: piece(end), space });
+      space = false;
+      start = end;
     }
-    if (cur) pieces.push({ text: cur, space });
   }
   return wrapGreedy(pieces, maxWidth, measure) ?? pieces.map((piece) => piece.text);
 }
+
+// Words that can take a hyphen when broken: alphabetic scripts written with spaces.
+const HYPHENABLE = /^[\p{Script=Latin}\p{Script=Cyrillic}\p{Script=Greek}\p{M}]+$/u;
+const VOWEL = /^[aeiouyàáâäãåæèéêëìíîïòóôöõøœùúûüýÿаеёиоуыэюяіїєαεηιουωάέήίόύώ]/iu;
+/** A break before `chars[k]` falls after a vowel and before a consonant. @param {string[]} chars @param {number} k */
+const syllableBreak = (chars, k) => VOWEL.test(chars[k - 1]) && !VOWEL.test(chars[k]) && /\p{L}/u.test(chars[k]);
 
 /**
  * Runs of whitespace a line may break at: all of it except the no-break spaces
@@ -500,6 +557,33 @@ export function fitText(text, opts) {
   if (!str) return { ...base, lines: [], size: 0, width: 0, height: 0, truncated: false };
 
   const tokens = tokenize(str);
+  // One long word that would come out smaller than `hyphenate` px: split it once, with a
+  // hyphen near the middle, if that sets it clearly larger on two lines.
+  if (opts.hyphenate && tokens.length === 1 && HYPHENABLE.test(str)) {
+    const plain = fitText(text, { ...opts, hyphenate: 0 });
+    if (plain.size >= opts.hyphenate) return plain;
+    const chars = graphemes(str);
+    if (chars.length < 9 || maxLines < 2) return plain;
+    const mid = chars.length / 2;
+    let at = -1;
+    for (let k = 4; k <= chars.length - 4; k++) {
+      if (syllableBreak(chars, k) && (at < 0 || Math.abs(k - mid) < Math.abs(at - mid))) at = k;
+    }
+    if (at < 0) at = Math.round(mid);
+    const lines = [`${chars.slice(0, at).join('')}-`, chars.slice(at).join('')];
+    // Widths scale with size, so the size that fits is a ratio.
+    const perPx = Math.max(...lines.map((line) => measureText(line, REFERENCE, spec) / REFERENCE));
+    const size = Math.min(maxSize, maxWidth / perPx, maxHeight / (cap + lineHeight + descent));
+    if (!(size > plain.size * 1.15)) return plain;
+    return {
+      ...base,
+      lines,
+      size,
+      width: Math.max(...lines.map((line) => measureText(line, size, spec))),
+      height: blockHeight(2, size, lineHeight, cap),
+      truncated: false,
+    };
+  }
   const finish = (lines, size, truncated = false) => {
     const measure = (s) => measureText(s, size, spec);
     return {

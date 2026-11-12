@@ -75,6 +75,8 @@ export interface FitOptions {
   balance?: boolean;
   /** Count the descenders below the last line in `maxHeight`. */
   descent?: boolean;
+  /** A single long word that would be set below this size (px) is split once, with a hyphen, instead. */
+  hyphenate?: number;
 }
 
 export interface TextFit {

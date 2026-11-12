@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { splitLead, stackLines, fitStack, drawStack, titleBlock, authorFit } from '../src/type.js';
-import { FONTS } from '../src/text.js';
+import { FONTS, fitText } from '../src/text.js';
 import { createRng } from '../src/core.js';
 
 /** A minimal style context. @param {Partial<import('../src/index.js').StyleContext>} [o] */
@@ -198,4 +198,100 @@ test('textColor falls back exactly like inkOn for a single background', async ()
   const p = /** @type {any} */ ({ ink: '#1a1a1a', bg: '#f4e9d8', accents: ['#f4e0d0', '#e8d8c8', '#c00000'] });
   for (const bg of ['#ffffff', '#000000', '#7f7f7f', '#f4e9d8']) assert.equal(textColor(p, bg), inkOn(bg, p), bg);
   assert.equal(textColor(p, '#ffffff', ['#c00000']), '#c00000');
+});
+
+test('leads in other languages, and only leads of three letters or more on their own line', () => {
+  assert.deepEqual(splitLead('Les Misérables'), { lead: 'Les', main: 'Misérables' });
+  assert.deepEqual(splitLead('La Peste'), { lead: 'La', main: 'Peste' });
+  assert.deepEqual(splitLead('Der Zauberberg'), { lead: 'Der', main: 'Zauberberg' });
+  assert.deepEqual(splitLead('Die Hard'), { lead: '', main: 'Die Hard' });
+  const lead = (/** @type {string} */ title) =>
+    titleBlock(ctx({ title }), { maxWidth: 500, maxHeight: 600, maxSize: 80 }).draw({ x: 0, y: 0, fill: '#000' });
+  assert.match(lead('The Lighthouse Keeper'), />THE</);
+  // "A" stays with the title instead of floating above it.
+  assert.doesNotMatch(lead('A Map of Quiet Places'), />A</);
+  assert.match(lead('A Map of Quiet Places'), /A Map/);
+});
+
+test('stacks keep short words of any language with the next word', () => {
+  assert.deepEqual(stackLines('Майсторът и Маргарита'), ['Майсторът', 'и Маргарита']);
+  assert.deepEqual(stackLines('Cien años de soledad'), ['Cien', 'años', 'de soledad']);
+});
+
+test('a short one-word title grows past the usual cap, within the box', () => {
+  const big = titleBlock(ctx({ title: 'Dune' }), { maxWidth: 500, maxHeight: 400, maxSize: 60 });
+  assert.ok(big.size > 60, `size ${big.size}`);
+  assert.ok(big.width <= 500 + 0.5 && big.height <= 400.5);
+  const long = titleBlock(ctx({ title: 'Dune Messiah' }), { maxWidth: 500, maxHeight: 400, maxSize: 60 });
+  assert.ok(long.size <= 60);
+});
+
+test('author names in scripts without capitals are set larger, untracked; wrapped caps get more leading', () => {
+  const kanji = authorFit(ctx({ author: '村上春樹' }));
+  const latin = authorFit(ctx({ author: 'Mara Ellison' }));
+  assert.ok(kanji.size > latin.size, `${kanji.size} vs ${latin.size}`);
+  assert.equal(kanji.letterSpacing, 0);
+  assert.equal(latin.lineHeight, 1.35);
+  assert.equal(authorFit(ctx({ author: 'Mara Ellison' }), { upper: false, letterSpacing: 0 }).lineHeight, 1.15);
+});
+
+test('fitTitleWith gives up art only when the title gains from it', async () => {
+  const { fitTitleWith } = await import('../src/styles/util.js');
+  // Every candidate sets the title the same: held back by its width, it can't grow.
+  const { value } = fitTitleWith(ctx({ title: 'Lighthouse' }), [100, 200, 300], () => ({
+    maxWidth: 60,
+    maxHeight: 300,
+    maxSize: 40,
+    lead: false,
+  }));
+  assert.equal(value, 100);
+  // A taller box that does set it larger is taken.
+  const grown = fitTitleWith(ctx({ title: 'The Lighthouse Keeper of the Northern Isles' }), [40, 300], (h) => ({
+    maxWidth: 300,
+    maxHeight: h,
+    maxSize: 60,
+  }));
+  assert.equal(grown.value, 300);
+});
+
+test('one long word is hyphenated rather than shrunk to a hairline', () => {
+  const plain = fitText('Internationalization', { font: FONTS.sans, maxWidth: 200, maxSize: 120 });
+  const split = fitText('Internationalization', { font: FONTS.sans, maxWidth: 200, maxSize: 120, hyphenate: 40 });
+  assert.equal(split.lines.length, 2);
+  assert.ok(split.lines[0].endsWith('-'), split.lines.join(' | '));
+  assert.equal(split.lines.join('').replace('-', ''), 'Internationalization');
+  assert.ok(split.size > plain.size * 1.15, `${split.size} vs ${plain.size}`);
+  // Not for words that are already large enough, or scripts without spaces.
+  assert.equal(fitText('Internationalization', { maxWidth: 2000, maxSize: 60, hyphenate: 40 }).lines.length, 1);
+  assert.equal(
+    fitText('国際化国際化国際化国際化', { maxWidth: 100, maxSize: 60, hyphenate: 40 }).lines[0].endsWith('-'),
+    false,
+  );
+  // A word broken because nothing else fits gets a hyphen at each break.
+  const broken = fitText('INTERNATIONALIZATION', {
+    font: FONTS.sans,
+    maxWidth: 80,
+    maxSize: 30,
+    minSize: 30,
+    maxLines: 6,
+  });
+  assert.ok(broken.lines.length > 1);
+  for (const line of broken.lines.slice(0, -1)) assert.ok(line.endsWith('-'), broken.lines.join(' | '));
+});
+
+test('a one-letter word stays with the next word when lines wrap', () => {
+  for (const width of [120, 160, 200, 260]) {
+    const fit = fitText('Майсторът и Маргарита', {
+      font: FONTS.serif,
+      maxWidth: width,
+      maxSize: 30,
+      minSize: 30,
+      maxLines: 6,
+    });
+    for (const line of fit.lines) assert.notEqual(line.trim(), 'и', fit.lines.join(' | '));
+    assert.ok(
+      fit.lines.some((line) => line.includes('и Маргарита')),
+      fit.lines.join(' | '),
+    );
+  }
 });

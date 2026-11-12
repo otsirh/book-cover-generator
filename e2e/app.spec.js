@@ -924,6 +924,69 @@ test('removing a kept design keeps keyboard focus in the tray', async ({ page })
   await expect(page.locator('#keep')).toBeFocused();
 });
 
+test('the variations strip offers six other variations; a click picks one, Undo goes back', async ({ page }) => {
+  await page.goto('/#title=Strip&author=A&style=bauhaus&palette=riso&seed=v1');
+  const buttons = page.locator('#variations button');
+  await expect(buttons).toHaveCount(6);
+  for (const img of await page.locator('#variations img').all()) {
+    await expect(img).toHaveAttribute('src', /^data:image\/svg\+xml/);
+  }
+  const label = (await buttons.nth(2).getAttribute('aria-label')) ?? '';
+  const seed = label.replace('Variation ', '');
+  expect(seed).toMatch(/^[0-9a-z]{4,6}$/);
+  await buttons.nth(2).click();
+  await expect(page.locator('#seed')).toHaveValue(seed);
+  await selected(page, 'bauhaus');
+  await page.locator('#undo').click();
+  await expect(page.locator('#seed')).toHaveValue('v1');
+  // The same design always offers the same six.
+  await expect(buttons.nth(2)).toHaveAttribute('aria-label', label);
+});
+
+test('family links in the rail jump to that family', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/#style=minimal&seed=r');
+  await expect(page.locator('.rail-jump')).toHaveCount(6);
+  await page.locator('.rail-jump', { hasText: 'Pattern' }).click();
+  await expect(page.locator('.tile[data-style="mosaic"]')).toBeInViewport();
+});
+
+test('kept designs show their style, and Download all saves each one', async ({ page }) => {
+  await page.goto('/#title=One&style=minimal&seed=k1');
+  await page.locator('#keep').click();
+  await page.locator('.tile[data-style="swiss"]').click();
+  await page.locator('#keep').click();
+  await expect(page.locator('.kept-label')).toHaveText(['Swiss', 'Minimal']);
+  /** @type {string[]} */
+  const names = [];
+  page.on('download', (download) => names.push(download.suggestedFilename()));
+  await page.locator('#kept-all').click();
+  await expect.poll(() => names.length, { timeout: 10_000 }).toBe(2);
+  expect(names.sort()).toEqual(['one-minimal.png', 'one-swiss.png']);
+  await expect(page.locator('#toast')).toContainText('Saved 2 PNGs');
+});
+
+test('on a laptop screen Randomize is in view at once, and the cover stays in view while scrolling', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto('/#title=The+Lighthouse+Keeper&style=artdeco&palette=midnight&seed=a1');
+  await expect(page.locator('#randomize')).toBeInViewport();
+  await page.evaluate(() => window.scrollTo(0, 250));
+  await expect(page.locator('#preview')).toBeInViewport({ ratio: 0.9 });
+});
+
+test('the toast shows at the top on wide screens, clear of the export buttons', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/#title=Toast&style=minimal&seed=t');
+  await page.locator('#keep').click();
+  const toast = page.locator('#toast');
+  await expect(toast).toHaveClass(/show/);
+  const box = await toast.boundingBox();
+  const exports = await page.locator('.export').boundingBox();
+  expect(box && exports && box.y + box.height <= exports.y).toBe(true);
+});
+
 test('kept designs are saved, restored and removed', async ({ page }) => {
   await page.goto('/#title=Keeper&style=artdeco&palette=midnight&seed=k');
   await expect(page.locator('#kept')).toBeHidden();

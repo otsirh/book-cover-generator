@@ -4,6 +4,28 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-12
+
+Cover art and app improvements from a second design review.
+
+### Added
+
+- A strip of six other variations under the preview: one click picks one.
+- Jump links to each style family in the style rail; style names under kept designs, and **Download all** to save every kept design as a PNG.
+- `pickStyle(options)`; `fitText`'s `hyphenate` option; `TitleBlock.smallest`.
+
+### Changed
+
+- Long single words are hyphenated across two lines instead of shrinking to a hairline, and a word that has to break gets a hyphen at a syllable-like point (Big Type no longer prints "INTERNATION / ALIZATION").
+- Short one-word titles ("Dune") grow to fill their space; a style gives up art for a longer title only when that sets the title clearly larger, so Bauhaus keeps its shapes.
+- Leading articles in French, Spanish, Italian and German are recognised, and only leads of three letters or more get their own small line (no more lone "A"); in any language, one- and two-letter words join the next word in stacks, and a one-letter word (и, a, y) never ends a line.
+- Thriller on light palettes is a field of one accent with ink shadows, not grey fog; Low Poly's scrim and text come from the palette; Landscape's ranges ramp through one hue; Typewriter makes a carbon copy on dark palettes and drops "by" before names in other scripts; Engraved sets a larger title in ink; Blocks colours 30–45% of its art and sets the title at one size; Pixel keeps stars and scanlines out of its lettering.
+- Big Letter takes the initial of the main word ("The Lighthouse Keeper" gets an L), fits a pair of letters whole, crops on one side at most and keeps ideographs clear of the rule.
+- Noir and Blueprint lay wide covers out side by side; Sunburst's sun stays clear of its banner on square covers.
+- Author names in scripts without capitals are set larger and untracked; wrapped tracked-caps names get more leading.
+- Font stacks include close matches on Windows, Android and Linux.
+- On desktop, Randomize sits under the text fields, the palette swatches take four rows, the preview stays in view while the controls scroll, and the toast shows at the top, clear of the export buttons.
+
 ## [1.2.0] - 2026-11-12
 
 A redesign of the covers and the app, based on a design review.
@@ -136,7 +158,8 @@ A redesign of the covers and the app, based on a design review.
 
 - First release: 27 styles, 20 palettes, seeded randomizer, text fitting, CLI and the web app with SVG, PNG and JPEG export.
 
-[Unreleased]: https://github.com/otsirh/book-cover-generator/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/otsirh/book-cover-generator/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/otsirh/book-cover-generator/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/otsirh/book-cover-generator/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/otsirh/book-cover-generator/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/otsirh/book-cover-generator/releases/tag/v1.0.0

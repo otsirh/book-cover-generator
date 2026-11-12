@@ -1,6 +1,6 @@
 import { n, rect, circle, mix, inkOn, escapeXml, contrast } from '../core.js';
 import { FONTS, fitText, drawText, measureText, textGroupAttrs } from '../text.js';
-import { titleBlock, authorFit } from '../type.js';
+import { titleBlock, authorFit, splitLead } from '../type.js';
 import { strongAccents, initialChars } from './util.js';
 
 /** @typedef {import('../index.js').StyleContext} Ctx */
@@ -63,17 +63,25 @@ export const typographic = {
   /** @param {Ctx} c */
   render(c) {
     const { W, H, S, u, m, rng, p } = c;
-    const chars = initialChars(c.title);
+    // The initial of the title's main word: "The Lighthouse Keeper" gets L, not every "The …" a T.
+    const chars = initialChars(splitLead(c.title).main);
     const first = chars[0] || 'A';
     // A narrow initial (I, l, 1…) makes an unexplained slab; use two letters instead.
-    const letters = NARROW_INITIALS.test(first) && chars[1] && /\p{L}/u.test(chars[1]) ? first + chars[1] : first;
+    const pair = NARROW_INITIALS.test(first) && chars[1] && /\p{L}/u.test(chars[1]);
+    const letters = pair ? first + chars[1] : first;
     const font = rng.pick([FONTS.didone, FONTS.serif, FONTS.didone]);
     const mode = rng.pick(['solid', 'outline', 'duo']);
     const [c1, c2] = strongAccents(p, p.bg, 1.4).concat(p.accents);
-    const fit = (S * rng.float(1.05, 1.3)) / Math.max(1, (measureText(letters, 100, { font }) / 100) * 0.95);
+    // One letter is set wider than the cover and cropped; two letters must both read, so they fit.
+    const wide = S * rng.float(1.05, 1.3);
+    const perPx = Math.max(0.01, measureText(letters, 100, { font }) / 100);
+    const fit = pair ? (W * 0.95) / perPx : wide / Math.max(1, perPx * 0.95);
     const size = Math.min(fit, H * 0.85, S * 1.35);
     const baseline = H * rng.float(0.6, 0.64);
-    const lx = W * rng.float(0.44, 0.56);
+    const gw = perPx * size;
+    let lx = W * rng.float(0.44, 0.56);
+    // Crop the glyph on one side at most: a letter cut on both sides stops reading as a letter.
+    if (lx - gw / 2 < 0 && lx + gw / 2 > W) lx = lx < W / 2 ? W - m * 0.4 - gw / 2 : m * 0.4 + gw / 2;
     /** @param {number} x @param {number} y @param {string} fill @param {string} [attrs] */
     const glyph = (x, y, fill, attrs) =>
       `<text x="${n(x)}" y="${n(y)}" ${textGroupAttrs({ font, size, anchor: 'middle', fill, attrs })}>${escapeXml(letters)}</text>`;
@@ -87,7 +95,8 @@ export const typographic = {
     } else {
       s += glyph(lx, baseline, c1);
     }
-    const ruleY = baseline + m * 0.5;
+    // Ideographs (and other scripts without case) reach below the baseline: keep the rule clear.
+    const ruleY = baseline + m * 0.5 + (/\p{Lo}/u.test(letters) ? size * 0.14 : 0);
     s += rect(m, ruleY, W - m * 2, 1.2 * u, p.ink);
 
     const a = authorFit(c, { maxSize: S * 0.044 });

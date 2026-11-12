@@ -191,7 +191,10 @@ export const sunburst = {
     const { W, H, S, u, m, rng, p } = c;
     const [c1, c2] = strongAccents(p, p.bg, 1.2).concat(p.accents);
     const cx = W / 2;
-    const cy = H * rng.float(0.36, 0.46);
+    // On square and wide covers the sun sits higher and smaller, so the banner below it
+    // doesn't cover half of it.
+    const tall = H / W >= 1.2;
+    const cy = H * (tall ? rng.float(0.36, 0.46) : rng.float(0.24, 0.3));
     const rays = rng.pick([24, 32, 36, 48]);
     const R = Math.hypot(W, H);
     const off = rng.float(0, Math.PI);
@@ -210,7 +213,7 @@ export const sunburst = {
     }
     let s = rect(0, 0, W, H, mix(c1, p.bg, 0.35));
     s += path(wedges, c1);
-    const sr = S * rng.float(0.12, 0.16);
+    const sr = S * (tall ? rng.float(0.12, 0.16) : rng.float(0.09, 0.12));
     s += circle(cx, cy, sr * 1.18, p.bg) + circle(cx, cy, sr, c2);
 
     const pad = m * 0.8;
@@ -295,8 +298,10 @@ export const typewriter = {
   /** @param {Ctx} c */
   render(c) {
     const { W, H, S, u, m, rng, p } = c;
-    const paper = mix(p.paper, '#f4ead4', 0.45);
-    const ink = mix(p.night, '#222222', 0.4);
+    // A dark palette gives a carbon copy: a dark sheet with light type.
+    const carbon = p.dark;
+    const paper = carbon ? mix(p.bg, '#000000', 0.15) : mix(p.paper, '#f4ead4', 0.45);
+    const ink = carbon ? mix(p.paper, '#ffffff', 0.2) : mix(p.night, '#222222', 0.4);
     const stampColor = readable(paper, p.accents);
     const ids = { tex: c.id('tex'), rough: c.id('rough'), stain: c.id('stain'), vig: c.id('vig') };
     let s = '<defs>';
@@ -357,8 +362,10 @@ export const typewriter = {
           lineHeight: 1.3,
         })
       : null;
+    // "by" only before a name in Latin script; "by Михаил Булгаков" reads as a mistake.
+    const byline = /\p{Script=Latin}/u.test(c.author) ? `by ${c.author}` : c.author;
     const by = c.author
-      ? fitText(`by ${c.author}`, {
+      ? fitText(byline, {
           font: FONTS.mono,
           maxWidth: maxW,
           maxHeight: S * 0.1,
@@ -457,8 +464,8 @@ export const engraved = {
     const { W, H, S, u, m, rng, p } = c;
     const cloth = p.bg;
     const gilt = rng.pick(strongAccents(p, cloth, 2).concat(p.ink));
-    // The gilt decorates; text takes it only where it reads (3:1).
-    const ink = textColor(p, cloth, [gilt]);
+    // The gilt decorates (border, rosette, rules); the text is in the palette's ink, which reads.
+    const ink = inkOn(cloth, p);
     const o1 = m * 0.5;
     const band = S * 0.05;
     const o2 = o1 + band;
@@ -533,11 +540,12 @@ export const engraved = {
     const regionH = my - mr - m * 0.8 - tTop;
     const t = titleBlock(c, {
       font: rng.pick([FONTS.didone, FONTS.serif, FONTS.garamond]),
+      weight: 600,
       upper: true,
-      letterSpacing: 0.12,
+      letterSpacing: 0.06,
       maxWidth: inner,
       maxHeight: regionH,
-      maxSize: S * 0.1,
+      maxSize: S * 0.13,
       lineHeight: 1.2,
       maxLines: 5,
     });

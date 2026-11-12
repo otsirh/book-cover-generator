@@ -403,13 +403,17 @@ test('Blueprint keeps its dimension callout clear of the title block', () => {
     [600, 600],
     [900, 600],
     [600, 900],
+    [1800, 600],
   ]) {
     for (const seed of ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']) {
       const { svg } = createCover({ title: 'Engine', author: 'A. Writer', style: 'blueprint', width, height, seed });
       const short = Math.min(width, height);
+      // Wide covers have the block on the right half; others along the bottom.
+      const wide = width / height > 1.4;
       const blockTop = height - short * 0.07 * 0.8 - Math.max(height * 0.24, short * 0.3);
-      for (const m of svg.matchAll(/<text [^>]*y="([\d.]+)"[^>]*>(?:Ø )?\d+<\/text>/g)) {
-        assert.ok(Number(m[1]) < blockTop, `${width}x${height} ${seed}: callout at ${m[1]}, block at ${blockTop}`);
+      for (const m of svg.matchAll(/<text x="([\d.]+)" y="([\d.]+)"[^>]*>(?:Ø )?\d+<\/text>/g)) {
+        if (wide) assert.ok(Number(m[1]) < width * 0.5, `${width}x${height} ${seed}: callout at x ${m[1]}`);
+        else assert.ok(Number(m[2]) < blockTop, `${width}x${height} ${seed}: callout at ${m[2]}, block at ${blockTop}`);
       }
     }
   }
@@ -627,40 +631,50 @@ test('Big Type sets every text colour at 3:1 or more against its background', ()
   }
 });
 
-test('Low Poly darkens the facets behind its white rule and title', () => {
+test('Low Poly sets its text on a palette scrim that is nearly opaque from the rule down', () => {
   for (const [width, height] of [
     [600, 900],
     [600, 600],
     [900, 600],
     [1800, 600],
   ]) {
-    for (const seed of SEEDS) {
-      const { svg } = createCover({
-        title: 'The Lighthouse Keeper',
-        author: 'Mara Ellison',
-        style: 'lowpoly',
-        width,
-        height,
-        seed,
-      });
-      const stops = [...svg.matchAll(/<stop offset="([\d.]+)" stop-color="[^"]*" stop-opacity="([\d.]+)"\/>/g)].map(
-        (s) => [Number(s[1]), Number(s[2])],
-      );
-      const shade = /<rect x="0" y="([\d.]+)" width="[\d.]+" height="([\d.]+)" fill="url\(#[^"]*shade[^"]*\)"/.exec(
-        svg,
-      );
-      assert.ok(shade, `${width}x${height} ${seed}: no shade`);
-      const [top, h] = [Number(shade[1]), Number(shade[2])];
-      const rule = /<rect x="[\d.]+" y="([\d.]+)" width="[\d.]+" height="[\d.]+" fill="#ffffff"\/>/.exec(svg);
-      assert.ok(rule, `${width}x${height} ${seed}: no rule`);
-      const at = (Number(rule[1]) - top) / h;
-      let opacity = 0;
-      for (let i = 1; i < stops.length; i++) {
-        const [o0, a0] = stops[i - 1];
-        const [o1, a1] = stops[i];
-        if (at >= o0 - 1e-6 && at <= o1 + 1e-6) opacity = a0 + ((a1 - a0) * (at - o0)) / (o1 - o0 || 1);
+    for (const palette of ['parchment', 'mustard', 'midnight', 'teal']) {
+      for (const seed of SEEDS) {
+        const { svg } = createCover({
+          title: 'The Lighthouse Keeper',
+          author: 'Mara Ellison',
+          style: 'lowpoly',
+          palette,
+          width,
+          height,
+          seed,
+        });
+        const label = `${width}x${height} ${palette} ${seed}`;
+        const stops = [
+          ...svg.matchAll(/<stop offset="([\d.]+)" stop-color="(#[0-9a-f]{6})" stop-opacity="([\d.]+)"\/>/g),
+        ].map((s) => [Number(s[1]), s[2], Number(s[3])]);
+        const shade = /<rect x="0" y="([\d.]+)" width="[\d.]+" height="([\d.]+)" fill="url\(#[^"]*shade[^"]*\)"/.exec(
+          svg,
+        );
+        assert.ok(shade, `${label}: no scrim`);
+        const [top, h] = [Number(shade[1]), Number(shade[2])];
+        // The rule: a short bar (0.12 of the short side) in the text colour, just above the title.
+        const short = Math.min(width, height);
+        const rule = [
+          ...svg.matchAll(/<rect x="[\d.]+" y="([\d.]+)" width="([\d.]+)" height="[\d.]+" fill="(#[0-9a-f]{6})"\/>/g),
+        ].find((r) => Math.abs(Number(r[2]) - short * 0.12) < 0.6);
+        assert.ok(rule, `${label}: no rule`);
+        const at = (Number(rule[1]) - top) / h;
+        let opacity = 0;
+        for (let k = 1; k < stops.length; k++) {
+          const [o0, , a0] = stops[k - 1];
+          const [o1, , a1] = stops[k];
+          if (at >= o0 - 1e-6 && at <= o1 + 1e-6) opacity = a0 + ((a1 - a0) * (at - o0)) / (o1 - o0 || 1);
+        }
+        assert.ok(opacity >= 0.85 - 0.01, `${label}: scrim ${opacity.toFixed(2)} at the rule`);
+        const scrim = /** @type {string} */ (stops[0][1]);
+        assert.ok(contrast(rule[3], scrim) >= 4.5, `${label}: text ${rule[3]} on scrim ${scrim}`);
       }
-      assert.ok(opacity >= 0.6 - 0.01, `${width}x${height} ${seed}: shade ${opacity.toFixed(2)} at the rule`);
     }
   }
 });
@@ -721,4 +735,151 @@ test('text that takes an accent colour keeps 3:1 against its background', () => 
     }
   }
   assert.deepEqual(low.slice(0, 8), []);
+});
+
+test('Big Letter takes the initial of the main word and fits a pair of letters', () => {
+  const glyph = (/** @type {string} */ title, /** @type {string} */ seed) => {
+    const runs = textRuns(createCover({ title, style: 'typographic', seed }).svg);
+    return runs.reduce((a, b) => (b.size > a.size ? b : a));
+  };
+  for (const seed of ['a', 'b', 'c']) {
+    assert.equal(glyph('The Lighthouse Keeper', seed).text, 'L');
+    assert.equal(glyph('An Unexpected Journey Home', seed).text, 'U');
+    assert.equal(glyph('Internationalization', seed).text, 'IN');
+  }
+});
+
+test('Typewriter makes a carbon copy on dark palettes, and says "by" only in Latin script', () => {
+  const dark = createCover({
+    title: 'Draft',
+    author: 'Mara Ellison',
+    style: 'typewriter',
+    palette: 'midnight',
+    seed: 'a',
+  }).svg;
+  const paper = /<rect x="0" y="0" width="600" height="900" fill="(#[0-9a-f]{6})"\/>/.exec(dark)?.[1] ?? '';
+  assert.ok(luminance(paper) < 0.1, `paper ${paper}`);
+  const cyrillic = createCover({ title: 'Роман', author: 'Михаил Булгаков', style: 'typewriter', seed: 'a' }).svg;
+  // (The accessible <title> may say "by"; the typed page must not.)
+  assert.doesNotMatch(
+    textRuns(cyrillic)
+      .map((r) => r.text)
+      .join(''),
+    /by/,
+  );
+  const latin = createCover({ title: 'Draft', author: 'Mara Ellison', style: 'typewriter', seed: 'a' }).svg;
+  assert.match(
+    textRuns(latin)
+      .map((r) => r.text)
+      .join(''),
+    /by/,
+  );
+});
+
+test('Thriller on a light palette is a field of one of its accents, not fog', () => {
+  for (const p of palettes.filter((x) => !x.dark)) {
+    const { svg } = createCover({
+      title: 'The Silent Patient',
+      author: 'A',
+      style: 'thriller',
+      palette: p.id,
+      seed: 'a1',
+    });
+    const ground = /<rect x="0" y="0" width="600" height="900" fill="(#[0-9a-f]{6})"\/>/.exec(svg)?.[1];
+    assert.ok(ground && p.accents.includes(ground), `${p.id}: ground ${ground}`);
+  }
+});
+
+test('Blocks always colours a real share of its art, in at least three blocks', () => {
+  for (const p of palettes) {
+    for (const seed of ['s1', 's2', 's3', 's4', 's5', 'a', 'b', 'c']) {
+      const { svg } = createCover({ title: 'The Silent Patient', author: 'A', style: 'blocks', palette: p.id, seed });
+      const rects = [
+        ...svg.matchAll(/<rect x="[\d.]+" y="[\d.]+" width="([\d.]+)" height="([\d.]+)" fill="(#[0-9a-f]{6})"/g),
+      ];
+      const coloured = rects.filter((r) => p.accents.includes(r[3]));
+      const area = coloured.reduce((sum, r) => sum + Number(r[1]) * Number(r[2]), 0);
+      assert.ok(coloured.length >= Math.min(3, new Set(p.accents).size), `${p.id} ${seed}: ${coloured.length} blocks`);
+      // 30% of the art, which is at least about half the cover (less the lines between blocks).
+      assert.ok(area >= 600 * 900 * 0.12, `${p.id} ${seed}: ${((area / (600 * 900)) * 100).toFixed(1)}% coloured`);
+    }
+  }
+});
+
+test('Pixel keeps its stars out of the title band', () => {
+  for (const seed of ['a', 'b', 'c', 'd']) {
+    const { svg } = createCover({
+      title: 'One Hundred Years of Solitude',
+      author: 'A',
+      style: 'pixel',
+      palette: 'midnight',
+      seed,
+    });
+    // The band: the second full-width rectangle from the top edge (after the first sky band).
+    const band = [...svg.matchAll(/<rect x="0" y="0" width="600" height="([\d.]+)" fill="#[0-9a-f]{6}"\/>/g)].at(-1);
+    assert.ok(band, `${seed}: no band`);
+    for (const star of svg.matchAll(
+      /<rect x="[\d.]+" y="([\d.]+)" width="[\d.]+" height="[\d.]+" fill="#[0-9a-f]{6}" opacity="0.7"\/>/g,
+    )) {
+      assert.ok(Number(star[1]) >= Number(band[1]), `${seed}: a star at y ${star[1]} in a band to ${band[1]}`);
+    }
+    // The lettering comes after the scanlines, on top of them.
+    assert.ok(svg.indexOf('<g opacity="0.12">') < svg.lastIndexOf('<rect'), `${seed}: scanlines over the text`);
+  }
+});
+
+test('Sunburst keeps its sun clear of the banner on square and wide covers', () => {
+  for (const [width, height] of [
+    [600, 600],
+    [900, 600],
+  ]) {
+    for (const seed of ['a', 'b', 'c', 'c5', 'd']) {
+      const { svg } = createCover({
+        title: 'The Remains of the Day',
+        author: 'Kazuo Ishiguro',
+        style: 'sunburst',
+        width,
+        height,
+        seed,
+      });
+      const circles = [...svg.matchAll(/<circle cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"/g)].map((c) => [
+        Number(c[2]),
+        Number(c[3]),
+      ]);
+      const sunBottom = Math.max(...circles.map(([cy, r]) => cy + r));
+      const banner = [...svg.matchAll(/<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/g)].find(
+        (r) => Number(r[1]) > 1 && Number(r[3]) > width * 0.6,
+      );
+      assert.ok(banner, `${width}x${height} ${seed}: no banner`);
+      assert.ok(
+        sunBottom <= Number(banner[2]) + 0.5,
+        `${width}x${height} ${seed}: sun to ${sunBottom}, banner at ${banner[2]}`,
+      );
+    }
+  }
+});
+
+test('Noir and Blueprint set wide covers side by side, with a larger title', () => {
+  for (const seed of ['a', 'd9', 'q']) {
+    const noir = createCover({
+      title: 'A Wizard of Earthsea',
+      author: 'Ursula K. Le Guin',
+      style: 'noir',
+      width: 900,
+      height: 500,
+      seed,
+    }).svg;
+    const title = textRuns(noir).reduce((a, b) => (b.size > a.size ? b : a));
+    assert.ok(title.size >= 500 * 0.1, `noir ${seed}: title at ${title.size}`);
+    const blueprint = createCover({
+      title: 'A Wizard of Earthsea',
+      author: 'Ursula K. Le Guin',
+      style: 'blueprint',
+      width: 900,
+      height: 500,
+      seed,
+    }).svg;
+    const runs = textRuns(blueprint).filter((r) => /WIZARD/.test(r.text));
+    assert.ok(runs.length && runs.every((r) => r.size >= 500 * 0.09), `blueprint ${seed}: ${runs.map((r) => r.size)}`);
+  }
 });
