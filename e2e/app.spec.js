@@ -1695,8 +1695,9 @@ test('a bookâ€™s genre in a list picks a style that suits it, unless the designâ
   // Bauhaus suits children's books but not horror: only the horror row changes style.
   await page.locator('#many-list').fill('title,genre\nNight,horror\nNight,\nNight,children');
   await expect(page.locator('#many-preview img')).toHaveCount(3);
+  // (svgOf waits for each to be drawn: the list draws a few a frame.)
   const [horror, plain, children] = await Promise.all(
-    [1, 2, 3].map((i) => svgSoon(page, `#many-preview li:nth-child(${i}) img`)),
+    [1, 2, 3].map((i) => svgOf(page, `#many-preview li:nth-child(${i}) img`)),
   );
   expect(horror).not.toBe(plain);
   expect(children).toBe(plain);
