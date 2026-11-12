@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-12
+
+Control over the cover: pin a style's choices, set the title's font and case and where its lines break, and add a series line and a credit. Covers that use none of these are drawn exactly as in 1.4.0.
+
 ### Added
 
 - **Style variants.** Eleven styles let you pin a choice the variation otherwise makes: Minimal's alignment, Big Letter's letter, Split's shape, Concentric's rings, Stripes' stripes and title, Mosaic's tiles, Silhouette's scene, Aurora's title, Botanical's flowers, Blueprint's drawing and Engraved's border. In the app they are buttons under the style (Auto, or a value; Auto outlines what the variation picked), kept in links as `variant=scene.forest`, and the variations strip keeps them. In the library: `createCover({ variants })`, `Cover.variants`, `variants` in `listStyles()`, and for custom styles a `variants` declaration and `ctx.choose(name, values)`. In the CLI: `--variant scene=forest`. Covers that pin nothing are drawn exactly as before.
@@ -214,7 +218,8 @@ A redesign of the covers and the app, based on a design review.
 
 - First release: 27 styles, 20 palettes, seeded randomizer, text fitting, CLI and the web app with SVG, PNG and JPEG export.
 
-[Unreleased]: https://github.com/otsirh/book-cover-generator/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/otsirh/book-cover-generator/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/otsirh/book-cover-generator/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/otsirh/book-cover-generator/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/otsirh/book-cover-generator/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/otsirh/book-cover-generator/compare/v1.1.0...v1.2.0
