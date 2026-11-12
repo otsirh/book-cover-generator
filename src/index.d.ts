@@ -92,7 +92,12 @@ export type StyleId =
   | 'engraved'
   | 'papercut'
   | 'silhouette'
-  | 'blueprint';
+  | 'blueprint'
+  | 'hollow'
+  | 'ribbon'
+  | 'crest'
+  | 'storybook'
+  | 'idea';
 
 export type StyleGroup = 'Typographic' | 'Geometric' | 'Pattern' | 'Scenic' | 'Vintage' | 'Genre';
 
@@ -123,6 +128,8 @@ export interface CoverOptions {
   texture?: boolean;
   /** A style id, a registered custom style, or `'random'` (default; picked from the seed). */
   style?: StyleId | 'random' | (string & {});
+  /** With a random style, pick one that suits this genre (see `genres`). */
+  genre?: GenreId | (string & {});
   /** A palette id, a custom palette, or `'random'` / `'auto'` (default; picked from the seed). */
   palette?: PaletteId | 'random' | 'auto' | CustomPalette | (string & {});
   /** Controls every random choice. Defaults to a hash of title + author. */
@@ -188,7 +195,13 @@ export interface StyleInfo {
   group: StyleGroup | (string & {});
   /** The choices you can pin with `createCover({ variants })`; empty for styles without any. */
   variants: StyleVariant[];
+  /** The genres the style suits (ids from `genres`). */
+  genres: string[];
 }
+
+export type GenreId = 'literary' | 'thriller' | 'horror' | 'romance' | 'fantasy' | 'children' | 'nonfiction';
+/** The genres styles can suit, as `createCover({ genre })` and `listStyles()` name them. */
+export declare const genres: readonly { readonly id: GenreId; readonly name: string }[];
 
 /** A palette as seen by styles, with derived light/dark colours. */
 export interface ResolvedPalette extends Palette {
@@ -241,6 +254,8 @@ export interface CoverStyle {
   group?: StyleGroup | (string & {});
   /** Background preference when the palette is picked automatically. */
   prefer?: 'light' | 'dark';
+  /** The genres the style suits (ids from `genres`), so `createCover({ genre })` can pick it. */
+  genres?: readonly string[];
   /**
    * The choices `render` makes with `ctx.choose(name, values)` that people can pin, with labels:
    * `{ scene: { label: 'Scene', values: { city: 'City', forest: 'Forest' } } }`.
@@ -274,7 +289,9 @@ export declare function unregisterPalette(id: string): boolean;
 /** A short random seed, e.g. for a "randomize" button. */
 export declare function randomSeed(): string;
 /** The style id `createCover` would use for these options (resolving `'random'` from the seed), without drawing. */
-export declare function pickStyle(options?: Pick<CoverOptions, 'title' | 'author' | 'seed' | 'style'>): string;
+export declare function pickStyle(
+  options?: Pick<CoverOptions, 'title' | 'author' | 'seed' | 'style' | 'genre'>,
+): string;
 /** Generate a cover and report the style and palette that were chosen. */
 export declare function createCover(options?: CoverOptions): Cover;
 /** Generate a cover and return the SVG markup. */

@@ -2,13 +2,16 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { createCover, listStyles, palettes, formats, parseBookList } from '../src/index.js';
+import { createCover, listStyles, palettes, formats, parseBookList, genres } from '../src/index.js';
 
 const HELP = `Usage: book-cover "<title>" ["<author>"] [options]
 
 Options:
   -s, --style <id>      style id or "random" (default: random from seed)
   -p, --palette <id>    palette id or "random" (default: random from seed)
+      --genre <id>      with a random style, one that suits this genre:
+                        literary, thriller, horror, romance, fantasy, children
+                        or nonfiction
       --bg <hex>        your own colours instead of a palette: background,
       --ink <hex>       text,
       --accent <hex>    and accents (repeat it, or separate them with commas)
@@ -57,6 +60,7 @@ try {
     options: {
       style: { type: 'string', short: 's' },
       palette: { type: 'string', short: 'p' },
+      genre: { type: 'string' },
       bg: { type: 'string' },
       ink: { type: 'string' },
       accent: { type: 'string', multiple: true },
@@ -103,10 +107,13 @@ function preflight() {
     console.log('Styles:');
     for (const s of listStyles()) {
       console.log(`  ${s.id.padEnd(14)} ${s.description}`);
+      if (s.genres.length) console.log(`  ${''.padEnd(14)}   genres: ${s.genres.join(', ')}`);
       for (const v of s.variants) {
         console.log(`  ${''.padEnd(14)}   --variant ${v.name}=${v.values.map((x) => x.value).join('|')}`);
       }
     }
+    console.log('\nGenres (--genre):');
+    for (const g of genres) console.log(`  ${g.id.padEnd(14)} ${g.name}`);
     console.log('\nPalettes:');
     for (const p of palettes) console.log(`  ${p.id.padEnd(14)} ${p.name}${p.dark ? ' (dark)' : ''}`);
     return false;
@@ -298,6 +305,7 @@ function run() {
         badge: values.badge,
         texture: values.texture,
         style: values.style,
+        genre: values.genre,
         palette: palette(),
         lang: values.lang,
         variants: variants(),
@@ -317,6 +325,7 @@ function run() {
       badge: values.badge,
       texture: values.texture,
       style: values.style,
+      genre: values.genre,
       palette: palette(),
       lang: values.lang,
       variants: variants(),

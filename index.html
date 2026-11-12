@@ -6,7 +6,7 @@
     <title>Book Cover Generator: covers from a title and an author</title>
     <meta
       name="description"
-      content="Type a title and an author, get a book cover. 34 styles, 28 palettes or your own colours, any size, and free SVG, PNG, JPEG or WebP downloads. Open source."
+      content="Type a title and an author, get a book cover. 39 styles, 28 palettes or your own colours, any size, and free SVG, PNG, JPEG or WebP downloads. Open source."
     />
     <link rel="canonical" href="https://covers.otsirh.dev/" />
     <meta name="color-scheme" content="light dark" />
@@ -18,7 +18,7 @@
     <meta property="og:title" content="Book Cover Generator" />
     <meta
       property="og:description"
-      content="Type a title and an author, get a book cover. 34 styles, 28 palettes or your own colours, any size."
+      content="Type a title and an author, get a book cover. 39 styles, 28 palettes or your own colours, any size."
     />
     <meta property="og:url" content="https://covers.otsirh.dev/" />
     <meta property="og:image" content="https://covers.otsirh.dev/og.png" />
@@ -48,6 +48,10 @@
     <link rel="modulepreload" href="src/styles/scenic.js" />
     <link rel="modulepreload" href="src/styles/vintage.js" />
     <link rel="modulepreload" href="src/styles/genre.js" />
+    <link rel="modulepreload" href="src/styles/genre-pack.js" />
+    <link rel="modulepreload" href="src/mockups.js" />
+    <link rel="modulepreload" href="src/books.js" />
+    <link rel="modulepreload" href="src/badge.js" />
     <script type="module" src="site/app.js"></script>
   </head>
   <body>
@@ -145,7 +149,7 @@
 
     <section class="intro">
       <h1>Type a title. Get a cover.</h1>
-      <p>34 styles · 28 palettes or your own colours · any size · free downloads</p>
+      <p>39 styles · 28 palettes or your own colours · any size · free downloads</p>
     </section>
 
     <main class="app">
@@ -525,6 +529,12 @@
         <div class="rail-head">
           <h2 id="rail-heading">Styles</h2>
           <p id="rail-note"></p>
+          <label class="rail-genre">
+            <span>Genre</span>
+            <select id="genre">
+              <option value="">All genres</option>
+            </select>
+          </label>
           <nav class="rail-groups" id="rail-groups" aria-label="Style families"></nav>
         </div>
         <div class="rail-body" id="rail"></div>

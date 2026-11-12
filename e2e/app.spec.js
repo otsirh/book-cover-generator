@@ -51,7 +51,7 @@ test('renders a cover and every style in the rail', async ({ page }) => {
   await page.goto('/');
   await ready(page);
   const tiles = page.locator('.tile');
-  await expect(tiles).toHaveCount(34);
+  await expect(tiles).toHaveCount(39);
   for (const tile of await tiles.all()) {
     await tile.scrollIntoViewIfNeeded();
     await expect(tile.locator('img')).toHaveAttribute('src', /^data:image\/svg\+xml/);
@@ -1605,6 +1605,29 @@ test('many covers: a list in, a preview, and a ZIP of one design for every book'
   await expect(page.locator('#toast')).toContainText('None of the books could be made');
 });
 
+test('a genre filters the rail, and Randomize and the arrows stay in it', async ({ page }) => {
+  await page.goto('/#title=Night&style=minimal&seed=g');
+  await page.locator('#genre').selectOption('horror');
+  const visible = page.locator('.tile:not([hidden])');
+  await expect(visible).toHaveCount(3);
+  const horror = await visible.evaluateAll((tiles) => tiles.map((t) => /** @type {HTMLElement} */ (t).dataset.style));
+  expect(horror).toEqual(expect.arrayContaining(['hollow', 'noir', 'silhouette']));
+  // Families without a horror style are hidden, with their links.
+  await expect(page.locator('.rail-jump:not([hidden])')).toHaveCount(2);
+  for (let i = 0; i < 3; i++) {
+    await page.locator('#randomize').click();
+    await expect.poll(() => page.locator('.tile[aria-pressed="true"]').getAttribute('data-style')).not.toBe('minimal');
+    expect(horror).toContain(await page.locator('.tile[aria-pressed="true"]').getAttribute('data-style'));
+  }
+  await page.locator('body').press('ArrowRight');
+  expect(horror).toContain(await page.locator('.tile[aria-pressed="true"]').getAttribute('data-style'));
+  // The choice is remembered, and All genres shows every style again.
+  await page.reload();
+  await expect(page.locator('#genre')).toHaveValue('horror');
+  await page.locator('#genre').selectOption('');
+  await expect(visible).toHaveCount(39);
+});
+
 test('a Japanese title sets the language of the cover', async ({ page }) => {
   await page.goto(`/#title=${encodeURIComponent('ガラスの街')}&style=minimal&seed=j`);
   expect(await svgOf(page, '#preview')).toMatch(/^<svg [^>]* lang="ja"/);
@@ -1621,7 +1644,7 @@ test('works offline once it has loaded', async ({ page, context, browserName }) 
     await page.reload();
     await ready(page);
     expect(await svgOf(page, '#preview')).toContain('Offline');
-    await expect(page.locator('.tile')).toHaveCount(34);
+    await expect(page.locator('.tile')).toHaveCount(39);
   } finally {
     await context.setOffline(false);
   }

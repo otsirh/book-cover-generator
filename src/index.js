@@ -7,7 +7,7 @@ import { createRng, hashString, isHex, luminance, escapeXml, stripInvalidXml, gr
 import { palettes } from './palettes.js';
 import { BREAKING_SPACE, FONTS, LINE_BREAK, clipGraphemes, recordText } from './text.js';
 import { drawBadge } from './badge.js';
-import { styleList } from './styles/index.js';
+import { styleList, genreList, builtInGenres } from './styles/index.js';
 
 export { palettes } from './palettes.js';
 export {
@@ -79,14 +79,16 @@ function variantsOf(id, variants) {
  * the style's own method on the style itself (so class styles keep `this` and private fields).
  * The caller's object is never changed.
  * @param {import('./index.js').CoverStyle} style
+ * @param {readonly string[]} [genres] for a built-in style, the genres it suits
  */
-const entryFor = (style) => ({
+const entryFor = (style, genres) => ({
   id: style.id,
   name: style.name ?? style.id,
   description: style.description ?? '',
   group: style.group ?? 'Custom',
   prefer: style.prefer,
   variants: variantsOf(style.id, style.variants),
+  genres: [...(style.genres ?? genres ?? [])].filter((g) => typeof g === 'string'),
   render: (/** @type {import('./index.js').StyleContext} */ ctx) => style.render(ctx),
 });
 
@@ -113,7 +115,10 @@ function pinnedVariants(given, style) {
   return pins;
 }
 
-const builtInStyles = new Map(styleList.map((s) => [s.id, entryFor(s)]));
+const builtInStyles = new Map(styleList.map((s) => [s.id, entryFor(s, builtInGenres[s.id])]));
+
+/** The genres styles can suit: `[{ id, name }]`, as `createCover({ genre })` and `listStyles()` name them. */
+export const genres = Object.freeze(genreList.map((g) => Object.freeze({ ...g })));
 const registry = new Map(builtInStyles);
 /** The palettes, as this module changes them (registering adds to the list everyone sees). */
 const paletteList = /** @type {import('./palettes.js').Palette[]} */ (/** @type {unknown} */ (palettes));
@@ -122,12 +127,13 @@ const builtInPalettes = new Map(paletteList.map((p) => [p.id, p]));
 
 /** Metadata for every available style: [{ id, name, description, group }] */
 export function listStyles() {
-  return [...registry.values()].map(({ id, name, description, group, variants }) => ({
+  return [...registry.values()].map(({ id, name, description, group, variants, genres: suits }) => ({
     id,
     name,
     description,
     group,
     variants: variants.map((v) => ({ ...v, values: v.values.map((x) => ({ ...x })) })),
+    genres: [...suits],
   }));
 }
 
@@ -218,8 +224,21 @@ export function randomSeed() {
   return Math.random().toString(36).slice(2, 8);
 }
 
-function resolveStyle(style, rng) {
-  if (style == null || style === '' || style === 'random') return rng.pick([...registry.keys()]);
+/**
+ * @param {string | null | undefined} style @param {import('./core.js').Rng} rng
+ * @param {unknown} [genre] with a random style, pick one that suits this genre
+ * @returns {string}
+ */
+function resolveStyle(style, rng, genre) {
+  if (style == null || style === '' || style === 'random') {
+    if (genre == null || genre === '') return rng.pick([...registry.keys()]);
+    if (!genreList.some((g) => g.id === genre)) {
+      throw new RangeError(`Unknown genre "${String(genre)}". Available: ${genreList.map((g) => g.id).join(', ')}`);
+    }
+    const suited = [...registry.values()].filter((s) => s.genres.includes(/** @type {string} */ (genre)));
+    if (!suited.length) throw new RangeError(`No style suits the genre "${String(genre)}"`);
+    return rng.pick(suited.map((s) => s.id));
+  }
   if (!registry.has(style)) {
     throw new Error(`Unknown style "${style}". Available: ${[...registry.keys()].join(', ')}`);
   }
@@ -345,7 +364,7 @@ function resolveLang(lang, text) {
 
 /**
  * The cleaned title and author, the seed, and the style id a cover with these options uses.
- * @param {Pick<import('./index.js').CoverOptions, 'title' | 'author' | 'seed' | 'style'>} options
+ * @param {Pick<import('./index.js').CoverOptions, 'title' | 'author' | 'seed' | 'style' | 'genre'>} options
  */
 function resolveText(options) {
   const title = cleanText(options.title, 300, { breaks: true }) || 'Untitled';
@@ -353,13 +372,13 @@ function resolveText(options) {
   // (A line break in the title doesn't change the seed it makes: same words, same artwork.)
   const seed =
     options.seed == null || options.seed === '' ? `${title.replace(/\n/g, ' ')}␟${author}` : String(options.seed);
-  return { title, author, seed, styleId: resolveStyle(options.style, createRng(`${seed}|style`)) };
+  return { title, author, seed, styleId: resolveStyle(options.style, createRng(`${seed}|style`), options.genre) };
 }
 
 /**
  * The style id `createCover` would use for these options (resolving `'random'` or a missing
  * style from the seed), without drawing the cover.
- * @param {Pick<import('./index.js').CoverOptions, 'title' | 'author' | 'seed' | 'style'>} [options]
+ * @param {Pick<import('./index.js').CoverOptions, 'title' | 'author' | 'seed' | 'style' | 'genre'>} [options]
  */
 export function pickStyle(options = {}) {
   return resolveText(options).styleId;

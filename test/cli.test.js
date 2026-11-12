@@ -244,7 +244,7 @@ test('--variant pins a style’s choice, and --list shows them', async () => {
   const city = await cli('Dune', '-s', 'silhouette', '--seed', 'x', '--variant', 'scene=city', '--json');
   assert.notEqual(JSON.parse(city.stdout).svg, JSON.parse(forest.stdout).svg);
   const list = await cli('--list');
-  assert.match(list.stdout, /silhouette[^\n]*\n\s+--variant scene=city\|forest/);
+  assert.match(list.stdout, /silhouette[^\n]*\n(?:\s+genres:[^\n]*\n)?\s+--variant scene=city\|forest/);
   for (const [args, message] of [
     [['Dune', '-s', 'silhouette', '--variant', 'scene=beach'], /no scene "beach"/],
     [['Dune', '--variant', 'scene'], /--variant must look like scene=forest/],
@@ -348,3 +348,20 @@ test(
     }
   },
 );
+
+test('--genre picks a random style that suits it, and --list names the genres', async () => {
+  const { listStyles } = await import('../src/index.js');
+  const horror = listStyles()
+    .filter((s) => s.genres.includes('horror'))
+    .map((s) => s.id);
+  for (const seed of ['1', '2', '3']) {
+    const { stdout } = await cli('Dune', '--genre', 'horror', '--seed', seed, '--json');
+    assert.ok(horror.includes(JSON.parse(stdout).style), seed);
+  }
+  const list = await cli('--list');
+  assert.match(list.stdout, /Genres \(--genre\):[\s\S]*horror\s+Horror/);
+  assert.match(list.stdout, /hollow[^\n]*\n\s+genres: horror/);
+  const bad = await cli('Dune', '--genre', 'poetry');
+  assert.equal(bad.code, 1);
+  assert.match(bad.stderr, /Unknown genre "poetry"/);
+});

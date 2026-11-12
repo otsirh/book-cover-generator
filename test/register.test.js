@@ -44,6 +44,7 @@ test('a style can be a class instance, and missing details get defaults', () => 
     description: '',
     group: 'Custom',
     variants: [],
+    genres: [],
   });
 });
 

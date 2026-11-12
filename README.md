@@ -7,7 +7,7 @@
 ![Types](https://img.shields.io/badge/types-included-blue)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-Generate book covers from a **title** and an **author**. 34 styles, 28 palettes or your own colours, a seeded randomizer, any size, and export to **SVG, PNG, JPEG or WebP**. The library has no dependencies and ships TypeScript types. It's written as plain ES modules, so it runs in the browser and in Node.
+Generate book covers from a **title** and an **author**. 39 styles, 28 palettes or your own colours, a seeded randomizer, any size, and export to **SVG, PNG, JPEG or WebP**. The library has no dependencies and ships TypeScript types. It's written as plain ES modules, so it runs in the browser and in Node.
 
 **[▶ Open the generator](https://covers.otsirh.dev)**
 
@@ -15,9 +15,9 @@ Generate book covers from a **title** and an **author**. 34 styles, 28 palettes 
 
 ## Features
 
-- **34 styles in six families.**
+- **39 styles in six families.**
   - Typographic: Big Type, Minimal, Big Letter, Swiss.
-  - Genre: Thriller, Botanical, Noir, Blueprint.
+  - Genre: Thriller, Botanical, Noir, Blueprint, Hollow (horror), Ribbon (romance), Crest (fantasy), Storybook (children's), Big Idea (non-fiction).
   - Vintage: Art Deco, Classic Paperback, Engraved, Sunburst, Typewriter.
   - Scenic: Landscape, Retro Sun, Silhouette, Constellation, Orbit, Waves, Aurora, Bookshelf.
   - Geometric: Bauhaus, Split, Blocks, Concentric, Stripes.
@@ -33,7 +33,7 @@ Generate book covers from a **title** and an **author**. 34 styles, 28 palettes 
 
 On [covers.otsirh.dev](https://covers.otsirh.dev) you type a title and author (press Enter in the title to break its line where you want), and if you like a subtitle, a series line ("Book Two of the Ember Cycle"), a credit ("Translated by…") and a badge ("Winner of the Hugo Award", set as a seal in a corner clear of the text). Then you choose:
 
-- **a style**, from a rail that previews your book in all 34 styles. Eleven styles let you pin a choice the variation otherwise makes, such as Silhouette's city or forest, or where Aurora puts the title;
+- **a style**, from a rail that previews your book in all 39 styles. Fifteen styles let you pin a choice the variation otherwise makes, such as Silhouette's city or forest, or where Aurora puts the title;
 - **title type**: any of the nine fonts instead of the style's, and the title in capitals or as typed. It stays when you change style, so the rail shows every style in your type;
 - **a palette**, from swatches that show the background, text colour and accents, or **Custom** for your own five colours (it starts from the palette on the cover and shows the text contrast);
 - **a variation**, the seed behind the artwork: the strip under the preview shows six others to click;
@@ -285,7 +285,7 @@ Open `examples/contact-sheet.html?palettes=noir,mint&seeds=a,b` on the dev serve
 
 ```
 src/            the library (plain ES modules + .d.ts types)
-  styles/       the 34 styles, one file per family
+  styles/       the 39 styles, in a file per family
 bin/            the CLI
 site/           the web app (index.html is at the root)
 public/         files served at the site root: headers, 404, icons, manifest, service worker

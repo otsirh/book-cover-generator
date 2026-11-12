@@ -987,6 +987,10 @@ test('styles list the variants they let you pin, and choose them in render', () 
     botanical: ['arrangement'],
     blueprint: ['drawing'],
     engraved: ['motif'],
+    hollow: ['sky'],
+    crest: ['field', 'emblem'],
+    storybook: ['sky'],
+    idea: ['mark'],
   });
   for (const style of builtIn) {
     const declared =
@@ -1386,4 +1390,24 @@ test('mockups keep the cover’s language, have ids of their own per kind, and r
   assert.deepEqual(recordText(() => noteText(1, 2, 3, 4)).boxes, [{ x0: 1, y0: 2, x1: 3, y1: 4 }]);
   // The badge counts when the language is inferred.
   assert.equal(createCover({ title: 'Glass City', badge: 'ベストセラー' }).lang, 'ja');
+});
+
+test('every style suits a genre, and a genre picks a random style that suits it', async () => {
+  const { genres } = await import('../src/index.js');
+  const ids = genres.map((g) => g.id);
+  for (const s of listStyles()) {
+    assert.ok(s.genres.length, `${s.id} suits no genre`);
+    for (const g of s.genres) assert.ok(ids.includes(g), `${s.id}: unknown genre ${g}`);
+  }
+  for (const g of ids) {
+    const suited = listStyles()
+      .filter((s) => s.genres.includes(g))
+      .map((s) => s.id);
+    for (let i = 0; i < 12; i++) assert.ok(suited.includes(createCover({ title: `T${i}`, genre: g }).style), g);
+    // pickStyle agrees with createCover.
+    assert.equal(pickStyle({ title: 'Same', genre: g }), createCover({ title: 'Same', genre: g }).style);
+  }
+  // An explicit style wins over the genre; an unknown genre throws.
+  assert.equal(createCover({ title: 'x', style: 'pixel', genre: 'horror' }).style, 'pixel');
+  assert.throws(() => createCover({ genre: 'poetry' }), /Unknown genre "poetry"/);
 });

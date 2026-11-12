@@ -10,6 +10,7 @@ import {
   FONTS,
   createMockup,
   parseBookList,
+  genres,
 } from '../src/index.js';
 import {
   svgToDataUrl,
@@ -90,6 +91,7 @@ const SAMPLES = [
 ];
 const KEEP_KEY = 'book-cover-generator:kept';
 const SHORTCUTS_KEY = 'book-cover-generator:shortcuts';
+const GENRE_KEY = 'book-cover-generator:genre';
 /** @type {Record<string, string>} */
 const LETTER_CODES = { KeyR: 'r', KeyZ: 'z', KeyY: 'y' };
 const MAX_KEPT = 100;
@@ -185,6 +187,8 @@ const ui = {
   shortcuts: true,
   /** The last custom colours and size, so Custom brings them back. @type {string[] | null} */
   colors: null,
+  /** The genre the rail shows (and Randomize picks from); '' for all. */
+  genre: '',
   size: '1600x2560',
 };
 /** @type {ReturnType<typeof createCover>} */
@@ -1055,7 +1059,7 @@ function buildControls() {
   });
   $('prev-style').addEventListener('click', () => stepStyle(-1));
   $('next-style').addEventListener('click', () => stepStyle(1));
-  $('dice-style').addEventListener('click', () => update({ style: pickOther(STYLE_IDS, design.style) }));
+  $('dice-style').addEventListener('click', () => update({ style: otherStyle() }));
   $('dice-palette').addEventListener('click', () =>
     update({ palette: pickOther([...PALETTE_IDS].slice(1), design.palette) }),
   );
@@ -1280,8 +1284,22 @@ function redo() {
 
 /** @param {number} dir */
 function stepStyle(dir) {
-  const i = STYLE_IDS.indexOf(design.style);
-  update({ style: STYLE_IDS[(i + dir + STYLE_IDS.length) % STYLE_IDS.length] });
+  const pool = stylePool();
+  const i = pool.indexOf(design.style);
+  // From a style outside the genre: to its first style or its last.
+  update({ style: i === -1 ? pool.at(dir > 0 ? 0 : -1) : pool[(i + dir + pool.length) % pool.length] });
+}
+
+/** The styles to pick from: those of the chosen genre (all of them without one). */
+function stylePool() {
+  const pool = ui.genre ? STYLES.filter((s) => s.genres.includes(ui.genre)).map((s) => s.id) : STYLE_IDS;
+  return pool.length ? pool : STYLE_IDS;
+}
+
+/** Another style from the pool (this one, if it is all the pool has). */
+function otherStyle() {
+  const others = stylePool().filter((id) => id !== design.style);
+  return others.length ? pick(others) : design.style;
 }
 
 /** @param {number} dir */
@@ -1294,7 +1312,7 @@ function stepPalette(dir) {
 
 function randomizeAll() {
   update({
-    style: ui.lockStyle ? design.style : pickOther(STYLE_IDS, design.style),
+    style: ui.lockStyle ? design.style : otherStyle(),
     palette: ui.lockPalette ? design.palette : Math.random() < 0.3 ? 'auto' : pick(palettes).id,
     seed: randomSeed(),
   });
@@ -1526,7 +1544,7 @@ function buildRail() {
       groups.set(s.group, grid);
       const section = h('section', { className: 'rail-group' }, h('h3', {}, s.group), grid);
       rail.append(section);
-      // A jump link per family in the rail's header: 34 styles are a long scroll.
+      // A jump link per family in the rail's header: 39 styles are a long scroll.
       const jump = h('button', { type: 'button', className: 'rail-jump' }, s.group);
       jump.addEventListener('click', () =>
         section.scrollIntoView({ behavior: reducedMotion.matches ? 'auto' : 'smooth', block: 'start' }),
@@ -1547,7 +1565,51 @@ function buildRail() {
     observer.observe(button);
     grid.append(button);
   }
-  railOrder = Array.from(rail.querySelectorAll('.tile'), (b) => /** @type {HTMLElement} */ (b).dataset.style ?? '');
+  buildGenres();
+}
+
+/** The genre menu: it filters the rail, and what Randomize, the dice and the arrows pick. */
+function buildGenres() {
+  const menu = /** @type {HTMLSelectElement} */ ($('genre'));
+  for (const g of genres) menu.append(h('option', { value: g.id }, g.name));
+  try {
+    const saved = localStorage.getItem(GENRE_KEY) ?? '';
+    if (genres.some((g) => g.id === saved)) ui.genre = saved;
+  } catch {
+    // Storage blocked: all genres.
+  }
+  menu.value = ui.genre;
+  menu.addEventListener('change', () => {
+    ui.genre = menu.value;
+    try {
+      if (ui.genre) localStorage.setItem(GENRE_KEY, ui.genre);
+      else localStorage.removeItem(GENRE_KEY);
+    } catch {
+      // Storage blocked: the choice lasts for this visit.
+    }
+    applyGenre();
+  });
+  applyGenre();
+}
+
+/** Show the styles of the chosen genre only, and the families that have some. */
+function applyGenre() {
+  const rail = $('rail');
+  for (const s of STYLES) {
+    const tile = tiles.get(s.id);
+    if (tile) tile.button.hidden = Boolean(ui.genre) && !s.genres.includes(ui.genre);
+  }
+  const sections = [...rail.querySelectorAll('.rail-group')];
+  const jumps = [...$('rail-groups').querySelectorAll('.rail-jump')];
+  sections.forEach((section, i) => {
+    const empty = ![...section.querySelectorAll('.tile')].some((t) => !(/** @type {HTMLElement} */ (t).hidden));
+    /** @type {HTMLElement} */ (section).hidden = empty;
+    if (jumps[i]) /** @type {HTMLElement} */ (jumps[i]).hidden = empty;
+  });
+  railOrder = Array.from(
+    rail.querySelectorAll('.tile:not([hidden])'),
+    (b) => /** @type {HTMLElement} */ (b).dataset.style ?? '',
+  );
 }
 
 function invalidateGallery() {
