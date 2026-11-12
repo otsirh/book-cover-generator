@@ -9,6 +9,8 @@ All notable changes to this project are documented here. The format follows [Kee
 - **Five genre styles**: Hollow (horror: a dead tree against a pale or blood moon, fog, and eroded lettering), Ribbon (romance: ribbons crossing under an italic title, and petals), Crest (fantasy: a heraldic shield in laurels, framed in gold, with its field and emblem to pin), Storybook (children's: hills, a sun or a rainbow, clouds, and a bold outlined title) and Big Idea (non-fiction: a big plain title, a prominent subtitle, and bars, an arrow or a circle). There are 39 styles now.
 - **Genres.** Every style says which genres it suits (`genres` in `listStyles()`, and the `genres` list), and `createCover({ genre })` picks a random style that suits one. In the app, the style rail's Genre menu shows only those styles (and is remembered), and Randomize, the dice and the arrow keys stay in it. In the CLI, `--genre`, and `--list` shows each style's genres.
 
+- **HTTP API.** `https://covers.otsirh.dev/api/cover.svg?title=…&author=…` draws a cover, and `/api/mockup.svg` a mockup, for an `<img>` on any page. The query takes the library's option names and the app's link parameters, so an app link's query draws the same cover. In the app, **Copy image link** copies that URL for the design on screen.
+
 ### Changed
 
 - With `style: 'random'` (the default), a seed can now pick one of the new styles, so covers made without a style may come out in a different one. Covers with a style are drawn exactly as before.

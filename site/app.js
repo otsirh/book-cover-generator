@@ -308,6 +308,16 @@ function toHash(d) {
   return `#${q}`;
 }
 
+/**
+ * The site's HTTP API URL that draws a design (see worker/index.js): its link, as a query.
+ * Only the pins its style has, so a pin left from another style can't make it an error.
+ * @param {Design} d
+ */
+function imageLink(d) {
+  const hash = toHash({ ...d, variant: variantOf(pinsFor(d.variant, d.style)) });
+  return new URL(`/api/cover.svg?${hash.slice(1)}`, location.href).href;
+}
+
 /** A version's major and minor number, or null. @param {string | null} v */
 function minorOf(v) {
   const m = /^(\d+)\.(\d+)(?:\.\d+)?$/.exec(v ?? '');
@@ -1110,6 +1120,15 @@ function buildControls() {
       // From the design itself: a history write the browser refused would leave the URL behind.
       await copyText(new URL(toHash(design), location.href).href);
       toast('Link copied: it opens this exact design');
+    } catch {
+      toast('Could not access the clipboard');
+    }
+  });
+  $('copy-image-link').addEventListener('click', async () => {
+    flushReplace();
+    try {
+      await copyText(imageLink(design));
+      toast('Image link copied: it draws this cover as an SVG, on any page');
     } catch {
       toast('Could not access the clipboard');
     }

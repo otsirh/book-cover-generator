@@ -1,13 +1,17 @@
 {
-  // Static site on Cloudflare Workers (static assets only, no Worker script).
+  // Static site on Cloudflare Workers. Static assets answer every path but /api/*, which the
+  // Worker (worker/index.js) answers: covers drawn from a query string.
   // `npm run deploy` runs every check, then `wrangler deploy` (which runs `npm run build` first).
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "book-cover-generator",
   "account_id": "a52b39ef7a73da0cc3ba58fccc491a55",
   "compatibility_date": "2026-11-01",
+  "main": "worker/index.js",
   "build": { "command": "npm run build" },
   "assets": {
     "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"],
     "not_found_handling": "404-page",
     "html_handling": "auto-trailing-slash",
   },

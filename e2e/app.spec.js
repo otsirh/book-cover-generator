@@ -1173,6 +1173,24 @@ test('copies the SVG and a link to the design', async ({ page, context, browserN
   expect(await page.evaluate(() => navigator.clipboard.readText())).toMatch(/#title=Clipboard.*style=minimal.*seed=c1/);
 });
 
+test('copies an image link: the site’s HTTP API draws the same cover', async ({ page, context, browserName }) => {
+  test.skip(browserName !== 'chromium', 'Only Chromium lets tests read the clipboard');
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  // (A pin left from another style, scene.forest, isn't in the image link.)
+  await page.goto(
+    '/#title=Glass%0ACity&author=A&style=crest&variant=emblem.sun-scene.forest&palette=custom-0b132b-f8f9fa-ff6b6b&seed=s&format=ebook&texture=1',
+  );
+  await ready(page);
+  await page.locator('#copy-image-link').click();
+  await expect(page.locator('#toast')).toContainText('Image link copied');
+  const link = await page.evaluate(() => navigator.clipboard.readText());
+  expect(link).toMatch(/\/api\/cover\.svg\?title=Glass%0ACity&/);
+  expect(link).not.toContain('scene.forest');
+  const res = await page.request.get(link);
+  expect(res.status()).toBe(200);
+  expect(await res.text()).toBe(await svgOf(page, '#preview'));
+});
+
 test('screen readers hear style changes but not typing', async ({ page }) => {
   await page.goto('/#style=minimal&palette=mint&seed=a');
   await ready(page);
@@ -1700,6 +1718,32 @@ test('serves security headers', async ({ request }) => {
   for (const path of ['/og.png', '/icons/icon-192.png']) {
     expect((await request.get(path)).headers()['cross-origin-resource-policy'], path).toBe('cross-origin');
   }
+});
+
+test('the HTTP API draws covers and mockups for any page', async ({ page, request }) => {
+  const res = await request.get('/api/cover.svg?title=Dune&author=Frank+Herbert&style=retro&seed=s');
+  expect(res.status()).toBe(200);
+  const headers = res.headers();
+  expect(headers['content-type']).toBe('image/svg+xml; charset=utf-8');
+  expect(headers['access-control-allow-origin']).toBe('*');
+  expect(headers['cross-origin-resource-policy']).toBe('cross-origin');
+  expect(headers['x-cover-style']).toBe('retro');
+  expect(await res.text()).toMatch(/^<svg [\s\S]*Dune[\s\S]*<\/svg>$/);
+  const mockup = await request.get('/api/mockup.svg?title=Dune&kind=card&text=Out+now');
+  expect(await mockup.text()).toContain('Out now');
+  const bad = await request.get('/api/cover.svg?style=nope');
+  expect(bad.status()).toBe(400);
+  expect(await bad.text()).toContain('Unknown style "nope"');
+  expect((await request.get('/api/nothing')).status()).toBe(404);
+  // It draws as an image on a page.
+  await page.goto('/');
+  const size = await page.evaluate(async () => {
+    const img = new Image();
+    img.src = '/api/cover.svg?title=Embedded&format=ebook';
+    await img.decode();
+    return [img.naturalWidth, img.naturalHeight];
+  });
+  expect(size).toEqual([600, 960]);
 });
 
 test('unknown pages get the 404 page', async ({ page }) => {

@@ -39,7 +39,7 @@ On [covers.otsirh.dev](https://covers.otsirh.dev) you type a title and author (p
 - **a variation**, the seed behind the artwork: the strip under the preview shows six others to click;
 - **a format**: paperback, eBook, square, or **Custom** for any size in pixels, typed in or picked from common sizes (Kindle, print trim sizes at 300 dpi, audiobook, social posts).
 
-**Store size** shrinks the preview to the size a store lists covers at, to check the title still reads. **Randomize** reshuffles everything, except what you've locked. Undo and redo step back and forth through your designs, and so do the browser's Back and Forward buttons. **Copy link** shares the exact design, because the URL holds every setting. The export panel tells you which size suits Kindle, print or audiobook covers.
+**Store size** shrinks the preview to the size a store lists covers at, to check the title still reads. **Randomize** reshuffles everything, except what you've locked. Undo and redo step back and forth through your designs, and so do the browser's Back and Forward buttons. **Copy link** shares the exact design, because the URL holds every setting, and **Copy image link** gives the [HTTP API](#http-api) URL that draws it, to put in any page. The export panel tells you which size suits Kindle, print or audiobook covers.
 
 **Mockup** shows and downloads the cover as a 3D book, a flat shot, on an e-reader, or on a social card (a 1200 × 630 link preview, a square post or a story, with a line such as "Out now").
 
@@ -57,6 +57,30 @@ Keyboard shortcuts:
 - `Z` undoes and `Shift+Z` redoes.
 
 The single-key shortcuts can be turned off under the controls (for example with speech input).
+
+## HTTP API
+
+The site draws covers from a URL too, so a page can show one with nothing installed:
+
+```html
+<img src="https://covers.otsirh.dev/api/cover.svg?title=Dune&author=Frank+Herbert&style=retro" alt="Dune" />
+```
+
+- `GET /api/cover.svg` answers with the cover as SVG.
+- `GET /api/mockup.svg` answers with a [mockup](#mockups) of it. Add `kind` (`book`, `flat`, `ereader`, `card`, `square`, `story`), `text` for the line on a card, square or story, and `background`.
+
+The query takes the options' own names (`title`, `author`, `subtitle`, `series`, `credit`, `badge`, `style`, `palette`, `seed`, `genre`, `font`, `lang`, `width`, `height`) and the app's link parameters, so the part of an app link after `#` draws the same cover:
+
+| parameter             | value                                                                                          |
+| --------------------- | ---------------------------------------------------------------------------------------------- |
+| `format`              | `paperback`, `ebook`, `square`, or a size in px such as `1600x2560`                            |
+| `case`                | the title `upper`, or `normal` (as typed)                                                      |
+| `texture`             | `1` (on) or `0` (off)                                                                          |
+| `variant`             | pinned choices as `name.value`, joined by `-`: `field.pale-emblem.sun`                         |
+| `palette`             | a palette id, or your own colours as `custom-0b132b-f8f9fa-ff6b6b` (background, text, accents) |
+| `bg`, `ink`, `accent` | your own colours, as hex (the `#` is optional; accents separated by commas)                    |
+
+A title breaks its line at `%0A`. Anyone may embed the answers (CORS and `Cross-Origin-Resource-Policy` allow it), and the headers `X-Cover-Style`, `X-Cover-Palette` and `X-Cover-Version` say what was drawn. The same URL always draws the same cover in a version of the library, so answers are cached for a day. Options the library rejects get a `400` with the reason as plain text.
 
 ## Library usage
 
@@ -295,9 +319,10 @@ test/           unit tests (node --test)
 test-d/         type tests (tsc)
 e2e/            browser tests (Playwright)
 scripts/        build, dev server and asset generation
+worker/         the HTTP API (the site's Worker)
 ```
 
-The site is a static [Cloudflare Workers](https://developers.cloudflare.com/workers/static-assets/) deployment configured in `wrangler.jsonc`, with security headers in `public/_headers`.
+The site is a [Cloudflare Workers](https://developers.cloudflare.com/workers/static-assets/) deployment configured in `wrangler.jsonc`: static assets, with security headers in `public/_headers`, and a Worker (`worker/index.js`) that answers `/api/*`. The dev server answers `/api/*` the same way.
 
 ## Contributing
 
