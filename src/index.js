@@ -111,7 +111,7 @@ const entryFor = (style, genres) => ({
  * @param {unknown} given @param {ReturnType<typeof entryFor>} style
  * @returns {Record<string, string>}
  */
-function pinnedVariants(given, style) {
+function pinnedVariants(given, style, strict = true) {
   if (given == null) return {};
   if (typeof given !== 'object') throw new TypeError('variants must be an object such as { scene: "forest" }');
   /** @type {Record<string, string>} */
@@ -120,6 +120,8 @@ function pinnedVariants(given, style) {
     const value = /** @type {Record<string, unknown>} */ (given)[variant.name];
     if (value == null || value === '') continue;
     if (!variant.values.some((v) => v.value === value)) {
+      // (A style picked at random takes only the pins it can: two styles may name a variant alike.)
+      if (!strict) continue;
       const offered = variant.values.map((v) => v.value).join(', ');
       throw new RangeError(`Style "${style.id}" has no ${variant.name} "${String(value)}". Available: ${offered}`);
     }
@@ -423,7 +425,8 @@ export function createCover(options = {}) {
   const [paper, night] =
     luminance(palette.bg) >= luminance(palette.ink) ? [palette.bg, palette.ink] : [palette.ink, palette.bg];
 
-  const pins = pinnedVariants(options.variants, style);
+  const named = options.style != null && options.style !== '' && options.style !== 'random';
+  const pins = pinnedVariants(options.variants, style, named);
   const titleType = typeOptions(options);
   const uid =
     'bc' +
@@ -522,3 +525,27 @@ export function generateCover(options = {}) {
 }
 
 export default generateCover;
+
+/**
+ * Cover options for a book from a list (see `parseBookList`) over `defaults`, the options every
+ * book shares. The book's own values win, and a size it gives replaces both sides of the
+ * defaults'. A book that names another style drops the defaults' pinned variants; one that names
+ * a genre the defaults' style doesn't suit gets a style that suits it instead.
+ * @param {import('./index.js').CoverOptions} book
+ * @param {import('./index.js').CoverOptions} [defaults]
+ * @returns {import('./index.js').CoverOptions}
+ */
+export function optionsForBook(book, defaults = {}) {
+  const style = defaults.style;
+  // (A style the defaults name but nobody registered is left to createCover, which says so.)
+  const chosen = typeof style === 'string' && style !== '' && style !== 'random' ? registry.get(style) : undefined;
+  const ownGenre =
+    Boolean(book.genre) && !book.style && chosen !== undefined && !chosen.genres.includes(String(book.genre));
+  return {
+    ...defaults,
+    ...(book.width !== undefined || book.height !== undefined ? { width: undefined, height: undefined } : {}),
+    ...(book.style && book.style !== style ? { variants: {} } : {}),
+    ...(ownGenre ? { style: 'random', variants: {} } : {}),
+    ...book,
+  };
+}

@@ -65,6 +65,6 @@ test('every built-in font stack has measured widths for every character', async 
     if (font.mono) continue;
     const m = METRICS.get(font.family);
     assert.ok(m, `no widths for ${font.family}: run npm run metrics`);
-    for (const table of [m.regular, m.bold]) assert.equal(table.length, [...CHARS].length * 2);
+    for (const table of [...m.upright, ...m.italic]) assert.equal(table.length, [...CHARS].length * 2);
   }
 });

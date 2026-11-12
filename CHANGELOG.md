@@ -8,13 +8,17 @@ All notable changes to this project are documented here. The format follows [Kee
 
 - **Five genre styles**: Hollow (horror: a dead tree across a full or blood moon, fog, and worn lettering), Ribbon (romance: ribbons turning over under an italic title, and falling petals; dark palettes make it a dark romance), Crest (fantasy: a heraldic shield before laurels, swords or rays, framed in gold, with its field, emblem and what's behind it to pin), Storybook (children's: hills with trees and a house, a sun or a rainbow, clouds, and a bold outlined title) and Big Idea (non-fiction: a big plain title, a prominent subtitle, and bars, a trend line or a pie). There are 39 styles now.
 - **Genres.** Every style says which genres it suits (`genres` in `listStyles()`, and the `genres` list), and `createCover({ genre })` picks a random style that suits one. In the app, the style rail's Genre menu shows only those styles (and is remembered), and Randomize, the dice and the arrow keys stay in it. In the CLI, `--genre`, and `--list` shows each style's genres. A book list can give each book its genre, in a `genre` column: a book whose genre the chosen style doesn't suit gets a style that does.
-
 - **HTTP API.** `https://covers.otsirh.dev/api/cover.svg?title=…&author=…` draws a cover, and `/api/mockup.svg` a mockup, for an `<img>` on any page. The query takes the library's option names and the app's link parameters, so an app link's query draws the same design. In the app, **Copy image link** copies that URL for the design on screen.
+- `optionsForBook(book, defaults)`: a listed book's cover options over the options every book shares, as the app's Many covers and the CLI's `--batch` make them. A list's ids may be in any case ("Horror", "Mint").
 
 ### Changed
 
-- **Text fits in Node as it does in the browser.** Where there is no canvas (Node, the CLI, the HTTP API), the built-in fonts are now measured from their characters' widths as macOS draws them, not estimated: text was up to 15% too wide or too narrow, and a title made in Node could run past its box in a browser. Covers made in Node may set their text at a slightly different size than before.
-- With `style: 'random'` (the default), a seed can now pick one of the new styles, so covers made without a style may come out in a different one. Covers with a style are drawn exactly as before.
+- **Text fits in Node as it does in the browser.** Where there is no canvas (Node, the CLI, the HTTP API), the built-in fonts are now measured from their characters' widths as macOS draws them, not estimated: text was up to 15% too wide or too narrow, and a title made in Node could run past its box in a browser. Each weight and its italic are measured on their own, as Chrome picks a different face for 600 or 800. Covers made in Node may set their text at a slightly different size than before.
+- With `style: 'random'` (the default), a seed can now pick one of the new styles, so covers made without a style may come out in a different one. Covers with a style keep it.
+
+### Fixed
+
+- With a random style, a pinned variant that another style names alike (Aurora's and Stripes' `layout`) no longer throws when the seed picks the other one: a style picked at random takes only the pins it can. A style you name still says when it lacks a value.
 
 ## [1.6.0] - 2026-11-12
 

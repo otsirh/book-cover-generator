@@ -1,6 +1,7 @@
 // Compile-time checks for the published type definitions (run by `npm run typecheck`).
 import generateDefault, {
   createCover,
+  optionsForBook,
   generateCover,
   styles,
   palettes,
@@ -139,7 +140,10 @@ const zip: Promise<Blob> = zipFiles([
   { name: 'b.png', data: new Blob() },
 ]);
 if (canCopyImage()) void copyImage(svg, { scale: 2 });
+const listed: string = createCover(optionsForBook({ title: 'A', genre: 'horror' }, { style: 'bauhaus' })).style;
+// @ts-expect-error a book is cover options
+void optionsForBook('Dune');
 // @ts-expect-error copyImage always makes a PNG
 void copyImage(svg, { type: 'image/jpeg' });
 
-export { fromDefault, ids, info, firstPalette, blob, group, lead, body, coverLang, saved, zip };
+export { fromDefault, ids, info, firstPalette, blob, group, lead, body, coverLang, saved, zip, listed };

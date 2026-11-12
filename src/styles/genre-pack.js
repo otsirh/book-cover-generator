@@ -41,12 +41,12 @@ export const hollow = {
   name: 'Hollow',
   group: 'Genre',
   description: 'Horror: a dead tree against a full or blood moon, fog, and worn lettering.',
-  variants: { sky: { label: 'Moon', values: { full: 'Full', blood: 'Blood moon' } } },
+  variants: { moon: { label: 'Moon', values: { full: 'Full', blood: 'Blood moon' } } },
   prefer: 'dark',
   /** @param {Ctx} c */
   render(c) {
     const { W, H, S, u, m, rng, p } = c;
-    const sky = c.choose('sky', ['full', 'full', 'blood']);
+    const moon = c.choose('moon', ['full', 'full', 'blood']);
     // A night that is black, not blue (Cobalt's and Teal's night is bright).
     let night = mix(p.night, '#000000', 0.35);
     for (let i = 0; i < 4 && luminance(night) > 0.012; i++) night = mix(night, '#000000', 0.25);
@@ -54,7 +54,7 @@ export const hollow = {
     const palest = [p.paper, ...p.accents].reduce((best, col) => (luminance(col) > luminance(best) ? col : best));
     const pale = mix(palest, '#f1ede4', 0.45);
     const blood = mix('#c2281c', most(p.accents, redness), 0.25);
-    const glowC = sky === 'blood' ? blood : mix(pale, p.accents[1], 0.08);
+    const glowC = moon === 'blood' ? blood : mix(pale, p.accents[1], 0.08);
     const ground = mix(night, '#000000', 0.6);
     const ink = textColor(p, ground, [pale, p.paper]);
 
@@ -238,7 +238,7 @@ export const hollow = {
     });
     // On a blood moon, a stacked title's last line is set in blood.
     const bloodInk = textColor(p, ground, [mix(blood, '#ff6a4d', 0.35)]);
-    const lineFills = sky === 'blood' && t.stacked ? [...Array(t.lines - 1), bloodInk] : [];
+    const lineFills = moon === 'blood' && t.stacked ? [...Array(t.lines - 1), bloodInk] : [];
     s += `<g filter="url(#${ids.rough})">${t.draw({ x: W / 2, y: titleY, anchor: 'middle', fill: ink, lineFills })}</g>`;
     if (tag) {
       s += drawText(tag, {

@@ -10,6 +10,7 @@ import {
   FONTS,
   createMockup,
   parseBookList,
+  optionsForBook,
   genres,
 } from '../src/index.js';
 import {
@@ -2110,18 +2111,11 @@ function bookOptions(book, i, d = design, own = /** @type {HTMLInputElement} */ 
     0,
     palettes.findIndex((p) => p.id === d.palette),
   );
-  // A book's genre picks a style that suits it, unless the book names a style or this design's
-  // already suits the genre.
-  const ownGenre = book.genre && !book.style && !STYLES.find((s) => s.id === d.style)?.genres.includes(book.genre);
-  return {
+  // (The book's own values win; see optionsForBook for its style, genre and size.)
+  return optionsForBook(book, {
     ...base,
     ...(own && !book.palette ? { palette: palettes[(start + i) % palettes.length].id } : {}),
-    // (Another style than this design's: none of this one's pinned choices.)
-    ...(book.style && book.style !== d.style ? { variants: {} } : {}),
-    ...(ownGenre ? { style: 'random', variants: {} } : {}),
-    ...(book.width !== undefined || book.height !== undefined ? { width: undefined, height: undefined } : {}),
-    ...book,
-  };
+  });
 }
 
 /** @type {ReturnType<typeof setTimeout> | undefined} */

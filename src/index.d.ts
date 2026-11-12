@@ -41,6 +41,13 @@ export interface MockupOptions {
  * font, case, lang, width, height, texture), JSON lines, or one book per line ("Title | Author | Subtitle").
  */
 export declare function parseBookList(text: string): CoverOptions[];
+/**
+ * Cover options for a book from a list over `defaults`, the options every book shares: the book's
+ * own values win, a size it gives replaces both sides of the defaults', a book naming another
+ * style drops the pinned variants, and one naming a genre the defaults' style doesn't suit gets a
+ * style that suits it.
+ */
+export declare function optionsForBook(book: CoverOptions, defaults?: CoverOptions): CoverOptions;
 /** The cover as a product shot (flat, book, e-reader) or on a social card, as SVG. */
 export declare function createMockup(
   cover: Cover,

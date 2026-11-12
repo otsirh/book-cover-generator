@@ -1,5 +1,6 @@
 import { Buffer } from 'node:buffer';
 import { readFile } from 'node:fs/promises';
+import { platform } from 'node:process';
 import { test, expect } from '@playwright/test';
 import { AxeBuilder } from '@axe-core/playwright';
 
@@ -1380,7 +1381,8 @@ test('copies the cover as an image', async ({ page, context, browserName }) => {
   await page.goto('/#title=Picture&style=minimal&seed=p');
   await expect(page.locator('#copy-image')).toBeVisible();
   await page.locator('#copy-image').click();
-  await expect(page.locator('#toast')).toContainText('Image copied · 1200 × 1800 px');
+  // (Drawing a 1200 × 1800 PNG on a busy two-core runner can take a few seconds.)
+  await expect(page.locator('#toast')).toContainText('Image copied · 1200 × 1800 px', { timeout: 15_000 });
   const types = await page.evaluate(async () => (await navigator.clipboard.read()).flatMap((item) => [...item.types]));
   expect(types).toContain('image/png');
 });
@@ -1768,6 +1770,41 @@ test('serves security headers', async ({ request }) => {
   for (const path of ['/og.png', '/icons/icon-192.png']) {
     expect((await request.get(path)).headers()['cross-origin-resource-policy'], path).toBe('cross-origin');
   }
+});
+
+test('Node measures the built-in fonts as Chrome on macOS does', async ({ page, browserName }) => {
+  // (The width tables are macOS's: elsewhere the browser has other fonts to measure.)
+  test.skip(platform !== 'darwin' || browserName !== 'chromium', 'The tables are measured in Chrome on macOS');
+  const { measureText, FONTS } = await import('../src/text.js');
+  const samples = ['The Lighthouse Keeper', 'MIDNIGHT ARITHMETIC', 'Salt and Static', 'Mara Ellison, J. R. Okafor'];
+  const specs = Object.keys(FONTS)
+    .filter((key) => !FONTS[/** @type {keyof typeof FONTS} */ (key)].mono)
+    .flatMap((key) =>
+      [400, 500, 600, 700, 800].flatMap((weight) => [false, true].map((italic) => ({ key, weight, italic }))),
+    );
+  await page.goto('/');
+  const chrome = await page.evaluate(
+    async ({ list, texts }) => {
+      const text = await import('/src/text.js');
+      return list.map((s) =>
+        texts.map((t) =>
+          text.measureText(t, 100, { font: text.FONTS[/** @type {keyof typeof text.FONTS} */ (s.key)], ...s }),
+        ),
+      );
+    },
+    { list: specs, texts: samples },
+  );
+  specs.forEach((s, i) => {
+    samples.forEach((t, j) => {
+      const node = measureText(t, 100, { font: FONTS[/** @type {keyof typeof FONTS} */ (s.key)], ...s });
+      // Never more than 1% narrow, which would overflow; a little wide is safe (Chrome kerns pairs of
+      // letters, the tables measure each alone).
+      const ratio = node / chrome[i][j];
+      const where = `${s.key} ${s.weight}${s.italic ? ' italic' : ''} "${t}": ${ratio.toFixed(3)}`;
+      expect(ratio, where).toBeGreaterThan(0.99);
+      expect(ratio, where).toBeLessThan(1.04);
+    });
+  });
 });
 
 test('the HTTP API draws covers and mockups for any page', async ({ page, request }) => {

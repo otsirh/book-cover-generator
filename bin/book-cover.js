@@ -2,7 +2,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { createCover, listStyles, palettes, formats, parseBookList, genres } from '../src/index.js';
+import { createCover, listStyles, palettes, formats, parseBookList, optionsForBook, genres } from '../src/index.js';
 import { clipGraphemes } from '../src/text.js';
 
 const HELP = `Usage: book-cover "<title>" ["<author>"] [options]
@@ -275,24 +275,9 @@ function batch(defaults) {
   books.forEach((book, i) => {
     const n = i + 1;
     try {
-      // A size in the list replaces the command line's.
-      const sized = book.width !== undefined || book.height !== undefined;
-      // A book's genre picks a style that suits it, unless the book names a style or --style's
-      // already suits the genre.
-      const ownGenre =
-        book.genre &&
-        !book.style &&
-        defaults.style &&
-        !listStyles()
-          .find((s) => s.id === defaults.style)
-          ?.genres.includes(book.genre);
-      const cover = createCover({
-        ...defaults,
-        ...(sized ? { width: undefined, height: undefined } : {}),
-        ...(ownGenre ? { style: 'random', variants: {} } : {}),
-        ...book,
-        seed: book.seed ?? values.seed,
-      });
+      // (The book's own values win, a size in the list replaces the command line's, and a genre
+      // --style doesn't suit picks a style that does: see optionsForBook.)
+      const cover = createCover({ ...optionsForBook(book, defaults), seed: book.seed ?? values.seed });
       const file = join(dir, `${String(n).padStart(digits, '0')}-${slug(cover.title)}.svg`);
       writeFileSync(file, cover.svg);
       const { style, palette: paletteId, seed, width, height } = cover;

@@ -36,7 +36,7 @@ test('Storybook never sets its title in plain black or white', () => {
 
 test('the genre styles draw at every shape, with every pinned choice', () => {
   const pins = {
-    hollow: [{ sky: 'full' }, { sky: 'blood' }],
+    hollow: [{ moon: 'full' }, { moon: 'blood' }],
     ribbon: [{}],
     crest: ['laurels', 'swords', 'rays'].map((behind) => ({ behind, field: 'quarterly', emblem: 'tower' })),
     storybook: [{ sky: 'sun' }, { sky: 'rainbow' }],

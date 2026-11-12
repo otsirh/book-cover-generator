@@ -44,3 +44,12 @@ test('_headers sets a strict CSP and keeps the library importable cross-origin',
     );
   }
 });
+
+test('the page preloads every module of the library', async () => {
+  const { readdirSync } = await import('node:fs');
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const modules = readdirSync(new URL('../src/', import.meta.url), { recursive: true })
+    .map((f) => `src/${String(f).replaceAll('\\', '/')}`)
+    .filter((f) => f.endsWith('.js'));
+  for (const file of modules) assert.ok(html.includes(`rel="modulepreload" href="${file}"`), `${file} isn't preloaded`);
+});

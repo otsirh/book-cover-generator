@@ -61,3 +61,33 @@ test('a book list can give each book a genre', () => {
     { title: 'Night', author: 'Ann', genre: 'horror' },
   ]);
 });
+
+test('ids in a list are read in lower case, as the app’s menus name them', () => {
+  assert.deepEqual(parseBookList('title,genre,palette,style\nNight,Horror,Mint,Hollow'), [
+    { title: 'Night', genre: 'horror', palette: 'mint', style: 'hollow' },
+  ]);
+});
+
+test('a listed book’s options: its own values win, and its genre picks a style the shared one doesn’t suit', async () => {
+  const { optionsForBook } = await import('../src/index.js');
+  const shared = { style: 'bauhaus', variants: { layout: 'x' }, width: 600, height: 900 };
+  assert.deepEqual(optionsForBook({ title: 'A', genre: 'horror' }, shared), {
+    ...shared,
+    style: 'random',
+    variants: {},
+    title: 'A',
+    genre: 'horror',
+  });
+  // A genre the shared style suits keeps it, pins and all; a size replaces both sides.
+  assert.deepEqual(optionsForBook({ title: 'A', genre: 'children', width: 800 }, shared), {
+    ...shared,
+    width: 800,
+    height: undefined,
+    title: 'A',
+    genre: 'children',
+  });
+  // With a random or unknown shared style, the genre is left to createCover (which picks, or says so).
+  for (const style of ['random', 'bauhauss', undefined]) {
+    assert.equal(optionsForBook({ title: 'A', genre: 'horror' }, { style, variants: { a: 'b' } }).style, style);
+  }
+});

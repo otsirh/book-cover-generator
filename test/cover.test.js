@@ -996,7 +996,7 @@ test('styles list the variants they let you pin, and choose them in render', () 
     botanical: ['arrangement'],
     blueprint: ['drawing'],
     engraved: ['motif'],
-    hollow: ['sky'],
+    hollow: ['moon'],
     crest: ['field', 'emblem', 'behind'],
     storybook: ['sky'],
     idea: ['mark'],
@@ -1081,6 +1081,11 @@ test('variants a style lacks are ignored, and a value it lacks throws', () => {
     () => createCover({ title: 'x', style: 'silhouette', variants: /** @type {any} */ ('forest') }),
     TypeError,
   );
+  // A style picked at random takes only the pins it can: Aurora's and Stripes' layouts differ.
+  for (let i = 0; i < 300; i++) {
+    const c = createCover({ title: 'x', seed: `p${i}`, variants: { layout: 'top', scene: 'forest' } });
+    if (c.style === 'silhouette') assert.equal(c.variants.scene, 'forest');
+  }
   // Pinned covers get ids of their own, so a pinned and a free cover can share a page.
   const free = createCover({ title: 'x', style: 'silhouette', seed: 's' });
   const other = free.variants.scene === 'city' ? 'forest' : 'city';
