@@ -215,8 +215,7 @@ export function titleBlock(c, o) {
   const weight = changedFont && serif ? Math.min(o.weight ?? 400, 700) : (o.weight ?? 400);
   const upper = c.titleCase ? c.titleCase === 'upper' : !!o.upper;
   // Spacing set for capitals is too wide for lower case, and capitals set solid need a little.
-  const letterSpacing =
-    upper === !!o.upper ? (o.letterSpacing ?? 0) : upper ? Math.max(o.letterSpacing ?? 0, 0.03) : 0;
+  const letterSpacing = upper === !!o.upper ? (o.letterSpacing ?? 0) : upper ? Math.max(o.letterSpacing ?? 0, 0.03) : 0;
   const whole = (o.text ?? c.title).trim();
   const split = o.lead === false ? { lead: '', main: whole } : splitLead(whole);
   // Only a lead of three letters or more gets its own small line: a lone "A" or "La" up there
