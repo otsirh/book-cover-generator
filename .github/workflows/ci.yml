@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   checks:
-    name: Lint, format, types & package
+    name: Lint, format, types, package & fuzz
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -34,6 +34,8 @@ jobs:
       - run: npm run format:check
       - run: npm run typecheck
       - run: npm run lint:package
+      # Property-based fuzzing (fast-check, a dev dependency: the unit test jobs install nothing).
+      - run: npm run test:fuzz
       - run: npm audit --audit-level=moderate
 
   unit:

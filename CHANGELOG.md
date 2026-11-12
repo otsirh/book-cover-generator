@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+
+- Each GitHub release carries the npm package and its build provenance, signed with Sigstore: check a download with `gh attestation verify book-cover-generator-X.Y.Z.tgz --repo otsirh/book-cover-generator`. (The package on npm has had provenance since 1.7.0.)
+
 ## [1.7.0] - 2026-11-12
 
 Genres and five styles made for them, an HTTP API that draws covers from a URL, and text that fits in Node as it does in the browser. Covers made without a style may come out in a new one, and text made in Node may be set a little differently (see Changed); covers drawn in the browser with a style are as in 1.6.0.

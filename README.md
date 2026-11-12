@@ -5,6 +5,7 @@
 [![Website](https://img.shields.io/website?url=https%3A%2F%2Fcovers.otsirh.dev&label=covers.otsirh.dev)](https://covers.otsirh.dev)
 ![Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)
 ![Types](https://img.shields.io/badge/types-included-blue)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/otsirh/book-cover-generator/badge)](https://scorecard.dev/viewer/?uri=github.com/otsirh/book-cover-generator)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 Generate book covers from a **title** and an **author**. 39 styles, 28 palettes or your own colours, a seeded randomizer, any size, and export to **SVG, PNG, JPEG or WebP**. The library has no dependencies and ships TypeScript types. It's written as plain ES modules, so it runs in the browser and in Node.
@@ -301,9 +302,10 @@ npm run dev                # http://127.0.0.1:4173
 
 | script                  | what it does                                                      |
 | ----------------------- | ----------------------------------------------------------------- |
-| `npm run check`         | lint, format check, type check, package check and unit tests      |
+| `npm run check`         | lint, format, type and package checks, unit tests and fuzzing     |
 | `npm test`              | unit tests (`node --test`)                                        |
 | `npm run test:coverage` | unit tests with coverage thresholds                               |
+| `npm run test:fuzz`     | property-based fuzzing (fast-check); `FUZZ_RUNS=20` for more      |
 | `npm run test:e2e`      | browser tests in Chromium, Firefox, WebKit and mobile Chrome      |
 | `npm run format`        | format everything with Prettier                                   |
 | `npm run assets`        | regenerate the app icons, the social preview and the README image |

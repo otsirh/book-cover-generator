@@ -18,6 +18,7 @@ npm only runs install scripts for packages listed in `allowScripts` in `package.
 
 ```sh
 npm run check      # lint, format check, type check, package check, unit tests
+npm run test:fuzz  # property-based fuzzing (part of check)
 npm run test:e2e   # browser tests (CI runs these too)
 ```
 

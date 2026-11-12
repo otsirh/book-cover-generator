@@ -57,8 +57,9 @@
     "typecheck": "tsc -p tsconfig.json",
     "test": "node --test",
     "test:coverage": "node --test --experimental-test-coverage --test-coverage-include=src/**/*.js --test-coverage-exclude=src/browser.js --test-coverage-lines=99 --test-coverage-branches=95 --test-coverage-functions=98",
+    "test:fuzz": "node --test fuzz/*.fuzz.js",
     "test:e2e": "playwright test",
-    "check": "npm run lint && npm run format:check && npm run typecheck && npm run lint:package && npm test",
+    "check": "npm run lint && npm run format:check && npm run typecheck && npm run lint:package && npm test && npm run test:fuzz",
     "assets": "node scripts/generate-assets.js",
     "metrics": "node scripts/generate-metrics.js",
     "deploy": "npm run check && npm run test:e2e && wrangler deploy"
@@ -70,6 +71,7 @@
     "@playwright/test": "1.65.0",
     "@types/node": "26.6.6",
     "eslint": "10.14.0",
+    "fast-check": "4.10.2",
     "globals": "17.14.0",
     "prettier": "3.10.0",
     "publint": "0.3.25",

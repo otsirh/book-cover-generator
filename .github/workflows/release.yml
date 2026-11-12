@@ -4,12 +4,18 @@ name: Release
 # release from the CHANGELOG. npm trusts this workflow to publish (trusted publishing, set in the
 # package's settings on npmjs.com), so no npm token is stored anywhere.
 #
-# Run it by hand for a dry run: the checks, and what the package would hold.
+# Run it by hand for a dry run: the checks, and what the package would hold. Give it a released
+# tag to bring that GitHub release up to date (notes, and the package with its signed provenance).
 
 on:
   push:
     tags: ['v[0-9]+.[0-9]+.[0-9]+']
   workflow_dispatch:
+    inputs:
+      release:
+        description: A released tag (v1.7.0) to bring the GitHub release up to date for (notes, signed package)
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -61,30 +67,54 @@ jobs:
   github:
     name: GitHub release
     needs: npm
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' || inputs.release != ''
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
+    env:
+      TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.release }}
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     steps:
+      - name: The tag is a version
+        run: |
+          echo "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' || { echo "::error::Not a version tag: $TAG"; exit 1; }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ env.TAG }}
           persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
       - name: Release notes from the CHANGELOG
         run: |
-          awk -v v="${GITHUB_REF_NAME#v}" '
+          awk -v v="${TAG#v}" '
             index($0, "## [" v "]") == 1 { on = 1; next }
             on && /^## \[/ { exit }
             on { print }
           ' CHANGELOG.md > notes.md
-          [ -s notes.md ] || { echo "::error::No CHANGELOG section for ${GITHUB_REF_NAME#v}"; exit 1; }
-      - name: Make the release (or bring an existing one's notes up to date)
+          [ -s notes.md ] || { echo "::error::No CHANGELOG section for ${TAG#v}"; exit 1; }
+      # The package as published, and its build provenance signed with Sigstore (verify with
+      # `gh attestation verify book-cover-generator-X.Y.Z.tgz --repo otsirh/book-cover-generator`).
+      - name: The package
+        run: npm pack
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        id: attest
+        with:
+          subject-path: book-cover-generator-*.tgz
+      - name: Its signed provenance, beside it
+        env:
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+        run: cp "$BUNDLE" "book-cover-generator-${TAG#v}.tgz.sigstore"
+      - name: Make the release (or bring an existing one up to date)
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
-            gh release edit "$GITHUB_REF_NAME" --title "${GITHUB_REF_NAME#v}" --notes-file notes.md
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release edit "$TAG" --title "${TAG#v}" --notes-file notes.md
           else
-            gh release create "$GITHUB_REF_NAME" --verify-tag --latest --title "${GITHUB_REF_NAME#v}" --notes-file notes.md
+            gh release create "$TAG" --verify-tag --latest --title "${TAG#v}" --notes-file notes.md
           fi
+          gh release upload "$TAG" "book-cover-generator-${TAG#v}.tgz" "book-cover-generator-${TAG#v}.tgz.sigstore" --clobber
