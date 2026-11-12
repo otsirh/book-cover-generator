@@ -7,7 +7,7 @@ import { createRng, hashString, isHex, luminance, escapeXml, stripInvalidXml, gr
 import { palettes } from './palettes.js';
 import { BREAKING_SPACE, FONTS, LINE_BREAK, clipGraphemes, recordText } from './text.js';
 import { drawBadge } from './badge.js';
-import { idFor } from './shared.js';
+import { idFor, fold, fontEntries } from './shared.js';
 import { styleList, genreList, builtInGenres } from './styles/index.js';
 
 export { palettes } from './palettes.js';
@@ -53,10 +53,12 @@ const isId = (id) => typeof id === 'string' && id !== '' && id === id.trim();
  */
 function genresOf(id, genres) {
   if (genres == null) return [];
-  if (!Array.isArray(genres) || !genres.every((g) => genreList.some((known) => known.id === g))) {
+  // (Ids or names, in any case, as everywhere else.)
+  const ids = Array.isArray(genres) ? genres.map((g) => idFor(g, genreList)) : [undefined];
+  if (ids.some((g) => g === undefined)) {
     throw new TypeError(`Style "${id}": genres must be a list of genre ids (${genreList.map((g) => g.id).join(', ')})`);
   }
-  return [...genres];
+  return /** @type {string[]} */ (ids);
 }
 
 /** A name or value as people read it: 'bouquet' → 'Bouquet'. @param {string} id */
@@ -106,13 +108,10 @@ const entryFor = (style, genres) => ({
   render: (/** @type {import('./index.js').StyleContext} */ ctx) => style.render(ctx),
 });
 
-/** Whether a style option leaves the choice to the seed ('random', in any case, or nothing). @param {unknown} v */
-const unsetStyle = (v) => v == null || v === '' || (typeof v === 'string' && v.toLowerCase() === 'random');
-/** Whether a palette option leaves the choice to the seed ('random' or 'auto', in any case, or nothing). @param {unknown} v */
-const unsetPalette = (v) =>
-  v == null || v === '' || (typeof v === 'string' && ['random', 'auto'].includes(v.toLowerCase()));
-/** The fonts by id and name, as idFor reads them. */
-const FONT_ENTRIES = Object.entries(FONTS).map(([id, f]) => ({ id, name: f.name }));
+/** Whether a style option leaves the choice to the seed ('random', read as idFor reads names, or nothing). @param {unknown} v */
+const unsetStyle = (v) => v == null || (typeof v === 'string' && ['', 'random'].includes(fold(v)));
+/** Whether a palette option leaves the choice to the seed ('random' or 'auto', or nothing). @param {unknown} v */
+const unsetPalette = (v) => v == null || (typeof v === 'string' && ['', 'random', 'auto'].includes(fold(v)));
 
 /**
  * The variants pinned for a style: the given ones it has (others are ignored, so the same
@@ -129,14 +128,6 @@ function pinnedVariants(given, style, strict = true) {
       .filter(([, value]) => value != null && value !== '')
       .map(([name, value]) => [name.toLowerCase(), String(value)]),
   );
-  // A value no style offers is a mistake, whatever the style. (A name no style has is ignored.)
-  for (const [name, value] of byName) {
-    const variants = [...registry.values()].flatMap((s) => s.variants.filter((v) => v.name.toLowerCase() === name));
-    if (variants.length && !variants.some((v) => valueIn(v, value))) {
-      const offered = [...new Set(variants.flatMap((v) => v.values.map((x) => x.value)))].join(', ');
-      throw new RangeError(`No style has ${name} "${value}". Available: ${offered}`);
-    }
-  }
   /** @type {Record<string, string>} */
   const pins = {};
   for (const variant of style.variants) {
@@ -144,11 +135,19 @@ function pinnedVariants(given, style, strict = true) {
     if (value === undefined) continue;
     const match = valueIn(variant, value);
     if (match) pins[variant.name] = match.value;
-    // A style you name says when it lacks a value; one picked at random takes only the pins it can
-    // (two styles may name a variant alike).
+    // A style you name says when it lacks a value (listing its own); one picked at random takes
+    // only the pins it can (two styles may name a variant alike).
     else if (strict) {
       const offered = variant.values.map((v) => v.value).join(', ');
       throw new RangeError(`Style "${style.id}" has no ${variant.name} "${value}". Available: ${offered}`);
+    }
+  }
+  // A value no style offers is a mistake, whatever the style. (A name no style has is ignored.)
+  for (const [name, value] of byName) {
+    const variants = [...registry.values()].flatMap((s) => s.variants.filter((v) => v.name.toLowerCase() === name));
+    if (variants.length && !variants.some((v) => valueIn(v, value))) {
+      const offered = [...new Set(variants.flatMap((v) => v.values.map((x) => x.value)))].join(', ');
+      throw new RangeError(`No style has ${name} "${value}". Available: ${offered}`);
     }
   }
   return pins;
@@ -250,6 +249,8 @@ export function registerPalette(palette, { replace = false } = {}) {
     throw new Error(`registerPalette: "${id}" is a built-in palette; pass { replace: true } to replace it`);
   }
   const { bg, ink, dark } = normalizePalette(palette);
+  if (palette.name != null && typeof palette.name !== 'string')
+    throw new TypeError('registerPalette: name must be a string');
   // Named after its id when it has no name, as a style is.
   const name = typeof palette.name === 'string' && palette.name.trim() ? palette.name : id;
   const entry = { id, name, bg, ink, accents: palette.accents.map((c) => c.trim()), dark };
@@ -383,7 +384,7 @@ const TITLE_CASES = ['upper', 'normal'];
 function typeOptions(options) {
   const font = /** @type {unknown} */ (options.font);
   const titleCase = /** @type {unknown} */ (options.titleCase);
-  const fontId = idFor(font, FONT_ENTRIES);
+  const fontId = font == null || font === '' ? undefined : idFor(font, fontEntries());
   if (font != null && font !== '' && fontId === undefined) {
     throw new RangeError(`Unknown font "${String(font)}". Available: ${Object.keys(FONTS).join(', ')}`);
   }
@@ -569,8 +570,9 @@ export default generateCover;
 /**
  * Cover options for a book from a list (see `parseBookList`) over `defaults`, the options every
  * book shares. The book's own values win, and a size it gives replaces both sides of the
- * defaults'. A book that names another style drops the defaults' pinned variants; one that names
- * a genre the defaults' style doesn't suit gets a style that suits it instead.
+ * defaults'. A book that names another style than the defaults' drops their pinned variants (with
+ * no shared style, it keeps the ones its own style offers); one that names a genre the defaults'
+ * style doesn't suit gets a style that suits it instead. A shared style that doesn't exist throws.
  * @param {import('./index.js').CoverOptions} book
  * @param {import('./index.js').CoverOptions} [defaults]
  * @returns {import('./index.js').CoverOptions}
@@ -593,16 +595,8 @@ export function optionsForBook(book, defaults = {}) {
     const ownEntry = own === undefined ? undefined : registry.get(own);
     // Pins made for the shared style don't follow a book to another one; with no shared style
     // they're for any, and the book's style takes the ones it offers.
-    variants =
-      shared !== undefined
-        ? {}
-        : ownEntry && variants && typeof variants === 'object'
-          ? Object.fromEntries(
-              Object.entries(variants).filter(([name, value]) =>
-                ownEntry.variants.some((v) => v.name.toLowerCase() === name.toLowerCase() && valueIn(v, String(value))),
-              ),
-            )
-          : variants;
+    // (As a style picked at random takes them: a value no style offers still throws.)
+    variants = shared !== undefined ? {} : ownEntry ? pinnedVariants(variants, ownEntry, false) : variants;
   }
   return {
     ...defaults,

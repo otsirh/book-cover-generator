@@ -26,7 +26,7 @@ import {
 } from '../src/browser.js';
 import { clipGraphemes, LINE_BREAK } from '../src/text.js';
 import { hashString, contrast } from '../src/core.js';
-import { CUSTOM_SIZE, CUSTOM_PALETTE, VARIANT, customColors, slug, idFor } from '../src/shared.js';
+import { CUSTOM_SIZE, CUSTOM_PALETTE, VARIANT, customColors, slug, idFor, fontEntries } from '../src/shared.js';
 
 /** @typedef {keyof typeof formats} Preset */
 /**
@@ -58,8 +58,6 @@ const MAX_PIXELS = 16_000_000;
 const DPI = 300;
 const STYLES = listStyles();
 const STYLE_IDS = STYLES.map((s) => s.id);
-/** The fonts by id and name, as idFor reads them. */
-const FONT_ENTRIES = Object.entries(FONTS).map(([id, f]) => ({ id, name: f.name }));
 /** @type {Set<string>} */
 const PALETTE_IDS = new Set(['auto', ...palettes.map((p) => p.id)]);
 // First-time visitors start on one of the strongest styles with a sample title.
@@ -218,13 +216,19 @@ const FIELDS = {
   // (Since 1.6.0.)
   badge: { read: (v) => clipText(v, 60), empty: '', optional: true, omitEmpty: true },
   // (Ids or names, in any case, as the library reads them: a hand-edited link opens as the API draws it.)
+  // ('random' leaves it to the title, as a link without a style does.)
   style: { read: (v) => idFor(text(v), STYLES), empty: '' },
   // (Since 1.5.0.) Checked against the style when used: see pinsFor().
-  variant: { read: (v) => oneOf(text(v), VARIANT.test.bind(VARIANT)), empty: '', optional: true, omitEmpty: true },
+  variant: {
+    read: (v) => oneOf(text(v)?.toLowerCase(), VARIANT.test.bind(VARIANT)),
+    empty: '',
+    optional: true,
+    omitEmpty: true,
+  },
   // (Since 1.5.0.)
-  font: { read: (v) => idFor(text(v), FONT_ENTRIES), empty: '', optional: true, omitEmpty: true },
+  font: { read: (v) => idFor(text(v), fontEntries()), empty: '', optional: true, omitEmpty: true },
   case: {
-    read: (v) => oneOf(text(v), (t) => t === 'upper' || t === 'normal'),
+    read: (v) => oneOf(text(v)?.toLowerCase(), (t) => t === 'upper' || t === 'normal'),
     empty: '',
     optional: true,
     omitEmpty: true,
@@ -233,7 +237,8 @@ const FIELDS = {
     read: (v) => {
       const t = text(v);
       const lower = t?.toLowerCase();
-      if (lower === 'auto' || (lower && CUSTOM_PALETTE.test(lower))) return lower;
+      if (lower === 'auto' || lower === 'random') return 'auto';
+      if (lower && CUSTOM_PALETTE.test(lower)) return lower;
       return idFor(t, palettes);
     },
     empty: 'auto',
@@ -249,7 +254,14 @@ const FIELDS = {
   },
   // On or off; any other value (texture=yes) is dropped like other unknown values.
   texture: {
-    read: (v) => (v === true || v === '1' ? true : v === false || v === '0' ? false : undefined),
+    read: (v) => {
+      const t = typeof v === 'string' ? v.toLowerCase() : v;
+      return t === true || t === '1' || t === 'true'
+        ? true
+        : t === false || t === '0' || t === 'false'
+          ? false
+          : undefined;
+    },
     write: (v) => (v ? '1' : '0'),
     empty: false,
     optional: true,

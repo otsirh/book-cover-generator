@@ -1723,6 +1723,14 @@ test('a link may name the style, palette and font as the menus do, as the HTTP A
   await selected(page, 'artdeco');
   await expect(page.locator('#title-font')).toHaveValue('garamond');
   await expect(page.locator('#meta')).toContainText('Deep Sea');
+  // Pins, case and texture as the HTTP API reads them too.
+  await page.evaluate(() => {
+    location.hash = 'title=Named&style=Silhouette&variant=Scene.Forest&case=Upper&texture=true&palette=random&seed=n';
+  });
+  await selected(page, 'silhouette');
+  await expect(page.locator('#style-variants [data-value="forest"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('[data-case="upper"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#texture')).toBeChecked();
 });
 
 test('a Japanese title sets the language of the cover', async ({ page }) => {

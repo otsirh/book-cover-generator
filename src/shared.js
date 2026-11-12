@@ -1,11 +1,11 @@
 // What the app, the CLI and the HTTP API share, so they read links and name files alike. (Not
 // part of the library's API: the package exports only src/index.js and src/browser.js.)
 
-import { clipGraphemes } from './text.js';
+import { FONTS, clipGraphemes } from './text.js';
 
 /**
- * A name as people may type it: without accents, case, apostrophes or punctuation, and "&" as
- * "and" ("Children’s" and "childrens", "Thriller & crime" and "thriller and crime" are alike).
+ * A name as people may type it: without accents, case, apostrophes, punctuation or "and"
+ * ("Children’s" and "childrens"; "Thriller & crime", "thriller and crime" and "Thriller crime").
  * @param {string} name
  */
 export const fold = (name) =>
@@ -14,9 +14,12 @@ export const fold = (name) =>
     .replace(/\p{M}/gu, '')
     .toLowerCase()
     .replace(/['’‘`]/g, '')
-    .replace(/&/g, ' and ')
-    .replace(/[^\p{L}\p{N}]+/gu, ' ')
-    .trim();
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((word) => word && word !== 'and')
+    .join(' ');
+
+/** The fonts of FONTS (as it is now) by id and name, as idFor reads them. */
+export const fontEntries = () => Object.entries(FONTS).map(([id, f]) => ({ id, name: f.name }));
 
 /**
  * The id that `given` names among `entries`: an id as it is, else an id or a name in any case and

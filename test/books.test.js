@@ -125,4 +125,8 @@ test('with no shared style, a book naming its own takes only the shared pins its
   assert.deepEqual(optionsForBook({ title: 'A', style: 'stripes' }, shared).variants, {});
   assert.equal(createCover(optionsForBook({ title: 'A', style: 'stripes' }, shared)).style, 'stripes');
   assert.equal(createCover(optionsForBook({ title: 'A', style: 'aurora' }, shared)).variants.layout, 'top');
+  // A value no style offers throws for every book, with a style of its own or not.
+  for (const book of [{ title: 'A', style: 'noir' }, { title: 'A' }]) {
+    assert.throws(() => createCover(optionsForBook(book, { variants: { scene: 'forrest' } })), /No style has scene/);
+  }
 });

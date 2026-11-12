@@ -166,15 +166,16 @@ test('a custom style can offer variants and pick them with choose', () => {
 });
 
 test('a registered style’s genres must be a list of genre ids', () => {
-  for (const genres of ['horror', ['Horror'], [1]]) {
+  for (const genres of ['horror', ['Horrors'], [1]]) {
     assert.throws(
       () => registerStyle({ id: 'test-genres', genres: /** @type {any} */ (genres), render: () => '' }),
       /genre ids/,
     );
   }
-  registerStyle({ id: 'test-genres', genres: ['horror'], render: () => '' });
+  // (By id or name, in any case.)
+  registerStyle({ id: 'test-genres', genres: ['Horror', 'Thriller & crime'], render: () => '' });
   try {
-    assert.deepEqual(listStyles().find((s) => s.id === 'test-genres')?.genres, ['horror']);
+    assert.deepEqual(listStyles().find((s) => s.id === 'test-genres')?.genres, ['horror', 'thriller']);
   } finally {
     unregisterStyle('test-genres');
   }

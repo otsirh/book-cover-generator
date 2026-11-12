@@ -1473,8 +1473,26 @@ test('a pin no style offers throws with a named style too; fonts and genres by t
   );
   for (const font of ['Typewriter', 'old style', 'HEAVY'])
     assert.doesNotThrow(() => createCover({ title: 'x', font }), font);
-  for (const genre of ['Childrens', 'Thriller and crime'])
+  for (const genre of ['Childrens', 'Thriller and crime', 'Thriller crime', 'Fantasy sci-fi']) {
     assert.doesNotThrow(() => createCover({ title: 'x', genre }), genre);
+  }
+  // A named style lists its own values; 'random' is read as names are.
+  assert.throws(
+    () => createCover({ title: 'x', style: 'stripes', variants: { layout: 'bogus' } }),
+    /Style "stripes" has no layout "bogus". Available: plate, open/,
+  );
+  assert.equal(
+    createCover({ title: 'x', style: ' Random ', palette: ' AUTO', seed: 'r' }).style,
+    createCover({ title: 'x', seed: 'r' }).style,
+  );
+  // A font added to FONTS is found too.
+  const { FONTS } = await import('../src/index.js');
+  /** @type {any} */ (FONTS).extra = { name: 'Extra', family: 'Georgia, serif' };
+  try {
+    assert.doesNotThrow(() => createCover({ title: 'x', font: 'Extra' }));
+  } finally {
+    delete (/** @type {any} */ (FONTS).extra);
+  }
   const { registerPalette } = await import('../src/index.js');
   assert.throws(() => registerStyle({ id: 'Random', render: () => '' }), /not a style id/);
   assert.throws(() => registerPalette({ id: 'AUTO', bg: '#ffffff', ink: '#000000', accents: ['#ff0000'] }), /reserved/);
