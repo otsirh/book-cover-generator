@@ -31,7 +31,7 @@ Generate book covers from a **title** and an **author**. 34 styles, 28 palettes 
 
 ## The web app
 
-On [covers.otsirh.dev](https://covers.otsirh.dev) you type a title and author (press Enter in the title to break its line where you want), then choose:
+On [covers.otsirh.dev](https://covers.otsirh.dev) you type a title and author (press Enter in the title to break its line where you want), and if you like a subtitle, a series line ("Book Two of the Ember Cycle") and a credit ("Translated by…"). Then you choose:
 
 - **a style**, from a rail that previews your book in all 34 styles. Eleven styles let you pin a choice the variation otherwise makes, such as Silhouette's city or forest, or where Aurora puts the title;
 - **title type**: any of the nine fonts instead of the style's, and the title in capitals or as typed. It stays when you change style, so the rail shows every style in your type;
@@ -110,7 +110,7 @@ npx book-cover-generator "Neon Tide" --size 1800x2700 --json
 npx book-cover-generator "Salt and Static" --count 12 -o ideas/cover.svg
 ```
 
-Options: `-s/--style`, `-p/--palette`, `--bg`, `--ink`, `--accent`, `--subtitle`, `--texture`, `--seed`, `--format` (`paperback`, `ebook` or `square`), `--width`, `--height`, `--size`, `--lang`, `--font`, `--case upper|normal`, `--variant name=value` (`--list` shows each style's), `-o/--out`, `--count`, `--json`, `--list`, `--help`.
+Options: `-s/--style`, `-p/--palette`, `--bg`, `--ink`, `--accent`, `--subtitle`, `--texture`, `--seed`, `--format` (`paperback`, `ebook` or `square`), `--width`, `--height`, `--size`, `--lang`, `--series`, `--credit`, `--font`, `--case upper|normal`, `--variant name=value` (`--list` shows each style's), `-o/--out`, `--count`, `--json`, `--list`, `--help`.
 
 ## API
 
@@ -127,6 +127,8 @@ Same as `generateCover`, but also tells you which style and palette were chosen.
 | `title`     | `string`           | `'Untitled'`           | a line break (`\n`) breaks the title's line there |
 | `author`    | `string`           | `''`                   | optional                                          |
 | `subtitle`  | `string`           | `''`                   | optional subtitle or tagline                      |
+| `series`    | `string`           | `''`                   | a series line above the title                     |
+| `credit`    | `string`           | `''`                   | a credit under the subtitle ("Translated by…")    |
 | `texture`   | `boolean`          | `false`                | adds a fine film grain                            |
 | `style`     | `string`           | `'random'`             | a style id, see `styles`                          |
 | `palette`   | `string \| object` | `'random'`             | a palette id, or `{ bg, ink, accents: [...] }`    |
@@ -195,7 +197,7 @@ generateCover({
 
 `render(ctx)` returns SVG markup without the outer `<svg>` element. `ctx` contains:
 
-- `title`, `author`, `subtitle` (may be empty)
+- `title`, `author`, `subtitle` (may be empty; a credit follows the subtitle on a line of its own), `series` (set by `titleBlock` above the title)
 - `W`, `H`: the size of the cover
 - `u`: a scale unit (1 at a short side of 600px)
 - `m`: the suggested margin

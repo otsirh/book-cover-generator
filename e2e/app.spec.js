@@ -1513,6 +1513,23 @@ test('a title font and case of your own: in the link, kept across styles, and in
   await expect(page.locator('#type-note')).toBeVisible();
 });
 
+test('a series line and a credit: typed in, on the cover and in the link', async ({ page }) => {
+  await page.goto('/#title=The+Lighthouse+Keeper&style=minimal&seed=s');
+  await expect(page.locator('#more-text')).not.toHaveAttribute('open');
+  await page.locator('#more-text summary').click();
+  await page.locator('#series').fill('Book Two of the Ember Cycle');
+  await page.locator('#credit').fill('Translated by Edith Grossman');
+  await expect.poll(() => svgSoon(page, '#preview')).toContain('BOOK TWO OF THE EMBER CYCLE');
+  expect(await svgOf(page, '#preview')).toContain('Translated by Edith Grossman');
+  await expect(page).toHaveURL(/series=Book\+Two\+of\+the\+Ember\+Cycle&credit=Translated\+by\+Edith\+Grossman/);
+  // A link with them opens the section that holds them.
+  const link = new URL(page.url()).hash;
+  await page.goto('about:blank');
+  await page.goto(`/${link}`);
+  await expect(page.locator('#more-text')).toHaveAttribute('open');
+  await expect(page.locator('#series')).toHaveValue('Book Two of the Ember Cycle');
+});
+
 test('a Japanese title sets the language of the cover', async ({ page }) => {
   await page.goto(`/#title=${encodeURIComponent('ガラスの街')}&style=minimal&seed=j`);
   expect(await svgOf(page, '#preview')).toMatch(/^<svg [^>]* lang="ja"/);

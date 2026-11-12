@@ -29,6 +29,8 @@ import { hashString, contrast } from '../src/core.js';
  * @property {string} title
  * @property {string} author
  * @property {string} subtitle
+ * @property {string} series    a series line above the title
+ * @property {string} credit    a credit under the subtitle ("Translated by …")
  * @property {string} style
  * @property {string} variant   the style's choices pinned, as name.value pairs joined by '-' ('scene.forest')
  * @property {string} font      the title's font (a FONTS key), or '' for the style's
@@ -157,6 +159,8 @@ const design = {
   title: sampleTitle,
   author: sampleAuthor,
   subtitle: '',
+  series: '',
+  credit: '',
   style: pick(STARTERS),
   variant: '',
   font: '',
@@ -209,6 +213,9 @@ const FIELDS = {
   author: { read: (v) => clipText(v, 120), empty: '' },
   // (Optional since 1.2.0: older links left it out when empty.)
   subtitle: { read: (v) => clipText(v, 160), empty: '', optional: true },
+  // (Since 1.5.0.)
+  series: { read: (v) => clipText(v, 120), empty: '', optional: true, omitEmpty: true },
+  credit: { read: (v) => clipText(v, 120), empty: '', optional: true, omitEmpty: true },
   style: { read: (v) => oneOf(text(v), STYLE_IDS.includes.bind(STYLE_IDS)), empty: '' },
   // (Since 1.5.0.) Checked against the style when used: see pinsFor().
   variant: { read: (v) => oneOf(text(v), VARIANT.test.bind(VARIANT)), empty: '', optional: true, omitEmpty: true },
@@ -702,6 +709,8 @@ function optionsFor(d, extra = {}) {
     title: d.title,
     author: d.author,
     subtitle: d.subtitle,
+    series: d.series,
+    credit: d.credit,
     style: d.style,
     palette: colors
       ? { bg: colors[0], ink: colors[1], accents: colors.slice(2) }
@@ -904,6 +913,8 @@ function buildControls() {
   $('title').addEventListener('input', (e) => update({ title: value(e) }, 'typing'));
   $('author').addEventListener('input', (e) => update({ author: value(e) }, 'typing'));
   $('subtitle').addEventListener('input', (e) => update({ subtitle: value(e) }, 'typing'));
+  $('series').addEventListener('input', (e) => update({ series: value(e) }, 'typing'));
+  $('credit').addEventListener('input', (e) => update({ credit: value(e) }, 'typing'));
   $('seed').addEventListener('input', (e) => update({ seed: value(e).trim() }, 'typing'));
   $('texture').addEventListener('change', (e) =>
     update({ texture: /** @type {HTMLInputElement} */ (e.target).checked }),
@@ -1269,9 +1280,11 @@ function syncSize(always = false) {
 
 function syncControls() {
   const input = (/** @type {string} */ id) => /** @type {HTMLInputElement} */ ($(id));
-  for (const key of /** @type {const} */ (['title', 'author', 'subtitle'])) {
+  for (const key of /** @type {const} */ (['title', 'author', 'subtitle', 'series', 'credit'])) {
     if (input(key).value !== design[key]) input(key).value = design[key];
   }
+  // (Opened when the design has either, so they are never hidden; closing it is up to you.)
+  if (design.series || design.credit) /** @type {HTMLDetailsElement} */ ($('more-text')).open = true;
   // (Compared trimmed, as the field's input handler trims: typing a space doesn't get undone.)
   if (input('seed').value.trim() !== design.seed) input('seed').value = design.seed;
   input('texture').checked = design.texture;

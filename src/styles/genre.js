@@ -524,7 +524,22 @@ export const blueprint = {
     s += line(bx + bw * 0.68, by + blockH * 0.68, bx + bw * 0.68, by + blockH, ink, u);
     const label = (/** @type {string} */ text, /** @type {number} */ x, /** @type {number} */ y) =>
       `<text x="${n(x)}" y="${n(y)}" ${textGroupAttrs({ font: FONTS.mono, size: labelSize, fill: ink, opacity: 0.7 })}>${escapeXml(text)}</text>`;
-    s += label('TITLE', bx + m * 0.4, by + labelRow * 0.7);
+    if (c.series) {
+      // The series goes in the title block's TITLE field (the title box has no room above the title).
+      const field = fitText(`TITLE · ${c.series}`, {
+        font: FONTS.mono,
+        upper: true,
+        maxWidth: bw - m * 0.8,
+        maxSize: labelSize,
+        maxLines: 1,
+      });
+      s += drawText(field, {
+        x: bx + m * 0.4,
+        y: by + labelRow * 0.7 - field.size * ((field.above ?? 0) + field.cap),
+        fill: ink,
+        opacity: 0.7,
+      });
+    } else s += label('TITLE', bx + m * 0.4, by + labelRow * 0.7);
     s += label('AUTHOR', bx + m * 0.4, by + blockH * 0.68 + labelRow * 0.7);
     s += label(`SCALE 1:${rng.pick([2, 5, 10, 20])}`, bx + bw * 0.68 + m * 0.3, by + blockH * 0.68 + labelRow * 0.7);
     s += label('SHEET 1 OF 1', bx + bw * 0.68 + m * 0.3, by + blockH - m * 0.35);
@@ -533,6 +548,7 @@ export const blueprint = {
       weight: 700,
       upper: true,
       letterSpacing: 0.04,
+      series: false,
       maxWidth: bw - m * 0.8,
       maxHeight: blockH * 0.68 - labelRow - m * 0.45,
       maxSize: S * (wide ? 0.16 : 0.11),

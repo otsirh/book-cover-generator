@@ -45,6 +45,8 @@ export interface TitleBlockOptions {
   /** Include the subtitle under the title. Default `true`. */
   subtitle?: boolean;
   subtitleFont?: FontSpec;
+  /** `false` to leave out the cover's series line (for a style that sets it itself). */
+  series?: false;
   subtitleItalic?: boolean;
   subtitleUpper?: boolean;
   subtitleSize?: number;

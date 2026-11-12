@@ -268,3 +268,18 @@ test('--font and --case set the title', async () => {
     assert.match(stderr, message);
   }
 });
+
+test('--series and --credit', async () => {
+  const { stdout } = await cli(
+    'Dune',
+    'Frank Herbert',
+    '-s',
+    'minimal',
+    '--series',
+    'Dune Chronicles 1',
+    '--credit',
+    'Foreword by Brian Herbert',
+  );
+  assert.match(stdout, /<title>Dune by Frank Herbert \(Dune Chronicles 1\)\. Foreword by Brian Herbert<\/title>/);
+  assert.match(stdout, />DUNE CHRONICLES 1</);
+});

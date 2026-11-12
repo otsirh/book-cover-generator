@@ -369,6 +369,8 @@ export function pickStyle(options = {}) {
 export function createCover(options = {}) {
   const { title, author, seed, styleId } = resolveText(options);
   const subtitle = cleanText(options.subtitle, 300);
+  const series = cleanText(options.series, 120);
+  const credit = cleanText(options.credit, 120);
   const W = dimension(options.width, 600, 'width');
   const H = dimension(options.height, W * 1.5, 'height');
   const lang = resolveLang(options.lang, `${title} ${subtitle} ${author}`);
@@ -399,6 +401,7 @@ export function createCover(options = {}) {
         !!options.texture,
         ...(Object.keys(pins).length ? [pins] : []),
         ...(titleType.font || titleType.titleCase ? [options.font ?? '', titleType.titleCase ?? ''] : []),
+        ...(series || credit ? [series, credit] : []),
       ]),
     ).toString(36);
   /** The variants the style chose (or was given). @type {Record<string, string>} */
@@ -409,7 +412,9 @@ export function createCover(options = {}) {
   const ctx = {
     title,
     author,
-    subtitle,
+    // A credit ("Translated by …") is a line of its own under the subtitle, so every style sets it.
+    subtitle: [subtitle, credit].filter(Boolean).join('\n'),
+    series,
     W,
     H,
     S: short,
@@ -439,7 +444,8 @@ export function createCover(options = {}) {
     body += `<defs>${dark.defs}${light.defs}</defs>${dark.layer}${light.layer}`;
   }
   const label = escapeXml(
-    `${title.replace(/\n/g, ' ')}${subtitle ? `: ${subtitle}` : ''}${author ? ` by ${author}` : ''}`,
+    `${title.replace(/\n/g, ' ')}${subtitle ? `: ${subtitle}` : ''}${author ? ` by ${author}` : ''}` +
+      `${series ? ` (${series})` : ''}${credit ? `. ${credit}` : ''}`,
   );
   // (Both spellings: `lang` is SVG 2's, `xml:lang` what older renderers read.)
   const langAttrs = lang ? ` lang="${lang}" xml:lang="${lang}"` : '';

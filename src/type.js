@@ -170,6 +170,7 @@ export function drawStack(fit, { x, y, anchor = 'start', fill = '#000', opacity,
  * @property {boolean} [stack]           try a justified stack first
  * @property {boolean} [subtitle]        include the subtitle (default true)
  * @property {import('./text.js').FontSpec} [subtitleFont]
+ * @property {false} [series]  false to leave out the cover's series line
  * @property {boolean} [subtitleItalic]
  * @property {boolean} [subtitleUpper]
  * @property {number} [subtitleSize]
@@ -231,6 +232,25 @@ export function titleBlock(c, o) {
   // reads as a stray mark, so short ones stay with the title.
   const { lead, main } = graphemes(split.lead).length >= 3 ? split : { lead: '', main: whole };
   const subtitle = o.subtitle === false ? '' : c.subtitle;
+  // The series ("Book Two of the Ember Cycle"): a small line of capitals above everything else.
+  const seriesFit =
+    o.series === false || !c.series
+      ? null
+      : fitText(c.series, {
+          font: o.subtitleFont ?? font,
+          weight: Math.min(weight, 600),
+          upper: true,
+          letterSpacing: 0.16,
+          maxWidth: o.maxWidth,
+          maxSize: clamp(o.maxSize * 0.2, c.S * 0.022, c.S * 0.036),
+          maxLines: 2,
+          lineHeight: 1.25,
+        });
+  const seriesH = seriesFit?.lines.length ? seriesFit.height + seriesFit.size * 1.2 : 0;
+  // Never at the title's expense beyond a quarter of the room: else it is left out.
+  const kicker = seriesH && seriesH <= o.maxHeight * 0.25 ? seriesFit : null;
+  const kickerH = kicker ? seriesH : 0;
+  const maxHeight = o.maxHeight - kickerH;
 
   const sub = subtitle
     ? fitSubtitle(c, subtitle, {
@@ -288,7 +308,7 @@ export function titleBlock(c, o) {
     let leadFitL = null;
     let leadGapL = 0;
     let reserve = leadText ? o.maxSize * 0.3 : 0;
-    let f = fitMain(text, Math.max(1, o.maxHeight - subHL - reserve));
+    let f = fitMain(text, Math.max(1, maxHeight - subHL - reserve));
     /** The lead line for a title of `size`: its fit and the room it takes with its gap. @param {number} size */
     const leadFor = (size) => {
       const fit = fitText(leadText, {
@@ -312,7 +332,7 @@ export function titleBlock(c, o) {
         let hi = reserve;
         for (let k = 0; k < 4 && hi - lo > 1; k++) {
           const mid = (lo + hi) / 2;
-          const bigger = fitMain(text, Math.max(1, o.maxHeight - subHL - mid));
+          const bigger = fitMain(text, Math.max(1, maxHeight - subHL - mid));
           const itsLead = leadFor(bigger.size);
           if (itsLead.needed <= mid + 0.5) {
             hi = mid;
@@ -324,7 +344,7 @@ export function titleBlock(c, o) {
         break;
       }
       reserve = leadLine.needed;
-      f = fitMain(text, Math.max(1, o.maxHeight - subHL - reserve));
+      f = fitMain(text, Math.max(1, maxHeight - subHL - reserve));
     }
     const leadHL = leadFitL ? leadFitL.height + leadGapL : 0;
     return {
@@ -344,15 +364,15 @@ export function titleBlock(c, o) {
   /** The title is at least as large as its subtitle and its lead. @param {ReturnType<typeof layout>} l */
   const inOrder = (l) => titleSize(l) >= Math.max(l.sub?.size ?? 0, l.leadFit?.size ?? 0);
   /** Fits the height, the title is whole, at its minimum or larger, and in order. @param {ReturnType<typeof layout>} l */
-  const fits = (l) => l.height <= o.maxHeight + 0.5 && !truncatedIn(l) && titleSize(l) >= minMain * 0.999 && inOrder(l);
+  const fits = (l) => l.height <= maxHeight + 0.5 && !truncatedIn(l) && titleSize(l) >= minMain * 0.999 && inOrder(l);
   /**
    * Of two layouts that don't fit, whether `a` is better: inside the height, then a title no
    * smaller than its subtitle and lead, then a larger title, then a whole one.
    * @param {ReturnType<typeof layout>} a @param {ReturnType<typeof layout>} b
    */
   const better = (a, b) => {
-    const inA = a.height <= o.maxHeight + 0.5;
-    const inB = b.height <= o.maxHeight + 0.5;
+    const inA = a.height <= maxHeight + 0.5;
+    const inB = b.height <= maxHeight + 0.5;
     if (inA !== inB) return inA;
     if (inOrder(a) !== inOrder(b)) return inOrder(a);
     if (Math.abs(titleSize(a) - titleSize(b)) > 0.01) return titleSize(a) > titleSize(b);
@@ -376,18 +396,20 @@ export function titleBlock(c, o) {
   if (!fits(L)) L = best;
   const { fit, leadFit, leadH } = L;
   const mainBottom = bottomOf(fit);
-  const width = Math.max(fit.width, leadFit?.width ?? 0, L.sub?.width ?? 0);
+  const width = Math.max(fit.width, leadFit?.width ?? 0, L.sub?.width ?? 0, kicker?.width ?? 0);
 
   return {
-    height: L.height,
+    height: L.height + kickerH,
     width,
     size: fit.size,
     smallest: titleSize(L),
     stacked: 'kind' in fit,
     lines: fit.lines.length,
     truncated: truncatedIn(L),
-    draw({ x, y, anchor = 'start', fill, leadFill, subtitleFill, attrs, lineFills }) {
+    draw({ x, y: top, anchor = 'start', fill, leadFill, subtitleFill, attrs, lineFills }) {
       let s = '';
+      if (kicker) s += drawText(kicker, { x, y: top, anchor, fill: leadFill ?? fill, opacity: 0.85, attrs });
+      const y = top + kickerH;
       if (leadFit) s += drawText(leadFit, { x, y, anchor, fill: leadFill ?? fill, attrs });
       const my = y + leadH;
       s +=

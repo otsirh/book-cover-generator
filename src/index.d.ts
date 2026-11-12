@@ -88,6 +88,10 @@ export interface CoverOptions {
   author?: string;
   /** A subtitle or tagline, set small under the title. Up to 300 characters are used. */
   subtitle?: string;
+  /** A series line set small above the title, such as `'Book Two of the Ember Cycle'`. Up to 120 characters. */
+  series?: string;
+  /** A credit set on a line of its own under the subtitle, such as `'Translated by Edith Grossman'`. Up to 120 characters. */
+  credit?: string;
   /** Add a fine film-grain texture over the cover. Default `false`. */
   texture?: boolean;
   /** A style id, a registered custom style, or `'random'` (default; picked from the seed). */
@@ -168,8 +172,10 @@ export interface ResolvedPalette extends Palette {
 export interface StyleContext {
   readonly title: string;
   readonly author: string;
-  /** Empty when there is no subtitle. */
+  /** Empty when there is no subtitle. A credit, if any, follows on a line of its own (after "\n"). */
   readonly subtitle: string;
+  /** The series line, or empty. `titleBlock` sets it above the title. */
+  readonly series: string;
   /** Cover width in px. */
   readonly W: number;
   /** Cover height in px. */

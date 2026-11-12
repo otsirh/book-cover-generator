@@ -659,7 +659,13 @@ export function fitText(text, opts) {
   const cap = font.cap ?? 0.72;
   // With `descent`, the budget also covers the descenders below the last line.
   const descent = Boolean(opts.descent);
-  const maxLines = opts.maxLines ?? 5;
+  // (Text typed on more lines than that gets them all: it shrinks to fit rather than lose one.)
+  const maxLines = Math.max(
+    opts.maxLines ?? 5,
+    String(text ?? '')
+      .split(LINE_BREAK)
+      .filter((l) => l.trim()).length,
+  );
   const maxWidth = Math.max(1, opts.maxWidth);
   const maxHeight = opts.maxHeight ?? Infinity;
   const maxSize = opts.maxSize;

@@ -374,6 +374,28 @@ input::placeholder {
   color: var(--muted);
 }
 
+/* Series and credit: tucked away until wanted. */
+.more-text {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.more-text summary {
+  width: fit-content;
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.more-text[open] summary {
+  margin-bottom: 10px;
+}
+
+.more-text .field + .field {
+  margin-top: 12px;
+}
+
 /* A style's variants: Auto, or one value pinned. */
 .style-variants {
   display: flex;

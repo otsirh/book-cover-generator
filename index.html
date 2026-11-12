@@ -163,6 +163,31 @@
           <span class="label">Subtitle or tagline <small>(optional)</small></span>
           <input id="subtitle" name="subtitle" type="text" maxlength="160" enterkeyhint="done" placeholder="A Novel" />
         </label>
+        <details class="more-text" id="more-text">
+          <summary>Series and credit</summary>
+          <label class="field">
+            <span class="label">Series <small>(above the title)</small></span>
+            <input
+              id="series"
+              name="series"
+              type="text"
+              maxlength="120"
+              enterkeyhint="done"
+              placeholder="Book Two of the Ember Cycle"
+            />
+          </label>
+          <label class="field">
+            <span class="label">Credit <small>(under the subtitle)</small></span>
+            <input
+              id="credit"
+              name="credit"
+              type="text"
+              maxlength="120"
+              enterkeyhint="done"
+              placeholder="Translated by Edith Grossman"
+            />
+          </label>
+        </details>
 
         <div class="randomize-row">
           <button type="button" class="primary" id="randomize" aria-keyshortcuts="R">

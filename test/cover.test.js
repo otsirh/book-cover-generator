@@ -1180,3 +1180,44 @@ test('a title typed on several lines is set on them, in every style, with the sa
   const { svg } = createCover({ title: 'T', author: 'A\nB', subtitle: 'C\nD', style: 'minimal' });
   assert.match(svg, /<title>T: C D by A B<\/title>/);
 });
+
+test('a series line and a credit, in every style', () => {
+  const missing = [];
+  for (const style of builtIn) {
+    for (const [width, height] of [
+      [600, 900],
+      [600, 600],
+      [1800, 600],
+    ]) {
+      const label = `${style} ${width}x${height}`;
+      const { svg } = createCover({
+        title: 'The Lighthouse Keeper',
+        author: 'Mara Ellison',
+        subtitle: 'A Novel',
+        series: 'Book Two of the Ember Cycle',
+        credit: 'Translated by Edith Grossman',
+        style,
+        seed: 's',
+        width,
+        height,
+      });
+      assertWellFormed(svg, label);
+      for (const [top, bottom, size] of textLines(svg)) {
+        if (size > Math.min(width, height) * 0.5) continue;
+        assert.ok(top >= -1 && bottom <= height + 1, `${label}: text at ${top}..${bottom}`);
+      }
+      const runs = textRuns(svg);
+      const title = runs.find((r) => /lighthouse|keeper/i.test(r.text));
+      const series = runs.find((r) => /ember cycle/i.test(r.text));
+      if (title && series) assert.ok(series.size < title.size, `${label}: series as large as the title`);
+      if (style !== 'typewriter' && style !== 'pixel' && width === 600 && height === 900 && !series)
+        missing.push(style);
+      assert.match(svg, /<title>[^<]*\(Book Two of the Ember Cycle\)\. Translated by Edith Grossman<\/title>/, label);
+    }
+  }
+  // Every style that sets its title with titleBlock sets the series on a paperback cover.
+  assert.deepEqual(missing, []);
+  // Without them, nothing changes.
+  const plain = createCover({ title: 'x', style: 'minimal', seed: 's' });
+  assert.equal(createCover({ title: 'x', style: 'minimal', seed: 's', series: ' ', credit: '' }).svg, plain.svg);
+});

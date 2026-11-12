@@ -17,6 +17,8 @@ Options:
                         geometric, humanist, condensed, display or mono
       --case <how>      the title in capitals (upper) or as typed (normal)
       --subtitle <text> a subtitle or tagline
+      --series <text>   a series line above the title ("Book Two of …")
+      --credit <text>   a credit under the subtitle ("Translated by …")
       --texture         add a fine film-grain texture
       --seed <value>    seed for the artwork (default: title + author)
       --format <shape>  paperback (2:3, the default), ebook (5:8) or square
@@ -52,6 +54,8 @@ try {
       font: { type: 'string' },
       case: { type: 'string' },
       subtitle: { type: 'string' },
+      series: { type: 'string' },
+      credit: { type: 'string' },
       texture: { type: 'boolean' },
       seed: { type: 'string' },
       format: { type: 'string' },
@@ -210,6 +214,8 @@ try {
     title: positionals[0],
     author: positionals[1] ?? '',
     subtitle: values.subtitle,
+    series: values.series,
+    credit: values.credit,
     texture: values.texture,
     style: values.style,
     palette: palette(),
