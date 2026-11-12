@@ -27,6 +27,7 @@ import {
 import { hashString, contrast } from '../src/core.js';
 import { CUSTOM_SIZE, customColors, slug } from '../src/shared.js';
 import { LINK_FIELDS, fits, lastValues, writeLink, customPalette, variantOf } from '../src/link.js';
+import { registerServiceWorker } from './offline.js';
 
 /** @typedef {keyof typeof formats} Preset */
 /**
@@ -666,6 +667,17 @@ let lastGalleryKey = '';
 /** @type {ReturnType<typeof setTimeout> | undefined} */
 let galleryTimer;
 
+/** The app's links to the gallery page (site/gallery.js keeps the design they carry). */
+const galleryLinks = /** @type {NodeListOf<HTMLAnchorElement>} */ (document.querySelectorAll('a[href^="/gallery/"]'));
+/**
+ * Keep the design in the gallery links, so its covers open your book: always, so a link opened
+ * in a new tab, copied or long-pressed carries it as a click does.
+ */
+function linkGallery() {
+  const href = `/gallery/${toHash(design)}`;
+  for (const a of galleryLinks) if (a.getAttribute('href') !== href) a.setAttribute('href', href);
+}
+
 /** @param {{ fade?: boolean, announce?: boolean }} [opts] */
 function render({ fade = false, announce = false } = {}) {
   applyShape();
@@ -679,6 +691,7 @@ function render({ fade = false, announce = false } = {}) {
   }
   syncControls();
   markRail();
+  linkGallery();
   // The gallery shows every style, so it only changes when something other than the style does.
   const key = JSON.stringify({ ...design, style: '' });
   if (key !== lastGalleryKey) {
@@ -1008,11 +1021,6 @@ function buildControls() {
     } catch {
       toast('Could not access the clipboard');
     }
-  });
-  // The Gallery link carries the design, so the gallery's links bring it back (site/gallery.js).
-  $('nav-gallery').addEventListener('click', () => {
-    flushReplace();
-    /** @type {HTMLAnchorElement} */ ($('nav-gallery')).href = `/gallery/${toHash(design)}`;
   });
   $('copy-image-link').addEventListener('click', async () => {
     flushReplace();
@@ -2127,30 +2135,6 @@ function toast(msg) {
 
 /* -------------------------------------------------------------------- boot */
 
-/**
- * Work offline: a service worker keeps the app's files (public/sw.js). The page runs under
- * Trusted Types, so the worker's URL goes through a policy that allows only it.
- */
-function registerServiceWorker() {
-  if (!('serviceWorker' in navigator)) return;
-  try {
-    const types = /** @type {any} */ (window).trustedTypes;
-    const url = types
-      ? types
-          .createPolicy('sw', {
-            createScriptURL: (/** @type {string} */ u) => {
-              if (u !== '/sw.js') throw new TypeError(`Not the service worker: ${u}`);
-              return u;
-            },
-          })
-          .createScriptURL('/sw.js')
-      : '/sw.js';
-    navigator.serviceWorker.register(url).catch((err) => console.warn('No offline copy:', err));
-  } catch (err) {
-    console.warn('No offline copy:', err);
-  }
-}
-
 // A shared link opens the same cover every time (see complete()); with no link, the sample stays.
 const linked = fromHash(location.hash);
 if (Object.keys(linked).length) Object.assign(design, complete(linked));
@@ -2162,12 +2146,14 @@ else {
   if (suits.length) design.style = pick(starters.length ? starters : suits);
 }
 const linkedHash = location.hash;
-// A fragment that isn't a design (#usage, from a header link opened in a new tab) is a place on
-// the page. The URL is about to hold the design instead, so scroll there once the page is built.
+// A fragment can name a place on the page: alone (#usage, from a header link opened in a new tab),
+// or before a design (#usage&title=…, from the gallery's header). The URL is about to hold just the
+// design, so scroll there once the page is built.
 let anchor = /** @type {HTMLElement | null} */ (null);
-if (!Object.keys(linked).length && location.hash.length > 1) {
+const place = location.hash.slice(1).split('&')[0];
+if (place && !place.includes('=')) {
   try {
-    anchor = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+    anchor = document.getElementById(decodeURIComponent(place));
   } catch {
     // A malformed fragment: nothing to scroll to.
   }

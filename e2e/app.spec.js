@@ -1817,7 +1817,9 @@ test('<book-cover> draws a cover on a page from its attributes', async ({ page }
 });
 
 test('the gallery draws every style, and a click opens the generator in it', async ({ page }) => {
-  await page.goto('/gallery/');
+  // (Without its slash, sent to it with the query, as production does.)
+  await page.goto('/gallery?from=test');
+  await expect(page).toHaveURL(/\/gallery\/\?from=test$/);
   const covers = page.locator('book-cover');
   await expect(covers).toHaveCount(39);
   const drawn = () =>
@@ -1847,10 +1849,26 @@ for (const scheme of /** @type {const} */ (['light', 'dark'])) {
 
 test('your design goes to the gallery and comes back in the style you pick', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto('/#title=My%20Own%20Book&author=Me&style=minimal&seed=mine&palette=mint&format=paperback');
+  await page.goto('/#title=My%20Own%20Book&author=Me&style=minimal&variant=align.start&seed=mine&palette=mint');
   await ready(page);
+  // Every link to the gallery carries it, before any click (opened in a new tab, it would too).
+  const links = page.locator('a[href^="/gallery/"]');
+  await expect(links).toHaveCount(2);
+  for (const href of await links.evaluateAll((els) => els.map((el) => el.getAttribute('href')))) {
+    expect(href).toMatch(/^\/gallery\/#title=My\+Own\+Book&/);
+  }
   await page.locator('#nav-gallery').click();
   await expect(page).toHaveURL(/\/gallery\/#title=My\+Own\+Book&/);
+  // Your pins stay with your own style, and are left behind for another, as in the app.
+  await expect(page.locator('a[data-style="minimal"]')).toHaveAttribute('href', /style=minimal&variant=align\.start/);
+  await expect(page.locator('a[data-style="crest"]')).not.toHaveAttribute('href', /variant=/);
+  await expect(page.locator('.site-header a[aria-current="page"]')).toHaveAttribute('href', /^\/gallery\/#title=/);
+  // The header's links back to the app keep the design, and the place they go to.
+  await page.locator('.site-header a', { hasText: 'Developers' }).click();
+  await expect(page.locator('#title')).toHaveValue('My Own Book');
+  await expect(page.locator('#usage')).toBeInViewport();
+  await expect(page).not.toHaveURL(/usage/);
+  await page.goBack();
   await page.locator('a[data-style="crest"]').click();
   await selected(page, 'crest');
   await expect(page.locator('#title')).toHaveValue('My Own Book');
@@ -1866,11 +1884,14 @@ test('lazy covers hold their own shape, and draw at once when no longer lazy', a
     document.body.append(spacer);
     const el = /** @type {any} */ (document.createElement('book-cover'));
     el.setAttribute('loading', 'LAZY');
-    el.setAttribute('cover-title', 'Square');
-    el.setAttribute('format', 'square');
+    el.setAttribute('author', 'Ann');
     el.style.width = '200px';
     document.body.append(el);
     const img = el.shadowRoot.querySelector('img');
+    const untitled = img.alt;
+    // Changed while it waits: its name and shape follow.
+    el.setAttribute('cover-title', 'Square');
+    el.setAttribute('format', 'square');
     const before = {
       src: img.getAttribute('src'),
       height: Math.round(img.getBoundingClientRect().height),
@@ -1879,10 +1900,17 @@ test('lazy covers hold their own shape, and draw at once when no longer lazy', a
     const drawn = new Promise((resolve) => el.addEventListener('cover', resolve, { once: true }));
     el.removeAttribute('loading');
     await drawn;
+    // (Its shape held before the image has decoded, too.)
+    const drawing = Math.round(img.getBoundingClientRect().height);
     await img.decode();
-    return { before, after: Math.round(img.getBoundingClientRect().height) };
+    return { untitled, before, drawing, after: Math.round(img.getBoundingClientRect().height) };
   });
-  expect(shape).toEqual({ before: { src: null, height: 200, alt: 'Cover: Square' }, after: 200 });
+  expect(shape).toEqual({
+    untitled: 'Cover: Untitled by Ann',
+    before: { src: null, height: 200, alt: 'Cover: Square by Ann' },
+    drawing: 200,
+    after: 200,
+  });
 });
 
 test('the gallery and the app fit a 320px phone @mobile', async ({ page }) => {
@@ -1918,6 +1946,25 @@ test('works offline once it has loaded', async ({ page, context, browserName }) 
     await page.goto('/gallery/');
     await expect(page.locator('h1')).toContainText('cover styles');
     await expect(page.locator('book-cover').first()).toBeAttached();
+  } finally {
+    await context.setOffline(false);
+  }
+});
+
+test('the gallery works offline on its own, opened before the app', async ({ page, context, browserName }) => {
+  test.skip(browserName !== 'chromium', 'Playwright emulates offline service workers reliably only in Chromium');
+  await page.goto('/gallery/');
+  await page.evaluate(() => navigator.serviceWorker.ready.then(() => undefined));
+  await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
+  await context.setOffline(true);
+  try {
+    for (const path of ['/gallery/', '/gallery/index.html']) {
+      await page.goto(path);
+      await expect(page.locator('h1'), path).toContainText('cover styles');
+    }
+    // Its covers open the app, kept too.
+    await page.locator('a[data-style="crest"]').click();
+    await selected(page, 'crest');
   } finally {
     await context.setOffline(false);
   }

@@ -35,8 +35,8 @@ const offline = [
   ...filesIn('site'),
   // (Not the MCP server, which the pages never load.)
   ...filesIn('src').filter((path) => path.endsWith('.js') && path !== '/src/mcp.js'),
-  // The gallery, linked from the app's header.
-  '/gallery/',
+  // The pages the build writes (the gallery), linked from the app's header.
+  ...Object.keys(PAGES),
   '/manifest.webmanifest',
   ...filesIn('icons'),
 ];

@@ -33,13 +33,19 @@ function chrome() {
     markup
       .replaceAll('href="./"', 'href="/"')
       .replace(/href="#/g, 'href="/#')
-      .replace('<a href="/gallery/" id="nav-gallery">', '<a href="/gallery/" aria-current="page">');
-  // The app's module preloads (its own script aside), so the covers' modules come at once.
-  const preloads = [...html.matchAll(/<link rel="modulepreload" href="(src\/[^"]+)" \/>/g)]
+      .replace(/<a ([^>]*)id="nav-gallery"([^>]*)>/, '<a $1aria-current="page"$2>');
+  // The app's module preloads of the library (the app's own scripts aside), so the covers' modules
+  // come at once.
+  const preloads = [...html.matchAll(/<link rel="modulepreload" href="(src\/[^"]+)"/g)]
     .map((m) => `    <link rel="modulepreload" href="/${m[1]}" />`)
     .join('\n');
+  const header = forGallery(part('header', 'site-header'));
+  // (Markup these depend on, changed in index.html: say so, rather than build a page without it.)
+  if (!header.includes('aria-current="page"'))
+    throw new Error('scripts/gallery.js: index.html has no #nav-gallery link');
+  if (!preloads.includes('/src/index.js')) throw new Error('scripts/gallery.js: index.html preloads no src/ modules');
   return {
-    header: forGallery(part('header', 'site-header')),
+    header,
     footer: forGallery(part('footer', 'site-footer')),
     preloads,
   };
@@ -88,6 +94,7 @@ export function galleryHtml() {
     <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/site/style.css" />
     <link rel="modulepreload" href="/src/element.js" />
+    <link rel="modulepreload" href="/site/offline.js" />
 ${preloads}
     <script type="module" src="/src/element.js"></script>
     <script type="module" src="/site/gallery.js"></script>

@@ -2,6 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
+import { PAGES } from '../scripts/gallery.js';
 
 test('security.txt has not expired (and will not within 30 days)', () => {
   const text = readFileSync('public/.well-known/security.txt', 'utf8');
@@ -23,8 +24,8 @@ test('every local asset referenced by index.html exists', () => {
   const html = readFileSync('index.html', 'utf8');
   const refs = [...html.matchAll(/(?:href|src)="([^"#:]+)"/g)].map((m) => m[1]).filter((r) => !r.startsWith('./'));
   assert.ok(refs.length > 5);
-  // (Pages the build writes: scripts/gallery.js's PAGES.)
-  const built = new Set(['/gallery/']);
+  // (And the pages the build writes.)
+  const built = new Set(Object.keys(PAGES));
   for (const ref of refs) assert.ok(built.has(ref) || existsSync(ref) || existsSync(`public/${ref}`), `missing ${ref}`);
 });
 

@@ -39,10 +39,13 @@ const CSS =
   ':host{display:inline-block;width:240px;vertical-align:top}:host([hidden]){display:none}' +
   'img{display:block;width:100%;height:auto}';
 
-/** How an image of a cover is named: "Cover: Dune by Frank Herbert". @param {string} title @param {string} author */
+/**
+ * How an image of a cover is named: "Cover: Dune by Frank Herbert" (with no title, "Untitled", as
+ * the cover says). @param {string} title @param {string} author
+ */
 const altFor = (title, author) => {
   const [t, a] = [title, author].map((s) => s.replace(/\s+/g, ' ').trim());
-  return t ? `Cover: ${t}${a ? ` by ${a}` : ''}` : '';
+  return `Cover: ${t || 'Untitled'}${a ? ` by ${a}` : ''}`;
 };
 /** The element's styles as a constructed sheet: a page whose CSP allows no inline styles still applies it. */
 const sheet =
@@ -108,18 +111,22 @@ export class BookCover extends Base {
     // loading="lazy", as on an image: drawn once it comes near the viewport.
     if (this.#lazy() && !this.cover && BookCover.#observer) {
       this.#waiting = true;
-      // Until it is drawn: named from its attributes, and the cover's own shape held for it.
-      this.#img.alt = altFor(this.getAttribute('cover-title') ?? '', this.getAttribute('author') ?? '');
-      try {
-        const { width = 600, height = width * 1.5 } = this.options();
-        this.#img.style.aspectRatio = `${width} / ${height}`;
-      } catch {
-        this.#img.style.aspectRatio = '2 / 3';
-      }
+      this.#hold();
       BookCover.#observer.observe(this);
       return;
     }
     this.#render();
+  }
+
+  /** Until it is drawn: named from its attributes, and the cover's own shape held for it. */
+  #hold() {
+    this.#img.alt = altFor(this.getAttribute('cover-title') ?? '', this.getAttribute('author') ?? '');
+    try {
+      const { width = 600, height = width * 1.5 } = this.options();
+      this.#img.style.aspectRatio = `${width} / ${height}`;
+    } catch {
+      this.#img.style.aspectRatio = '2 / 3';
+    }
   }
 
   disconnectedCallback() {
@@ -138,9 +145,14 @@ export class BookCover extends Base {
       BookCover.#observer?.unobserve(this);
       this.#waiting = false;
     }
+    // A cover still waiting: its name and shape follow the attributes.
+    if (this.#waiting) {
+      this.#hold();
+      return;
+    }
     // (Several attributes set at once draw once; an element upgraded on the page draws once, when
     // it connects.)
-    if (!this.#ready || this.#waiting || this.#queued || !this.isConnected) return;
+    if (!this.#ready || this.#queued || !this.isConnected) return;
     this.#queued = true;
     queueMicrotask(() => {
       this.#queued = false;
@@ -171,7 +183,8 @@ export class BookCover extends Base {
       this.cover = createCover(options);
       this.#img.src = svgToDataUrl(this.cover.svg);
       this.#img.alt = altFor(this.cover.title, this.cover.author);
-      this.#img.style.aspectRatio = '';
+      // (Its shape held while the image decodes, so nothing below it moves.)
+      this.#img.style.aspectRatio = `${this.cover.width} / ${this.cover.height}`;
       this.dispatchEvent(new CustomEvent('cover', { detail: this.cover }));
     } catch (err) {
       this.cover = null;

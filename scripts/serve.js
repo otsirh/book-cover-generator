@@ -135,17 +135,17 @@ async function handle(req, res) {
       (seg) =>
         (seg.startsWith('.') && seg !== '.well-known' && seg !== '..') || seg.startsWith('_') || seg === 'node_modules',
     );
+  // A page the build writes, without its slash: sent to it, as production does (built or not).
+  if (Object.hasOwn(PAGES, `${urlPath}/`)) {
+    res.writeHead(307, { Location: `${urlPath}/${new URL(req.url ?? '/', 'http://localhost').search}` }).end();
+    return;
+  }
   let file = hidden ? null : await locate(urlPath);
   let status = 200;
-  // A page the build writes, made here when the roots haven't it (the source tree); without its
-  // slash, sent to it, as production does.
+  // A page the build writes, made here when the roots haven't it (the source tree).
   /** @type {string | null} */
   let generated = null;
   const page = PAGES[/** @type {keyof typeof PAGES} */ (urlPath)];
-  if (!file && Object.hasOwn(PAGES, `${urlPath}/`)) {
-    res.writeHead(307, { Location: `${urlPath}/` }).end();
-    return;
-  }
   if (!file && page) generated = page();
   else if (!file) {
     status = 404;

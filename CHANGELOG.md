@@ -6,10 +6,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
-- **A gallery** of every style at [covers.otsirh.dev/gallery/](https://covers.otsirh.dev/gallery/), each drawn for a book of the genre it suits (by `<book-cover>`, in your browser) and opening the generator in it. It works offline, as the app does.
+- **A gallery** of every style at [covers.otsirh.dev/gallery/](https://covers.otsirh.dev/gallery/), each drawn for a book of the genre it suits (by `<book-cover>`, in your browser) and opening the generator in it. It works offline, as the app does, even when it is the first page you open.
 - **JSR**: `import { createCover } from 'jsr:@otsirh/book-cover-generator'` in Deno. Every module names its types for Deno.
-- `<book-cover loading="lazy">` draws once it comes near the viewport, as an image does (the gallery's covers do), holding the cover's shape until then.
-- Going to the gallery from the app keeps your design: a cover there opens your book in its style.
+- `<book-cover loading="lazy">` draws once it comes near the viewport, as an image does (the gallery's covers do). Until then it holds the cover's shape and is named for screen readers, both following its attributes.
+- Going to the gallery from the app keeps your design, whichever link takes you there (or opens it in a new tab): a cover there opens your book in its style, with your pins if it is your own style, and the header's links take you back to your design.
 - The app's developer section shows every way to use the covers: an image link, `<book-cover>`, an AI assistant (MCP) and the library.
 
 ### Fixed
