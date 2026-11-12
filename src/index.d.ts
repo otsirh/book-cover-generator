@@ -86,6 +86,106 @@ export declare function createMockup(
   options?: MockupOptions,
 ): { svg: string; width: number; height: number };
 
+/** A paper a paperback is printed on. `color` is KDP's standard colour; `premium-color` is thicker. */
+export type PaperType = 'white' | 'cream' | 'color' | 'premium-color';
+/** How thick a page is, in inches, on each paper (Amazon KDP's figures). */
+export declare const paperTypes: Readonly<Record<PaperType, number>>;
+/** Common paperback trim sizes, width × height in inches, by name (`'6x9'`…). */
+export declare const trimSizes: Readonly<
+  Record<'5x8' | '5.25x8' | '5.5x8.5' | '6x9' | '6.14x9.21' | '7x10' | '8.5x11', readonly [number, number]>
+>;
+/** What a paperback can be (Amazon KDP's limits). */
+export declare const printLimits: Readonly<{
+  /** Trim width, in inches: least and most. */
+  width: readonly [number, number];
+  /** Trim height, in inches: least and most. */
+  height: readonly [number, number];
+  /** Page count: least and most. */
+  pages: readonly [number, number];
+  /** The most pages on cream paper, which is thicker. */
+  creamPages: number;
+  /** A book with fewer pages has no text on its spine. */
+  spineTextPages: number;
+}>;
+/**
+ * A paperback's spine width in inches: `pages` times the thickness of its paper (default white).
+ * Throws for an unknown paper, or a page count outside `printLimits`.
+ */
+export declare function spineWidth(pages: number, paper?: PaperType | (string & {})): number;
+
+/** Options for `createPrintCover`: the book as printed, and its back cover. */
+export interface PrintOptions {
+  /** The page count, from which the spine's width follows. Required. */
+  pages: number;
+  /** The trim size: a name such as `'6x9'` or `'5.5 × 8.5'`, or `[width, height]` in inches. Default `'6x9'`. */
+  trim?: string | readonly [number, number];
+  /** The paper, which sets the thickness of a page. Default `'white'`. */
+  paper?: PaperType | (string & {});
+  /** Inches per page, for a printer with other figures than KDP's (instead of `paper`'s). */
+  pageThickness?: number;
+  /** Bleed past the trim on the outside edges, in inches. Default 0.125 (KDP's). */
+  bleed?: number;
+  /** A line or two at the top of the back cover, set large ("Some lights are kept burning for a reason."). */
+  hook?: string;
+  /** The back cover's text: paragraphs separated by blank lines. As large as fits, from 12 pt to 8 pt, then cut with "…". */
+  blurb?: string;
+  /** A small line at the foot of the back cover: your imprint, website… */
+  imprint?: string;
+  /** Keep the barcode's box (2 × 1.2 in, at the foot of the back, by the spine) clear of text. Default `true`. */
+  barcode?: boolean;
+  /** The back cover's colour (hex). Default: the cover's background. */
+  backColor?: string;
+  /** The spine's colour (hex). Default: the cover's ink. */
+  spineColor?: string;
+  /** Draw the trim, the folds and the barcode's box as dashed lines: for a preview, not for the printer. */
+  guides?: boolean;
+}
+
+/** A paperback's whole cover, from `createPrintCover`. */
+export interface PrintCover {
+  /** The back, the spine and the front as one SVG, in CSS px (96 to the inch). */
+  svg: string;
+  /** Its width in CSS px (96 to the inch). */
+  width: number;
+  /** Its height in CSS px (96 to the inch). */
+  height: number;
+  /** Its sizes in inches, as a print service asks for them. */
+  inches: {
+    /** The whole width: bleed, back, spine, front and bleed. */
+    width: number;
+    /** The whole height: the trim's and the bleed above and below. */
+    height: number;
+    /** The trim size, width and height. */
+    trim: [number, number];
+    /** The spine's width. */
+    spine: number;
+    /** The bleed on each outside edge. */
+    bleed: number;
+  };
+  /** Whether the spine has the title and author (only from `printLimits.spineTextPages` pages, and when they'd be readable). */
+  spineText: boolean;
+  /** The barcode's box in CSS px, kept clear of text, or null with `barcode: false`. */
+  barcode: { x: number; y: number; width: number; height: number } | null;
+  /** The front cover, as `createCover` drew it at the trim's shape. */
+  front: Cover;
+}
+
+/**
+ * A paperback's whole cover as one SVG: the back with your text and room for the barcode, the
+ * spine with the title and author, and the front, which is the cover `cover` draws, its art
+ * carried into the bleed. Sized by Amazon KDP's rules from the trim and the page count; in a
+ * browser, `svgToPdf` (from `./browser`) makes the PDF to upload.
+ *
+ * ```js
+ * const { svg, inches } = createPrintCover(
+ *   { title: 'The Lighthouse Keeper', author: 'Mara Ellison', style: 'artdeco' },
+ *   { trim: '6x9', pages: 320, paper: 'cream', blurb: 'When the lamp at Gull Point goes dark…' },
+ * );
+ * // inches.width === 13.05, inches.spine === 0.8
+ * ```
+ */
+export declare function createPrintCover(cover?: CoverOptions, print?: PrintOptions): PrintCover;
+
 /** This version of the library, such as `'1.4.0'`. Artwork for a seed can change between minor versions. */
 export declare const version: string;
 /** The sizes a cover can have: each side `min` to `max` px, and neither more than `ratio` times the other. */

@@ -823,6 +823,27 @@ input[type='number'][aria-invalid='true'] {
   min-width: 0;
 }
 
+/* The preview's column, as tall as the first row: on wider screens the preview stays in view (sticky)
+   within it, and so never over the tools below. */
+.stage-zone {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: stretch;
+  min-width: 0;
+}
+
+/* Under the preview: kept designs, many covers, print. Their own block, so the preview's column
+   stays short enough to keep in view however many designs are kept. */
+.stage-tools {
+  grid-column: 2;
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
 .preview-wrap {
   display: flex;
   justify-content: center;
@@ -1170,6 +1191,33 @@ input[type='number'][aria-invalid='true'] {
   color: var(--muted);
 }
 
+/* Paperback for print: the trim, pages and paper in a row, the back cover's text, a preview. */
+.print-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 120px), 1fr));
+  gap: 8px;
+}
+
+.print-row label,
+.print-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.print-preview {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+.print-preview:not([src]) {
+  display: none;
+}
+
 .kept-head {
   display: flex;
   align-items: center;
@@ -1273,6 +1321,9 @@ input[type='number'][aria-invalid='true'] {
 /* -------------------------------------------------------------------- rail */
 
 .rail {
+  /* (Beside the preview and the tools under it.) */
+  grid-column: 3;
+  grid-row: 1 / span 2;
   position: sticky;
   top: 16px;
   max-height: calc(100vh - 32px);
@@ -1640,7 +1691,6 @@ pre {
   .stage {
     position: sticky;
     top: 16px;
-    align-self: start;
   }
 }
 
@@ -1651,6 +1701,7 @@ pre {
 
   .rail {
     grid-column: 1 / -1;
+    grid-row: auto;
     position: static;
     max-height: none;
     overflow: visible;
@@ -1691,6 +1742,7 @@ pre {
     padding: 0 16px 24px;
   }
 
+  .stage-zone,
   .stage {
     display: contents;
   }
@@ -1726,8 +1778,13 @@ pre {
     width: 100%;
   }
 
-  .kept {
+  .stage-tools {
+    grid-column: 1;
+    grid-row: auto;
     order: 5;
+  }
+
+  .kept {
     width: 100%;
   }
 

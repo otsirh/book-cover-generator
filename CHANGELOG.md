@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+
+- **A paperback for print**: the whole cover of a printed book, the back, the spine and the front, as the PDF Amazon KDP takes. In the app, **Paperback for print** sizes it from the trim, the page count and the paper (an eighth of an inch of bleed, a spine as wide as the pages are thick, blank under 80 pages as KDP requires), sets your headline, back cover text and imprint on the back with the barcode's box left clear, carries the front's art into the bleed, and downloads a PDF at 300 dpi with its trim marked. In the library, `createPrintCover(cover, print)` makes it as SVG and `svgToPdf` (in `./browser`) the PDF; `spineWidth`, `trimSizes`, `paperTypes` and `printLimits` give the numbers. On the command line, `--print 6x9 --pages 320`.
+
+### Fixed
+
+- On phones, **Many covers** sat above the preview at the top of the page; it now follows the export buttons, with Kept designs and the print panel. On wider screens, the preview stays in view beside the controls however many designs are kept, and never covers what's under it.
+
 ## [1.9.2] - 2026-11-13
 
 The whole API documented, on JSR and in your editor. Covers are drawn as in 1.9.1.

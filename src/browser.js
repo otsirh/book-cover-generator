@@ -1,6 +1,7 @@
 /* @ts-self-types="./browser.d.ts" */
-// Browser helpers for exporting covers: copy, download, rasterise, zip. (`setDpi` and
+// Browser helpers for exporting covers: copy, download, rasterise, zip, print PDF. (`setDpi` and
 // `zipFiles` also work in Node.)
+import { pdfPage } from './pdf.js';
 
 /** SVG markup to a `data:` URL usable as an <img> src. */
 export function svgToDataUrl(svg) {
@@ -82,6 +83,65 @@ export async function rasterize(
     );
   });
   return dpi ? setDpi(blob, dpi) : blob;
+}
+
+/**
+ * A print-ready PDF of an SVG whose px are CSS px (96 to the inch), as `createPrintCover` makes:
+ * one page at its size, drawn at `dpi` (300 by default, what printers ask for) as JPEG, with its
+ * trim box `bleed` inches inside the page. A page too large for one canvas (browsers cap their
+ * size; iPhones and iPads at 16.7 million pixels) is drawn in strips, side by side.
+ * @param {string} svg
+ * @param {{ dpi?: number, quality?: number, bleed?: number, title?: string, maxPixels?: number }} [opts]
+ * @returns {Promise<Blob>}
+ */
+export async function svgToPdf(svg, { dpi = 300, quality = 0.95, bleed = 0, title = '', maxPixels = 16_777_216 } = {}) {
+  const size = svgSize(svg);
+  if (!size) throw new RangeError('svgToPdf: the SVG needs a width and height (or a viewBox)');
+  for (const [name, value] of /** @type {const} */ ([
+    ['dpi', dpi],
+    ['quality', quality],
+    ['maxPixels', maxPixels],
+  ])) {
+    if (!(Number.isFinite(value) && value > 0)) throw new RangeError(`svgToPdf: ${name} must be a positive number`);
+  }
+  const [sw, sh] = size;
+  const [pageW, pageH] = [(sw / 96) * 72, (sh / 96) * 72];
+  const [pw, ph] = [Math.max(1, Math.round((sw / 96) * dpi)), Math.max(1, Math.round((sh / 96) * dpi))];
+  const strips = Math.max(1, Math.ceil((pw * ph) / maxPixels));
+  const stripPixels = Math.ceil(pw / strips);
+  // The root's viewBox, which each strip narrows to its own part.
+  const tag = /<svg\b[^>]*>/i.exec(svg)?.[0] ?? '';
+  const box = /\sviewBox="\s*([-\d.]+)[\s,]+([-\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)\s*"/.exec(tag);
+  const [vx, vy, vw, vh] = box ? box.slice(1, 5).map(Number) : [0, 0, sw, sh];
+  /** @type {import('./pdf.js').PdfImage[]} */
+  const images = [];
+  for (let x0 = 0; x0 < pw; x0 += stripPixels) {
+    const w = Math.min(stripPixels, pw - x0);
+    const part =
+      strips === 1
+        ? svg
+        : svg.replace(
+            tag,
+            tag
+              .replace(/\s(width|height|viewBox)="[^"]*"/g, '')
+              .replace(
+                /^<svg\b/i,
+                `<svg width="${(w / pw) * sw}" height="${sh}" viewBox="${vx + (x0 / pw) * vw} ${vy} ${(w / pw) * vw} ${vh}"`,
+              ),
+          );
+    const jpeg = await rasterize(part, { type: 'image/jpeg', width: w, height: ph, quality, background: '#ffffff' });
+    images.push({
+      jpeg: new Uint8Array(await jpeg.arrayBuffer()),
+      pixelWidth: w,
+      pixelHeight: ph,
+      x: (x0 / pw) * pageW,
+      y: 0,
+      width: (w / pw) * pageW,
+      height: pageH,
+    });
+  }
+  const pdf = pdfPage({ width: pageW, height: pageH, bleed: bleed * 72, title, images });
+  return new Blob([/** @type {BlobPart} */ (pdf)], { type: 'application/pdf' });
 }
 
 /* ----------------------------------------------------------- bytes and files */

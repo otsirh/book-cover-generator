@@ -4,7 +4,7 @@
 // Only system font stacks are used so that covers render identically when the
 // SVG is rasterised through <img>/<canvas> (which cannot load web fonts).
 
-import { escapeXml, n } from './core.js';
+import { escapeXml, n, stripInvalidXml } from './core.js';
 // (The width tables are for measuring without a canvas. A browser loads them too, about 6 KB
 // compressed: a Node-only entry point would spare it that, but bundlers and Workers pick entry
 // points their own way, and one entry everywhere is worth more.)
@@ -392,6 +392,27 @@ export const typedLines = (text) => Math.max(1, text.split(LINE_BREAK).filter((l
 
 /** A line break in the text itself (a title typed on two lines): lines always break there. */
 export const LINE_BREAK = /\r\n|[\r\n\u2028\u2029]/;
+
+// eslint-disable-next-line no-control-regex -- matching control characters is the point
+const CONTROL = /[\u0000-\u001F\u007F-\u009F]/g;
+
+/**
+ * Collapse control characters and whitespace, drop anything illegal in XML and
+ * cap the length (so huge inputs can't make layout slow).
+ * @param {unknown} value
+ * @param {number} max  maximum length in characters
+ * @param {{ breaks?: boolean }} [options]
+ */
+export function cleanText(value, max, { breaks = false } = {}) {
+  // With `breaks`, line breaks stay (as "\n", one between lines): the title's lines break there.
+  const text = String(value ?? '')
+    .split(breaks ? LINE_BREAK : /(?!)/)
+    .map((line) => stripInvalidXml(line.replace(CONTROL, ' ')).replace(BREAKING_SPACE, ' ').trim())
+    .filter(Boolean)
+    .join('\n');
+  // Cut between visible characters (segmenting lazily), so an emoji or accented letter is never split.
+  return text.length > max ? clipGraphemes(text, max).trimEnd() : text;
+}
 
 /**
  * Wrap units of text that may hold line breaks: each line is split as `tokenize` splits text,

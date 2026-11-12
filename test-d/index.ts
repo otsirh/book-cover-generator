@@ -29,6 +29,13 @@ import generateDefault, {
   textPanel,
   baselineOf,
   textBottom,
+  createPrintCover,
+  spineWidth,
+  trimSizes,
+  paperTypes,
+  printLimits,
+  type PrintCover,
+  type PaperType,
   type Cover,
   type StyleGroup,
   type StyleContext,
@@ -43,6 +50,7 @@ import {
   setDpi,
   zipFiles,
   svgToDataUrl,
+  svgToPdf,
 } from '../src/browser.js';
 import type { BookCover } from '../src/element.js';
 const typed: BookCover | null = null;
@@ -153,6 +161,19 @@ const elementStyle: string | undefined = element.cover?.style;
 void element.options().title;
 // @ts-expect-error copyImage always makes a PNG
 void copyImage(svg, { type: 'image/jpeg' });
+const paperback: PrintCover = createPrintCover(
+  { title: 'Dune', style: 'retro' },
+  { trim: '6x9', pages: 412, paper: 'cream', blurb: 'A desert planet.', backColor: '#102030' },
+);
+const spineIn: number = paperback.inches.spine + spineWidth(200, 'white') + paperTypes.cream;
+const trimIn: readonly [number, number] = trimSizes['5.5x8.5'];
+const minPages: number = printLimits.pages[0];
+const paperKind: PaperType = 'premium-color';
+const pdf: Promise<Blob> = svgToPdf(paperback.svg, { bleed: paperback.inches.bleed, title: 'Dune' });
+// @ts-expect-error the page count is required
+void createPrintCover({ title: 'Dune' }, { trim: '6x9' });
+// @ts-expect-error a trim is a name or [width, height]
+void createPrintCover({}, { pages: 100, trim: 6 });
 
 export {
   fromDefault,
@@ -169,4 +190,9 @@ export {
   listed,
   named,
   elementStyle,
+  spineIn,
+  trimIn,
+  minPages,
+  paperKind,
+  pdf,
 };

@@ -37,6 +37,26 @@ export interface RasterizeOptions {
   background?: string;
 }
 
+/** Options for `svgToPdf`. */
+export interface PdfOptions {
+  /** Pixels per inch to draw the page at. Default 300, what printers ask for. */
+  dpi?: number;
+  /** JPEG quality, 0–1. Default 0.95. */
+  quality?: number;
+  /** Bleed in inches: the PDF's trim box is this far inside the page on every side. Default 0. */
+  bleed?: number;
+  /** The document's title, in its properties. */
+  title?: string;
+  /** The most pixels to draw on one canvas; a larger page is drawn in strips. Default 16,777,216 (iOS's limit). */
+  maxPixels?: number;
+}
+
+/**
+ * A print-ready PDF (one page, as JPEG at `dpi`) of an SVG whose px are CSS px, 96 to the inch,
+ * as `createPrintCover` makes: `svgToPdf(print.svg, { bleed: print.inches.bleed, title })` is the
+ * file to upload to KDP. Throws if the SVG has no size.
+ */
+export declare function svgToPdf(svg: string, opts?: PdfOptions): Promise<Blob>;
 /** Render SVG markup to an image Blob. Browsers that can't encode `type` return PNG; check `blob.type`. */
 export declare function rasterize(svg: string, opts?: RasterizeOptions): Promise<Blob>;
 /** Trigger a file download for a Blob. */

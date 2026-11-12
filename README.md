@@ -29,6 +29,7 @@ Generate book covers from a **title** and an **author**. 39 styles, 28 palettes 
 - **Randomizer.** Every random choice comes from a seed, so the same seed always gives the same cover. If you don't pass a seed, it is derived from the title and author.
 - **Any size.** 2:3 paperback, 5:8 eBook, 1:1 audiobook, or any width × height from 50 to 10,000 px with an aspect ratio between 1:3 and 3:1, such as Kindle's 1600 × 2560 or a print trim size at 300 dpi.
 - **Export.** Download SVG, PNG, JPEG or WebP. PNG and JPEG files record 300 dpi, so print software sizes them right. Copy the image or the SVG, or share it from a phone.
+- **A paperback for print.** The whole cover of a printed book, back, spine and front, as the PDF Amazon KDP takes: sized from the trim and the page count, with bleed, the back cover's text, and room for the barcode.
 
 ## The web app
 
@@ -45,6 +46,8 @@ On [covers.otsirh.dev](https://covers.otsirh.dev) you type a title and author (p
 **Mockup** shows and downloads the cover as a 3D book, a flat shot, on an e-reader, or on a social card (a 1200 × 630 link preview, a square post or a story, with a line such as "Out now").
 
 **Many covers** takes a list of books (one per line as `Title | Author | Subtitle`, or a CSV with a title column) and makes them all with the design you have, as PNG or SVG in one ZIP. With a fixed variation they share one look, as a series does; switch on "A different palette for each" for a set in several colours.
+
+**Paperback for print** makes the whole cover of a printed paperback from the design: the back with your headline, back cover text and imprint (and the barcode's box left clear), the spine with the title and author, and the front. Choose the trim size, the page count and the paper, and it sizes everything as Amazon KDP asks: an eighth of an inch of bleed, a spine as wide as the pages are thick (and blank under 80 pages, as KDP requires), the front's art carried into the bleed. **Download print PDF** saves the file to upload: one page at 300 dpi, its trim marked. The back and spine take any colour of the palette; the settings stay in your browser for next time.
 
 **Keep** saves a design to a tray under the preview, together with the cover as it was drawn, so a later version of the app can't change it. **Download all** saves every kept design as a PNG in one ZIP file. **Export** saves the kept designs to a file, and **Import** adds them in another browser.
 
@@ -177,9 +180,12 @@ npx book-cover-generator "Neon Tide" --size 1800x2700 --json
 npx book-cover-generator --batch books.csv --style minimal --seed series --out-dir covers
 # twelve variations to choose from: ideas/cover-1.svg … ideas/cover-12.svg (seeds 1 to 12)
 npx book-cover-generator "Salt and Static" --count 12 -o ideas/cover.svg
+# a paperback's whole cover for print (back, spine and front), 6 × 9 in with 320 pages on cream paper
+npx book-cover-generator "The Lighthouse Keeper" "Mara Ellison" -s artdeco --print 6x9 --pages 320 --paper cream \
+  --hook "Some lights are kept burning." --blurb-file blurb.txt -o paperback.svg
 ```
 
-Options: `-s/--style`, `-p/--palette`, `--bg`, `--ink`, `--accent`, `--subtitle`, `--texture`, `--seed`, `--format` (`paperback`, `ebook` or `square`), `--width`, `--height`, `--size`, `--genre`, `--lang`, `--series`, `--credit`, `--badge`, `--font`, `--case upper|normal`, `--variant name=value` (`--list` shows each style's), `-o/--out`, `--count`, `--batch <file|->`, `--out-dir`, `--json`, `--list`, `--help`.
+Options: `-s/--style`, `-p/--palette`, `--bg`, `--ink`, `--accent`, `--subtitle`, `--texture`, `--seed`, `--format` (`paperback`, `ebook` or `square`), `--width`, `--height`, `--size`, `--genre`, `--lang`, `--series`, `--credit`, `--badge`, `--font`, `--case upper|normal`, `--variant name=value` (`--list` shows each style's), `-o/--out`, `--count`, `--batch <file|->`, `--out-dir`, `--print <trim>` with `--pages`, `--paper`, `--hook`, `--blurb`, `--blurb-file` and `--imprint`, `--json`, `--list`, `--help`. A print cover is an SVG at 96 px to the inch: the app makes the PDF, or any SVG converter does (`rsvg-convert -f pdf`).
 
 ## API
 
@@ -253,6 +259,23 @@ const card = createMockup(cover, { kind: 'card', text: 'Out now' }); // 1200 × 
 ```
 
 Product shots (`flat`, `book`, `ereader`) follow the cover's size on a light backdrop (`background` to change it); social cards have fixed sizes and take the cover's colours. `mockupKinds` lists them.
+
+### Print: a paperback's whole cover
+
+```js
+import { createPrintCover } from 'book-cover-generator';
+import { svgToPdf, downloadBlob } from 'book-cover-generator/browser';
+
+const print = createPrintCover(
+  { title: 'The Lighthouse Keeper', author: 'Mara Ellison', style: 'artdeco' },
+  { trim: '6x9', pages: 320, paper: 'cream', hook: 'Some lights are kept burning.', blurb: 'When the lamp…' },
+);
+print.inches; // { width: 13.05, height: 9.25, trim: [6, 9], spine: 0.8, bleed: 0.125 }
+const pdf = await svgToPdf(print.svg, { bleed: print.inches.bleed, title: 'The Lighthouse Keeper' });
+downloadBlob(pdf, 'paperback.pdf'); // one page at 300 dpi, the file to upload to KDP
+```
+
+`createPrintCover(cover, print)` lays out the back (the `hook`, the `blurb`'s paragraphs at the largest size from 12 to 8 pt that fits, an `imprint`, and the barcode's 2 × 1.2 in box kept clear), the spine (the title and author, from 80 pages and when they'd be readable) and the front (the cover these options draw at the trim's shape, its edges mirrored into the bleed). Sizes follow Amazon KDP: `trim` by name (`trimSizes`) or `[width, height]` in inches, `paper` (`paperTypes`: white, cream, color, premium-color), `bleed` (0.125 in) and `pageThickness` for another printer's figures, `backColor` and `spineColor` (the cover's background and ink by default), and `guides` to dash the trim, the folds and the barcode's box for a preview. `spineWidth(pages, paper)` gives the spine alone; `printLimits` what KDP takes. `svgToPdf` draws a page too large for one canvas in strips.
 
 ### Export helpers (browser)
 

@@ -409,3 +409,65 @@ test('--format with --width or --height: the shape at that size, as the HTTP API
     assert.deepEqual([width, height], size, args.join(' '));
   }
 });
+
+test('--print: the whole paperback cover, sized from the trim and the pages', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'book-cover-print-'));
+  try {
+    const out = join(dir, 'paperback.svg');
+    const blurbFile = join(dir, 'blurb.txt');
+    await import('node:fs/promises').then((fs) => fs.writeFile(blurbFile, 'The first paragraph.\n\nThe second one.'));
+    const made = await cli(
+      'The Lighthouse Keeper',
+      'Mara Ellison',
+      '-s',
+      'artdeco',
+      '--print',
+      '6x9',
+      '--pages',
+      '320',
+      '--paper',
+      'cream',
+      '--hook',
+      'Some lights are kept burning.',
+      '--blurb-file',
+      blurbFile,
+      '--imprint',
+      'Harbour Press',
+      '-o',
+      out,
+    );
+    assert.equal(made.code, 0, made.stderr);
+    assert.match(made.stderr, /Wrote .*paperback\.svg: 13\.05 × 9\.25 in, spine 0\.8 in \(style: artdeco\)/);
+    const svg = await readFile(out, 'utf8');
+    assert.match(svg, /^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" width="1252\.8" height="888"/);
+    for (const text of [
+      'Some lights are kept',
+      'The first paragraph.',
+      'The second one.',
+      'Harbour Press',
+      'MARA ELLISON',
+    ]) {
+      assert.ok(svg.includes(text), text);
+    }
+    // As JSON, to stdout.
+    const json = JSON.parse((await cli('X', '--print', '5x8', '--pages', '60', '--json')).stdout);
+    assert.deepEqual(json.inches, { width: 10.38512, height: 8.25, trim: [5, 8], spine: 0.13512, bleed: 0.125 });
+    assert.equal(json.spineText, false);
+    assert.match(json.svg, /^<svg /);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+  // What doesn't go with it, or is missing.
+  for (const [args, message] of /** @type {const} */ ([
+    [['X', '--print', '6x9'], /--print needs --pages/],
+    [['X', '--pages', '300'], /--pages is for a print cover: add --print/],
+    [['X', '--print', '6x9', '--pages', '200', '--size', '600x900'], /use it without --size/],
+    [['X', '--print', '6x9', '--pages', '200', '--blurb', 'a', '--blurb-file', 'b'], /--blurb or --blurb-file/],
+    [['X', '--print', '9x13', '--pages', '200'], /trim must be/],
+    [['X', '--print', '6x9', '--pages', '2000'], /pages must be a whole number from 24 to 828/],
+  ])) {
+    const { code, stderr } = await cli(...args);
+    assert.equal(code, 1, args.join(' '));
+    assert.match(stderr, message, args.join(' '));
+  }
+});

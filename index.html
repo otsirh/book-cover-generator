@@ -56,6 +56,8 @@
     <link rel="modulepreload" href="src/badge.js" />
     <link rel="modulepreload" href="src/shared.js" />
     <link rel="modulepreload" href="src/link.js" />
+    <link rel="modulepreload" href="src/print.js" />
+    <link rel="modulepreload" href="src/pdf.js" />
     <script type="module" src="site/app.js"></script>
   </head>
   <body class="app-page">
@@ -413,76 +415,80 @@
         </p>
       </form>
 
-      <section class="stage" aria-labelledby="preview-heading">
-        <h2 id="preview-heading" class="visually-hidden">Preview</h2>
-        <div class="preview-wrap">
-          <button
-            type="button"
-            class="thumb-toggle"
-            id="thumb-toggle"
-            aria-pressed="false"
-            title="See the cover as small as stores list it: is the title still clear?"
-          >
-            Store size
-          </button>
-          <figure class="book" id="book">
-            <img id="preview" alt="Cover preview" width="600" height="900" />
-            <img id="preview-prev" class="prev" alt="" aria-hidden="true" width="600" height="900" />
-          </figure>
-        </div>
-        <p class="meta" id="meta"></p>
-        <div class="variations-row">
-          <span class="variations-label" id="variations-label">Variations</span>
-          <div class="variations" id="variations" role="group" aria-labelledby="variations-label"></div>
-        </div>
-        <p class="visually-hidden" id="announce" aria-live="polite"></p>
-
-        <div class="export">
-          <button type="button" class="primary download" id="dl-png">
-            <svg aria-hidden="true"><use href="#i-download" /></svg>
-            <span>Download PNG <small id="png-size"></small></span>
-          </button>
-          <div class="secondary" role="group" aria-label="More export options">
-            <button type="button" id="dl-jpeg" aria-label="Download JPEG">JPEG</button>
-            <button type="button" id="dl-webp" aria-label="Download WebP">WebP</button>
-            <button type="button" id="dl-svg" aria-label="Download SVG">SVG</button>
-            <button type="button" id="copy-image" hidden>Copy image</button>
-            <button type="button" id="copy-svg">Copy SVG</button>
-            <button type="button" id="copy-link">Copy link</button>
-            <button type="button" id="copy-image-link">Copy image link</button>
-            <button type="button" id="share" hidden>Share</button>
-            <button type="button" id="keep" aria-label="Keep this design">
-              <svg aria-hidden="true"><use href="#i-star" /></svg> Keep
+      <div class="stage-zone">
+        <section class="stage" aria-labelledby="preview-heading">
+          <h2 id="preview-heading" class="visually-hidden">Preview</h2>
+          <div class="preview-wrap">
+            <button
+              type="button"
+              class="thumb-toggle"
+              id="thumb-toggle"
+              aria-pressed="false"
+              title="See the cover as small as stores list it: is the title still clear?"
+            >
+              Store size
             </button>
+            <figure class="book" id="book">
+              <img id="preview" alt="Cover preview" width="600" height="900" />
+              <img id="preview-prev" class="prev" alt="" aria-hidden="true" width="600" height="900" />
+            </figure>
           </div>
-          <div class="size">
-            <span class="label" id="scale-label">Size</span>
-            <div class="segmented compact" id="scale" role="group" aria-labelledby="scale-label">
-              <button type="button" data-scale="1">1×</button>
-              <button type="button" data-scale="2">2×</button>
-              <button type="button" data-scale="3">3×</button>
-              <button type="button" data-scale="4">4×</button>
-            </div>
+          <p class="meta" id="meta"></p>
+          <div class="variations-row">
+            <span class="variations-label" id="variations-label">Variations</span>
+            <div class="variations" id="variations" role="group" aria-labelledby="variations-label"></div>
           </div>
-          <p class="size-hint" id="size-hint"></p>
-          <div class="mockup">
-            <img id="mockup-preview" class="mockup-preview" alt="" />
-            <div class="mockup-controls">
-              <label class="label" for="mockup-kind">Mockup</label>
-              <select id="mockup-kind">
-                <option value="book">3D book</option>
-                <option value="flat">Flat, with a shadow</option>
-                <option value="ereader">E-reader</option>
-                <option value="card">Link preview · 1200 × 630</option>
-                <option value="square">Square post · 1080 × 1080</option>
-                <option value="story">Story · 1080 × 1920</option>
-              </select>
-              <input id="mockup-text" type="text" maxlength="80" placeholder="A line for the card: Out now" hidden />
-              <button type="button" id="dl-mockup">Download mockup</button>
-            </div>
-          </div>
-        </div>
+          <p class="visually-hidden" id="announce" aria-live="polite"></p>
 
+          <div class="export">
+            <button type="button" class="primary download" id="dl-png">
+              <svg aria-hidden="true"><use href="#i-download" /></svg>
+              <span>Download PNG <small id="png-size"></small></span>
+            </button>
+            <div class="secondary" role="group" aria-label="More export options">
+              <button type="button" id="dl-jpeg" aria-label="Download JPEG">JPEG</button>
+              <button type="button" id="dl-webp" aria-label="Download WebP">WebP</button>
+              <button type="button" id="dl-svg" aria-label="Download SVG">SVG</button>
+              <button type="button" id="copy-image" hidden>Copy image</button>
+              <button type="button" id="copy-svg">Copy SVG</button>
+              <button type="button" id="copy-link">Copy link</button>
+              <button type="button" id="copy-image-link">Copy image link</button>
+              <button type="button" id="share" hidden>Share</button>
+              <button type="button" id="keep" aria-label="Keep this design">
+                <svg aria-hidden="true"><use href="#i-star" /></svg> Keep
+              </button>
+            </div>
+            <div class="size">
+              <span class="label" id="scale-label">Size</span>
+              <div class="segmented compact" id="scale" role="group" aria-labelledby="scale-label">
+                <button type="button" data-scale="1">1×</button>
+                <button type="button" data-scale="2">2×</button>
+                <button type="button" data-scale="3">3×</button>
+                <button type="button" data-scale="4">4×</button>
+              </div>
+            </div>
+            <p class="size-hint" id="size-hint"></p>
+            <div class="mockup">
+              <img id="mockup-preview" class="mockup-preview" alt="" />
+              <div class="mockup-controls">
+                <label class="label" for="mockup-kind">Mockup</label>
+                <select id="mockup-kind">
+                  <option value="book">3D book</option>
+                  <option value="flat">Flat, with a shadow</option>
+                  <option value="ereader">E-reader</option>
+                  <option value="card">Link preview · 1200 × 630</option>
+                  <option value="square">Square post · 1080 × 1080</option>
+                  <option value="story">Story · 1080 × 1920</option>
+                </select>
+                <input id="mockup-text" type="text" maxlength="80" placeholder="A line for the card: Out now" hidden />
+                <button type="button" id="dl-mockup">Download mockup</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="stage-tools">
         <section class="kept" id="kept" aria-labelledby="kept-heading">
           <div class="kept-head">
             <h2 id="kept-heading">Kept designs</h2>
@@ -529,7 +535,77 @@
             <ul class="kept-list" id="many-preview"></ul>
           </details>
         </section>
-      </section>
+
+        <section class="many print" aria-labelledby="print-heading">
+          <details id="print">
+            <summary><h2 id="print-heading">Paperback for print</h2></summary>
+            <p class="many-help" id="print-help">
+              The whole cover of a printed paperback: the back, the spine and this front, sized from the trim and the
+              page count as Amazon KDP asks, as the PDF to upload (300 dpi, with bleed).
+            </p>
+            <div class="print-row">
+              <label
+                ><span class="label">Trim (in)</span
+                ><select id="print-trim"></select
+              ></label>
+              <label
+                ><span class="label">Pages</span
+                ><input id="print-pages" type="number" inputmode="numeric" min="24" max="828" step="1" value="300"
+              /></label>
+              <label
+                ><span class="label">Paper</span
+                ><select id="print-paper">
+                  <option value="white">White</option>
+                  <option value="cream">Cream</option>
+                  <option value="color">Colour</option>
+                  <option value="premium-color">Premium colour</option>
+                </select></label
+              >
+            </div>
+            <label class="print-field"
+              ><span class="label">Headline</span
+              ><input
+                id="print-hook"
+                type="text"
+                maxlength="200"
+                placeholder="Some lights are kept burning for a reason."
+            /></label>
+            <label class="print-field"
+              ><span class="label">Back cover</span
+              ><textarea
+                id="print-blurb"
+                rows="5"
+                maxlength="3000"
+                placeholder="What the book is about. A blank line starts a new paragraph."
+              ></textarea>
+            </label>
+            <label class="print-field"
+              ><span class="label">Imprint</span
+              ><input id="print-imprint" type="text" maxlength="80" placeholder="Your imprint or website"
+            /></label>
+            <div class="print-row">
+              <label
+                ><span class="label">Back</span
+                ><select id="print-back"></select
+              ></label>
+              <label
+                ><span class="label">Spine</span
+                ><select id="print-spine"></select
+              ></label>
+            </div>
+            <img
+              id="print-preview"
+              class="print-preview"
+              alt="The whole paperback cover: the back, the spine and the front, with the trim, the folds and the barcode's box dashed"
+            />
+            <p class="many-count" id="print-size" role="status"></p>
+            <div class="many-row">
+              <button type="button" class="kept-tool" id="print-pdf">Download print PDF</button>
+              <button type="button" class="kept-tool" id="print-svg">SVG</button>
+            </div>
+          </details>
+        </section>
+      </div>
 
       <aside class="rail" id="styles" aria-labelledby="rail-heading">
         <div class="rail-head">

@@ -12,6 +12,8 @@ import {
   parseBookList,
   optionsForBook,
   genres,
+  createPrintCover,
+  trimSizes,
 } from '../src/index.js';
 import {
   svgToDataUrl,
@@ -23,6 +25,8 @@ import {
   rasterize,
   zipFiles,
   extensionOf,
+  svgToPdf,
+  svgToBlob,
 } from '../src/browser.js';
 import { hashString, contrast } from '../src/core.js';
 import { CUSTOM_SIZE, customColors, slug } from '../src/shared.js';
@@ -692,6 +696,14 @@ function render({ fade = false, announce = false } = {}) {
   syncControls();
   markRail();
   linkGallery();
+  // The print panel follows the design, when it's open.
+  if (
+    /** @type {HTMLDetailsElement} */ ($('print')).open &&
+    JSON.stringify({ design, settings: printSettings() }) !== lastPrintKey
+  ) {
+    clearTimeout(printTimer);
+    printTimer = setTimeout(renderPrint, typing ? 250 : 0);
+  }
   // The gallery shows every style, so it only changes when something other than the style does.
   const key = JSON.stringify({ ...design, style: '' });
   if (key !== lastGalleryKey) {
@@ -1067,6 +1079,7 @@ function buildControls() {
     }),
   );
   buildMany();
+  buildPrint();
   $('thumb-toggle').addEventListener('click', () => {
     const on = $('book').classList.toggle('store-size');
     $('thumb-toggle').setAttribute('aria-pressed', String(on));
@@ -2123,6 +2136,183 @@ async function downloadMany() {
   } finally {
     button.textContent = 'Download all as ZIP';
   }
+}
+
+/* ------------------------------------------------------------------- print */
+
+const PRINT_KEY = 'book-cover-generator:print';
+/** The paperback's settings, as the print form holds them. */
+const PRINT_DEFAULTS = {
+  trim: '6x9',
+  pages: 300,
+  paper: 'white',
+  hook: '',
+  blurb: '',
+  imprint: '',
+  /** The back's colour and the spine's, by their place in the cover's palette: bg, ink, a0… */
+  back: 'bg',
+  spine: 'ink',
+};
+/** @typedef {typeof PRINT_DEFAULTS} PrintSettings */
+/** @type {ReturnType<typeof setTimeout> | undefined} */
+let printTimer;
+let lastPrintKey = '';
+const PRINT_FIELDS = /** @type {const} */ (['trim', 'pages', 'paper', 'hook', 'blurb', 'imprint', 'back', 'spine']);
+
+/** The print settings last used in this browser (a convenience: they aren't in the link). */
+function savedPrint() {
+  const out = { ...PRINT_DEFAULTS };
+  try {
+    const saved = JSON.parse(localStorage.getItem(PRINT_KEY) || '{}');
+    for (const key of PRINT_FIELDS) {
+      if (typeof saved?.[key] === typeof PRINT_DEFAULTS[key]) /** @type {any} */ (out)[key] = saved[key];
+    }
+  } catch {
+    // Storage blocked, or something else there: the defaults.
+  }
+  return out;
+}
+
+/** @param {string} id */
+const field = (id) => /** @type {HTMLInputElement} */ ($(id));
+
+/** The print form's settings. @returns {PrintSettings} */
+function printSettings() {
+  return {
+    trim: field('print-trim').value,
+    pages: Number(field('print-pages').value),
+    paper: field('print-paper').value,
+    hook: field('print-hook').value,
+    blurb: field('print-blurb').value,
+    imprint: field('print-imprint').value,
+    back: field('print-back').value,
+    spine: field('print-spine').value,
+  };
+}
+
+/** A colour of the cover's palette by its place (bg, ink, a0…). @param {string} key @param {ReturnType<typeof createCover>['colors']} colors */
+function paletteColour(key, colors) {
+  if (key === 'bg') return colors.bg;
+  if (key === 'ink') return colors.ink;
+  return colors.accents[Number(key.slice(1))] ?? colors.ink;
+}
+
+/** The colour menus, from the cover's palette (the choice kept, as a place in it). */
+function printColourMenus() {
+  const { colors } = current;
+  const choices = [['bg', 'Background'], ['ink', 'Ink'], ...colors.accents.map((_, i) => [`a${i}`, `Accent ${i + 1}`])];
+  for (const id of ['print-back', 'print-spine']) {
+    const menu = /** @type {HTMLSelectElement} */ ($(id));
+    const chosen = menu.value || (id === 'print-back' ? savedPrint().back : savedPrint().spine);
+    const labels = choices.map(([key, name]) => `${key}:${name}:${paletteColour(key, colors)}`).join('|');
+    if (menu.dataset.labels !== labels) {
+      menu.dataset.labels = labels;
+      menu.replaceChildren(
+        ...choices.map(([key, name]) => h('option', { value: key }, `${name} · ${paletteColour(key, colors)}`)),
+      );
+    }
+    menu.value = choices.some(([key]) => key === chosen) ? chosen : id === 'print-back' ? 'bg' : 'ink';
+  }
+}
+
+/**
+ * The paperback cover for a design and the print settings.
+ * @param {Design} d @param {PrintSettings} settings @param {boolean} guides
+ */
+function printCoverOf(d, settings, guides) {
+  const { colors } = current;
+  return createPrintCover(optionsFor(d), {
+    trim: settings.trim,
+    pages: settings.pages,
+    paper: settings.paper,
+    hook: settings.hook,
+    blurb: settings.blurb,
+    imprint: settings.imprint,
+    backColor: paletteColour(settings.back, colors),
+    spineColor: paletteColour(settings.spine, colors),
+    guides,
+  });
+}
+
+/** The preview and the sizes, when the panel is open. */
+function renderPrint() {
+  if (!(/** @type {HTMLDetailsElement} */ ($('print')).open)) return;
+  printColourMenus();
+  const settings = printSettings();
+  lastPrintKey = JSON.stringify({ design, settings });
+  try {
+    localStorage.setItem(PRINT_KEY, JSON.stringify(settings));
+  } catch {
+    // Storage blocked: the settings last as long as the page.
+  }
+  const preview = /** @type {HTMLImageElement} */ ($('print-preview'));
+  try {
+    const print = printCoverOf(design, settings, true);
+    preview.src = svgToDataUrl(print.svg);
+    const { width, height, spine } = print.inches;
+    const inches = (/** @type {number} */ v) => v.toFixed(3).replace(/\.?0+$/, '');
+    $('print-size').textContent =
+      `Whole cover ${inches(width)} × ${inches(height)} in, spine ${inches(spine)} in` +
+      (print.spineText ? '' : ` (no spine text: ${settings.pages < 80 ? 'under 80 pages' : 'too thin to read'})`);
+  } catch (err) {
+    preview.removeAttribute('src');
+    $('print-size').textContent = err instanceof Error ? err.message : String(err);
+  }
+}
+
+function buildPrint() {
+  const saved = savedPrint();
+  const trims = /** @type {HTMLSelectElement} */ ($('print-trim'));
+  trims.replaceChildren(
+    ...Object.entries(trimSizes).map(([name, [w, h2]]) => h('option', { value: name }, `${w} × ${h2}`)),
+  );
+  for (const key of PRINT_FIELDS) {
+    if (key === 'back' || key === 'spine') continue;
+    const input = field(`print-${key}`);
+    input.value = String(saved[key]);
+    // (A trim saved that the menu no longer has: the default.)
+    if (input.value !== String(saved[key])) input.value = String(PRINT_DEFAULTS[key]);
+  }
+  const later = () => {
+    clearTimeout(printTimer);
+    printTimer = setTimeout(renderPrint, 250);
+  };
+  for (const key of PRINT_FIELDS)
+    field(`print-${key}`).addEventListener(
+      key === 'blurb' || key === 'hook' || key === 'imprint' || key === 'pages' ? 'input' : 'change',
+      later,
+    );
+  $('print').addEventListener('toggle', renderPrint);
+  const pdf = /** @type {HTMLButtonElement} */ ($('print-pdf'));
+  pdf.addEventListener('click', () =>
+    busyWhile(pdf, async () => {
+      // Taken now: the design may change while the PDF is drawn.
+      const d = { ...design };
+      const settings = printSettings();
+      try {
+        const print = printCoverOf(d, settings, false);
+        pdf.textContent = 'Drawing the PDF…';
+        const blob = await svgToPdf(print.svg, { bleed: print.inches.bleed, title: oneLine(d.title) });
+        downloadBlob(blob, `${slug(d.title)}-paperback-${settings.trim}.pdf`);
+        toast(
+          `Saved the print PDF · ${print.inches.width.toFixed(3).replace(/\.?0+$/, '')} × ${print.inches.height} in at ${DPI} dpi`,
+        );
+      } catch (err) {
+        console.error(err);
+        toast(err instanceof RangeError ? err.message : 'The PDF could not be made. Try the SVG.');
+      } finally {
+        pdf.textContent = 'Download print PDF';
+      }
+    }),
+  );
+  $('print-svg').addEventListener('click', () => {
+    try {
+      const print = printCoverOf({ ...design }, printSettings(), false);
+      downloadBlob(svgToBlob(print.svg), `${slug(design.title)}-paperback-${printSettings().trim}.svg`);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : String(err));
+    }
+  });
 }
 
 /** @type {ReturnType<typeof setTimeout> | undefined} */

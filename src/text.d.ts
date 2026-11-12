@@ -90,6 +90,12 @@ export declare function noteText(x0: number, y0: number, x1: number, y1: number)
 export declare function recordText<T>(draw: () => T): { result: T; boxes: TextBox[] };
 /** The start of a string, cut between user-perceived characters (`units`: count UTF-16 code units). */
 export declare function clipGraphemes(str: string, max: number, options?: { units?: boolean }): string;
+/**
+ * Text as a cover sets it: control characters and runs of spaces become one space, characters XML
+ * can't hold are dropped, and it's cut (between whole characters) to `max` characters. With
+ * `breaks`, typed line breaks stay, as "\n" (empty lines dropped).
+ */
+export declare function cleanText(value: unknown, max: number, options?: { breaks?: boolean }): string;
 /** Split a string into user-perceived characters. */
 export declare function graphemes(str: string): string[];
 

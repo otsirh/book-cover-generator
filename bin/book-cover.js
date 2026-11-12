@@ -3,7 +3,15 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { parseArgs } from 'node:util';
-import { createCover, listStyles, palettes, parseBookList, optionsForBook, genres } from '../src/index.js';
+import {
+  createCover,
+  createPrintCover,
+  listStyles,
+  palettes,
+  parseBookList,
+  optionsForBook,
+  genres,
+} from '../src/index.js';
 import { hex, slug } from '../src/shared.js';
 import { px, formatSize } from '../src/link.js';
 import { answerPayload } from '../src/mcp.js';
@@ -44,6 +52,16 @@ Options:
                         line as "Title | Author | Subtitle"; the other options
                         apply to every book the list doesn't say otherwise for
       --out-dir <dir>   where --batch writes its covers (default: here)
+      --print <trim>    the whole paperback cover for print, back, spine and front,
+                        sized for Amazon KDP from the trim (6x9, 5.5x8.5…, in
+                        inches) and --pages; an SVG at 96 px to the inch (the
+                        app makes the PDF)
+      --pages <n>       the page count, for the spine (with --print)
+      --paper <kind>    white (default), cream, color or premium-color
+      --hook <text>     a line or two, large, at the top of the back
+      --blurb <text>    the back cover's text (a blank line between paragraphs)
+      --blurb-file <f>  the back cover's text from a file (- reads stdin)
+      --imprint <text>  a small line at the foot of the back
   -o, --out <file>      write SVG to a file instead of stdout
       --count <n>       write n variations (seeds 1…n, or <seed>-1…), named
                         cover-1.svg… from --out (or put {n} or {seed} in it)
@@ -59,7 +77,9 @@ Examples:
   book-cover "Neon Tide" "Kai Moreno" --style retro --palette synth --size 1600x2560 > cover.svg
   book-cover "Bright Machines" --bg 0b132b --ink f8f9fa --accent ff6b6b,4ecdc4 --format ebook -o cover.svg
   book-cover "Salt and Static" "J. R. Okafor" --count 12 -o ideas/cover.svg
-  book-cover --batch books.csv --style minimal --seed series --out-dir covers`;
+  book-cover --batch books.csv --style minimal --seed series --out-dir covers
+  book-cover "The Lighthouse Keeper" "Mara Ellison" -s artdeco --print 6x9 --pages 320 \\
+    --paper cream --blurb-file blurb.txt -o paperback.svg`;
 
 let args;
 try {
@@ -89,6 +109,13 @@ try {
       out: { type: 'string', short: 'o' },
       batch: { type: 'string' },
       'out-dir': { type: 'string' },
+      print: { type: 'string' },
+      pages: { type: 'string' },
+      paper: { type: 'string' },
+      hook: { type: 'string' },
+      blurb: { type: 'string' },
+      'blurb-file': { type: 'string' },
+      imprint: { type: 'string' },
       count: { type: 'string' },
       json: { type: 'boolean' },
       list: { type: 'boolean' },
@@ -272,8 +299,77 @@ function batch(defaults) {
   if (failed) process.exitCode = 1;
 }
 
+/**
+ * The paperback's whole cover (--print) for these cover options, to --out or stdout.
+ * @param {import('../src/index.js').CoverOptions} options
+ */
+function printCover(options) {
+  const conflicting = ['batch', 'count', 'format', 'width', 'height', 'size'].filter(
+    (name) => values[/** @type {keyof typeof values} */ (name)] !== undefined,
+  );
+  if (conflicting.length) {
+    throw new Error(`--print sizes the cover from the trim and pages: use it without --${conflicting.join(', --')}`);
+  }
+  if (values.blurb !== undefined && values['blurb-file'] !== undefined) {
+    throw new Error('Use --blurb or --blurb-file, not both');
+  }
+  const file = values['blurb-file'];
+  const pages = Number(values.pages);
+  if (values.pages === undefined || !/^\s*\d+\s*$/.test(values.pages)) {
+    throw new RangeError(`--print needs --pages, the page count (a whole number), got ${JSON.stringify(values.pages)}`);
+  }
+  const print = createPrintCover(options, {
+    trim: values.print,
+    pages,
+    paper: values.paper,
+    hook: values.hook,
+    blurb: file === undefined ? values.blurb : readFileSync(file === '-' ? 0 : file, 'utf8'),
+    imprint: values.imprint,
+  });
+  const { inches, spineText } = print;
+  const about = { inches, spineText, style: print.front.style, palette: print.front.palette, seed: print.front.seed };
+  if (values.out) {
+    mkdirSync(dirname(values.out), { recursive: true });
+    writeFileSync(values.out, print.svg);
+    if (values.json) process.stdout.write(JSON.stringify({ file: values.out, ...about }) + '\n');
+    else {
+      const size = (/** @type {number} */ v) => String(Math.round(v * 1000) / 1000);
+      console.error(
+        `Wrote ${values.out}: ${size(inches.width)} × ${size(inches.height)} in, spine ${size(inches.spine)} in` +
+          `${spineText ? '' : ' (no spine text)'} (style: ${print.front.style})`,
+      );
+    }
+  } else if (values.json) process.stdout.write(JSON.stringify({ ...about, svg: print.svg }) + '\n');
+  else process.stdout.write(print.svg + '\n');
+}
+
 function run() {
   try {
+    if (values.print !== undefined) {
+      printCover({
+        title: positionals[0],
+        author: positionals[1] ?? '',
+        subtitle: values.subtitle,
+        series: values.series,
+        credit: values.credit,
+        badge: values.badge,
+        texture: values.texture,
+        style: values.style,
+        genre: values.genre,
+        palette: palette(),
+        lang: values.lang,
+        variants: variants(),
+        font: values.font,
+        titleCase: /** @type {'upper' | 'normal' | undefined} */ (values.case),
+        seed: values.seed,
+      });
+      return;
+    }
+    for (const name of ['pages', 'paper', 'hook', 'blurb', 'blurb-file', 'imprint']) {
+      if (values[/** @type {keyof typeof values} */ (name)] !== undefined) {
+        throw new Error(`--${name} is for a print cover: add --print with the trim, e.g. --print 6x9`);
+      }
+    }
     if (values.batch !== undefined) {
       batch({
         subtitle: values.subtitle,

@@ -4,9 +4,9 @@
 //   import { generateCover } from 'book-cover-generator';
 //   const svg = generateCover({ title: 'Dune', author: 'Frank Herbert', style: 'retro' });
 
-import { createRng, hashString, isHex, luminance, escapeXml, stripInvalidXml, grain } from './core.js';
+import { createRng, hashString, isHex, luminance, escapeXml, grain } from './core.js';
 import { palettes } from './palettes.js';
-import { BREAKING_SPACE, FONTS, LINE_BREAK, clipGraphemes, recordText } from './text.js';
+import { FONTS, cleanText, recordText } from './text.js';
 import { drawBadge } from './badge.js';
 import { idFor, fontEntries, reserved, STYLE_WORDS, PALETTE_WORDS } from './shared.js';
 import { styleList, genreList, builtInGenres } from './styles/index.js';
@@ -29,6 +29,7 @@ export { titleBlock, authorFit, fitStack, drawStack, splitLead } from './type.js
 export { strongAccents, textColor, tintText, fitTitleWith, textPanel, TEXT_CONTRAST } from './styles/util.js';
 export * as svgUtils from './core.js';
 export { createMockup, mockupKinds } from './mockups.js';
+export { createPrintCover, spineWidth, paperTypes, trimSizes, printLimits } from './print.js';
 export { parseBookList } from './books.js';
 
 /** This version of the library (artwork for a seed can change between minor versions). */
@@ -353,27 +354,6 @@ function resolvePalette(palette, rng, style) {
   const found = palettes.find((p) => p.id === id);
   if (!found) throw new Error(`Unknown palette "${palette}". Available: ${palettes.map((p) => p.id).join(', ')}`);
   return normalizePalette(found);
-}
-
-// eslint-disable-next-line no-control-regex -- matching control characters is the point
-const CONTROL = /[\u0000-\u001F\u007F-\u009F]/g;
-
-/**
- * Collapse control characters and whitespace, drop anything illegal in XML and
- * cap the length (so huge inputs can't make layout slow).
- * @param {unknown} value
- * @param {number} max  maximum length in characters
- * @param {{ breaks?: boolean }} [options]
- */
-function cleanText(value, max, { breaks = false } = {}) {
-  // With `breaks`, line breaks stay (as "\n", one between lines): the title's lines break there.
-  const text = String(value ?? '')
-    .split(breaks ? LINE_BREAK : /(?!)/)
-    .map((line) => stripInvalidXml(line.replace(CONTROL, ' ')).replace(BREAKING_SPACE, ' ').trim())
-    .filter(Boolean)
-    .join('\n');
-  // Cut between visible characters (segmenting lazily), so an emoji or accented letter is never split.
-  return text.length > max ? clipGraphemes(text, max).trimEnd() : text;
 }
 
 /**

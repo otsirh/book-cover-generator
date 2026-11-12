@@ -1081,6 +1081,33 @@ test('on a laptop screen Randomize is in view at once, and the cover stays in vi
   await expect(page.locator('#preview')).toBeInViewport({ ratio: 0.9 });
 });
 
+test('the tools under the preview: never covered by it while it stays in view, and after it on phones', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto('/#title=Tools&style=artdeco&seed=t');
+  await ready(page);
+  // Keep a few designs: the tools grow, and the preview still stays in view beside the controls.
+  for (let i = 0; i < 3; i++) await page.locator('#keep').click();
+  for (const y of [0, 400, 800, 2000]) {
+    await page.evaluate((top) => window.scrollTo(0, top), y);
+    const [stage, tools] = await Promise.all([
+      page.locator('.stage').boundingBox(),
+      page.locator('.stage-tools').boundingBox(),
+    ]);
+    expect(stage && tools && stage.y + stage.height <= tools.y + 0.5, `scrolled to ${y}`).toBe(true);
+  }
+  // Their buttons can be pressed (nothing lies over them).
+  await page.locator('#print summary').click();
+  await expect(page.locator('#print')).toHaveAttribute('open', '');
+  // On a phone: after the preview and the export buttons, not above them.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  const top = async (/** @type {string} */ selector) => (await page.locator(selector).boundingBox())?.y ?? NaN;
+  expect(await top('#print summary')).toBeGreaterThan(await top('.export'));
+  expect(await top('#many summary')).toBeGreaterThan(await top('#preview'));
+});
+
 test('the toast shows at the top on wide screens, clear of the export buttons', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/#title=Toast&style=minimal&seed=t');
@@ -1678,6 +1705,80 @@ test('many covers: a list in, a preview, and a ZIP of one design for every book'
   await expect(page.locator('#toast')).toContainText('None of the books could be made');
 });
 
+test('a paperback for print: the whole cover, sized from the trim and pages, as a PDF', async ({ page }) => {
+  await page.goto('/#title=The%20Lighthouse%20Keeper&author=Mara%20Ellison&style=artdeco&seed=p');
+  await ready(page);
+  await page.locator('#print summary').click();
+  await expect(page.locator('#print-size')).toHaveText('Whole cover 12.926 × 9.25 in, spine 0.676 in');
+  await page.locator('#print-trim').selectOption('5.5x8.5');
+  await page.locator('#print-paper').selectOption('cream');
+  await page.locator('#print-pages').fill('240');
+  await page.locator('#print-hook').fill('Some lights are kept burning.');
+  await page
+    .locator('#print-blurb')
+    .fill('When the lamp goes dark, Ada rows out.\n\nWhat she finds will change everything.');
+  await page.locator('#print-imprint').fill('Harbour Press');
+  await page.locator('#print-back').selectOption('ink');
+  // 2 × 5.5 + 240 × 0.0025 + 2 × 0.125 = 11.85 wide; 8.5 + 0.25 = 8.75 high.
+  await expect(page.locator('#print-size')).toHaveText('Whole cover 11.85 × 8.75 in, spine 0.6 in');
+  const preview = await svgSoon(page, '#print-preview');
+  expect(preview).toContain('Some lights are kept burning.');
+  expect(preview).toContain('stroke-dasharray');
+  // The preview follows the design.
+  await page.locator('.tile[data-style="swiss"]').click();
+  await expect.poll(() => svgSoon(page, '#print-preview')).not.toBe(preview);
+  // Under 80 pages, the spine stays blank, and the panel says why.
+  await page.locator('#print-pages').fill('60');
+  await expect(page.locator('#print-size')).toContainText('(no spine text: under 80 pages)');
+  await page.locator('#print-pages').fill('10');
+  await expect(page.locator('#print-size')).toContainText('pages must be a whole number from 24 to 776 on cream paper');
+  await expect(page.locator('#print-preview')).not.toHaveAttribute('src');
+  await page.locator('#print-pages').fill('240');
+  // The PDF: one page, the whole cover at 300 dpi, its trim box an eighth of an inch in.
+  const [download] = await Promise.all([page.waitForEvent('download'), page.locator('#print-pdf').click()]);
+  expect(download.suggestedFilename()).toBe('the-lighthouse-keeper-paperback-5.5x8.5.pdf');
+  const pdf = (await readFile(/** @type {string} */ (await download.path()))).toString('latin1');
+  expect(pdf.startsWith('%PDF-1.4\n')).toBe(true);
+  expect(pdf.endsWith('%%EOF\n')).toBe(true);
+  expect(pdf).toContain('/MediaBox [0 0 853.2 630] /BleedBox [0 0 853.2 630] /TrimBox [9 9 844.2 621]');
+  expect(pdf).toMatch(/\/Width 3555 \/Height 2625 \/ColorSpace \/DeviceRGB/);
+  await expect(page.locator('#toast')).toContainText('Saved the print PDF · 11.85 × 8.75 in at 300 dpi');
+  // The settings stay for the next visit (in this browser).
+  await page.reload();
+  await ready(page);
+  await page.locator('#print summary').click();
+  await expect(page.locator('#print-trim')).toHaveValue('5.5x8.5');
+  await expect(page.locator('#print-blurb')).toHaveValue(
+    'When the lamp goes dark, Ada rows out.\n\nWhat she finds will change everything.',
+  );
+  await expect(page.locator('#print-back')).toHaveValue('ink');
+});
+
+test('a print cover too large for one canvas is drawn in strips', async ({ page }) => {
+  await page.goto('/#title=Strips&style=minimal&seed=s');
+  await ready(page);
+  const result = await page.evaluate(async () => {
+    const { createPrintCover } = await import('/src/index.js');
+    const { svgToPdf } = await import('/src/browser.js');
+    const print = createPrintCover({ title: 'Strips', style: 'minimal', seed: 's' }, { pages: 100, trim: '5x8' });
+    const blob = await svgToPdf(print.svg, { dpi: 100, maxPixels: 300_000, bleed: 0.125 });
+    const text = new TextDecoder('latin1').decode(await blob.arrayBuffer());
+    return {
+      type: blob.type,
+      images: [...text.matchAll(/\/Subtype \/Image \/Width (\d+) \/Height (\d+)/g)].map((m) => [
+        Number(m[1]),
+        Number(m[2]),
+      ]),
+    };
+  });
+  expect(result.type).toBe('application/pdf');
+  // 10.475 × 8.25 in at 100 dpi is 1048 × 825 px: three strips of at most 300,000 px, side by side.
+  expect(result.images.length).toBe(3);
+  expect(result.images.reduce((sum, [w]) => sum + w, 0)).toBe(1048);
+  for (const [w, h] of result.images) expect(w * h).toBeLessThanOrEqual(300_000);
+  expect(result.images.every(([, h]) => h === 825)).toBe(true);
+});
+
 test('a genre filters the rail, and Randomize and the arrows stay in it', async ({ page }) => {
   await page.goto('/#title=Night&style=minimal&seed=g');
   await page.locator('#genre').selectOption('horror');
@@ -2002,6 +2103,9 @@ for (const scheme of /** @type {const} */ (['light', 'dark'])) {
     // The colour pickers and the size fields too.
     await page.locator('[data-palette="custom"]').click();
     await page.locator('[data-format="custom"]').click();
+    // And the print panel, open, with its preview.
+    await page.locator('#print summary').click();
+    await expect(page.locator('#print-preview')).toHaveAttribute('src', /^data:image\/svg\+xml/);
     await page.locator('.tile').first().scrollIntoViewIfNeeded();
     const results = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])

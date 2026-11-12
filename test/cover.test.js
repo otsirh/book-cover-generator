@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createCover, generateCover, styles, palettes, registerStyle, listStyles, pickStyle } from '../src/index.js';
 import { contrast, mix, luminance } from '../src/core.js';
 import * as textLib from '../src/text.js';
+import { FONT_BY_FAMILY, extentOf, textBoxes, unescapeXml } from './svg-text.js';
 import { assertWellFormed } from './well-formed.js';
 
 // The built-in styles (registration is tested in its own process, in register.test.js).
@@ -138,51 +139,6 @@ function textElements(svg) {
   return out;
 }
 
-const FONT_BY_FAMILY = new Map(Object.values(textLib.FONTS).map((f) => [f.family, f]));
-/** @param {string} s */
-const unescapeXml = (s) =>
-  s.replace(/&(apos|quot|lt|gt|amp);/g, (_, e) => ({ apos: "'", quot: '"', lt: '<', gt: '>', amp: '&' })[e] ?? e);
-
-/**
- * Every line of text set on the cover, with where it is and what it is set in, inherited through
- * nested elements. Text in a transformed group (a spine, a turned line) or in definitions (a clip,
- * a mask) is marked `moved`: its place isn't its x and y.
- * @param {string} svg
- */
-function textBoxes(svg) {
-  /** @type {{ size: number, family?: string, weight: number, italic: boolean, spacing: number, anchor: string, x?: string, moved: boolean }[]} */
-  const stack = [];
-  const out = [];
-  for (const [, closing, tag, attrs, selfClosing, content] of svg.matchAll(
-    /<(\/?)(g|text|tspan|svg|clipPath|mask|pattern|defs|symbol)\b([^>]*?)(\/?)>([^<]*)/g,
-  )) {
-    if (closing) {
-      stack.pop();
-      continue;
-    }
-    const up = stack.at(-1);
-    /** @param {RegExp} re */
-    const get = (re) => re.exec(attrs)?.[1];
-    const state = {
-      size: Number(get(/font-size="([\d.]+)"/) ?? up?.size ?? 0),
-      family: get(/font-family="([^"]*)"/) ?? up?.family,
-      weight: Number(get(/font-weight="(\d+)"/) ?? up?.weight ?? 400),
-      italic: (get(/font-style="(\w+)"/) ?? (up?.italic ? 'italic' : '')) === 'italic',
-      spacing: Number(get(/letter-spacing="(-?[\d.]+)"/) ?? up?.spacing ?? 0),
-      anchor: get(/text-anchor="(\w+)"/) ?? up?.anchor ?? 'start',
-      x: get(/\bx="(-?[\d.]+)"/) ?? (tag === 'tspan' ? up?.x : undefined),
-      moved: !!up?.moved || /\btransform=/.test(attrs) || !['g', 'text', 'tspan', 'svg'].includes(tag),
-    };
-    const y = get(/\by="(-?[\d.]+)"/);
-    const text = unescapeXml(content);
-    if ((tag === 'text' || tag === 'tspan') && text.trim() && y != null && state.size) {
-      out.push({ ...state, text, y: Number(y) });
-    }
-    if (!selfClosing) stack.push(state);
-  }
-  return out;
-}
-
 /**
  * Every line of text is on the cover: across, from its x, its anchor and its width as the library
  * measures it, and down, from the top of its capitals to the bottom of its descenders. (Not text
@@ -202,13 +158,9 @@ function assertTextInside(svg, width, height, label, style) {
     const top = box.y - box.size * (giant ? (font.cap ?? 0.72) + textLib.markExtent(box.text).above : 0.8);
     assert.ok(top >= -1 && bottom <= height + 1, `${where}: from ${top.toFixed(0)} to ${bottom.toFixed(0)} down`);
     if (box.x === undefined) continue;
-    const w =
-      textLib.measureText(box.text, box.size, { font, weight: box.weight, italic: box.italic }) +
-      box.spacing * textLib.graphemes(box.text).length;
-    const x = Number(box.x);
-    const left = box.anchor === 'middle' ? x - w / 2 : box.anchor === 'end' ? x - w : x;
-    const [inLeft, inRight] = [left >= -1, left + w <= width + 1];
-    const across = `${where}: from ${left.toFixed(0)} to ${(left + w).toFixed(0)} across`;
+    const { left, right } = extentOf(box);
+    const [inLeft, inRight] = [left >= -1, right <= width + 1];
+    const across = `${where}: from ${left.toFixed(0)} to ${right.toFixed(0)} across`;
     if (giant) assert.ok(inLeft || inRight, `${across} (cropped on both sides)`);
     else assert.ok(inLeft && inRight, across);
   }
