@@ -1665,7 +1665,8 @@ pre {
 
 /* Phones: one column, the preview pinned while you edit, styles in strips. */
 @media (max-width: 759px) {
-  body {
+  /* (Room for the app's bar along the bottom: other pages have none.) */
+  body:has(.mobile-bar) {
     padding-bottom: 76px;
   }
 

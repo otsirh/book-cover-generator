@@ -1,3 +1,4 @@
+/* @ts-self-types="./text.d.ts" */
 // Text measurement, fitting (wrap + shrink-to-fit) and rendering.
 //
 // Only system font stacks are used so that covers render identically when the

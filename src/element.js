@@ -7,7 +7,8 @@
 // Attributes: cover-title and cover-style (`title` and `style` are HTML's own: a tooltip, the
 // element's CSS), author, subtitle, series, credit, badge, genre, palette, seed, format (paperback,
 // ebook, square or 1600x2560), font, case, texture (present: on), variant (as in the app's links:
-// scene.forest) and lang (the language of the text, as on any element). The cover
+// scene.forest) and lang (the language of the text, as on any element). With loading="lazy" it
+// draws once it comes near the viewport, as an image does. The cover
 // is drawn as an image (so pages with Trusted Types can show it: the page's CSP must allow data:
 // images), sized by the element's width (240px unless styled).
 
@@ -36,7 +37,9 @@ const ATTRIBUTES = /** @type {const} */ ({
 
 const CSS =
   ':host{display:inline-block;width:240px;vertical-align:top}:host([hidden]){display:none}' +
-  'img{display:block;width:100%;height:auto}';
+  'img{display:block;width:100%;height:auto}' +
+  // (A lazy cover not drawn yet keeps a cover's place, so the ones below aren't all in view.)
+  ':host([loading=lazy]) img:not([src]){aspect-ratio:2/3}';
 /** The element's styles as a constructed sheet: a page whose CSP allows no inline styles still applies it. */
 const sheet =
   typeof CSSStyleSheet !== 'undefined' && 'replaceSync' in CSSStyleSheet.prototype
@@ -62,6 +65,24 @@ export class BookCover extends Base {
   #ready = false;
   /** The options last drawn, to skip drawing them again. */
   #drawn = '';
+  /** A lazy element waiting to come into view. */
+  #waiting = false;
+  /** Lazy elements wait for this to see them near the viewport (none outside a browser). */
+  static #observer =
+    typeof IntersectionObserver === 'undefined'
+      ? null
+      : new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries) {
+              if (!entry.isIntersecting) continue;
+              const el = /** @type {BookCover} */ (entry.target);
+              BookCover.#observer?.unobserve(el);
+              el.#waiting = false;
+              el.#render();
+            }
+          },
+          { rootMargin: '300px' },
+        );
 
   constructor() {
     super();
@@ -80,13 +101,28 @@ export class BookCover extends Base {
 
   connectedCallback() {
     this.#ready = true;
+    // loading="lazy", as on an image: drawn once it comes near the viewport.
+    if (this.getAttribute('loading') === 'lazy' && !this.cover && BookCover.#observer) {
+      this.#waiting = true;
+      // (Named already, from its attributes, for whoever reads the page before it is drawn.)
+      const title = (this.getAttribute('cover-title') ?? '').replace(/\s+/g, ' ').trim();
+      const author = (this.getAttribute('author') ?? '').trim();
+      this.#img.alt = title ? `Cover: ${title}${author ? ` by ${author}` : ''}` : '';
+      BookCover.#observer.observe(this);
+      return;
+    }
     this.#render();
+  }
+
+  disconnectedCallback() {
+    if (this.#waiting) BookCover.#observer?.unobserve(this);
+    this.#waiting = false;
   }
 
   attributeChangedCallback() {
     // (Several attributes set at once draw once; an element upgraded on the page draws once, when
     // it connects.)
-    if (!this.#ready || this.#queued || !this.isConnected) return;
+    if (!this.#ready || this.#waiting || this.#queued || !this.isConnected) return;
     this.#queued = true;
     queueMicrotask(() => {
       this.#queued = false;

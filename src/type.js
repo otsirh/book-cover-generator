@@ -1,3 +1,4 @@
+/* @ts-self-types="./type.d.ts" */
 // Shared cover typography: title blocks and author lines.
 //
 // A title block is an optional small leading article ("THE"), the title itself

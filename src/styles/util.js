@@ -1,3 +1,4 @@
+/* @ts-self-types="./util.d.ts" */
 import { n, circle, contrast, readable, clamp, mix, inkCandidates, hexToRgb } from '../core.js';
 import { titleBlock } from '../type.js';
 import { graphemes } from '../text.js';

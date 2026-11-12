@@ -106,12 +106,6 @@ async function handle(req, res) {
   // with the body as a stream: routing, limits and headers as in production (which doesn't add
   // _headers to the Worker's answers).
   const rawPath = new URL(req.url ?? '/', 'http://localhost').pathname;
-  // The gallery, as the build writes it.
-  if (rawPath === '/gallery/' || rawPath === '/gallery') {
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
-    res.end(req.method === 'HEAD' ? undefined : galleryHtml());
-    return;
-  }
   if (rawPath === '/mcp' || rawPath.startsWith('/api/')) {
     const method = req.method ?? 'GET';
     const headers = new Headers();
@@ -143,7 +137,11 @@ async function handle(req, res) {
     );
   let file = hidden ? null : await locate(urlPath);
   let status = 200;
-  if (!file) {
+  // The gallery the build writes, made here when the roots haven't one (the source tree).
+  /** @type {string | null} */
+  let generated = null;
+  if (!file && (urlPath === '/gallery/' || urlPath === '/gallery')) generated = galleryHtml();
+  else if (!file) {
     status = 404;
     file = await locate('/404.html');
   }
@@ -161,6 +159,11 @@ async function handle(req, res) {
   for (const [name, value] of headers.values()) res.setHeader(name, value);
   res.setHeader('Cache-Control', res.getHeader('Cache-Control') ?? 'no-cache');
 
+  if (generated !== null) {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(req.method === 'HEAD' ? undefined : generated);
+    return;
+  }
   if (!file) {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }).end('Not found');
     return;

@@ -1,6 +1,7 @@
 // The gallery page (/gallery/): every style, drawn by <book-cover> in the visitor's browser, each
 // opening the app in that style. Written by scripts/build.js; the dev server answers it too.
-import { escapeXml } from '../src/core.js';
+import { readFileSync } from 'node:fs';
+import { escapeXml as esc } from '../src/core.js';
 import { listStyles, genres } from '../src/index.js';
 
 /** A sample title for each genre, so a style is shown with a book it suits. */
@@ -14,11 +15,31 @@ const SAMPLES = {
   nonfiction: ['The Habit Engine', 'How small changes compound'],
 };
 
-/** @param {string} text */
-const esc = (text) => escapeXml(text);
+/**
+ * The app's header and footer (index.html), for this page: one copy of the site's chrome. Its
+ * in-page links point back to the app, and the Gallery link is this page.
+ */
+function chrome() {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  /** @param {string} tag @param {string} cls */
+  const part = (tag, cls) => {
+    const start = html.indexOf(`<${tag} class="${cls}">`);
+    const end = html.indexOf(`</${tag}>`, start);
+    if (start < 0 || end < 0) throw new Error(`scripts/gallery.js: index.html has no <${tag} class="${cls}">`);
+    return html.slice(start, end + tag.length + 3);
+  };
+  /** @param {string} markup */
+  const forGallery = (markup) =>
+    markup
+      .replaceAll('href="./"', 'href="/"')
+      .replace(/href="#/g, 'href="/#')
+      .replace('<a href="/gallery/">', '<a href="/gallery/" aria-current="page">');
+  return { header: forGallery(part('header', 'site-header')), footer: forGallery(part('footer', 'site-footer')) };
+}
 
 /** The gallery page's HTML. */
 export function galleryHtml() {
+  const { header, footer } = chrome();
   const styles = listStyles();
   const groups = [...new Set(styles.map((s) => s.group))];
   const genreName = Object.fromEntries(genres.map((g) => [g.id, g.name]));
@@ -33,7 +54,7 @@ export function galleryHtml() {
           return `
         <figure class="gallery-item">
           <a href="/#${esc(link.toString())}" aria-label="${esc(`${s.name}: open it in the generator`)}">
-            <book-cover cover-title="${esc(title)}" author="Mara Ellison"${subtitle ? ` subtitle="${esc(subtitle)}"` : ''} cover-style="${esc(s.id)}" seed="gallery"></book-cover>
+            <book-cover loading="lazy" cover-title="${esc(title)}" author="Mara Ellison"${subtitle ? ` subtitle="${esc(subtitle)}"` : ''} cover-style="${esc(s.id)}" seed="gallery"></book-cover>
           </a>
           <figcaption><strong>${esc(s.name)}</strong> ${esc(s.description)}${suits ? ` <span class="gallery-genres">${esc(suits)}</span>` : ''}</figcaption>
         </figure>`;
@@ -61,33 +82,14 @@ export function galleryHtml() {
     <script type="module" src="/src/element.js"></script>
   </head>
   <body>
-    <header class="site-header">
-      <a class="brand" href="/">
-        <svg viewBox="0 0 32 32" aria-hidden="true">
-          <rect x="6" y="3" width="20" height="26" rx="2" fill="currentColor" />
-          <rect x="6" y="3" width="4" height="26" fill="#000" opacity=".3" />
-          <rect x="13" y="9" width="9" height="2" fill="#fff" />
-        </svg>
-        <span>Book Cover Generator</span>
-      </a>
-      <nav aria-label="Main">
-        <a href="/">Generator</a>
-        <a href="/gallery/" aria-current="page">Gallery</a>
-        <a href="https://github.com/otsirh/book-cover-generator">GitHub</a>
-      </nav>
-    </header>
+    ${header}
     <main class="gallery">
       <div class="section-head">
         <h1>${styles.length} cover styles</h1>
         <p>Each drawn here as you see it, for a book of the genre it suits. Click one to make your own cover in it.</p>
       </div>${sections}
     </main>
-    <footer class="site-footer">
-      <p>
-        MIT licensed · <a href="https://github.com/otsirh/book-cover-generator">Source on GitHub</a> ·
-        <a href="https://github.com/otsirh/book-cover-generator/blob/main/CHANGELOG.md">Changelog</a>
-      </p>
-    </footer>
+    ${footer}
   </body>
 </html>
 `;

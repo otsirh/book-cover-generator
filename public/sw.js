@@ -51,10 +51,11 @@ async function networkFirst(request) {
     }
     return response;
   } catch (err) {
-    // Offline. The page itself is kept as "/", whatever its query.
+    // Offline. The app is kept as "/", whatever its query; another page (the gallery) as itself.
+    const app = new URL(request.url).pathname === '/';
     const kept =
       (await cache.match(request, { ignoreSearch: true })) ??
-      (request.mode === 'navigate' ? await cache.match('/') : undefined);
+      (request.mode === 'navigate' && app ? await cache.match('/') : undefined);
     if (kept) return kept;
     throw err;
   }

@@ -1820,11 +1820,14 @@ test('the gallery draws every style, and a click opens the generator in it', asy
   await page.goto('/gallery/');
   const covers = page.locator('book-cover');
   await expect(covers).toHaveCount(39);
-  await expect
-    .poll(() =>
-      covers.evaluateAll((els) => els.filter((el) => el.shadowRoot?.querySelector('img')?.getAttribute('src')).length),
-    )
-    .toBe(39);
+  const drawn = () =>
+    covers.evaluateAll((els) => els.filter((el) => el.shadowRoot?.querySelector('img')?.getAttribute('src')).length);
+  // Drawn as they come into view (loading="lazy"): the first are, the last only once scrolled to.
+  await expect.poll(drawn).toBeGreaterThan(0);
+  expect(await drawn()).toBeLessThan(39);
+  for (let i = 0; i < 39; i += 4) await covers.nth(i).scrollIntoViewIfNeeded();
+  await covers.last().scrollIntoViewIfNeeded();
+  await expect.poll(drawn).toBe(39);
   await page.locator('a', { has: page.locator('book-cover[cover-style="crest"]') }).click();
   await selected(page, 'crest');
   await expect(page.locator('#title')).toHaveValue('Kingdom of Ash');
@@ -1859,6 +1862,10 @@ test('works offline once it has loaded', async ({ page, context, browserName }) 
     await ready(page);
     expect(await svgOf(page, '#preview')).toContain('Offline');
     await expect(page.locator('.tile')).toHaveCount(39);
+    // The gallery, linked from the header, opens offline too (not the app in its place).
+    await page.goto('/gallery/');
+    await expect(page.locator('h1')).toContainText('cover styles');
+    await expect(page.locator('book-cover').first()).toBeAttached();
   } finally {
     await context.setOffline(false);
   }

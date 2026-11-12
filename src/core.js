@@ -1,3 +1,4 @@
+/* @ts-self-types="./core.d.ts" */
 // Core utilities: seeded randomness, colour math, noise and SVG helpers.
 
 /** 32-bit string hash (cyrb53 variant folded to 32 bits). */

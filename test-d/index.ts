@@ -148,7 +148,7 @@ const listed: string = createCover(optionsForBook({ title: 'A', genre: 'horror' 
 // @ts-expect-error a book is cover options
 void optionsForBook('Dune');
 const named: string | undefined = styleIdFor('Art Deco');
-const element = document.createElement('book-cover') as BookCover;
+const element = document.createElement('book-cover');
 const elementStyle: string | undefined = element.cover?.style;
 void element.options().title;
 // @ts-expect-error copyImage always makes a PNG

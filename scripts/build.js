@@ -14,6 +14,9 @@ rmSync('dist', { recursive: true, force: true });
 mkdirSync('dist');
 for (const entry of SITE) cpSync(entry, `dist/${entry}`, { recursive: true, filter });
 cpSync('public', 'dist', { recursive: true, filter });
+// The gallery page, from the styles as they are now.
+mkdirSync('dist/gallery');
+writeFileSync('dist/gallery/index.html', galleryHtml());
 
 /** Every file under a folder of dist/, as a site path. @param {string} dir */
 const filesIn = (dir) =>
@@ -28,14 +31,17 @@ const filesIn = (dir) =>
 const offline = [
   '/',
   ...filesIn('site'),
-  // (Not the MCP server or <book-cover>: the app loads neither.)
-  ...filesIn('src').filter((path) => path.endsWith('.js') && !['/src/mcp.js', '/src/element.js'].includes(path)),
+  // (Not the MCP server, which the pages never load.)
+  ...filesIn('src').filter((path) => path.endsWith('.js') && path !== '/src/mcp.js'),
+  // The gallery, linked from the app's header.
+  '/gallery/',
   '/manifest.webmanifest',
   ...filesIn('icons'),
 ];
 // The release changes whenever one of those files does, so the worker updates its copy.
 const hash = createHash('sha256');
-for (const path of offline) hash.update(path).update(readFileSync(`dist${path === '/' ? '/index.html' : path}`));
+for (const path of offline)
+  hash.update(path).update(readFileSync(`dist${path.endsWith('/') ? `${path}index.html` : path}`));
 const release = hash.digest('hex').slice(0, 12);
 
 const worker = readFileSync('dist/sw.js', 'utf8');
@@ -46,9 +52,5 @@ if (!built.includes(release) || built.includes('const FILES = [];')) {
   throw new Error('scripts/build.js: dist/sw.js no longer has the RELEASE and FILES lines to fill in');
 }
 writeFileSync('dist/sw.js', built);
-
-// The gallery page, from the styles as they are now.
-mkdirSync('dist/gallery');
-writeFileSync('dist/gallery/index.html', galleryHtml());
 
 console.log(`Built dist/ from ${SITE.join(', ')} and public/ (offline copy: ${offline.length} files, ${release})`);

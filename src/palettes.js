@@ -1,3 +1,4 @@
+/* @ts-self-types="./palettes.d.ts" */
 // Curated palettes. Every palette has a background, an ink colour with strong
 // contrast against it, and three accents. `dark` marks dark backgrounds.
 
