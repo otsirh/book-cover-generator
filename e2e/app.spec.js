@@ -1780,7 +1780,7 @@ test('Node measures the built-in fonts as Chrome on macOS does', async ({ page, 
   const specs = Object.keys(FONTS)
     .filter((key) => !FONTS[/** @type {keyof typeof FONTS} */ (key)].mono)
     .flatMap((key) =>
-      [400, 500, 600, 700, 800].flatMap((weight) => [false, true].map((italic) => ({ key, weight, italic }))),
+      [300, 400, 500, 600, 700, 800].flatMap((weight) => [false, true].map((italic) => ({ key, weight, italic }))),
     );
   await page.goto('/');
   const chrome = await page.evaluate(

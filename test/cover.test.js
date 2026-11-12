@@ -1436,3 +1436,32 @@ test('a genre is checked even with a style given, and a mockup’s line is cut b
     'no lone surrogate',
   );
 });
+
+test('styles, palettes, genres and fonts may be named in any case, or by their names', () => {
+  const canonical = createCover({ title: 'x', style: 'artdeco', palette: 'deepsea', font: 'didone', seed: 'n' });
+  const named = createCover({ title: 'x', style: 'Art Deco', palette: 'Deep Sea', font: 'DIDONE', seed: 'n' });
+  assert.equal(named.svg, canonical.svg);
+  assert.equal(named.style, 'artdeco');
+  assert.equal(
+    createCover({ title: 'x', style: 'RANDOM', seed: 'n' }).style,
+    createCover({ title: 'x', seed: 'n' }).style,
+  );
+  for (const genre of ['Non-fiction', 'NONFICTION', 'Children’s', 'Thriller & crime']) {
+    assert.doesNotThrow(() => createCover({ title: 'x', genre }), genre);
+  }
+  assert.throws(() => createCover({ title: 'x', style: 'Art Decco' }), /Unknown style "Art Decco"/);
+});
+
+test('a pinned value no style offers throws, whichever style the seed picks', () => {
+  for (let i = 0; i < 40; i++) {
+    assert.throws(
+      () => createCover({ title: 'x', seed: `t${i}`, variants: { scene: 'forrest' } }),
+      /No style has scene "forrest"/,
+    );
+    // Names and values in any case.
+    assert.doesNotThrow(() =>
+      createCover({ title: 'x', seed: `t${i}`, variants: { Scene: 'Forest', layout: 'open' } }),
+    );
+  }
+  assert.equal(createCover({ title: 'x', style: 'silhouette', variants: { SCENE: 'City' } }).variants.scene, 'city');
+});

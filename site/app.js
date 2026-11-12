@@ -26,6 +26,7 @@ import {
 } from '../src/browser.js';
 import { clipGraphemes, LINE_BREAK } from '../src/text.js';
 import { hashString, contrast } from '../src/core.js';
+import { CUSTOM_SIZE, CUSTOM_PALETTE, VARIANT, customColors, slug } from '../src/shared.js';
 
 /** @typedef {keyof typeof formats} Preset */
 /**
@@ -50,13 +51,7 @@ import { hashString, contrast } from '../src/core.js';
 
 /** The preset formats (the library's, as the CLI's --format has them too). */
 const FORMATS = formats;
-/** A custom size: width x height in px (see fits() for the sizes the library can make). */
-const CUSTOM_SIZE = /^([1-9]\d{1,4})x([1-9]\d{1,4})$/;
 const MAX_SIDE = sizeLimits.max;
-/** Your own colours: background, text and one to three accents. */
-const CUSTOM_PALETTE = /^custom(?:-[0-9a-f]{6}){3,5}$/;
-/** Pinned variants as a design holds them: name.value pairs joined by '-'. */
-const VARIANT = /^[a-z][a-z0-9]*\.[a-z][a-z0-9]*(?:-[a-z][a-z0-9]*\.[a-z][a-z0-9]*)*$/;
 /** The most pixels an image is drawn with where it needn't be larger (iOS Safari's canvas limit). */
 const MAX_PIXELS = 16_000_000;
 /** Pixels per inch recorded in PNG and JPEG downloads, so print software sizes them right. */
@@ -126,15 +121,6 @@ function sizeOf(format) {
   return m ? [Number(m[1]), Number(m[2])] : FORMATS.paperback;
 }
 
-/** The colours of a custom palette (background, text, accents), or null for a palette id. @param {string} palette */
-function customColors(palette) {
-  return CUSTOM_PALETTE.test(palette)
-    ? palette
-        .slice('custom-'.length)
-        .split('-')
-        .map((hex) => `#${hex}`)
-    : null;
-}
 /** The five colours the editor shows: background, text and three accents (repeating the ones given). @param {string[]} colors */
 const fiveColors = (colors) => [colors[0], colors[1], ...[0, 1, 2].map((i) => colors[2 + (i % (colors.length - 2))])];
 /** A design's palette for these colours (#rrggbb). @param {readonly string[]} colors */
@@ -1688,7 +1674,12 @@ const scheduleGallery = sliced(() => {
   return true;
 });
 
+/** The style the rail last marked. */
+let markedStyle = '';
 function markRail() {
+  // (Only a change of style changes the rail: typing in the title doesn't.)
+  if (design.style === markedStyle) return;
+  markedStyle = design.style;
   for (const [style, tile] of tiles) tile.button.setAttribute('aria-pressed', String(style === design.style));
   // The selected style shows in the rail even outside the genre (and the one before it no longer).
   if (ui.genre) applyGenre();
@@ -1968,21 +1959,6 @@ const scheduleKept = sliced(() => {
 });
 
 /* ------------------------------------------------------------------ export */
-
-/** @param {string} str */
-function slug(str) {
-  const words = str
-    // Drop accents from Latin letters only (é → e); other marks (й, ά, Japanese voicing
-    // marks, Indic vowel signs) are part of the letter and come back together under NFC.
-    .normalize('NFKD')
-    .replace(/(\p{Script=Latin})[̀-ͯ]+/gu, '$1')
-    .normalize('NFC')
-    .toLowerCase()
-    .replace(/[^\p{L}\p{M}\p{N}]+/gu, '-')
-    .replace(/^-+/, '');
-  // Cut between whole characters first, so the trim also catches a separator at the cut.
-  return clipGraphemes(words, 60).replace(/-+$/, '') || 'cover';
-}
 
 /**
  * Run `work` with `button` marked busy, ignoring presses meanwhile. (aria-disabled, not
@@ -2264,11 +2240,12 @@ function registerServiceWorker() {
 // A shared link opens the same cover every time (see complete()); with no link, the sample stays.
 const linked = fromHash(location.hash);
 if (Object.keys(linked).length) Object.assign(design, complete(linked));
-else if (savedGenre()) {
+else {
   // With no link, the first cover is in the genre chosen last time: a starter that suits it, if any.
-  const suits = STYLES.filter((s) => s.genres.includes(savedGenre())).map((s) => s.id);
+  const genre = savedGenre();
+  const suits = genre ? STYLES.filter((s) => s.genres.includes(genre)).map((s) => s.id) : [];
   const starters = STARTERS.filter((id) => suits.includes(id));
-  design.style = pick(starters.length ? starters : suits);
+  if (suits.length) design.style = pick(starters.length ? starters : suits);
 }
 const linkedHash = location.hash;
 // A fragment that isn't a design (#usage, from a header link opened in a new tab) is a place on

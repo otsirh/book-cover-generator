@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { createCover, listStyles, palettes, formats, parseBookList, optionsForBook, genres } from '../src/index.js';
-import { clipGraphemes } from '../src/text.js';
+import { hex, slug } from '../src/shared.js';
 
 const HELP = `Usage: book-cover "<title>" ["<author>"] [options]
 
@@ -174,9 +174,6 @@ function dimensions() {
   return { width: W, height: Math.round((W * h) / w) };
 }
 
-/** A colour as typed, with the # added (it starts a comment in most shells). @param {string} c */
-const hex = (c) => (c.trim().startsWith('#') ? c.trim() : `#${c.trim()}`);
-
 /** The palette: an id, or your own colours from --bg, --ink and --accent. */
 function palette() {
   const custom = values.bg !== undefined || values.ink !== undefined || values.accent !== undefined;
@@ -238,19 +235,6 @@ function fileFor(out, n, total, seed) {
  * @param {string} seed
  */
 const safeName = (seed) => seed.replace(/[^\p{L}\p{N}._-]+/gu, '-').replace(/^[.-]+/, '') || 'cover';
-
-/** A title as part of a file name: lower case, accents off Latin letters, dashes between words. @param {string} title */
-function slug(title) {
-  const words = title
-    .normalize('NFKD')
-    .replace(/(\p{Script=Latin})[\u0300-\u036f]+/gu, '$1')
-    .normalize('NFC')
-    .toLowerCase()
-    .replace(/[^\p{L}\p{M}\p{N}]+/gu, '-')
-    .replace(/^-+/, '');
-  // (Cut between whole characters, as the app cuts its file names.)
-  return clipGraphemes(words, 60).replace(/-+$/, '') || 'cover';
-}
 
 /**
  * Write a cover for each book in the --batch list into --out-dir; the command line's options

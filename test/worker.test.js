@@ -141,12 +141,17 @@ test('mockups, errors, other methods, and what isn’t the API', async () => {
 
 test('the API reads a link as the app does, and sizes a format as the CLI does', () => {
   const o = coverOptions(new URLSearchParams(`palette=Mint&seed=%20abc%20&title=${'x'.repeat(250)}`));
-  assert.equal(o.palette, 'mint');
+  // (A palette's name in any case is left to the library, which reads it.)
+  assert.equal(o.palette, 'Mint');
+  assert.equal(createCover({ ...o, title: 'x' }).palette, 'mint');
   assert.equal(o.seed, 'abc');
   assert.equal(o.title?.length, 200);
   assert.deepEqual(coverOptions(new URLSearchParams('format=ebook&width=1200')), { width: 1200, height: 1920 });
   assert.deepEqual(coverOptions(new URLSearchParams('format=square&height=500')), { width: 500, height: 500 });
   assert.throws(() => coverOptions(new URLSearchParams('format=ebook&width=600&height=600')), /not both/);
+  // Sizes and pins as the app reads them: no leading zeros, and pins in any case.
+  assert.throws(() => coverOptions(new URLSearchParams('format=0x0')), /Unknown format/);
+  assert.deepEqual(coverOptions(new URLSearchParams('variant=Moon.Blood')).variants, { moon: 'blood' });
 });
 
 test('a mockup background without its #, and a preflight for any header', async () => {

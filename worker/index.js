@@ -9,18 +9,12 @@
 
 import { createCover, createMockup, formats, version } from '../src/index.js';
 import { clipGraphemes } from '../src/text.js';
+import { CUSTOM_PALETTE, CUSTOM_SIZE, VARIANT, customColors, hex } from '../src/shared.js';
 
 /** Query parameters that are cover options as they are. */
 const TEXT = ['style', 'genre', 'font', 'lang'];
 /** Text read as the app reads its links: cut to the app's lengths (in UTF-16 units). */
 const LIMITS = { title: 200, author: 120, subtitle: 160, series: 120, credit: 120, badge: 60 };
-/** Your own colours as the app's links write them: background, text and one to three accents. */
-const CUSTOM_PALETTE = /^custom((?:-[0-9a-f]{6}){3,5})$/i;
-const SIZE = /^(\d{1,5})x(\d{1,5})$/;
-const PAIR = /^[a-z][a-z0-9]*\.[a-z][a-z0-9]*$/i;
-
-/** `#abc`, `abc` or `#aabbcc` as a colour with its #. @param {string} c */
-const hex = (c) => (c.trim().startsWith('#') ? c.trim() : `#${c.trim()}`);
 
 /**
  * Cover options from a query string: the app's link parameters (`format`, `palette` with your
@@ -49,7 +43,7 @@ export function coverOptions(q) {
   if (format) {
     const size = Object.hasOwn(formats, format)
       ? formats[/** @type {keyof typeof formats} */ (format)]
-      : SIZE.exec(format)?.slice(1).map(Number);
+      : CUSTOM_SIZE.exec(format)?.slice(1).map(Number);
     if (!size) {
       throw new RangeError(
         `Unknown format "${format}". Use one of ${Object.keys(formats).join(', ')}, or a size such as 1600x2560`,
@@ -70,12 +64,11 @@ export function coverOptions(q) {
     if (width !== undefined) o.width = width;
     if (height !== undefined) o.height = height;
   }
+  // A palette id or name (the library reads either in any case), or your own colours.
   const palette = q.get('palette');
-  const custom = palette ? CUSTOM_PALETTE.exec(palette) : null;
-  if (custom) {
-    const colors = custom[1].slice(1).split('-').map(hex);
-    o.palette = { bg: colors[0], ink: colors[1], accents: colors.slice(2) };
-  } else if (palette) o.palette = palette.toLowerCase();
+  const colors = palette && CUSTOM_PALETTE.test(palette.toLowerCase()) ? customColors(palette.toLowerCase()) : null;
+  if (colors) o.palette = { bg: colors[0], ink: colors[1], accents: colors.slice(2) };
+  else if (palette) o.palette = palette;
   const [bg, ink, accent] = [q.get('bg'), q.get('ink'), q.get('accent')];
   if (bg || ink || accent) {
     if (!bg || !ink || !accent) throw new RangeError('Your own colours need bg, ink and accent');
@@ -95,13 +88,12 @@ export function coverOptions(q) {
     if (!['1', '0', 'true', 'false'].includes(texture)) throw new RangeError('texture is 1 (on) or 0 (off)');
     o.texture = texture === '1' || texture === 'true';
   }
-  const variant = q.get('variant');
+  const variant = q.get('variant')?.toLowerCase();
   if (variant) {
-    const pairs = variant.split('-');
-    if (!pairs.every((pair) => PAIR.test(pair))) {
+    if (!VARIANT.test(variant)) {
       throw new RangeError('variant is name.value pairs joined by "-", such as scene.forest or field.pale-emblem.sun');
     }
-    o.variants = Object.fromEntries(pairs.map((pair) => pair.split('.')));
+    o.variants = Object.fromEntries(variant.split('-').map((pair) => pair.split('.')));
   }
   return /** @type {import('../src/index.js').CoverOptions} */ (o);
 }

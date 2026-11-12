@@ -172,6 +172,8 @@ Same as `generateCover`, but also tells you which style and palette were chosen.
 | `font`      | `string`           | the style's            | the title's font, one of `FONTS`                  |
 | `titleCase` | `string`           | the style's            | `'upper'` (capitals) or `'normal'` (as typed)     |
 
+Styles, palettes, genres and fonts may be given by id or by name, in any case: `'artdeco'`, `'Art Deco'` and `'ART DECO'` are the same style, and a book list or a link can name them as the app's menus do.
+
 `lang` is set on the cover so Chinese characters get the right glyphs for the language. Without it, text with kana is marked Japanese and text with Hangul Korean; pass `'zh-Hans'`, `'zh-Hant'` or `'ja'` for text in Chinese characters only.
 
 Titles and subtitles longer than 300 characters (authors: 200) are cut. With `'random'`, the style and palette are picked from the seed, so you get the same result every time for the same seed. Some styles prefer dark or light palettes when they pick one themselves. Invalid options throw an error that says what's wrong.
@@ -180,7 +182,7 @@ Titles and subtitles longer than 300 characters (authors: 200) are cut. With `'r
 
 - `styles`: array of style ids
 - `genres`: `[{ id, name }]`, the genres styles suit: `literary`, `thriller`, `horror`, `romance`, `fantasy`, `children`, `nonfiction`
-- `listStyles()`: `[{ id, name, description, group, variants, genres }]`. `variants` lists the choices a style lets you pin, as `[{ name, label, values: [{ value, label }] }]`; pin them with `createCover({ variants: { scene: 'forest' } })`, and `createCover` reports the ones it used in `variants`. Names a style lacks are ignored; a value it lacks throws
+- `listStyles()`: `[{ id, name, description, group, variants, genres }]`. `variants` lists the choices a style lets you pin, as `[{ name, label, values: [{ value, label }] }]`; pin them with `createCover({ variants: { scene: 'forest' } })`, and `createCover` reports the ones it used in `variants`. Names a style lacks are ignored. A value no style offers throws; with a style you name, so does a value that style lacks (a style picked at random takes only the pins it can)
 - `palettes`: `[{ id, name, bg, ink, accents, dark? }]`
 - `randomSeed()`: a short random seed string
 - `pickStyle(options)`: the style id `createCover` would use for these options (resolving `'random'` from the seed), without drawing the cover

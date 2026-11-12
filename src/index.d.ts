@@ -152,8 +152,9 @@ export interface CoverOptions {
   lang?: string;
   /**
    * Choices to pin instead of leaving them to the seed, such as `{ scene: 'forest' }` for
-   * Silhouette (see each style's `variants` in `listStyles()`). Names the style doesn't have
-   * are ignored; a value it doesn't offer throws.
+   * Silhouette (see each style's `variants` in `listStyles()`), in any case. Names the style
+   * doesn't have are ignored. A value no style offers throws; with a style you name, so does a
+   * value that style lacks (a style picked at random takes only the pins it can).
    */
   variants?: Readonly<Record<string, string>>;
   /**

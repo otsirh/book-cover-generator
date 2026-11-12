@@ -62,9 +62,9 @@ test('a book list can give each book a genre', () => {
   ]);
 });
 
-test('ids in a list are read in lower case, as the app’s menus name them', () => {
-  assert.deepEqual(parseBookList('title,genre,palette,style\nNight,Horror,Mint,Hollow'), [
-    { title: 'Night', genre: 'horror', palette: 'mint', style: 'hollow' },
+test('a list’s ids are kept as typed: the library reads names in any case', () => {
+  assert.deepEqual(parseBookList('title,genre,palette,style\nNight,Horror,Mint,Art Deco'), [
+    { title: 'Night', genre: 'Horror', palette: 'Mint', style: 'Art Deco' },
   ]);
 });
 
@@ -89,5 +89,29 @@ test('a listed book’s options: its own values win, and its genre picks a style
   // With a random or unknown shared style, the genre is left to createCover (which picks, or says so).
   for (const style of ['random', 'bauhauss', undefined]) {
     assert.equal(optionsForBook({ title: 'A', genre: 'horror' }, { style, variants: { a: 'b' } }).style, style);
+  }
+});
+
+test('with no shared style, a book naming its own keeps the shared pins', async () => {
+  const { optionsForBook, registerPalette, unregisterPalette } = await import('../src/index.js');
+  for (const shared of [{}, { style: 'random' }]) {
+    const o = optionsForBook({ title: 'Dune', style: 'silhouette' }, { ...shared, variants: { scene: 'forest' } });
+    assert.equal(createCover(o).variants.scene, 'forest');
+  }
+  // The same style, named in another case, is the same style.
+  assert.deepEqual(
+    optionsForBook({ title: 'A', style: 'hollow' }, { style: 'Hollow', variants: { moon: 'blood' } }).variants,
+    {
+      moon: 'blood',
+    },
+  );
+  // A palette of your own, named in a list as you named it, in any case.
+  registerPalette({ id: 'Brand', bg: '#ffffff', ink: '#111111', accents: ['#ff0000'] });
+  try {
+    for (const row of ['Dune,Brand', 'Dune,brand']) {
+      assert.equal(createCover(parseBookList(`title,palette\n${row}`)[0]).palette, 'Brand');
+    }
+  } finally {
+    unregisterPalette('Brand');
   }
 });

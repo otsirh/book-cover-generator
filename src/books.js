@@ -22,9 +22,6 @@ const COLUMNS = /** @type {const} */ ({
   texture: 'texture',
 });
 
-/** Columns that hold an id. */
-const IDS = new Set(['style', 'genre', 'palette', 'font', 'titleCase']);
-
 /** Separators of a plain line: a tab, or a bar or dash with spaces around it. */
 const LINE_SEPARATOR = /\t| \| | — | – /;
 
@@ -89,8 +86,6 @@ function optionsFrom(named) {
     const value = typeof raw === 'number' && option !== 'title' ? raw : String(raw).trim();
     if (value === '') continue;
     if (option === 'width' || option === 'height') out[option] = Number(value);
-    // Ids as people type them from the app's menus ("Horror", "Mint"): the library's are lower-case.
-    else if (IDS.has(option)) out[option] = String(value).toLowerCase();
     else out[option] = option === 'seed' ? value : String(value);
   }
   return /** @type {import('./index.js').CoverOptions} */ (out);

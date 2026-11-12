@@ -4,6 +4,9 @@
 // SVG is rasterised through <img>/<canvas> (which cannot load web fonts).
 
 import { escapeXml, n } from './core.js';
+// (The width tables are for measuring without a canvas. A browser loads them too, about 6 KB
+// compressed: a Node-only entry point would spare it that, but bundlers and Workers pick entry
+// points their own way, and one entry everywhere is worth more.)
 import { CHARS, UPRIGHT, ITALIC, METRICS } from './metrics.js';
 
 // Each stack starts with the macOS face the style was drawn with, then close matches on
