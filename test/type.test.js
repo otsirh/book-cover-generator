@@ -157,3 +157,11 @@ test('stacks are never smaller than fitText would go', () => {
     if (fit) for (const line of fit.lines) assert.ok(line.size >= 6, `${maxWidth}: ${line.text} at ${line.size}`);
   }
 });
+
+test('titleBlock gives the title the room the lead line does not need', () => {
+  const c = ctx({ title: 'The End' });
+  const block = titleBlock(c, { maxWidth: 516, maxHeight: 150, maxSize: 300, minSize: 20 });
+  assert.match(block.draw({ x: 0, y: 0, fill: '#000' }), />THE</);
+  assert.ok(block.size > 95, `title at ${block.size}px`);
+  assert.ok(block.height <= 150.5, `block ${block.height}`);
+});

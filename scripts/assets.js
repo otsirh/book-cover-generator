@@ -17,11 +17,15 @@ const loads = covers.map(([title, author, style, palette, seed, x, y, rot], i) =
   return img.decode();
 });
 
+// The PNG icons are drawn from the SVG icon (32×32), so editing icon.svg updates them all.
+const iconResponse = await fetch('/public/icons/icon.svg');
+const iconSvg = await iconResponse.text();
+if (!iconResponse.ok || !iconSvg.trimStart().startsWith('<svg'))
+  throw new Error('Could not load public/icons/icon.svg');
+const artwork = iconSvg.replace(/^[\s\S]*?<svg[^>]*>|<\/svg>\s*$/g, '');
 /** @param {number} scale */
 const book = (scale) =>
-  `<g transform="translate(${16 - 16 * scale} ${16 - 16 * scale}) scale(${scale})">` +
-  '<rect x="6" y="3" width="20" height="26" rx="2" fill="#c2410c"/><rect x="6" y="3" width="4" height="26" fill="#7c2d12"/>' +
-  '<rect x="13" y="9" width="9" height="2" rx=".5" fill="#fff"/><rect x="13" y="13" width="6" height="1.4" rx=".5" fill="#fed7aa"/></g>';
+  `<g transform="translate(${16 - 16 * scale} ${16 - 16 * scale}) scale(${scale})">${artwork}</g>`;
 /** @param {number} rx @param {number} scale */
 const icon = (rx, scale) =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="${rx}" fill="#f5f2ec"/>${book(scale)}</svg>`;

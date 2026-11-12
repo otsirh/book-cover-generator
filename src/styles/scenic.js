@@ -14,6 +14,7 @@ import {
   radialGradient,
   blurFilter,
   shadowFilter,
+  contrast,
 } from '../core.js';
 import { FONTS, drawText } from '../text.js';
 import { titleBlock, authorFit } from '../type.js';
@@ -684,7 +685,9 @@ export const aurora = {
     const count = rng.int(4, 6);
     for (let i = 0; i < count; i++) {
       const col = cols[i % cols.length];
-      const op = col === p.ink ? 0.35 : rng.float(0.7, 1);
+      let op = col === p.ink ? 0.35 : +rng.float(0.7, 1).toFixed(2);
+      // The title and author sit on the blobs: fade any blob that would leave the ink under 3:1.
+      while (op > 0.1 && contrast(mix(p.bg, col, op), p.ink) < 3) op = +(op - 0.05).toFixed(2);
       blobs += circle(
         rng.float(-0.1, 1.1) * W,
         rng.float(-0.05, 1.05) * H,

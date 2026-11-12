@@ -1,4 +1,4 @@
-import { n, rect, circle, mix, inkOn, escapeXml } from '../core.js';
+import { n, rect, circle, mix, inkOn, escapeXml, contrast } from '../core.js';
 import { FONTS, fitText, drawText, measureText, textGroupAttrs } from '../text.js';
 import { titleBlock, authorFit } from '../type.js';
 import { strongAccents, initialChars } from './util.js';
@@ -119,10 +119,12 @@ export const bigtype = {
     const flat = rng.bool(0.5);
     const bg = flat ? rng.pick(strongAccents(p, p.bg, 1.2)) : p.bg;
     const ink = inkOn(bg, p);
+    // The lead line and one stacked line take this colour: keep it at 3:1 or more.
+    const soft = mix(ink, bg, 0.3);
     const accent = rng.pick(
-      strongAccents(p, bg, 1.6)
-        .filter((col) => col !== ink)
-        .concat([mix(ink, bg, 0.45)]),
+      strongAccents(p, bg, 3)
+        .filter((col) => col !== ink && contrast(col, bg) >= 3)
+        .concat(contrast(soft, bg) >= 3 ? [soft] : [ink]),
     );
     const font = rng.pick([FONTS.display, FONTS.condensed, FONTS.sans]);
     const weight = font === FONTS.display ? 400 : 800;

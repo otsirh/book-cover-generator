@@ -292,8 +292,12 @@
             <svg aria-hidden="true"><use href="#i-redo" /></svg>
           </button>
         </div>
-        <p class="hint">
-          <kbd>R</kbd> randomize · <kbd>←</kbd><kbd>→</kbd> style · <kbd>[</kbd><kbd>]</kbd> palette · <kbd>Z</kbd> undo
+        <p class="hint" id="shortcut-hint">
+          <span class="hint-keys">
+            <kbd>R</kbd> randomize · <kbd>←</kbd><kbd>→</kbd> style · <kbd>[</kbd><kbd>]</kbd> palette ·
+            <kbd>Z</kbd> undo
+          </span>
+          <button type="button" class="hint-toggle" id="shortcuts-toggle">Turn off shortcuts</button>
         </p>
       </form>
 

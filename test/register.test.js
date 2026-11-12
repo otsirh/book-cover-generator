@@ -14,3 +14,20 @@ test('custom styles can be registered', () => {
   const { svg } = createCover({ title: 'x', style: 'test-plain', palette: 'noir' });
   assert.ok(svg.includes('fill="#121212"'));
 });
+
+test('a style can be a class instance, and missing details get defaults', () => {
+  class Plain {
+    id = 'test-class';
+    fill = '#123456';
+    /** @param {import('../src/index.js').StyleContext} c */
+    render(c) {
+      return `<rect width="${c.W}" height="${c.H}" fill="${this.fill}"/>`;
+    }
+  }
+  registerStyle(new Plain());
+  assert.match(createCover({ title: 'x', style: 'test-class' }).svg, /fill="#123456"/);
+  const frozen = Object.freeze({ id: 'test-undefined', name: undefined, group: undefined, render: () => '' });
+  registerStyle(frozen);
+  const info = listStyles().find((s) => s.id === 'test-undefined');
+  assert.deepEqual(info, { id: 'test-undefined', name: 'test-undefined', description: '', group: 'Custom' });
+});

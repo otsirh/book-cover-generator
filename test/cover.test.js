@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createCover, generateCover, styles, palettes, registerStyle, listStyles } from '../src/index.js';
+import { contrast, mix } from '../src/core.js';
 
 // The built-in styles (registration is tested in its own process, in register.test.js).
 const builtIn = [...styles];
@@ -554,6 +555,121 @@ test('a narrow initial pairs only with a letter of the same word', () => {
       const runs = textRuns(createCover({ title, style: 'typographic', seed }).svg);
       const glyph = runs.reduce((a, b) => (b.size > a.size ? b : a));
       assert.equal(glyph.text, initial, `${title} ${seed}`);
+    }
+  }
+});
+
+const SEEDS = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
+
+test('Aurora keeps its ink at 3:1 or more over every colour field', () => {
+  for (const p of palettes) {
+    for (const seed of SEEDS) {
+      const { svg } = createCover({
+        title: 'The Lighthouse Keeper',
+        author: 'Mara Ellison',
+        style: 'aurora',
+        palette: p.id,
+        seed,
+      });
+      const blobs = /<g filter="url\(#[^"]*blur[^"]*\)">(.*?)<\/g>/.exec(svg)?.[1] ?? '';
+      assert.ok(blobs, `${p.id} ${seed}: no colour fields`);
+      for (const [, fill, op] of blobs.matchAll(/fill="(#[0-9a-f]{6})" opacity="([\d.]+)"/g)) {
+        const seen = mix(p.bg, fill, Number(op));
+        assert.ok(
+          contrast(seen, p.ink) >= 3 - 1e-9,
+          `${p.id} ${seed}: ${fill} at ${op} gives ${contrast(seen, p.ink)}`,
+        );
+      }
+    }
+  }
+});
+
+test('Classic draws its emblem initial readably on the panel', () => {
+  for (const p of palettes) {
+    for (const seed of SEEDS) {
+      const { svg } = createCover({
+        title: 'The Lighthouse Keeper',
+        style: 'classic',
+        palette: p.id,
+        seed,
+        width: seed < 'd' ? 600 : 900,
+        height: 600 + (seed < 'd' ? 300 : 0),
+      });
+      const m =
+        /<circle [^>]*fill="(#[0-9a-f]{6})" stroke="[^"]*"[^>]*\/><text [^>]*fill="(#[0-9a-f]{6})"[^>]*>T<\/text>/.exec(
+          svg,
+        );
+      assert.ok(m, `${p.id} ${seed}: no emblem`);
+      assert.ok(contrast(m[1], m[2]) >= 3, `${p.id} ${seed}: ${m[2]} on ${m[1]} is ${contrast(m[1], m[2]).toFixed(2)}`);
+    }
+  }
+});
+
+test('Big Type sets every text colour at 3:1 or more against its background', () => {
+  for (const p of palettes) {
+    for (const seed of SEEDS) {
+      const { svg } = createCover({
+        title: 'The Lighthouse Keeper',
+        author: 'Mara Ellison',
+        style: 'bigtype',
+        palette: p.id,
+        seed,
+      });
+      const bg = /<rect [^>]*fill="(#[0-9a-f]{6})"/.exec(svg)?.[1] ?? '';
+      for (const [, fill] of svg.matchAll(/<(?:g|text)\b[^>]*\bfill="(#[0-9a-f]{6})"[^>]*>(?=[^<]*\S|<text)/g)) {
+        assert.ok(contrast(fill, bg) >= 3, `${p.id} ${seed}: ${fill} on ${bg} is ${contrast(fill, bg).toFixed(2)}`);
+      }
+    }
+  }
+});
+
+test('Low Poly darkens the facets behind its white rule and title', () => {
+  for (const [width, height] of [
+    [600, 900],
+    [600, 600],
+    [900, 600],
+    [1800, 600],
+  ]) {
+    for (const seed of SEEDS) {
+      const { svg } = createCover({
+        title: 'The Lighthouse Keeper',
+        author: 'Mara Ellison',
+        style: 'lowpoly',
+        width,
+        height,
+        seed,
+      });
+      const stops = [...svg.matchAll(/<stop offset="([\d.]+)" stop-color="[^"]*" stop-opacity="([\d.]+)"\/>/g)].map(
+        (s) => [Number(s[1]), Number(s[2])],
+      );
+      const shade = /<rect x="0" y="([\d.]+)" width="[\d.]+" height="([\d.]+)" fill="url\(#[^"]*shade[^"]*\)"/.exec(
+        svg,
+      );
+      assert.ok(shade, `${width}x${height} ${seed}: no shade`);
+      const [top, h] = [Number(shade[1]), Number(shade[2])];
+      const rule = /<rect x="[\d.]+" y="([\d.]+)" width="[\d.]+" height="[\d.]+" fill="#ffffff"\/>/.exec(svg);
+      assert.ok(rule, `${width}x${height} ${seed}: no rule`);
+      const at = (Number(rule[1]) - top) / h;
+      let opacity = 0;
+      for (let i = 1; i < stops.length; i++) {
+        const [o0, a0] = stops[i - 1];
+        const [o1, a1] = stops[i];
+        if (at >= o0 - 1e-6 && at <= o1 + 1e-6) opacity = a0 + ((a1 - a0) * (at - o0)) / (o1 - o0 || 1);
+      }
+      assert.ok(opacity >= 0.6 - 0.01, `${width}x${height} ${seed}: shade ${opacity.toFixed(2)} at the rule`);
+    }
+  }
+});
+
+test('Typewriter sets scripts with conjuncts as one run', () => {
+  for (const title of ['க்ஷேத்திரம்', 'ಕನ್ನಡ ಕಥೆ', 'မြန်မာစာ', 'संस्कृत']) {
+    const { svg } = createCover({ title, author: 'A', style: 'typewriter', seed: 'a' });
+    const drawn = textRuns(svg).map((r) => r.text);
+    for (const word of title.split(' ')) {
+      assert.ok(
+        drawn.some((text) => text.includes(word)),
+        `${title}: "${word}" was split into ${JSON.stringify(drawn)}`,
+      );
     }
   }
 });

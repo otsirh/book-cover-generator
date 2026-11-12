@@ -379,6 +379,13 @@ function hardWrap(tokens, maxWidth, measure) {
  */
 export const BREAKING_SPACE = /[^\S\u00A0\u2007\u202F\uFEFF]+/g;
 
+/**
+ * The smallest size text shrinks to before wrapping harder: `minSize` if given,
+ * else 22% of `maxSize` but at least 6 px (never above `maxSize`).
+ * @param {number} maxSize @param {number} [minSize]
+ */
+export const defaultMinSize = (maxSize, minSize) => Math.min(maxSize, minSize ?? Math.max(6, maxSize * 0.22));
+
 /** Room below the last baseline for descenders, as a fraction of the size. */
 const DESCENT = 0.22;
 /** How far below `minSize` text may shrink so that a long word fits whole. */
@@ -413,7 +420,7 @@ export function fitText(text, opts) {
   if (opts.minSize != null && (!Number.isFinite(opts.minSize) || opts.minSize <= 0)) {
     throw new TypeError('fitText: `minSize` must be a positive number of pixels');
   }
-  const minSize = Math.min(maxSize, opts.minSize ?? Math.max(6, maxSize * 0.22));
+  const minSize = defaultMinSize(maxSize, opts.minSize);
 
   let str = String(text ?? '')
     .replace(BREAKING_SPACE, ' ')

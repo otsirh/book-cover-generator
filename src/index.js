@@ -32,7 +32,15 @@ export function registerStyle(style) {
   if (!style || !style.id || typeof style.render !== 'function') {
     throw new TypeError('registerStyle: a style needs an `id` and a `render(ctx)` function');
   }
-  registry.set(style.id, { name: style.id, description: '', group: 'Custom', ...style });
+  // Inherit from the style rather than copy it, so a class instance keeps its methods (and
+  // `this`), and fill in missing details without touching the caller's object.
+  // (Defined, not assigned: assigning would throw where a frozen style has these as read-only.)
+  const entry = Object.create(style, {
+    name: { value: style.name ?? style.id, enumerable: true },
+    description: { value: style.description ?? '', enumerable: true },
+    group: { value: style.group ?? 'Custom', enumerable: true },
+  });
+  registry.set(style.id, entry);
   if (!styles.includes(style.id)) styles.push(style.id);
 }
 
@@ -132,8 +140,7 @@ export function createCover(options = {}) {
   const seed = options.seed == null || options.seed === '' ? `${title}␟${author}` : String(options.seed);
 
   const styleId = resolveStyle(options.style, createRng(`${seed}|style`));
-  const style = registry.get(styleId);
-  if (!style) throw new Error(`Unknown style "${styleId}"`);
+  const style = /** @type {import('./index.js').CoverStyle} */ (registry.get(styleId)); // resolveStyle checked it
   const palette = resolvePalette(options.palette, createRng(`${seed}|palette`), style);
   const [paper, night] =
     luminance(palette.bg) >= luminance(palette.ink) ? [palette.bg, palette.ink] : [palette.ink, palette.bg];

@@ -1,4 +1,18 @@
-import { n, rect, circle, line, path, pathD, mix, readable, inkOn, clamp, escapeXml, radialGradient } from '../core.js';
+import {
+  n,
+  rect,
+  circle,
+  line,
+  path,
+  pathD,
+  mix,
+  readable,
+  inkOn,
+  clamp,
+  escapeXml,
+  radialGradient,
+  contrast,
+} from '../core.js';
 import { FONTS, fitText, drawText, textBottom, graphemes, measureText, textGroupAttrs } from '../text.js';
 import { titleBlock, authorFit } from '../type.js';
 import { strongAccents, flower, initialChars } from './util.js';
@@ -50,7 +64,8 @@ export const classic = {
     s += circle(W / 2, ey, er, panel, `stroke="${ink}" stroke-width="${n(1.5 * u)}"`);
     const initial = initialChars(c.title)[0];
     if (initial) {
-      const attrs = textGroupAttrs({ font: FONTS.serif, size: er * 1.1, anchor: 'middle', fill: band });
+      const fill = contrast(band, panel) >= 3 ? band : ink;
+      const attrs = textGroupAttrs({ font: FONTS.serif, size: er * 1.1, anchor: 'middle', fill });
       s += `<text x="${n(W / 2)}" y="${n(ey + er * 0.38)}" ${attrs}>${escapeXml(initial)}</text>`;
     }
     return s;
@@ -240,9 +255,10 @@ export const sunburst = {
 };
 
 const STAMPS = ['MANUSCRIPT', 'FIRST DRAFT', 'ADVANCE COPY', 'UNCORRECTED PROOF', 'FILE COPY', 'APPROVED'];
-// Scripts whose letters join or run right to left: typing them glyph by glyph would break them.
-const COMPLEX_SCRIPT =
-  /[\p{Script=Arabic}\p{Script=Hebrew}\p{Script=Syriac}\p{Script=Thaana}\p{Script=Nko}\p{Script=Adlam}\p{Script=Mongolian}]/u;
+// Scripts whose letters stand alone (no joining, conjuncts or reordering), so they can be typed one by
+// one. Others (Arabic, Hebrew, Devanagari, Tamil, Myanmar…) are set as one run to keep their shaping.
+const TYPED_BY_LETTER =
+  /^[\p{Script=Latin}\p{Script=Greek}\p{Script=Cyrillic}\p{Script=Armenian}\p{Script=Georgian}\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Common}\p{Script=Inherited}]*$/u;
 
 /**
  * Type a line character by character, each slightly off its baseline and ink level.
@@ -253,8 +269,8 @@ const COMPLEX_SCRIPT =
 function typedLine(str, x, y, size, weight, rng, color, anchor = 'start') {
   const spec = { font: FONTS.mono, weight };
   const width = measureText(str, size, spec);
-  if (COMPLEX_SCRIPT.test(str)) {
-    // Keep joining and direction intact: one run of text, no per-letter jitter.
+  if (!TYPED_BY_LETTER.test(str)) {
+    // Keep joining, conjuncts and direction intact: one run of text, no per-letter jitter.
     return `<text x="${n(x)}" y="${n(y)}" ${textGroupAttrs({ ...spec, size, fill: color, anchor })}>${escapeXml(str)}</text>`;
   }
   let o = '';
@@ -351,13 +367,14 @@ export const typewriter = {
         })
       : null;
     const gap = S * 0.05;
+    const underline = 8 * u;
     const blockH =
-      textBottom(t, 0) + 10 * u + (sub ? gap * 0.6 + textBottom(sub, 0) : 0) + (by ? gap + textBottom(by, 0) : 0);
+      textBottom(t, 0) + underline + (sub ? gap * 0.6 + textBottom(sub, 0) : 0) + (by ? gap + textBottom(by, 0) : 0);
     let y = H * 0.42 - blockH / 2;
     t.lines.forEach((ln, i) => {
       s += typedLine(ln, W / 2, y + t.size * t.cap + i * t.size * t.lineHeight, t.size, 700, rng, ink, 'middle');
     });
-    y = textBottom(t, y) + 8 * u;
+    y = textBottom(t, y) + underline;
     const uw = Math.max(...t.lines.map((ln) => measureText(ln, t.size, { font: FONTS.mono, weight: 700 })));
     s += line(
       W / 2 - uw / 2,

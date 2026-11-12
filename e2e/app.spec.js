@@ -253,6 +253,24 @@ test('keyboard shortcuts: R, arrows and brackets, but not while typing', async (
   await expect(page.locator('#seed')).not.toHaveValue('fixed');
 });
 
+test('single-key shortcuts can be turned off, and stay off', async ({ page }) => {
+  await page.goto('/#style=minimal&seed=keys');
+  const toggle = page.locator('#shortcuts-toggle');
+  await toggle.click();
+  await expect(toggle).toHaveText('Turn on shortcuts');
+  await expect(page.locator('#randomize')).not.toHaveAttribute('aria-keyshortcuts');
+  await page.locator('body').press('KeyR');
+  await page.locator('body').press('ArrowRight');
+  await expect(page.locator('#seed')).toHaveValue('keys');
+  await expect(page.locator('#style-name')).toHaveText('Minimal');
+  await page.reload();
+  await expect(toggle).toHaveText('Turn on shortcuts');
+  await toggle.click();
+  await expect(page.locator('#randomize')).toHaveAttribute('aria-keyshortcuts', 'R');
+  await page.locator('body').press('KeyR');
+  await expect(page.locator('#seed')).not.toHaveValue('keys');
+});
+
 test('shortcuts follow the printed key, on any keyboard layout', async ({ page }) => {
   await page.goto('/#style=minimal&seed=k');
   await page.locator('.tile[data-style="swiss"]').click();

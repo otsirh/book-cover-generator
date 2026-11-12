@@ -555,6 +555,22 @@ input::placeholder {
   color: var(--muted);
 }
 
+.hint.off .hint-keys {
+  text-decoration: line-through;
+}
+
+.hint-toggle {
+  min-height: 24px;
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
 /* ------------------------------------------------------------------- stage */
 
 .stage {

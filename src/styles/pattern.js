@@ -467,15 +467,6 @@ export const lowpoly = {
         }
       }
     }
-    const shade = c.id('shade');
-    const night = mix(p.night, '#000000', 0.3);
-    s = `<defs>${linearGradient(shade, [
-      [0, night, 0],
-      [0.45, night, 0.55],
-      [1, night, 0.92],
-    ])}</defs>${s}`;
-    s += rect(0, H * 0.35, W, H * 0.65, `url(#${shade})`);
-
     const light = '#ffffff';
     const a = authorFit(c, { maxSize: S * 0.046 });
     const aY = H - m * 1.2 - a.height;
@@ -491,8 +482,21 @@ export const lowpoly = {
       subtitleItalic: false,
     });
     const tY = aY - m * 0.8 - t.height;
+    const ruleY = tY - m * 0.6;
+    // A dark shade under the white text: it fades in above the rule, and is at least 60% from
+    // the rule down, so even the lightest facets keep white text readable.
+    const shade = c.id('shade');
+    const night = mix(p.night, '#000000', 0.3);
+    const top = Math.max(0, Math.min(H * 0.35, ruleY - m * 1.5));
+    const full = (ruleY - top) / (H - top);
+    s = `<defs>${linearGradient(shade, [
+      [0, night, 0],
+      [full, night, 0.6],
+      [1, night, 0.92],
+    ])}</defs>${s}`;
+    s += rect(0, top, W, H - top, `url(#${shade})`);
     s += t.draw({ x: m, y: tY, fill: light });
-    s += rect(m, tY - m * 0.6, S * 0.12, 4 * u, light);
+    s += rect(m, ruleY, S * 0.12, 4 * u, light);
     s += drawText(a, { x: m, y: aY, fill: light, opacity: 0.92 });
     return s;
   },

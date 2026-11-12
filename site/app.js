@@ -48,6 +48,7 @@ const SAMPLES = [
   ['Under Paper Skies', 'Noor Haddad'],
 ];
 const KEEP_KEY = 'book-cover-generator:kept';
+const SHORTCUTS_KEY = 'book-cover-generator:shortcuts';
 /** @type {Record<string, string>} */
 const LETTER_CODES = { KeyR: 'r', KeyZ: 'z', KeyY: 'y' };
 const MAX_KEPT = 24;
@@ -90,7 +91,7 @@ const design = {
   format: 'paperback',
   texture: false,
 };
-const ui = { scale: 2, lockStyle: false, lockPalette: false };
+const ui = { scale: 2, lockStyle: false, lockPalette: false, shortcuts: true };
 /** @type {ReturnType<typeof createCover>} */
 let current;
 
@@ -572,8 +573,40 @@ function buildControls() {
     else target.scrollIntoView({ behavior });
   });
 
+  // Single-key shortcuts can be turned off (WCAG 2.1.4), e.g. for speech input; the choice is remembered.
+  const toggle = $('shortcuts-toggle');
+  const syncShortcuts = () => {
+    toggle.textContent = ui.shortcuts ? 'Turn off shortcuts' : 'Turn on shortcuts';
+    $('shortcut-hint').classList.toggle('off', !ui.shortcuts);
+    for (const [id, keys] of [
+      ['randomize', 'R'],
+      ['undo', 'Z'],
+      ['redo', 'Shift+Z'],
+    ]) {
+      if (ui.shortcuts) $(id).setAttribute('aria-keyshortcuts', keys);
+      else $(id).removeAttribute('aria-keyshortcuts');
+    }
+  };
+  try {
+    ui.shortcuts = localStorage.getItem(SHORTCUTS_KEY) !== 'off';
+  } catch {
+    // Storage blocked: shortcuts stay on.
+  }
+  syncShortcuts();
+  toggle.addEventListener('click', () => {
+    ui.shortcuts = !ui.shortcuts;
+    try {
+      if (ui.shortcuts) localStorage.removeItem(SHORTCUTS_KEY);
+      else localStorage.setItem(SHORTCUTS_KEY, 'off');
+    } catch {
+      // Storage blocked: the choice lasts for this visit.
+    }
+    syncShortcuts();
+    toast(ui.shortcuts ? 'Keyboard shortcuts on' : 'Keyboard shortcuts off');
+  });
+
   document.addEventListener('keydown', (e) => {
-    if (e.metaKey || e.repeat) return;
+    if (!ui.shortcuts || e.metaKey || e.repeat) return;
     // The target can be the document itself (events dispatched by scripts or extensions).
     const target = e.target instanceof Element ? e.target : null;
     // Text fields keep their keys; the texture switch (a checkbox) has no use for them.

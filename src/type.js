@@ -6,7 +6,16 @@
 // the cover (c.S), so they work at any size and shape.
 
 import { n, clamp, escapeXml } from './core.js';
-import { FONTS, fitText, drawText, measureText, textBottom, textGroupAttrs, spacingShift } from './text.js';
+import {
+  FONTS,
+  fitText,
+  drawText,
+  measureText,
+  textBottom,
+  textGroupAttrs,
+  spacingShift,
+  defaultMinSize,
+} from './text.js';
 
 const LEAD = /^(the|a|an) +(\S.*)$/i;
 
@@ -99,7 +108,7 @@ export function fitStack(text, o) {
   const h = heightOf(sizes) + sizes[sizes.length - 1] * desc[desc.length - 1];
   if (h > maxHeight) sizes = sizes.map((size) => (size * maxHeight) / h);
   // fitText's own floor, so a stack is never smaller than a wrapped title could be.
-  const minSize = Math.min(o.maxSize, o.minSize ?? Math.max(6, o.maxSize * 0.22));
+  const minSize = defaultMinSize(o.maxSize, o.minSize);
   if (Math.min(...sizes) < minSize) return null;
   // Very uneven stacks (a two-letter word next to a long one) look accidental.
   if (Math.max(...sizes) / Math.min(...sizes) > 3.2) return null;
@@ -213,7 +222,7 @@ export function titleBlock(c, o) {
       })
     : null;
   // fitText's own default: a title forced below this didn't really fit.
-  const minMain = Math.min(o.maxSize, o.minSize ?? Math.max(6, o.maxSize * 0.22));
+  const minMain = defaultMinSize(o.maxSize, o.minSize);
 
   /** @type {import('./text.js').FitOptions} */
   const mainOpts = {
@@ -248,20 +257,41 @@ export function titleBlock(c, o) {
     let leadGapL = 0;
     let reserve = leadText ? o.maxSize * 0.3 : 0;
     let f = fitMain(text, Math.max(1, o.maxHeight - subHL - reserve));
-    for (let pass = 0; leadText && pass < 3; pass++) {
-      const leadSize = clamp(f.size * 0.3, c.S * 0.026, c.S * 0.07);
-      leadFitL = fitText(leadText, {
+    /** The lead line for a title of `size`: its fit and the room it takes with its gap. @param {number} size */
+    const leadFor = (size) => {
+      const fit = fitText(leadText, {
         font,
         weight,
         upper: true,
         letterSpacing: 0.28,
         maxWidth: o.maxWidth,
-        maxSize: leadSize,
+        maxSize: clamp(size * 0.3, c.S * 0.026, c.S * 0.07),
       });
-      leadGapL = leadFitL.size * 0.9;
-      const needed = leadFitL.height + leadGapL;
-      if (needed <= reserve + 0.5) break;
-      reserve = needed;
+      return { fit, gap: fit.size * 0.9, needed: fit.height + fit.size * 0.9 };
+    };
+    for (let pass = 0; leadText && pass < 3; pass++) {
+      const leadLine = leadFor(f.size);
+      leadFitL = leadLine.fit;
+      leadGapL = leadLine.gap;
+      if (leadLine.needed <= reserve + 0.5) {
+        // The first guess can be generous: give the title back what the lead doesn't need. A
+        // bigger title has a bigger lead, so search for the smallest reserve that still holds it.
+        let lo = leadLine.needed;
+        let hi = reserve;
+        for (let k = 0; k < 4 && hi - lo > 1; k++) {
+          const mid = (lo + hi) / 2;
+          const bigger = fitMain(text, Math.max(1, o.maxHeight - subHL - mid));
+          const itsLead = leadFor(bigger.size);
+          if (itsLead.needed <= mid + 0.5) {
+            hi = mid;
+            f = bigger;
+            leadFitL = itsLead.fit;
+            leadGapL = itsLead.gap;
+          } else lo = mid;
+        }
+        break;
+      }
+      reserve = leadLine.needed;
       f = fitMain(text, Math.max(1, o.maxHeight - subHL - reserve));
     }
     const leadHL = leadFitL ? leadFitL.height + leadGapL : 0;

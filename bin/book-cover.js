@@ -80,6 +80,12 @@ function size(value, name) {
   return number;
 }
 
+// A reader that stops early (book-cover … | head) closes the pipe: that's fine, not a crash.
+process.stdout.on('error', (err) => {
+  if (/** @type {NodeJS.ErrnoException} */ (err).code === 'EPIPE') process.exit(0);
+  throw err;
+});
+
 try {
   const cover = createCover({
     title: positionals[0],

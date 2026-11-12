@@ -102,3 +102,14 @@ test('--subtitle and --texture', async () => {
   assert.match(stdout, /<title>Dune: A Novel by Herbert<\/title>/);
   assert.match(stdout, /feTurbulence/);
 });
+
+test(
+  'a reader that stops early (| head) is not a crash',
+  { skip: process.platform === 'win32' && 'needs a POSIX shell' },
+  async () => {
+    // ~100 KB of SVG into `head`, which exits after 20 bytes and closes the pipe.
+    const command = `"${process.execPath}" "${CLI}" Flow -s flowfield --width 3000 --height 3000 | head -c 20 > /dev/null`;
+    const { stderr } = await run('sh', ['-c', command]);
+    assert.doesNotMatch(stderr, /EPIPE|Unhandled/);
+  },
+);
