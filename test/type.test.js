@@ -140,3 +140,20 @@ test('titleBlock drops the subtitle before crushing the title', () => {
   const roomy = titleBlock(c, { maxWidth: 516, maxHeight: 300, maxSize: 120, font: FONTS.sans, weight: 700 });
   assert.match(roomy.draw({ x: 0, y: 0, fill: '#000' }), /A Novel/);
 });
+
+test('stacks leave room for descenders in Cyrillic, Greek and accented Latin too', () => {
+  for (const text of ['Музыка дружбы', 'Φως και ψυχή', 'Façade Ząbki', 'Vịnh Hạ Long']) {
+    const fit = fitStack(text, { maxWidth: 500, maxSize: 200 });
+    assert.ok(fit, text);
+    assert.ok(fit.descent >= fit.lines[fit.lines.length - 1].size * 0.2, `${text}: descent ${fit.descent}`);
+  }
+  const caps = fitStack('MUSIC HALL', { maxWidth: 500, maxSize: 200 });
+  assert.ok(caps && caps.descent < caps.lines[1].size * 0.1);
+});
+
+test('stacks are never smaller than fitText would go', () => {
+  for (const maxWidth of [30, 40, 60]) {
+    const fit = fitStack('Big Extraordinarily', { maxWidth, maxSize: 12 });
+    if (fit) for (const line of fit.lines) assert.ok(line.size >= 6, `${maxWidth}: ${line.text} at ${line.size}`);
+  }
+});

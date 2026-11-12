@@ -168,6 +168,9 @@ let queuedSteps = 0;
 let typingTimer;
 /** @type {ReturnType<typeof setTimeout> | undefined} */
 let replaceTimer;
+/** Keystrokes not yet written to the typing burst's entry. */
+let replaceDirty = false;
+const REPLACE_MS = 300;
 
 /**
  * Write to the history, ignoring the SecurityError browsers throw when pages
@@ -183,11 +186,36 @@ function safely(write) {
   }
 }
 
+/** Write the current design into the current entry. */
+function writeReplace() {
+  replaceDirty = false;
+  safely(() => history.replaceState({ i: historyIndex }, '', toHash(design)));
+}
+
+/** Save keystrokes not yet in the current entry, now. */
 function flushReplace() {
-  if (replaceTimer === undefined) return;
   clearTimeout(replaceTimer);
   replaceTimer = undefined;
-  safely(() => history.replaceState({ i: historyIndex }, '', toHash(design)));
+  if (replaceDirty) writeReplace();
+}
+
+/**
+ * Keystrokes within a typing burst update the burst's entry: at once, then at most
+ * every REPLACE_MS (browsers rate-limit history writes). The entry is never more than
+ * that behind, even if the toolbar's Back button (which can't be intercepted) leaves it.
+ */
+function scheduleReplace() {
+  replaceDirty = true;
+  if (replaceTimer !== undefined) return;
+  writeReplace();
+  const tick = () => {
+    replaceTimer = undefined;
+    if (replaceDirty) {
+      writeReplace();
+      replaceTimer = setTimeout(tick, REPLACE_MS);
+    }
+  };
+  replaceTimer = setTimeout(tick, REPLACE_MS);
 }
 
 function commit() {
@@ -195,13 +223,18 @@ function commit() {
   // A discrete change ends any typing burst, so later keystrokes get their own step.
   typing = false;
   clearTimeout(typingTimer);
-  if (safely(() => history.pushState({ i: historyIndex + 1 }, '', toHash(design)))) {
+  // Chrome may ignore a pushState without throwing when a page writes history too fast:
+  // only count the entry if it is really there.
+  const pushed =
+    safely(() => history.pushState({ i: historyIndex + 1 }, '', toHash(design))) &&
+    history.state?.i === historyIndex + 1;
+  if (pushed) {
     historyIndex += 1;
     historyMax = historyIndex;
     saveHistoryMax();
   } else {
     // Rate-limited: update the current entry instead (which may also be refused).
-    safely(() => history.replaceState({ i: historyIndex }, '', toHash(design)));
+    writeReplace();
   }
   syncHistoryButtons();
 }
@@ -210,10 +243,7 @@ function typed() {
   if (!typing) {
     commit();
     typing = true;
-  } else {
-    clearTimeout(replaceTimer);
-    replaceTimer = setTimeout(flushReplace, 250);
-  }
+  } else scheduleReplace();
   clearTimeout(typingTimer);
   typingTimer = setTimeout(() => {
     typing = false;
@@ -252,8 +282,10 @@ document.addEventListener('visibilitychange', () => {
 });
 
 window.addEventListener('popstate', (e) => {
+  // The entry being left can no longer be written: what it missed is lost.
   clearTimeout(replaceTimer);
   replaceTimer = undefined;
+  replaceDirty = false;
   typing = false;
   const dir = stepping;
   stepping = 0;
@@ -284,7 +316,9 @@ window.addEventListener('popstate', (e) => {
     historyIndex = historyMax;
     saveHistoryMax();
   }
-  Object.assign(design, OPTIONAL, linked ?? fromHash(location.hash));
+  // The app's own entries hold whole designs, leaving out only empty optional keys; an edited
+  // URL changes just the keys it names, like the rest of the design.
+  Object.assign(design, linked ?? { ...OPTIONAL, ...fromHash(location.hash) });
   // Rewrite an edited URL so it always holds the whole design (for Copy link).
   if (!ours) safely(() => history.replaceState({ i: historyIndex }, '', toHash(design)));
   render({ fade: true, announce: true });
@@ -764,7 +798,8 @@ function loadKept() {
   try {
     const raw = JSON.parse(localStorage.getItem(KEEP_KEY) || '[]');
     if (!Array.isArray(raw)) return [];
-    return raw.map((item) => complete(sanitize(item && typeof item === 'object' ? item : {}))).slice(0, MAX_KEPT);
+    // (Cut first: completing a design can render a cover to pick its style.)
+    return raw.slice(0, MAX_KEPT).map((item) => complete(sanitize(item && typeof item === 'object' ? item : {})));
   } catch {
     return [];
   }
@@ -784,11 +819,12 @@ function keepDesign() {
   const hash = toHash(design);
   const list = loadKept().filter((d) => toHash(d) !== hash);
   list.unshift({ ...design });
-  if (!saveKept(list.slice(0, MAX_KEPT))) {
+  const kept = list.slice(0, MAX_KEPT);
+  if (!saveKept(kept)) {
     toast('Could not save here (private browsing?)');
     return;
   }
-  renderKept();
+  renderKept(kept);
   toast('Kept. It’s under the preview.');
 }
 
@@ -799,8 +835,8 @@ const keptThumbs = new Map();
 let keptQueue = [];
 let keptFrame = 0;
 
-function renderKept() {
-  const list = loadKept();
+/** @param {Design[]} [list] the kept designs, if already loaded */
+function renderKept(list = loadKept()) {
   const hashes = list.map(toHash);
   for (const hash of keptThumbs.keys()) if (!hashes.includes(hash)) keptThumbs.delete(hash);
   keptQueue = [];
@@ -822,8 +858,9 @@ function renderKept() {
       );
       remove.addEventListener('click', () => {
         // Remove this exact design (another tab may have changed the list since it was drawn).
-        saveKept(loadKept().filter((k) => toHash(k) !== hash));
-        renderKept();
+        const rest = loadKept().filter((k) => toHash(k) !== hash);
+        saveKept(rest);
+        renderKept(rest);
       });
       return h('li', {}, open, remove);
     }),
@@ -837,9 +874,7 @@ function pumpKept() {
   const start = performance.now();
   for (let item = keptQueue.shift(); item; item = keptQueue.shift()) {
     const { img, design: d, hash } = item;
-    const [width, height] = FORMATS[d.format];
-    const { svg } = createCover({ ...d, palette: d.palette === 'auto' ? 'random' : d.palette, width, height });
-    const url = svgToDataUrl(svg);
+    const url = svgToDataUrl(createCover(optionsFor(d)).svg);
     keptThumbs.set(hash, url);
     img.src = url;
     if (keptQueue.length && performance.now() - start > 8) {

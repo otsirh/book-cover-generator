@@ -429,12 +429,27 @@ test('coming back from another page and reloading never enables a stale Redo', a
 });
 
 test('a hand-edited URL is rewritten to hold the whole design', async ({ page }) => {
-  await page.goto('/#title=Neon+Tide&author=Kai&style=retro&palette=synth&seed=one&format=ebook');
+  await page.goto(
+    '/#title=Neon+Tide&author=Kai&subtitle=A+Novel&style=retro&palette=synth&seed=one&format=ebook&texture=1',
+  );
   await page.evaluate(() => {
     location.hash = 'style=orbit&seed=two';
   });
   await selected(page, 'orbit');
-  await expect(page).toHaveURL(/title=Neon\+Tide.*palette=synth.*seed=two.*format=ebook/);
+  await expect(page).toHaveURL(/title=Neon\+Tide.*subtitle=A\+Novel.*palette=synth.*seed=two.*format=ebook&texture=1/);
+  await expect(page.locator('#subtitle')).toHaveValue('A Novel');
+  await expect(page.locator('#texture')).toBeChecked();
+});
+
+test("a typing burst's entry keeps up while typing, so the toolbar's Back loses little", async ({ page }) => {
+  await page.goto('/#title=Before&style=minimal&seed=t');
+  const title = page.locator('#title');
+  await title.fill('');
+  // Keystrokes spread over more than the write interval, with no quiet gap.
+  await title.pressSequentially('Hello world', { delay: 60 });
+  const saved = await page.evaluate(() => new URLSearchParams(location.hash.slice(1)).get('title') ?? '');
+  // Some of the burst is already in the URL (the entry), not only after a pause.
+  expect(saved.length).toBeGreaterThan(3);
 });
 
 test('the rail says when every style picks its own palette', async ({ page }) => {

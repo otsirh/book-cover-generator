@@ -62,6 +62,18 @@ export function stackLines(text) {
  */
 
 /**
+ * Room below a stack line for descenders, in em: a little for capitals and letters
+ * without descenders, the full amount for g, p, y…, cedillas and ogoneks (ç ą), marks
+ * below (ạ), lowercase Cyrillic and Greek (у р μ ρ), and scripts without case.
+ * @param {string} line
+ */
+function descentOf(line) {
+  const d = line.normalize('NFD');
+  if (/[gjpqyQ,;()ДЦЩдцщ]/.test(d) || /[\u0316-\u0333]/.test(d)) return 0.22;
+  return /[\p{Ll}\p{Lo}]/u.test(d.replace(/\p{Script=Latin}/gu, '')) ? 0.22 : 0.04;
+}
+
+/**
  * Justified stack: every line is sized to fill `maxWidth`, then the whole stack
  * is scaled down to fit `maxHeight`. Returns null when the text doesn't suit a
  * stack (one line, more than `maxLines`, or lines that would be too small).
@@ -79,15 +91,15 @@ export function fitStack(text, o) {
   if (lines.length < 2 || lines.length > (o.maxLines ?? 5)) return null;
   const cap = font.cap ?? 0.72;
   const gap = o.gap ?? 0.16;
-  // Room below each line for descenders (none needed for capitals).
-  const desc = lines.map((line) => (/[gjpqyQ,;()]/.test(line) ? 0.22 : 0.04));
+  const desc = lines.map(descentOf);
   let sizes = lines.map((line) => Math.min(o.maxSize, o.maxWidth / (measureText(line, 100, spec) / 100)));
   const heightOf = (/** @type {number[]} */ sz) =>
     sz.reduce((h, size, i) => h + size * cap + (i ? size * gap + sz[i - 1] * desc[i - 1] : 0), 0);
   const maxHeight = o.maxHeight ?? Infinity;
   const h = heightOf(sizes) + sizes[sizes.length - 1] * desc[desc.length - 1];
   if (h > maxHeight) sizes = sizes.map((size) => (size * maxHeight) / h);
-  const minSize = o.minSize ?? o.maxSize * 0.22;
+  // fitText's own floor, so a stack is never smaller than a wrapped title could be.
+  const minSize = Math.min(o.maxSize, o.minSize ?? Math.max(6, o.maxSize * 0.22));
   if (Math.min(...sizes) < minSize) return null;
   // Very uneven stacks (a two-letter word next to a long one) look accidental.
   if (Math.max(...sizes) / Math.min(...sizes) > 3.2) return null;
@@ -266,11 +278,16 @@ export function titleBlock(c, o) {
   /** @param {ReturnType<typeof layout>} l */
   const truncatedIn = (l) => !('kind' in l.fit) && l.fit.truncated;
   /** Fits the height, the title is whole and at least as large as its minimum, its lead and its subtitle. @param {ReturnType<typeof layout>} l */
-  const fits = (l) =>
-    l.height <= o.maxHeight + 0.5 &&
-    !truncatedIn(l) &&
-    l.fit.size >= minMain * 0.999 &&
-    l.fit.size >= Math.max(l.sub?.size ?? 0, l.leadFit?.size ?? 0);
+  const fits = (l) => {
+    // For a stack, its smallest line.
+    const size = 'kind' in l.fit ? Math.min(...l.fit.lines.map((line) => line.size)) : l.fit.size;
+    return (
+      l.height <= o.maxHeight + 0.5 &&
+      !truncatedIn(l) &&
+      size >= minMain * 0.999 &&
+      size >= Math.max(l.sub?.size ?? 0, l.leadFit?.size ?? 0)
+    );
+  };
   /** Of two layouts that don't fit, whether `a` is better: inside the height, then a larger title, then whole. @param {ReturnType<typeof layout>} a @param {ReturnType<typeof layout>} b */
   const better = (a, b) => {
     const inA = a.height <= o.maxHeight + 0.5;

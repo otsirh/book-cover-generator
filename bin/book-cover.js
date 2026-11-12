@@ -69,6 +69,17 @@ if (positionals.length > 2) {
   process.exit(1);
 }
 
+/**
+ * A --width/--height value as a number, reporting what was typed if it isn't one.
+ * @param {string | undefined} value @param {string} name
+ */
+function size(value, name) {
+  if (value === undefined) return undefined;
+  const number = Number(value);
+  if (!value.trim() || !Number.isFinite(number)) throw new RangeError(`--${name} must be a number, got "${value}"`);
+  return number;
+}
+
 try {
   const cover = createCover({
     title: positionals[0],
@@ -78,8 +89,8 @@ try {
     style: values.style,
     palette: values.palette,
     seed: values.seed,
-    width: values.width ? Number(values.width) : undefined,
-    height: values.height ? Number(values.height) : undefined,
+    width: size(values.width, 'width'),
+    height: size(values.height, 'height'),
   });
   if (values.out) {
     writeFileSync(values.out, cover.svg);

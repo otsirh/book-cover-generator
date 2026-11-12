@@ -5,13 +5,24 @@ import assert from 'node:assert/strict';
 
 /** @type {string[]} */
 const fontsSet = [];
+const PROBE = '10px sans-serif';
 class FakeOffscreenCanvas {
   getContext() {
+    let font = PROBE;
     return {
-      set font(/** @type {string} */ value) {
-        fontsSet.push(value);
+      get font() {
+        return font;
       },
-      measureText: (/** @type {string} */ text) => ({ width: [...text].length * 10 }),
+      set font(/** @type {string} */ value) {
+        if (value !== PROBE) fontsSet.push(value);
+        // Like a real canvas, ignore a shorthand that doesn't parse: here, an unquoted
+        // family name word that starts with a digit, or any family named BROKEN.
+        const families = value.replace(/^.*?\d+px /, '').replace(/"[^"]*"/g, '""');
+        if (/(^|[ ,])\d/.test(families) || value.includes('BROKEN')) return;
+        font = value;
+      },
+      // 10 px per character at 100 px; 20 px under a quoted family name, to tell them apart.
+      measureText: (/** @type {string} */ text) => ({ width: [...text].length * (font.includes('"') ? 20 : 10) }),
     };
   }
 }
@@ -194,4 +205,17 @@ test('lines never break at a no-break space', () => {
       fit.lines.join(' | '),
     );
   }
+});
+
+test('a font shorthand the canvas rejects is retried with quoted names, then estimated', () => {
+  const spec = { font: { family: 'Font Awesome 6, serif', cap: 0.7 } };
+  // Accepted once quoted: measured by the canvas (the fake gives 20 px per character then).
+  assert.equal(measureText('ab', 100, spec), 40);
+  assert.ok(fontsSet.includes('400 100px "Font Awesome 6", serif'));
+  // Rejected either way: the estimate, not the previous font's metrics.
+  const broken = { font: { family: 'BROKEN', cap: 0.7 } };
+  const estimate = measureText('ab', 100, broken);
+  assert.notEqual(estimate, 20);
+  assert.notEqual(estimate, 40);
+  assert.ok(estimate > 0);
 });

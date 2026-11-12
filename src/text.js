@@ -116,6 +116,43 @@ let lastFont = '';
 // so shrinking a title to fit costs no extra measuring.
 const REFERENCE = 100;
 
+const GENERIC_FAMILIES = new Set(['serif', 'sans-serif', 'monospace', 'cursive', 'fantasy', 'system-ui']);
+/** @type {Map<string, string | null>} */
+const canvasFonts = new Map();
+
+/**
+ * The font shorthand a canvas accepts for `font`, or null if it accepts none. A canvas
+ * silently ignores a shorthand it can't parse (say, an unquoted family name with a digit,
+ * like Font Awesome 6), which would measure with the previous font; quoting the names
+ * fixes most, and the rest fall back to the estimate.
+ * @param {{ font: string }} c @param {string} font
+ * @param {{ font: { family: string }, weight?: number, italic?: boolean }} spec
+ */
+function canvasFont(c, font, spec) {
+  let accepted = canvasFonts.get(font);
+  if (accepted !== undefined) return accepted;
+  const quoted = spec.font.family
+    .split(',')
+    .map((name) => name.trim())
+    .map((name) =>
+      /^(['"]).*\1$/.test(name) || GENERIC_FAMILIES.has(name) ? name : `"${name.replace(/["\\]/g, '\\$&')}"`,
+    )
+    .join(', ');
+  accepted = null;
+  for (const candidate of [font, font.slice(0, -spec.font.family.length) + quoted]) {
+    c.font = '10px sans-serif';
+    c.font = candidate;
+    if (c.font !== '10px sans-serif') {
+      accepted = candidate;
+      break;
+    }
+  }
+  // The canvas now holds the accepted shorthand (or the probe, if none was).
+  lastFont = accepted ?? '';
+  canvasFonts.set(font, accepted);
+  return accepted;
+}
+
 /**
  * Advance width at the reference size, from the custom measurer, a canvas or the estimate.
  * @param {string} text
@@ -131,10 +168,11 @@ function referenceWidth(text, spec) {
   if (customMeasure) w = customMeasure(text, REFERENCE, { family: spec.font.family, weight, italic: !!spec.italic });
   else {
     const c = canvasContext();
-    if (c) {
-      if (font !== lastFont) {
-        c.font = font;
-        lastFont = font;
+    const shorthand = c && canvasFont(c, font, spec);
+    if (c && shorthand) {
+      if (shorthand !== lastFont) {
+        c.font = shorthand;
+        lastFont = shorthand;
       }
       w = c.measureText(text).width;
     } else w = heuristicWidth(text, spec) * REFERENCE;
@@ -219,7 +257,7 @@ export function clipGraphemes(str, max, { units = false } = {}) {
 const NO_SPACE =
   /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}\p{Emoji_Presentation}]|\uFE0F/u;
 // Never start a line with closing punctuation, or end one with opening punctuation.
-const NO_BREAK_BEFORE = /^[)\]}»›’”、。，．・：；！？‼⁇⁈⁉ーゝゞヽヾ々〉》」』】〕〗〙〛）］｝｠｡｣､･]/u;
+const NO_BREAK_BEFORE = /^[.,!?:;…%)\]}»›’”、。，．・：；！？‼⁇⁈⁉ーゝゞヽヾ々〉》」』】〕〗〙〛）］｝｠｡｣､･]/u;
 const NO_BREAK_AFTER = /[([{«‹‘“〈《「『【〔〖〘〚（［｛｟｢]$/u;
 
 /** @type {Intl.Segmenter | null | undefined} */

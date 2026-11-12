@@ -37,3 +37,13 @@ test('symbols with text presentation stay with their word', () => {
   const emoji = fitText('😀😀😀😀😀😀😀😀😀😀😀😀', { font: FONTS.sans, maxWidth: 60, maxSize: 20, minSize: 20 });
   assert.ok(emoji.lines.length > 1);
 });
+
+test('ASCII punctuation never starts a line after CJK, Thai or emoji', () => {
+  for (const title of ['こんにちは世界、さようなら!?', '😀😀😀😀😀😀😀😀😀!', 'สวัสดีครับสวัสดีครับ.']) {
+    for (const maxWidth of [60, 80, 100]) {
+      const fit = fitText(title, { font: FONTS.sans, maxWidth, maxSize: 20, minSize: 20, maxLines: 12 });
+      for (const line of fit.lines)
+        assert.doesNotMatch(line, /^[.,!?:;…]/u, `${title} at ${maxWidth}: ${fit.lines.join(' | ')}`);
+    }
+  }
+});

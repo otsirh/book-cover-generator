@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -78,9 +78,22 @@ test('fails clearly on bad input', async () => {
 });
 
 test('an unquoted title is caught, not silently cut', async () => {
-  const { code, stderr } = await cli('The', 'Lighthouse', 'Keeper', '-o', 'never.svg');
+  const dir = await mkdtemp(join(tmpdir(), 'book-cover-'));
+  try {
+    const out = join(dir, 'never.svg');
+    const { code, stderr } = await cli('The', 'Lighthouse', 'Keeper', '-o', out);
+    assert.equal(code, 1);
+    assert.match(stderr, /Quote values with spaces/);
+    await assert.rejects(stat(out), { code: 'ENOENT' }, 'no file is written');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('a bad size is reported as typed', async () => {
+  const { code, stderr } = await cli('T', '--width', '12abc');
   assert.equal(code, 1);
-  assert.match(stderr, /Quote values with spaces/);
+  assert.match(stderr, /--width must be a number, got "12abc"/);
 });
 
 test('--subtitle and --texture', async () => {

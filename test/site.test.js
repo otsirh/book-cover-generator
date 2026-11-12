@@ -9,7 +9,7 @@ test('security.txt has not expired (and will not within 30 days)', () => {
   assert.ok(expires, 'Expires field is required by RFC 9116');
   const days = (Date.parse(expires) - Date.now()) / 86_400_000;
   assert.ok(days > 30, `security.txt expires in ${Math.round(days)} days; bump the Expires date`);
-  assert.ok(days < 400, 'Expires should be less than a year away');
+  assert.ok(days <= 365, `Expires is ${Math.round(days)} days away; RFC 9116 recommends less than a year`);
 });
 
 test('the web manifest is valid and its icons exist', () => {
