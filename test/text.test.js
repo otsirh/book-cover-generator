@@ -155,3 +155,23 @@ test('letter-spaced widths stay exact when measured again', () => {
   assert.equal(measureText('Café 🧑‍🚀', 10, spec), first);
   assert.equal(first, measureText('Café 🧑‍🚀', 10, { font: FONTS.sans }) + 0.2 * 10 * 6);
 });
+
+test('a long word shrinks a little below minSize rather than break', () => {
+  // The fake measures 0.1 × size per character: "Cartographer" is 1.2 × size wide.
+  const whole = fitText('Last Cartographer', { font: FONTS.sans, maxWidth: 100, maxSize: 200, minSize: 100 });
+  assert.deepEqual(whole.lines, ['Last', 'Cartographer']);
+  assert.ok(whole.size < 100 && whole.size >= 60, `size ${whole.size}`);
+  assert.equal(whole.truncated, false);
+  // Too far below minSize: break the word instead.
+  const broken = fitText('Last Cartographer', { font: FONTS.sans, maxWidth: 50, maxSize: 200, minSize: 100 });
+  assert.equal(broken.size, 100);
+  assert.ok(broken.lines.length > 2, broken.lines.join(' | '));
+});
+
+test('clipGraphemes can count UTF-16 code units, as maxlength does', async () => {
+  const { clipGraphemes } = await import('../src/text.js');
+  const family = '👨‍👩‍👧‍👦';
+  assert.equal(clipGraphemes(family.repeat(30), 200, { units: true }), family.repeat(18));
+  assert.equal(clipGraphemes('a𠮷b', 2, { units: true }), 'a');
+  assert.equal(clipGraphemes('abc', 5, { units: true }), 'abc');
+});

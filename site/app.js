@@ -1,5 +1,6 @@
 import { createCover, listStyles, palettes, randomSeed } from '../src/index.js';
 import { svgToDataUrl, downloadCover, copyText } from '../src/browser.js';
+import { clipGraphemes } from '../src/text.js';
 
 /** @typedef {'paperback' | 'ebook' | 'square'} Format */
 /**
@@ -58,8 +59,8 @@ const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 /** @template T @param {readonly T[]} arr @param {T} current @returns {T} */
 const pickOther = (arr, current) => pick(arr.filter((x) => x !== current));
-/** Clip to `max` characters (code points), matching the inputs' maxlength. */
-const clip = (/** @type {string} */ str, /** @type {number} */ max) => Array.from(str).slice(0, max).join('');
+/** Clip to the inputs' maxlength (which counts UTF-16 code units), between whole characters. */
+const clip = (/** @type {string} */ str, /** @type {number} */ max) => clipGraphemes(str, max, { units: true });
 
 /**
  * Tiny element builder (no innerHTML, so the page works under Trusted Types).
@@ -158,6 +159,8 @@ function saveHistoryMax() {
   }
 }
 let typing = false;
+/** Direction of an Undo (-1) or Redo (1) in flight, until its popstate arrives. */
+let stepping = 0;
 /** @type {ReturnType<typeof setTimeout> | undefined} */
 let typingTimer;
 /** @type {ReturnType<typeof setTimeout> | undefined} */
@@ -249,17 +252,28 @@ window.addEventListener('popstate', (e) => {
   clearTimeout(replaceTimer);
   replaceTimer = undefined;
   typing = false;
+  const step = stepping;
+  stepping = 0;
   const ours = Boolean(e.state) && typeof e.state.i === 'number';
   if (ours) historyIndex = e.state.i;
   const linked = ours ? null : fromHash(location.hash);
   if (linked && !Object.keys(linked).length) {
     // A fragment that isn't a design (say #usage, typed to jump to the docs): keep the
-    // design. The browser dropped the entries ahead of this one, so nothing is left to redo.
+    // design, and make this entry the newest step (the browser dropped the ones ahead).
+    historyIndex += 1;
     historyMax = historyIndex;
     saveHistoryMax();
     safely(() => history.replaceState({ i: historyIndex }, '', toHash(design)));
     syncHistoryButtons();
     return;
+  }
+  // Undo and Redo pass over entries that show the same design, so every press changes something.
+  if (ours && step && toHash({ ...design, ...OPTIONAL, ...fromHash(location.hash) }) === toHash(design)) {
+    if (step < 0 ? historyIndex > 0 : historyIndex < historyMax) {
+      stepping = step;
+      history.go(step);
+      return;
+    }
   }
   if (!ours) {
     // An edited URL: make it the newest entry.
@@ -467,7 +481,8 @@ function buildControls() {
     const button = /** @type {HTMLButtonElement} */ ($(`dl-${format}`));
     button.addEventListener('click', () => exportAs(format, button));
   }
-  $('m-download').addEventListener('click', () => exportAs('png', /** @type {HTMLButtonElement} */ ($('dl-png'))));
+  const mobileDownload = /** @type {HTMLButtonElement} */ ($('m-download'));
+  mobileDownload.addEventListener('click', () => exportAs('png', mobileDownload));
   $('keep').addEventListener('click', keepDesign);
 
   // In-page links scroll without touching the URL, which holds the design.
@@ -512,13 +527,19 @@ function buildControls() {
 // Both save pending keystrokes to the current entry before moving through history.
 function undo() {
   flushReplace();
-  if (historyIndex > 0) history.back();
+  if (historyIndex > 0) {
+    stepping = -1;
+    history.back();
+  }
 }
 
 /** Redo only within this app's own history, never forward to another site. */
 function redo() {
   flushReplace();
-  if (historyIndex < historyMax) history.forward();
+  if (historyIndex < historyMax) {
+    stepping = 1;
+    history.forward();
+  }
 }
 
 /** @param {number} dir */
@@ -552,7 +573,8 @@ function syncControls() {
   for (const key of /** @type {const} */ (['title', 'author', 'subtitle'])) {
     if (input(key).value !== design[key]) input(key).value = design[key];
   }
-  if (document.activeElement !== $('seed')) input('seed').value = design.seed;
+  // (Compared trimmed, as the field's input handler trims: typing a space doesn't get undone.)
+  if (input('seed').value.trim() !== design.seed) input('seed').value = design.seed;
   input('texture').checked = design.texture;
   for (const b of document.querySelectorAll('[data-palette]')) {
     b.setAttribute('aria-pressed', String(b.getAttribute('data-palette') === design.palette));
@@ -755,15 +777,14 @@ function pumpKept() {
 
 /** @param {string} str */
 function slug(str) {
-  return (
-    str
-      .normalize('NFKD')
-      .replace(/\p{M}/gu, '')
-      .toLowerCase()
-      .replace(/[^\p{L}\p{N}]+/gu, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 60) || 'cover'
-  );
+  const words = str
+    .normalize('NFKD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '-')
+    .replace(/^-+/, '');
+  // Cut between whole characters first, so the trim also catches a separator at the cut.
+  return clipGraphemes(words, 60).replace(/-+$/, '') || 'cover';
 }
 
 /**

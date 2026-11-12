@@ -1,7 +1,7 @@
 import { n, rect, circle, mix, inkOn, escapeXml } from '../core.js';
-import { FONTS, fitText, drawText, graphemes, measureText } from '../text.js';
+import { FONTS, fitText, drawText, measureText, textGroupAttrs } from '../text.js';
 import { titleBlock, authorFit } from '../type.js';
-import { strongAccents } from './util.js';
+import { strongAccents, initialChars } from './util.js';
 
 /** @typedef {import('../index.js').StyleContext} Ctx */
 
@@ -62,7 +62,7 @@ export const typographic = {
   /** @param {Ctx} c */
   render(c) {
     const { W, H, S, u, m, rng, p } = c;
-    const chars = graphemes(c.title.trim().toUpperCase()).filter((ch) => ch.trim());
+    const chars = initialChars(c.title);
     const first = chars[0] || 'A';
     // A narrow initial (I, l, 1…) makes an unexplained slab; use two letters instead.
     const letters = NARROW_INITIALS.test(first) && chars[1] && /\p{L}/u.test(chars[1]) ? first + chars[1] : first;
@@ -73,17 +73,18 @@ export const typographic = {
     const size = Math.min(fit, H * 0.85, S * 1.35);
     const baseline = H * rng.float(0.6, 0.64);
     const lx = W * rng.float(0.44, 0.56);
-    const attrs = `font-family="${escapeXml(font.family)}" font-size="${n(size)}" text-anchor="middle"`;
-    const glyph = escapeXml(letters);
+    /** @param {number} x @param {number} y @param {string} fill @param {string} [attrs] */
+    const glyph = (x, y, fill, attrs) =>
+      `<text x="${n(x)}" y="${n(y)}" ${textGroupAttrs({ font, size, anchor: 'middle', fill, attrs })}>${escapeXml(letters)}</text>`;
 
     let s = rect(0, 0, W, H, p.bg);
     if (mode === 'duo') {
-      s += `<text x="${n(lx + size * 0.035)}" y="${n(baseline + size * 0.02)}" ${attrs} fill="${c2}">${glyph}</text>`;
-      s += `<text x="${n(lx)}" y="${n(baseline)}" ${attrs} fill="${c1}" style="mix-blend-mode:${p.dark ? 'screen' : 'multiply'}">${glyph}</text>`;
+      s += glyph(lx + size * 0.035, baseline + size * 0.02, c2);
+      s += glyph(lx, baseline, c1, `style="mix-blend-mode:${p.dark ? 'screen' : 'multiply'}"`);
     } else if (mode === 'outline') {
-      s += `<text x="${n(lx)}" y="${n(baseline)}" ${attrs} fill="none" stroke="${c1}" stroke-width="${n(3.5 * u)}">${glyph}</text>`;
+      s += glyph(lx, baseline, 'none', `stroke="${c1}" stroke-width="${n(3.5 * u)}"`);
     } else {
-      s += `<text x="${n(lx)}" y="${n(baseline)}" ${attrs} fill="${c1}">${glyph}</text>`;
+      s += glyph(lx, baseline, c1);
     }
     const ruleY = baseline + m * 0.5;
     s += rect(m, ruleY, W - m * 2, 1.2 * u, p.ink);

@@ -1,5 +1,18 @@
 import { n, circle, contrast, readable } from '../core.js';
 import { titleBlock } from '../type.js';
+import { graphemes } from '../text.js';
+
+/**
+ * The title's visible characters, upper-cased, from the first that isn't punctuation:
+ * an initial skips opening quotes, brackets, "¿" and the like (but keeps letters,
+ * digits, symbols and emoji). All of them if the title is only punctuation.
+ * @param {string} title
+ */
+export function initialChars(title) {
+  const chars = graphemes(title.trim().toUpperCase()).filter((ch) => ch.trim());
+  const start = chars.findIndex((ch) => !/^\p{P}+$/u.test(ch));
+  return start > 0 ? chars.slice(start) : chars;
+}
 
 /**
  * Accents that stand out against `bg`, best first; falls back to the single

@@ -84,11 +84,8 @@ export function fitStack(text, o) {
   const heightOf = (/** @type {number[]} */ sz) =>
     sz.reduce((h, size, i) => h + size * cap + (i ? size * gap + sz[i - 1] * desc[i - 1] : 0), 0);
   const maxHeight = o.maxHeight ?? Infinity;
-  let h = heightOf(sizes) + sizes[sizes.length - 1] * desc[desc.length - 1];
-  if (h > maxHeight) {
-    sizes = sizes.map((size) => (size * maxHeight) / h);
-    h = maxHeight;
-  }
+  const h = heightOf(sizes) + sizes[sizes.length - 1] * desc[desc.length - 1];
+  if (h > maxHeight) sizes = sizes.map((size) => (size * maxHeight) / h);
   const minSize = o.minSize ?? o.maxSize * 0.22;
   if (Math.min(...sizes) < minSize) return null;
   // Very uneven stacks (a two-letter word next to a long one) look accidental.
@@ -158,6 +155,23 @@ export function drawStack(fit, { x, y, anchor = 'start', fill = '#000', opacity,
  * @property {(o: { x: number, y: number, anchor?: 'start' | 'middle' | 'end', fill: string, leadFill?: string, subtitleFill?: string, attrs?: string, lineFills?: (string | undefined)[] }) => string} draw
  */
 
+/** Subtitle fits per cover: fitTitleWith lays the title out several ways with the same subtitle. */
+/** @type {WeakMap<object, Map<string, import('./text.js').TextFit>>} */
+const subtitleFits = new WeakMap();
+
+/**
+ * @param {import('./index.js').StyleContext} c @param {string} text
+ * @param {import('./text.js').FitOptions} opts
+ */
+function fitSubtitle(c, text, opts) {
+  let fits = subtitleFits.get(c);
+  if (!fits) subtitleFits.set(c, (fits = new Map()));
+  const key = JSON.stringify([text, opts]);
+  let fit = fits.get(key);
+  if (!fit) fits.set(key, (fit = fitText(text, opts)));
+  return fit;
+}
+
 /**
  * Fit the title (and subtitle) into a box.
  * @param {import('./index.js').StyleContext} c
@@ -172,7 +186,7 @@ export function titleBlock(c, o) {
   const subtitle = o.subtitle === false ? '' : c.subtitle;
 
   const sub = subtitle
-    ? fitText(subtitle, {
+    ? fitSubtitle(c, subtitle, {
         font: o.subtitleFont ?? font,
         italic: o.subtitleItalic ?? (o.subtitleFont ?? font) !== FONTS.mono,
         upper: !!o.subtitleUpper,
@@ -185,6 +199,8 @@ export function titleBlock(c, o) {
         lineHeight: 1.25,
       })
     : null;
+  // fitText's own default: a title forced below this didn't really fit.
+  const minMain = Math.min(o.maxSize, o.minSize ?? Math.max(6, o.maxSize * 0.22));
 
   /** @type {import('./text.js').FitOptions} */
   const mainOpts = {
@@ -246,31 +262,57 @@ export function titleBlock(c, o) {
     };
   };
 
-  // Shrink first; if the block still doesn't fit, fold the lead back into the title, then drop the subtitle.
-  let L = layout(Boolean(lead), Boolean(sub?.lines.length));
-  if (L.height > o.maxHeight + 0.5 && lead) L = layout(false, Boolean(sub?.lines.length));
-  if (L.height > o.maxHeight + 0.5 && sub?.lines.length) L = layout(false, false);
+  /** @param {ReturnType<typeof layout>} l */
+  const truncatedIn = (l) => !('kind' in l.fit) && l.fit.truncated;
+  /** Fits the height, the title is whole and at least as large as its minimum, its lead and its subtitle. @param {ReturnType<typeof layout>} l */
+  const fits = (l) =>
+    l.height <= o.maxHeight + 0.5 &&
+    !truncatedIn(l) &&
+    l.fit.size >= minMain * 0.999 &&
+    l.fit.size >= Math.max(l.sub?.size ?? 0, l.leadFit?.size ?? 0);
+  /** Of two layouts that don't fit, whether `a` is better: inside the height, then a larger title, then whole. @param {ReturnType<typeof layout>} a @param {ReturnType<typeof layout>} b */
+  const better = (a, b) => {
+    const inA = a.height <= o.maxHeight + 0.5;
+    const inB = b.height <= o.maxHeight + 0.5;
+    if (inA !== inB) return inA;
+    if (Math.abs(a.fit.size - b.fit.size) > 0.01) return a.fit.size > b.fit.size;
+    return truncatedIn(b) && !truncatedIn(a);
+  };
+
+  // Shrink first; if the title still doesn't fit, fold the lead back into it, then drop the subtitle.
+  const hasLead = Boolean(lead);
+  const hasSub = Boolean(sub?.lines.length);
+  /** @type {[boolean, boolean][]} */
+  const tries = [[hasLead, hasSub]];
+  if (hasLead) tries.push([false, hasSub]);
+  if (hasSub) tries.push([hasLead, false]);
+  if (hasLead && hasSub) tries.push([false, false]);
+  let L = layout(...tries[0]);
+  let best = L;
+  for (let i = 1; i < tries.length && !fits(L); i++) {
+    L = layout(...tries[i]);
+    if (better(L, best)) best = L;
+  }
+  if (!fits(L)) L = best;
   const { fit, leadFit, leadH } = L;
-  const mainFit = fit;
-  const mainBottom = bottomOf(mainFit);
-  const height = L.height;
+  const mainBottom = bottomOf(fit);
   const width = Math.max(fit.width, leadFit?.width ?? 0, L.sub?.width ?? 0);
 
   return {
-    height,
+    height: L.height,
     width,
-    size: mainFit.size,
-    stacked: 'kind' in mainFit,
-    lines: mainFit.lines.length,
-    truncated: 'kind' in mainFit ? false : mainFit.truncated,
+    size: fit.size,
+    stacked: 'kind' in fit,
+    lines: fit.lines.length,
+    truncated: truncatedIn(L),
     draw({ x, y, anchor = 'start', fill, leadFill, subtitleFill, attrs, lineFills }) {
       let s = '';
       if (leadFit) s += drawText(leadFit, { x, y, anchor, fill: leadFill ?? fill, attrs });
       const my = y + leadH;
       s +=
-        'kind' in mainFit
-          ? drawStack(mainFit, { x, y: my, anchor, fill, attrs, lineFills })
-          : drawText(mainFit, { x, y: my, anchor, fill, attrs });
+        'kind' in fit
+          ? drawStack(fit, { x, y: my, anchor, fill, attrs, lineFills })
+          : drawText(fit, { x, y: my, anchor, fill, attrs });
       if (L.sub?.lines.length) {
         s += drawText(L.sub, {
           x,

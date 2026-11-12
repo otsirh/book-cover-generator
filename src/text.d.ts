@@ -42,8 +42,8 @@ export type TextMeasurer = (
  */
 export declare function setTextMeasurer(fn: TextMeasurer | null): void;
 export declare function measureText(text: string, size: number, spec: TextSpec): number;
-/** The first `max` user-perceived characters of a string. */
-export declare function clipGraphemes(str: string, max: number): string;
+/** The start of a string, cut between user-perceived characters (`units`: count UTF-16 code units). */
+export declare function clipGraphemes(str: string, max: number, options?: { units?: boolean }): string;
 /** Split a string into user-perceived characters. */
 export declare function graphemes(str: string): string[];
 

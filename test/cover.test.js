@@ -476,3 +476,78 @@ test('Blueprint hatches the whole section ring', () => {
   }
   assert.ok(checked > 0, 'no seed drew a section');
 });
+
+/** Font size of every text run in an SVG, inherited from enclosing groups. @param {string} svg */
+function textRuns(svg) {
+  /** @type {{ text: string, size: number }[]} */
+  const runs = [];
+  /** @type {number[]} */
+  const sizes = [];
+  for (const [, close, attrs, self, content] of svg.matchAll(/<(\/?)(?:g|text|tspan)\b([^>]*?)(\/?)>([^<]*)/g)) {
+    if (close) {
+      sizes.pop();
+      continue;
+    }
+    const size = Number(/font-size="([\d.]+)"/.exec(attrs)?.[1] ?? sizes.at(-1) ?? 0);
+    if (!self) sizes.push(size);
+    if (content.trim()) runs.push({ text: content, size });
+  }
+  return runs;
+}
+
+test('a title is never set smaller than its subtitle', () => {
+  for (const subtitle of ['A Novel', 'The Definitive Edition with a Long Subtitle'])
+    for (const style of builtIn) {
+      for (const [width, height] of [
+        [600, 900],
+        [600, 960],
+        [600, 600],
+      ]) {
+        for (const [title, word] of [
+          ['The Lighthouse Keeper', 'LIGHTHOUSE'],
+          ['Do Androids Dream of Electric Sheep', 'ANDROIDS'],
+        ]) {
+          for (const seed of ['a', 'e', 'h']) {
+            const { svg } = createCover({ title, author: 'Mara Ellison', subtitle, style, width, height, seed });
+            const runs = textRuns(svg);
+            const main = runs.find((r) => r.text.toUpperCase().replace(/\s+/g, '').includes(word));
+            const sub = runs.find((r) => r.text.toUpperCase().startsWith(subtitle.toUpperCase().slice(0, 7)));
+            if (!main || !sub) continue;
+            assert.ok(
+              main.size >= sub.size,
+              `${style} ${width}x${height} ${seed} ${title}: ${main.size} < ${sub.size}`,
+            );
+          }
+        }
+      }
+    }
+});
+
+test('initials skip opening quotes, brackets and other punctuation', () => {
+  for (const title of ['“Who Goes There?”', '(Don’t Fear) The Reaper', '¿Quién?', "'Salem's Lot", '#1 Fan']) {
+    for (const style of ['typographic', 'classic']) {
+      for (const seed of ['a', 'b', 'c', 'd']) {
+        const { svg } = createCover({ title, style, seed });
+        for (const run of textRuns(svg)) {
+          assert.doesNotMatch(run.text, /^\p{P}$/u, `${style} ${seed} ${title}: a lone "${run.text}"`);
+        }
+      }
+    }
+  }
+});
+
+test('Typewriter places its word count from the text it types', async () => {
+  const { setTextMeasurer } = await import('../src/index.js');
+  // Very wide monospace glyphs force the word count to be cut to fit.
+  setTextMeasurer((text, size, font) => [...text].length * size * (font.family.includes('Courier') ? 1.4 : 0.5));
+  try {
+    for (const seed of ['a', 'b', 'c']) {
+      const { svg } = createCover({ title: 'Draft', author: 'A', style: 'typewriter', width: 300, height: 900, seed });
+      for (const m of svg.matchAll(/<tspan x="([\d.-]+)"/g)) {
+        assert.ok(Number(m[1]) < 300 - 300 * 0.07 * 1.2 + 1, `seed ${seed}: a character at x=${m[1]}`);
+      }
+    }
+  } finally {
+    setTextMeasurer(null);
+  }
+});

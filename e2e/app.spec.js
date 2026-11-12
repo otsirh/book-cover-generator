@@ -276,16 +276,40 @@ test('arrow keys scroll a focused code sample instead of changing the style', as
   await expect(page.locator('#style-name')).toHaveText('Minimal');
 });
 
-test('a fragment that is not a design keeps the design', async ({ page }) => {
+test('a fragment that is not a design keeps the design, and Undo skips its entry', async ({ page }) => {
   await page.goto('/#title=T&subtitle=A+Novel&style=minimal&seed=s&texture=1');
-  await expect(page.locator('#texture')).toBeChecked();
+  await page.locator('.tile[data-style="swiss"]').click();
+  await selected(page, 'swiss');
   await page.evaluate(() => {
     location.hash = 'usage';
   });
-  await expect(page).toHaveURL(/subtitle=A\+Novel.*texture=1/);
+  await expect(page).toHaveURL(/subtitle=A\+Novel.*style=swiss.*texture=1/);
   await expect(page.locator('#subtitle')).toHaveValue('A Novel');
   await expect(page.locator('#texture')).toBeChecked();
-  await expect(page.locator('#undo')).toBeDisabled();
+  await page.locator('.tile[data-style="bauhaus"]').click();
+  await page.locator('#undo').click();
+  await selected(page, 'swiss');
+  // The entry left by #usage shows the same design, so this one press goes back to Minimal.
+  await page.locator('#undo').click();
+  await selected(page, 'minimal');
+  await page.locator('#redo').click();
+  await selected(page, 'swiss');
+  await page.locator('#redo').click();
+  await selected(page, 'bauhaus');
+});
+
+test('the Variation field follows Back even while it has focus', async ({ page }) => {
+  await page.goto('/#title=T&style=minimal&seed=xyz');
+  const seed = page.locator('#seed');
+  await seed.fill('abc');
+  await expect(page).toHaveURL(/seed=abc/);
+  await page.goBack();
+  await expect(page).toHaveURL(/seed=xyz/);
+  await expect(seed).toBeFocused();
+  await expect(seed).toHaveValue('xyz');
+  // A trailing space while typing stays in the field.
+  await seed.pressSequentially(' ');
+  await expect(seed).toHaveValue('xyz ');
 });
 
 test("the browser's back shortcuts and mouse button save the last keystrokes first", async ({ page }) => {
@@ -409,6 +433,18 @@ test('downloads SVG, PNG and JPEG at the chosen size', async ({ page }) => {
   expect(jpegSize(jpg.data)).toEqual([1200, 1800]);
 });
 
+test('file names are cut between whole characters and never end in a separator', async ({ page }) => {
+  for (const [title, name] of [
+    ['a' + '𠮷'.repeat(70), 'a' + '𠮷'.repeat(59)],
+    ['a'.repeat(59) + ' b', 'a'.repeat(59)],
+  ]) {
+    await page.goto(`/#title=${encodeURIComponent(title)}&style=minimal&seed=f`);
+    const [download] = await Promise.all([page.waitForEvent('download'), page.locator('#dl-svg').click()]);
+    expect(download.suggestedFilename()).toBe(`${name}-minimal.svg`);
+    await page.goto('about:blank');
+  }
+});
+
 test('size hints match the format', async ({ page }) => {
   await page.goto('/#format=ebook&seed=x');
   await page.locator('[data-scale="2"]').click();
@@ -496,10 +532,31 @@ test('fits a phone screen, keeps the preview pinned and shows the action bar @mo
   await expect(page.locator('#seed')).not.toHaveValue('m');
 });
 
+test('the phone download button shows that it is busy @mobile', async ({ page }) => {
+  await page.goto('/#title=Busy&style=minimal&seed=b');
+  await expect(page.locator('#m-download')).toBeVisible();
+  const [download, busy] = await Promise.all([
+    page.waitForEvent('download'),
+    page.evaluate(() => {
+      const button = /** @type {HTMLButtonElement} */ (document.getElementById('m-download'));
+      button.click();
+      return button.disabled && button.getAttribute('aria-busy') === 'true';
+    }),
+  ]);
+  expect(busy).toBe(true);
+  expect(download.suggestedFilename()).toBe('busy-minimal.png');
+  await expect(page.locator('#m-download')).toBeEnabled();
+});
+
 test('long values in a shared link are clipped and never overflow @mobile', async ({ page }) => {
   await page.goto(`/#seed=${'x'.repeat(300)}&title=${'T'.repeat(500)}`);
   await expect(page.locator('#seed')).toHaveValue('x'.repeat(40));
   await expect(page.locator('#title')).toHaveValue('T'.repeat(200));
+  // Clipped to maxlength in UTF-16 units, between whole characters.
+  const family = '👨\u200D👩\u200D👧\u200D👦';
+  await page.goto('about:blank');
+  await page.goto(`/#title=${encodeURIComponent(family.repeat(30))}`);
+  await expect(page.locator('#title')).toHaveValue(family.repeat(18));
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );

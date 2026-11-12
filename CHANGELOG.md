@@ -63,6 +63,10 @@ A redesign of the covers and the app, based on a design review.
 - `fitText` takes a `descent` option that counts the descenders in `maxHeight`, so title blocks fit in one pass; letter-spaced widths reuse their character count.
 - The app saves a typing burst's last keystrokes before the browser's own Back (Alt+←, ⌘[, mouse buttons) and when the page is hidden; a fragment that isn't a design (say `#usage`) leaves the design alone; arrow keys scroll a focused code sample instead of changing the style; kept-design thumbnails are drawn once each, a few per frame.
 - The link-preview image and icons can be shown by other sites (`Cross-Origin-Resource-Policy: cross-origin`).
+- A title is never crushed below its minimum or set smaller than its subtitle: the title block folds the lead line in, then drops the subtitle, before shrinking the title that far.
+- A long word shrinks the text a little (to 60% of `minSize`) instead of breaking mid-word, so Big Type sets "Cartographer" whole.
+- Big Letter's initial and Classic's emblem skip opening quotes, brackets and other punctuation; Typewriter types the word count it measured.
+- The app's Undo and Redo pass over entries that show the same design; the Variation field follows Back and buttons even while focused; the phone's PNG button shows its own busy state; shared-link fields are clipped to the inputs' maxlength between whole characters; download names are cut between whole characters and never end in a hyphen.
 
 ## [1.1.0] - 2026-11-12
 

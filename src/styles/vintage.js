@@ -1,7 +1,7 @@
 import { n, rect, circle, line, path, pathD, mix, readable, inkOn, clamp, escapeXml, radialGradient } from '../core.js';
-import { FONTS, fitText, drawText, textBottom, graphemes, measureText } from '../text.js';
+import { FONTS, fitText, drawText, textBottom, graphemes, measureText, textGroupAttrs } from '../text.js';
 import { titleBlock, authorFit } from '../type.js';
-import { strongAccents, flower } from './util.js';
+import { strongAccents, flower, initialChars } from './util.js';
 
 /** @typedef {import('../index.js').StyleContext} Ctx */
 
@@ -48,9 +48,10 @@ export const classic = {
     const er = Math.min(S * 0.07, (H - b2) * 0.28);
     const ey = (b2 + H) / 2;
     s += circle(W / 2, ey, er, panel, `stroke="${ink}" stroke-width="${n(1.5 * u)}"`);
-    const initial = (graphemes(c.title.trim())[0] || '').toUpperCase();
+    const initial = initialChars(c.title)[0];
     if (initial) {
-      s += `<text x="${n(W / 2)}" y="${n(ey + er * 0.38)}" font-family="${escapeXml(FONTS.serif.family)}" font-size="${n(er * 1.1)}" text-anchor="middle" fill="${band}">${escapeXml(initial)}</text>`;
+      const attrs = textGroupAttrs({ font: FONTS.serif, size: er * 1.1, anchor: 'middle', fill: band });
+      s += `<text x="${n(W / 2)}" y="${n(ey + er * 0.38)}" ${attrs}>${escapeXml(initial)}</text>`;
     }
     return s;
   },
@@ -254,7 +255,7 @@ function typedLine(str, x, y, size, weight, rng, color, anchor = 'start') {
   const width = measureText(str, size, spec);
   if (COMPLEX_SCRIPT.test(str)) {
     // Keep joining and direction intact: one run of text, no per-letter jitter.
-    return `<text x="${n(x)}" y="${n(y)}" font-family="${escapeXml(FONTS.mono.family)}" font-size="${n(size)}" font-weight="${weight}" fill="${color}"${anchor === 'middle' ? ' text-anchor="middle"' : ''}>${escapeXml(str)}</text>`;
+    return `<text x="${n(x)}" y="${n(y)}" ${textGroupAttrs({ ...spec, size, fill: color, anchor })}>${escapeXml(str)}</text>`;
   }
   let o = '';
   let cx = anchor === 'middle' ? x - width / 2 : x;
@@ -265,7 +266,7 @@ function typedLine(str, x, y, size, weight, rng, color, anchor = 'start') {
     }
     cx += measureText(ch, size, spec);
   }
-  return `<text font-family="${escapeXml(FONTS.mono.family)}" font-size="${n(size)}" font-weight="${weight}" fill="${color}">${o}</text>`;
+  return `<text ${textGroupAttrs({ ...spec, size, fill: color })}>${o}</text>`;
 }
 
 export const typewriter = {
@@ -314,7 +315,7 @@ export const typewriter = {
     }
     const words = `approx. ${rng.int(55, 140)},000 words`;
     const wc = fitText(words, { font: FONTS.mono, maxWidth: W * 0.4, maxSize: small, maxLines: 1 });
-    s += typedLine(words, W - m * 1.2 - wc.width, headY, wc.size, 400, rng, ink);
+    if (wc.lines[0]) s += typedLine(wc.lines[0], W - m * 1.2 - wc.width, headY, wc.size, 400, rng, ink);
 
     // The title page itself, centred.
     const maxW = W - m * 3;

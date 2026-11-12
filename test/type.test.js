@@ -122,3 +122,16 @@ test('titleBlock stays within even a very small budget', () => {
   const block = titleBlock(ctx({ subtitle: 'And a subtitle' }), { maxWidth: 500, maxHeight: 12, maxSize: 100 });
   assert.ok(block.height <= 12.5, `height ${block.height}`);
 });
+
+test('titleBlock drops the subtitle before crushing the title', () => {
+  const c = ctx({ subtitle: 'A Novel', W: 600, H: 600, S: 600 });
+  for (const maxHeight of [40, 50, 60, 70, 80, 90, 100]) {
+    const block = titleBlock(c, { maxWidth: 516, maxHeight, maxSize: 120, font: FONTS.sans, weight: 700 });
+    // fitText's default minimum for a 120 px title is 26.4 px; the subtitle is 21.6 px.
+    assert.ok(block.size >= 26.4 - 1e-9, `${maxHeight}: title at ${block.size}px`);
+    assert.ok(block.height <= maxHeight + 0.5, `${maxHeight}: block ${block.height}`);
+  }
+  // With room to spare, the subtitle stays.
+  const roomy = titleBlock(c, { maxWidth: 516, maxHeight: 300, maxSize: 120, font: FONTS.sans, weight: 700 });
+  assert.match(roomy.draw({ x: 0, y: 0, fill: '#000' }), /A Novel/);
+});

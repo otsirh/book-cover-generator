@@ -179,18 +179,31 @@ export function graphemes(str) {
 }
 
 /**
- * The first `max` user-perceived characters of a string. Segments lazily, so a
- * huge string costs no more than its first `max` characters.
- * @param {string} str @param {number} max
+ * Iterate a string's user-perceived characters lazily (code points without Intl.Segmenter).
+ * @param {string} str
  */
-export function clipGraphemes(str, max) {
+function* lazyGraphemes(str) {
   const seg = graphemeSegmenter();
-  if (!seg) return Array.from(str).slice(0, max).join('');
+  if (!seg) {
+    yield* str;
+    return;
+  }
+  for (const { segment } of seg.segment(str)) yield segment;
+}
+
+/**
+ * The start of a string, cut between user-perceived characters: at most `max`
+ * characters, or with `units`, at most `max` UTF-16 code units (what an input's
+ * maxlength counts). Segments lazily, so a huge string costs only what is kept.
+ * @param {string} str @param {number} max @param {{ units?: boolean }} [options]
+ */
+export function clipGraphemes(str, max, { units = false } = {}) {
   let out = '';
   let count = 0;
-  for (const { segment } of seg.segment(str)) {
-    if (count++ === max) break;
-    out += segment;
+  for (const ch of lazyGraphemes(str)) {
+    count += units ? ch.length : 1;
+    if (count > max) break;
+    out += ch;
   }
   return out;
 }
@@ -320,6 +333,8 @@ function hardWrap(tokens, maxWidth, measure) {
 
 /** Room below the last baseline for descenders, as a fraction of the size. */
 const DESCENT = 0.22;
+/** How far below `minSize` text may shrink so that a long word fits whole. */
+const WORD_FLOOR = 0.6;
 
 const blockHeight = (count, size, lineHeight, cap) => (count ? size * (cap + (count - 1) * lineHeight) : 0);
 
@@ -392,13 +407,21 @@ export function fitText(text, opts) {
   // break long words, truncate with an ellipsis.
   if (maxHeight <= 0) return { ...base, lines: [], size: 0, width: 0, height: 0, truncated: true };
   size = Math.min(minSize, maxHeight / (cap + descent));
+  // A word wider than the box: shrink a little further (widths scale with size) rather than
+  // break it mid-word, down to WORD_FLOOR of this size.
+  const widest = Math.max(...tokens.map((token) => measureText(token.text, size, spec)));
+  const wordFits = (size * maxWidth) / widest;
+  if (widest > maxWidth && wordFits >= size * WORD_FLOOR) size = wordFits * (1 - 1e-9);
   const measure = (s) => measureText(s, size, spec);
   let lines = hardWrap(tokens, maxWidth, measure);
   const fitCount = Math.max(
     1,
     Math.min(maxLines, Math.floor((maxHeight / size - cap - descent) / lineHeight + 1e-9) + 1),
   );
-  if (lines.length <= fitCount) return finish(lines, size);
+  if (lines.length <= fitCount) {
+    const whole = lines.length > 1 && opts.balance !== false && wrapGreedy(tokens, maxWidth, measure);
+    return finish(whole ? balance(tokens, lines.length, maxWidth, measure) : lines, size);
+  }
   lines = lines.slice(0, fitCount);
   const chars = graphemes(lines[fitCount - 1]);
   while (chars.length > 1 && measure(chars.join('') + '…') > maxWidth) chars.pop();
