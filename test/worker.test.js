@@ -152,6 +152,9 @@ test('the API reads a link as the app does, and sizes a format as the CLI does',
   // Sizes and pins as the app reads them: no leading zeros, and pins in any case.
   assert.throws(() => coverOptions(new URLSearchParams('format=0x0')), /Unknown format/);
   assert.deepEqual(coverOptions(new URLSearchParams('variant=Moon.Blood')).variants, { moon: 'blood' });
+  // Texture in any case, and a seed's line breaks as spaces, as the app reads them.
+  assert.equal(coverOptions(new URLSearchParams('texture=TRUE')).texture, true);
+  assert.equal(coverOptions(new URLSearchParams('seed=a%0Ab')).seed, 'a b');
 });
 
 test('a mockup background without its #, and a preflight for any header', async () => {

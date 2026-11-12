@@ -169,7 +169,7 @@ test('a registered style’s genres must be a list of genre ids', () => {
   for (const genres of ['horror', ['Horrors'], [1]]) {
     assert.throws(
       () => registerStyle({ id: 'test-genres', genres: /** @type {any} */ (genres), render: () => '' }),
-      /genre ids/,
+      /list of genres/,
     );
   }
   // (By id or name, in any case.)

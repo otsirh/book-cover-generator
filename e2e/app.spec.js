@@ -454,6 +454,8 @@ test('coming back with Forward makes the app entries ahead reachable again', asy
 });
 
 test('a long typing session slows its history writes, inside browser rate limits', async ({ page }) => {
+  // (30 s of the page's time, each step drawing its frames: slow on a busy machine.)
+  test.slow();
   await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') });
   await page.goto('/#title=&style=minimal&seed=r');
   await ready(page);

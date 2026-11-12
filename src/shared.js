@@ -18,8 +18,14 @@ export const fold = (name) =>
     .filter((word) => word && word !== 'and')
     .join(' ');
 
-/** The fonts of FONTS (as it is now) by id and name, as idFor reads them. */
-export const fontEntries = () => Object.entries(FONTS).map(([id, f]) => ({ id, name: f.name }));
+/** @type {{ key: string, entries: { id: string, name?: string }[] } | null} */
+let fonts = null;
+/** The fonts of FONTS (as it is now: fonts may be added) by id and name, as idFor reads them. */
+export function fontEntries() {
+  const key = Object.keys(FONTS).join();
+  if (fonts?.key !== key) fonts = { key, entries: Object.entries(FONTS).map(([id, f]) => ({ id, name: f.name })) };
+  return fonts.entries;
+}
 
 /**
  * The id that `given` names among `entries`: an id as it is, else an id or a name in any case and
@@ -30,7 +36,9 @@ export const fontEntries = () => Object.entries(FONTS).map(([id, f]) => ({ id, n
 export function idFor(given, entries) {
   if (typeof given !== 'string') return undefined;
   const list = Array.isArray(entries) ? entries : [...entries];
-  if (list.some((e) => e.id === given)) return given;
+  // An id or a name as written wins over one only spelled alike ("Art Deco" is the style named so).
+  const exact = list.find((e) => e.id === given) ?? list.find((e) => e.name === given);
+  if (exact) return exact.id;
   const key = fold(given);
   if (!key) return undefined;
   return (

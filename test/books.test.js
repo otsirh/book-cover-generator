@@ -70,7 +70,7 @@ test('a list’s ids are kept as typed: the library reads names in any case', ()
 
 test('a listed book’s options: its own values win, and its genre picks a style the shared one doesn’t suit', async () => {
   const { optionsForBook } = await import('../src/index.js');
-  const shared = { style: 'bauhaus', variants: { layout: 'x' }, width: 600, height: 900 };
+  const shared = { style: 'bauhaus', variants: { layout: 'open' }, width: 600, height: 900 };
   assert.deepEqual(optionsForBook({ title: 'A', genre: 'horror' }, shared), {
     ...shared,
     style: 'random',
@@ -128,5 +128,15 @@ test('with no shared style, a book naming its own takes only the shared pins its
   // A value no style offers throws for every book, with a style of its own or not.
   for (const book of [{ title: 'A', style: 'noir' }, { title: 'A' }]) {
     assert.throws(() => createCover(optionsForBook(book, { variants: { scene: 'forrest' } })), /No style has scene/);
+  }
+});
+
+test('a shared pin no style offers is reported for every book, whichever style it gets', async () => {
+  const { optionsForBook } = await import('../src/index.js');
+  for (const book of [{ title: 'A', style: 'retro' }, { title: 'A', genre: 'horror' }, { title: 'A' }]) {
+    assert.throws(
+      () => optionsForBook(book, { style: 'silhouette', variants: { scene: 'desert' } }),
+      /No style has scene "desert"/,
+    );
   }
 });

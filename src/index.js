@@ -7,7 +7,7 @@ import { createRng, hashString, isHex, luminance, escapeXml, stripInvalidXml, gr
 import { palettes } from './palettes.js';
 import { BREAKING_SPACE, FONTS, LINE_BREAK, clipGraphemes, recordText } from './text.js';
 import { drawBadge } from './badge.js';
-import { idFor, fold, fontEntries } from './shared.js';
+import { idFor, fontEntries } from './shared.js';
 import { styleList, genreList, builtInGenres } from './styles/index.js';
 
 export { palettes } from './palettes.js';
@@ -56,9 +56,11 @@ function genresOf(id, genres) {
   // (Ids or names, in any case, as everywhere else.)
   const ids = Array.isArray(genres) ? genres.map((g) => idFor(g, genreList)) : [undefined];
   if (ids.some((g) => g === undefined)) {
-    throw new TypeError(`Style "${id}": genres must be a list of genre ids (${genreList.map((g) => g.id).join(', ')})`);
+    throw new TypeError(
+      `Style "${id}": genres must be a list of genres, by id or name (${genreList.map((g) => g.id).join(', ')})`,
+    );
   }
-  return /** @type {string[]} */ (ids);
+  return [...new Set(/** @type {string[]} */ (ids))];
 }
 
 /** A name or value as people read it: 'bouquet' → 'Bouquet'. @param {string} id */
@@ -108,10 +110,19 @@ const entryFor = (style, genres) => ({
   render: (/** @type {import('./index.js').StyleContext} */ ctx) => style.render(ctx),
 });
 
-/** Whether a style option leaves the choice to the seed ('random', read as idFor reads names, or nothing). @param {unknown} v */
-const unsetStyle = (v) => v == null || (typeof v === 'string' && ['', 'random'].includes(fold(v)));
-/** Whether a palette option leaves the choice to the seed ('random' or 'auto', or nothing). @param {unknown} v */
-const unsetPalette = (v) => v == null || (typeof v === 'string' && ['', 'random', 'auto'].includes(fold(v)));
+/**
+ * The words that leave a choice to the seed, in any case and with spaces around: 'random' for a
+ * style, and 'random' or 'auto' for a palette. Registering refuses them as ids, so every id stays
+ * one that can be chosen.
+ * @param {unknown} v @param {readonly string[]} words
+ */
+const reserved = (v, words) => typeof v === 'string' && words.includes(v.trim().toLowerCase());
+const STYLE_WORDS = ['random'];
+const PALETTE_WORDS = ['random', 'auto'];
+/** Whether a style option leaves the choice to the seed. @param {unknown} v */
+const unsetStyle = (v) => v == null || v === '' || reserved(v, STYLE_WORDS);
+/** Whether a palette option leaves the choice to the seed. @param {unknown} v */
+const unsetPalette = (v) => v == null || v === '' || reserved(v, PALETTE_WORDS);
 
 /**
  * The variants pinned for a style: the given ones it has (others are ignored, so the same
@@ -123,11 +134,7 @@ function pinnedVariants(given, style, strict = true) {
   if (given == null) return {};
   if (typeof given !== 'object') throw new TypeError('variants must be an object such as { scene: "forest" }');
   // Names and values in any case.
-  const byName = new Map(
-    Object.entries(given)
-      .filter(([, value]) => value != null && value !== '')
-      .map(([name, value]) => [name.toLowerCase(), String(value)]),
-  );
+  const byName = pinsByName(given);
   /** @type {Record<string, string>} */
   const pins = {};
   for (const variant of style.variants) {
@@ -142,7 +149,26 @@ function pinnedVariants(given, style, strict = true) {
       throw new RangeError(`Style "${style.id}" has no ${variant.name} "${value}". Available: ${offered}`);
     }
   }
-  // A value no style offers is a mistake, whatever the style. (A name no style has is ignored.)
+  checkOffered(byName);
+  return pins;
+}
+
+/**
+ * Pins by lower-cased name, with values as strings (empty ones left out).
+ * @param {object} given
+ */
+const pinsByName = (given) =>
+  new Map(
+    Object.entries(given)
+      .filter(([, value]) => value != null && value !== '')
+      .map(([name, value]) => [name.toLowerCase(), String(value)]),
+  );
+
+/**
+ * A pinned value no style offers is a mistake, whatever the style. (A name no style has is ignored.)
+ * @param {Map<string, string>} byName
+ */
+function checkOffered(byName) {
   for (const [name, value] of byName) {
     const variants = [...registry.values()].flatMap((s) => s.variants.filter((v) => v.name.toLowerCase() === name));
     if (variants.length && !variants.some((v) => valueIn(v, value))) {
@@ -150,7 +176,6 @@ function pinnedVariants(given, style, strict = true) {
       throw new RangeError(`No style has ${name} "${value}". Available: ${offered}`);
     }
   }
-  return pins;
 }
 
 /**
@@ -202,8 +227,7 @@ export function registerStyle(style, { replace = false } = {}) {
       'registerStyle: a style needs an `id` (a string without spaces at either end) and a `render(ctx)` function',
     );
   }
-  if (style.id.toLowerCase() === 'random')
-    throw new TypeError('registerStyle: "random" is not a style id, it picks one');
+  if (reserved(style.id, STYLE_WORDS)) throw new TypeError('registerStyle: "random" is not a style id, it picks one');
   if (style.name != null && typeof style.name !== 'string') throw new TypeError('registerStyle: name must be a string');
   if (builtInStyles.has(style.id) && !replace) {
     throw new Error(`registerStyle: "${style.id}" is a built-in style; pass { replace: true } to replace it`);
@@ -231,7 +255,6 @@ export function unregisterStyle(id) {
 }
 
 /** Palette ids that mean something else. */
-const RESERVED_PALETTES = new Set(['random', 'auto', 'custom']);
 
 /**
  * Register a palette, so `palette: id` uses it (and `'random'` can pick it). Replacing a
@@ -244,7 +267,8 @@ export function registerPalette(palette, { replace = false } = {}) {
     throw new TypeError('registerPalette: a palette needs an `id` (a string without spaces at either end)');
   }
   const id = palette.id;
-  if (RESERVED_PALETTES.has(String(id).toLowerCase())) throw new TypeError(`registerPalette: "${id}" is reserved`);
+  // ("custom" too: the app's links write your own colours as custom-….)
+  if (reserved(id, [...PALETTE_WORDS, 'custom'])) throw new TypeError(`registerPalette: "${id}" is reserved`);
   if (builtInPalettes.has(id) && !replace) {
     throw new Error(`registerPalette: "${id}" is a built-in palette; pass { replace: true } to replace it`);
   }
@@ -384,8 +408,9 @@ const TITLE_CASES = ['upper', 'normal'];
 function typeOptions(options) {
   const font = /** @type {unknown} */ (options.font);
   const titleCase = /** @type {unknown} */ (options.titleCase);
-  const fontId = font == null || font === '' ? undefined : idFor(font, fontEntries());
-  if (font != null && font !== '' && fontId === undefined) {
+  const fontGiven = font != null && font !== '';
+  const fontId = fontGiven ? idFor(font, fontEntries()) : undefined;
+  if (fontGiven && fontId === undefined) {
     throw new RangeError(`Unknown font "${String(font)}". Available: ${Object.keys(FONTS).join(', ')}`);
   }
   const caseId = typeof titleCase === 'string' ? titleCase.toLowerCase() : titleCase;
@@ -580,10 +605,13 @@ export default generateCover;
 export function optionsForBook(book, defaults = {}) {
   // The styles as ids (undefined: picked by the seed, or for the book's, not one that exists,
   // which createCover reports). A shared style that doesn't exist is reported for every book.
-  const shared = unsetStyle(defaults.style) ? undefined : idFor(defaults.style, registry.values());
-  if (!unsetStyle(defaults.style) && shared === undefined) {
+  const sharedGiven = !unsetStyle(defaults.style);
+  const shared = sharedGiven ? idFor(defaults.style, registry.values()) : undefined;
+  if (sharedGiven && shared === undefined) {
     throw new Error(`Unknown style "${String(defaults.style)}". Available: ${[...registry.keys()].join(', ')}`);
   }
+  // A shared pin no style offers is reported for every book, whichever style each one gets.
+  if (defaults.variants != null && typeof defaults.variants === 'object') checkOffered(pinsByName(defaults.variants));
   const own = unsetStyle(book.style) ? undefined : idFor(book.style, registry.values());
   const genre = idFor(book.genre, genreList);
   const sharedEntry = shared === undefined ? undefined : registry.get(shared);

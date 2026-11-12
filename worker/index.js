@@ -8,7 +8,7 @@
 // a little differently from the app on another system, which measures with its own fonts.
 
 import { createCover, createMockup, formats, version } from '../src/index.js';
-import { clipGraphemes } from '../src/text.js';
+import { LINE_BREAK, clipGraphemes } from '../src/text.js';
 import { CUSTOM_SIZE, VARIANT, customColors, hex } from '../src/shared.js';
 
 /** Query parameters that are cover options as they are. */
@@ -36,7 +36,7 @@ export function coverOptions(q) {
     if (value) o[key] = clipGraphemes(value, max, { units: true });
   }
   // (The app trims the seed it reads from a link, and keeps 40 characters.)
-  const seed = q.get('seed')?.trim();
+  const seed = q.get('seed')?.split(LINE_BREAK).join(' ').trim();
   if (seed) o.seed = clipGraphemes(seed, 40, { units: true });
   const [width, height] = ['width', 'height'].map((key) => (q.get(key) ? Number(q.get(key)) : undefined));
   const format = q.get('format');
@@ -83,7 +83,7 @@ export function coverOptions(q) {
   }
   const titleCase = q.get('case');
   if (titleCase) o.titleCase = titleCase;
-  const texture = q.get('texture');
+  const texture = q.get('texture')?.toLowerCase();
   if (texture) {
     if (!['1', '0', 'true', 'false'].includes(texture)) throw new RangeError('texture is 1 (on) or 0 (off)');
     o.texture = texture === '1' || texture === 'true';

@@ -1501,3 +1501,19 @@ test('a pin no style offers throws with a named style too; fonts and genres by t
     /name must be a string/,
   );
 });
+
+test('only random and auto (any case, spaces around) leave a choice to the seed, and can’t be ids', async () => {
+  for (const style of [' ', '-', 'and'])
+    assert.throws(() => createCover({ title: 'x', style }), /Unknown style/, style);
+  assert.throws(() => createCover({ title: 'x', palette: '-' }), /Unknown palette/);
+  const { unregisterStyle, registerPalette } = await import('../src/index.js');
+  assert.throws(() => registerStyle({ id: 'RANDOM', render: () => '' }), /not a style id/);
+  assert.throws(() => registerPalette({ id: 'Custom', bg: '#ffffff', ink: '#000000', accents: ['#f00'] }), /reserved/);
+  // An id spelled like a style's name doesn't take it over: "Art Deco" is the style named so.
+  registerStyle({ id: 'art-deco', name: 'Deco Mine', render: () => '' });
+  try {
+    assert.equal(createCover({ title: 'x', style: 'Art Deco' }).style, 'artdeco');
+  } finally {
+    unregisterStyle('art-deco');
+  }
+});
