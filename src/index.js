@@ -25,7 +25,7 @@ export { strongAccents, textColor, tintText, fitTitleWith, textPanel, TEXT_CONTR
 export * as svgUtils from './core.js';
 
 /** This version of the library (artwork for a seed can change between minor versions). */
-export const version = '1.3.0';
+export const version = '1.4.0';
 
 /** The sizes a cover can have: each side `min` to `max` px, and neither more than `ratio` times the other. */
 export const sizeLimits = Object.freeze({ min: 50, max: 10000, ratio: 3 });

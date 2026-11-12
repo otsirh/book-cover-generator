@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-12
+
+Your own colours, any size, more ways to export, kept designs that last, and the app offline.
+
 ### Fixed
 
 - Accents on capitals (É Å Ž Й) and the marks of Devanagari, Bengali, Thai, Lao, Khmer, Myanmar and other scripts no longer run into the line above or off the top of the cover: text leaves room for them above its first line and between lines. Arabic and CJK get a little room too. Text without such marks is laid out exactly as before. Big Letter keeps an accented initial on the cover.
@@ -199,7 +203,8 @@ A redesign of the covers and the app, based on a design review.
 
 - First release: 27 styles, 20 palettes, seeded randomizer, text fitting, CLI and the web app with SVG, PNG and JPEG export.
 
-[Unreleased]: https://github.com/otsirh/book-cover-generator/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/otsirh/book-cover-generator/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/otsirh/book-cover-generator/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/otsirh/book-cover-generator/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/otsirh/book-cover-generator/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/otsirh/book-cover-generator/compare/v1.0.0...v1.1.0
