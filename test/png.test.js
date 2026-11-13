@@ -169,3 +169,34 @@ test('an engine whose resvg stopped draws no more (the Worker makes a new one)',
   assert.equal(broken.broken, true);
   assert.throws(() => broken.render('<svg xmlns="http://www.w3.org/2000/svg"/>'), /unreachable/);
 });
+
+test(
+  'a character the stack’s faces lack (∞, →, a superscript in italic) is set in a family whose face has it',
+  { skip },
+  () => {
+    const f = engine.fonts;
+    // EB Garamond's italic has no superscripts (its upright has): an italic line with one is set in
+    // a family whose italic has them all, so resvg draws it as measured.
+    assert.equal(f.familyOf(FONTS.garamond.family, 'E = mc²', 400, false), 'EB Garamond');
+    assert.notEqual(f.familyOf(FONTS.garamond.family, 'E = mc²', 400, true), 'EB Garamond');
+    assert.equal(f.whole(FONTS.garamond.family, 'E = mc²', 400, true), true);
+    // ∞ and → aren't in the Noto faces: the line goes to a family that has them, and only it is loaded.
+    for (const text of ['Love ∞ Forever', 'North → South']) {
+      const family = f.familyOf(FONTS.serif.family, text);
+      assert.equal(f.whole(family, text), true, `${text} in ${family}`);
+      const cover = engine.laidOut(() =>
+        createCover({ title: text, author: 'Mara Ellison', style: 'classic', seed: 's' }),
+      );
+      const ready = prepare(cover.svg, f);
+      const line = new RegExp(
+        `font-family="([^"]+)"[^>]*>${text.split(' ')[1]}|font-family="([^"]+)"[^>]*>[^<]*${text.split(' ')[1]}`,
+      ).exec(ready);
+      assert.ok(line, `${text}: named`);
+      assert.equal(
+        f.whole(/** @type {string} */ (line[1] ?? line[2]), text.split(' ')[1]),
+        true,
+        `${text}: ${line[1] ?? line[2]}`,
+      );
+    }
+  },
+);

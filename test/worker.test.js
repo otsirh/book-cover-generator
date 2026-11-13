@@ -262,6 +262,16 @@ test(
     // A large cover is drawn smaller, to fit 600,000 pixels (resvg's memory in a Worker).
     const [w, h] = await size(await fetchPath('/api/cover.png?title=Dune&width=1600&height=2560'));
     assert.ok(w * h <= 600_000 && w * h > 590_000 && Math.abs(w / h - 1600 / 2560) < 0.01, `${w} × ${h}`);
+    // A flat shot's shadow is as wide as its picture: it has fewer pixels (1.3 million).
+    const [fw, fh] = await size(await fetchPath('/api/mockup.png?title=Dune&kind=flat&width=1600&height=2560'));
+    assert.ok(fw * fh <= 1_300_000 && fw * fh > 1_280_000, `${fw} × ${fh}`);
+    // A scale too small to draw anything is the request's mistake (400), and the engine stays.
+    const tiny = await fetchPath('/api/cover.png?title=Dune&style=retro&seed=s&scale=0.0001');
+    assert.equal(tiny.status, 400);
+    assert.match(await tiny.text(), /draws 600 × 900 as nothing/);
+    assert.equal((await fetchPath('/api/cover.png?title=Dune&scale=0.01')).status, 200);
+    // A character no named face has (∞) is drawn from a family that has it.
+    assert.equal((await fetchPath('/api/cover.png?title=Love+%E2%88%9E+Forever&style=classic&seed=s')).status, 200);
     // Designs resvg 2.6 once stopped on (opacity under a blur): drawn.
     for (const path of [
       '/api/cover.png?title=Dune&author=Frank+Herbert&style=aurora&seed=s',

@@ -6,7 +6,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
-- **PNG from the HTTP API**: `/api/cover.png` and `/api/mockup.png` draw what the `.svg` endpoints do as PNG, for email, chat and social posts: a cover up to 600,000 pixels (600 × 900), a mockup up to 2.1 million (a 1080 × 1920 story), larger ones drawn smaller to fit (`scale` to choose). The site's Worker draws them with resvg and open fonts (Noto, Liberation, EB Garamond, Roboto Condensed, Anton, TeX Gyre Adventor), laying the text out in their own widths; text in a script they lack gets a `422` (the SVG draws it).
+- **PNG from the HTTP API**: `/api/cover.png` and `/api/mockup.png` draw what the `.svg` endpoints do as PNG, for email, chat and social posts: a cover up to 600,000 pixels (600 × 900), a mockup up to 2.1 million (a 1080 × 1920 story; a flat or e-reader shot 1.3 million), larger ones drawn smaller to fit (`scale` to choose). The site's Worker draws them with resvg and open fonts (Noto, Liberation, EB Garamond, Roboto Condensed, Anton, TeX Gyre Adventor), laying the text out in their own widths; text in a script they lack gets a `422` (the SVG draws it).
 - **Link previews of a design**: Copy link gives a link that holds the design in its query, `https://covers.otsirh.dev/?title=…`, and a link preview of it (on X, Facebook, Slack, Discord, iMessage…) shows that design, as a social card. The app opens it as before.
 
 ## [1.11.0] - 2026-11-13

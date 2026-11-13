@@ -175,33 +175,11 @@ export function fontSet(faces) {
   };
 
   /**
-   * The family a CSS font-family list sets a text in: the first family there is that has every
-   * character of the text (as a browser falls back along the list), else its first there is,
-   * else the serif. Generic names are the faces GENERIC says.
-   * @param {string} stack @param {string} [text]
+   * The face of a family CSS picks for a weight and slant: the slant if the family has it, then
+   * the nearest weight, lighter first up to 500.
+   * @param {Face[]} list @param {number} weight @param {boolean} italic
    */
-  const familyFor = (stack, text = '') => {
-    const names = stack.split(',').map((s) => s.trim().replace(/^['"]|['"]$/g, ''));
-    const found = /** @type {Face[][]} */ (
-      names
-        .map((n) => families.get((GENERIC[/** @type {keyof typeof GENERIC} */ (n)] ?? n).toLowerCase()))
-        .filter(Boolean)
-    );
-    const serif = /** @type {Face[]} */ (families.get(GENERIC.serif.toLowerCase()));
-    if (text) {
-      // (Down the list, then the generic faces, which have Latin, Greek and Cyrillic.)
-      for (const list of [...found, serif]) if (has(list[0], text)) return list;
-    }
-    return found[0] ?? serif;
-  };
-
-  /**
-   * The face a CSS font-family list (with a weight and slant) sets a text in: in its family (see
-   * familyFor), the weight CSS matches: the nearest, lighter first up to 500.
-   * @param {string} stack @param {number} weight @param {boolean} italic @param {string} [text]
-   */
-  const faceFor = (stack, weight, italic, text) => {
-    const list = familyFor(stack, text);
+  const pick = (list, weight, italic) => {
     const slanted = list.filter((f) => f.italic === italic);
     const pool = slanted.length ? slanted : list;
     /** CSS's order of preference among weights. @param {Face} f */
@@ -217,6 +195,34 @@ export function fontSet(faces) {
     return pool.reduce((best, f) => (rank(f) < rank(best) ? f : best));
   };
 
+  /**
+   * The family a CSS font-family list sets a text in, at a weight and slant: the first whose face
+   * for them has every character of the text (as a browser falls back along the list); else the
+   * serif, else any family that has them all (∞, →…); else the list's first there is. Generic
+   * names are the faces GENERIC says.
+   * @param {string} stack @param {string} [text] @param {number} [weight] @param {boolean} [italic]
+   */
+  const familyFor = (stack, text = '', weight = 400, italic = false) => {
+    const names = stack.split(',').map((s) => s.trim().replace(/^['"]|['"]$/g, ''));
+    const found = /** @type {Face[][]} */ (
+      names
+        .map((n) => families.get((GENERIC[/** @type {keyof typeof GENERIC} */ (n)] ?? n).toLowerCase()))
+        .filter(Boolean)
+    );
+    const serif = /** @type {Face[]} */ (families.get(GENERIC.serif.toLowerCase()));
+    if (text) {
+      for (const list of [...found, serif, ...families.values()])
+        if (has(pick(list, weight, italic), text)) return list;
+    }
+    return found[0] ?? serif;
+  };
+
+  /**
+   * The face a CSS font-family list sets a text in, at a weight and slant (see familyFor).
+   * @param {string} stack @param {number} weight @param {boolean} italic @param {string} [text]
+   */
+  const faceFor = (stack, weight, italic, text) => pick(familyFor(stack, text, weight, italic), weight, italic);
+
   /** Every face, for characters no family of the list has (as resvg falls back to any font). */
   const fallbacks = [...families.values()].flat();
 
@@ -225,9 +231,15 @@ export function fontSet(faces) {
     /**
      * The name of the family a CSS font-family list sets a text in (see familyFor): render() names
      * it on each line, so resvg draws the line in the face it was measured in.
-     * @param {string} stack @param {string} [text]
+     * @param {string} stack @param {string} [text] @param {number} [weight] @param {boolean} [italic]
      */
-    familyOf: (stack, text) => familyFor(stack, text)[0].family,
+    familyOf: (stack, text, weight = 400, italic = false) => familyFor(stack, text, weight, italic)[0].family,
+    /**
+     * Whether one family's face (at the weight and slant) has every character of the text: else
+     * resvg sets it from several fonts, and needs them all.
+     * @param {string} stack @param {string} text @param {number} [weight] @param {boolean} [italic]
+     */
+    whole: (stack, text, weight = 400, italic = false) => has(faceFor(stack, weight, italic, text), text),
     /**
      * Width in px of `text` at `size` px in a font-family list: a setTextMeasurer measurer.
      * (Advance widths, without kerning, which only ever narrows a line.)

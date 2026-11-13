@@ -12,7 +12,7 @@ import { hex } from '../src/shared.js';
 import { optionsFromLink } from '../src/link.js';
 import { answerPayload } from '../src/mcp.js';
 import { escapeXml } from '../src/core.js';
-import { COVER_PIXELS, MOCKUP_PIXELS, pngEngine } from './png.js';
+import { COVER_PIXELS, MOCKUP_PIXELS, SHADOWED_PIXELS, pngEngine } from './png.js';
 
 /**
  * The site's headers (public/_headers, /*), for the pages the Worker answers itself: the static
@@ -205,7 +205,8 @@ export async function png(request, env) {
     const { cover, svg, width, height } = drawer.laidOut(() => drawn(kind, q));
     // At its size, or smaller to fit (a large cover, a story); a scale asked for that can't fit is
     // refused. (Auto a hair under the limit, as resvg rounds the size.)
-    const most = kind === 'cover' ? COVER_PIXELS : MOCKUP_PIXELS;
+    const shadowed = /^(flat|ereader)$/.test(mockupOptions(q).kind);
+    const most = kind === 'cover' ? COVER_PIXELS : shadowed ? SHADOWED_PIXELS : MOCKUP_PIXELS;
     const fit = Math.sqrt(most / (width * height));
     const scale = given ?? Math.min(1, fit * 0.995);
     const [w, h] = [Math.ceil(width * scale), Math.ceil(height * scale)];
@@ -213,6 +214,9 @@ export async function png(request, env) {
       throw new RangeError(
         `A ${kind} PNG has at most ${most} pixels; ${w} × ${h} is more: ask for a scale up to ${Math.floor(fit * 100) / 100}, the SVG, or a large PNG from the app`,
       );
+    }
+    if (Math.round(width * scale) < 1 || Math.round(height * scale) < 1) {
+      throw new RangeError(`scale ${scale} draws ${width} × ${height} as nothing: ask for a larger scale`);
     }
     if (!drawer.draws(svg)) {
       if (q.has('preview')) return Response.redirect(new URL('/og.png', url).href, 302);
@@ -240,9 +244,9 @@ export async function png(request, env) {
         bytes = drawer.render(flat.svg, scale);
       }
     } catch (err) {
-      // resvg failed: our fault, not the request's; the next one gets a new engine.
+      // resvg failed: our fault, not the request's. If it trapped, the next request gets a new engine.
       console.error(err);
-      if (engine && (await engine) === drawer) engine = null;
+      if (drawer.broken && engine && (await engine) === drawer) engine = null;
       return refusal(new Error('The PNG could not be drawn: ask for the SVG (cover.svg)'), 500);
     }
     return new Response(request.method === 'HEAD' ? null : /** @type {BodyInit} */ (bytes), {
