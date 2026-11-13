@@ -355,9 +355,11 @@ test(
     assert.equal(fallback.headers.get('location'), 'https://covers.example/og.png');
     // (Kept, as the 422 is: the design's text won't draw any better next time.)
     assert.match(fallback.headers.get('cache-control') ?? '', /public/);
-    // preview=0 is off, as the API's other switches are: the refusal itself.
-    const off = await fetchPath(`/api/mockup.png?kind=card&preview=0&title=${encodeURIComponent('灯台守')}`);
-    assert.equal(off.status, 422);
+    // preview=0 (or empty) is off, as the API's other switches are: the refusal itself.
+    for (const value of ['0', '', 'FALSE']) {
+      const off = await fetchPath(`/api/mockup.png?kind=card&preview=${value}&title=${encodeURIComponent('灯台守')}`);
+      assert.equal(off.status, 422, value);
+    }
     assert.equal((await fetchPath('/api/cover.png', 'POST')).status, 405);
     // A scale that draws the cover in a mockup as nothing is the request's fault, as for a cover.
     const nothing = await fetchPath('/api/mockup.png?title=x&format=3000x1000&kind=card&scale=0.001');
@@ -479,7 +481,10 @@ test('a design’s link (/?title=…) gets its own link preview; the site’s he
   const tracked = await (
     await worker.fetch(new Request('https://covers.example/?title=Dune&utm_source=x&fbclid=y'), env, { waitUntil() {} })
   ).text();
-  assert.doesNotMatch(/<meta property="og:url" content="([^"]+)"/.exec(tracked)?.[1] ?? '', /utm_source|fbclid/);
+  assert.doesNotMatch(
+    /<meta property="og:url" content="([^"]+)"/.exec(tracked)?.[1] ?? '',
+    /utm_source|fbclid|[?&amp;]v=/,
+  );
   // The page is the design's own: its canonical address too.
   assert.match(html, /<link rel="canonical" href="https:\/\/covers\.example\/\?title=Dune&amp;author=Frank\+Herbert/);
   // The page's validators don't describe the page rewritten.
@@ -608,6 +613,19 @@ test('download names the file after the title, or as asked', async () => {
     named.headers.get('content-disposition'),
     `attachment; filename="the-cafe-days.svg"; filename*=UTF-8''the-cafe-days.svg`,
   );
+  // (A name given with its extension keeps it once.)
+  for (const [given, file] of [
+    ['my.file', 'my-file.svg'],
+    ['dune.svg', 'dune.svg'],
+    ['Dune.PNG', 'dune.svg'],
+  ]) {
+    const res = /** @type {Response} */ (get(`/api/cover.svg?title=x&download=${encodeURIComponent(given)}`));
+    assert.match(
+      res.headers.get('content-disposition') ?? '',
+      new RegExp(`filename="${file.replace('.', '\\.')}"`),
+      given,
+    );
+  }
   const asked = /** @type {Response} */ (get('/api/mockup.svg?title=Dune&kind=card&download=My+Card'));
   assert.equal(
     asked.headers.get('content-disposition'),
@@ -819,4 +837,11 @@ test('an MCP cover’s link pins only what the cover took (a style the seed pick
     const link = new URL(answer.structuredContent.imageUrl).searchParams;
     assert.equal(createCover(optionsFromLink(link)).svg, answer.content[1].text, seed);
   }
+});
+
+test('createMockup says to pass a cover, of anything that isn’t a whole one', () => {
+  assert.throws(
+    () => createMockup(/** @type {any} */ ({ width: 600, height: 900, body: '<rect/>' }), { kind: 'flat' }),
+    /pass a cover from createCover/,
+  );
 });

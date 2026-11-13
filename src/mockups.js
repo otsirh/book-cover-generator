@@ -64,7 +64,17 @@ export const mockupText = (text) =>
 export function createMockup(cover, { kind: named = 'book', background: given, text = '' } = {}) {
   // (A kind in any case, as the library's other names.)
   const kind = typeof named === 'string' ? named.trim().toLowerCase() : named;
-  if (!cover || typeof cover.body !== 'string' || !(cover.width > 0) || !(cover.height > 0)) {
+  // (All it reads of one: its picture, size, title, colours and SVG.)
+  if (
+    !cover ||
+    typeof cover.body !== 'string' ||
+    !(cover.width > 0) ||
+    !(cover.height > 0) ||
+    typeof cover.title !== 'string' ||
+    typeof cover.svg !== 'string' ||
+    !cover.colors ||
+    typeof cover.colors.bg !== 'string'
+  ) {
     throw new TypeError('createMockup: pass a cover from createCover');
   }
   if (!mockupKinds.includes(kind)) {

@@ -152,3 +152,9 @@ export function scaleWithin(w, h, most, wanted, { round = Math.round, step = 0 }
   // (Without a float's noise: 3.51, not 3.5100000000000002.)
   return Math.max(Math.round(s * 1e9) / 1e9, 0);
 }
+
+/**
+ * Whether a query's switch (download, preview) is on: given, and not empty, 0 or false, in any case.
+ * @param {string | null | undefined} value the last value given, if any
+ */
+export const switchedOn = (value) => value != null && !/^(0|false)?$/i.test(value.trim());

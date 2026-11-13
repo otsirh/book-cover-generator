@@ -10,7 +10,7 @@
 // a little differently from the app on another system, which measures with its own fonts.
 
 import { createCover, createMockup, listStyles, version } from '../src/index.js';
-import { hex, slug, joinBytes, scaleWithin } from '../src/shared.js';
+import { hex, slug, joinBytes, scaleWithin, switchedOn } from '../src/shared.js';
 import {
   optionsFromLink,
   linkOf,
@@ -125,9 +125,10 @@ const TOO_MANY = 'Too many requests: wait a minute, or draw covers in your own c
  */
 function disposition(q, title, ext) {
   const asked = q.getAll('download').at(-1)?.trim();
-  // (Off as the API's other switches are: 0 or false, or not given, or empty.)
-  if (!asked || /^(0|false)$/i.test(asked)) return {};
-  const name = `${slug(asked && !/^(1|true)$/i.test(asked) ? asked : title)}.${ext}`;
+  if (!switchedOn(asked)) return {};
+  // (A name given with its extension keeps it once: my-cover.png is my-cover.png.)
+  const given = /^(1|true)$/i.test(asked ?? '') ? title : (asked ?? '').replace(/\.(svg|png|json)$/i, '');
+  const name = `${slug(given)}.${ext}`;
   // (A name in ASCII for older clients, and the name itself, encoded, for the rest.)
   const ascii = name.replace(/[^\x20-\x7e]/g, '_');
   return { 'Content-Disposition': `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(name)}` };
@@ -361,8 +362,7 @@ export async function png(request, env) {
   // A link preview's picture that can't be drawn (too many asked of the crawler's address, resvg
   // unavailable or failed, a script the fonts lack) is the site's own: never an error card.
   // (On as the API's other switches are: given, and not 0 or false.)
-  const forPreview = url.searchParams.getAll('preview').at(-1)?.trim();
-  if (!answer.ok && answer.status !== 405 && forPreview !== undefined && !/^(0|false)$/i.test(forPreview)) {
+  if (!answer.ok && answer.status !== 405 && switchedOn(url.searchParams.getAll('preview').at(-1))) {
     // (Kept, as the 422 is, when the design's text can't be drawn: that answer won't change.)
     return new Response(null, {
       status: 302,
@@ -472,11 +472,11 @@ function pngPlan(kind, q) {
   }
   const { cover, width, height, coverScale, shape } = drawn(kind, q);
   // At its size, or smaller to fit (a large cover, a story); a scale asked for that can't fit is
-  // refused. (Auto a hair under the limit, as resvg rounds the size.)
+  // refused.
   const shadowed = shape === 'flat' || shape === 'ereader';
   const most = kind === 'cover' ? COVER_PIXELS : shadowed ? SHADOWED_PIXELS : MOCKUP_PIXELS;
-  const fit = Math.sqrt(most / (width * height));
-  const scale = given ?? (fit >= 1 ? 1 : fit * 0.995);
+  // (Auto: its size, or the largest within the pixels, its sides as resvg rounds them up.)
+  const scale = given ?? scaleWithin(width, height, most, 1, { round: Math.ceil });
   const [w, h] = [Math.ceil(width * scale), Math.ceil(height * scale)];
   if (w * h > most) {
     throw new RangeError(
@@ -488,7 +488,7 @@ function pngPlan(kind, q) {
   }
   if (kind === 'cover') return { scale, pictureScale: scale };
   // (The cover's picture at the size the mockup shows it, at most COVER_PIXELS.)
-  const pictureScale = Math.min(scale * coverScale, 0.995 * Math.sqrt(COVER_PIXELS / (cover.width * cover.height)));
+  const pictureScale = scaleWithin(cover.width, cover.height, COVER_PIXELS, scale * coverScale, { round: Math.ceil });
   if (Math.round(cover.width * pictureScale) < 1 || Math.round(cover.height * pictureScale) < 1) {
     throw new RangeError(`scale ${scale} draws the cover in this mockup as nothing: ask for a larger scale`);
   }
@@ -521,8 +521,10 @@ export async function preview(request, env) {
     const cover = createCover(designOptions(design, offered));
     name = `${cover.title.replace(/\n/g, ' ')}${cover.author ? ` by ${cover.author}` : ''}`;
     link = writeLink({ ...design, variant: variantOf(pinsOf(design.variant, offered)) });
-  } catch {
-    // A design the library can't draw: the page as it is.
+  } catch (err) {
+    // A design the library can't draw: the page as it is. (A TypeError or ReferenceError is more
+    // likely the code's fault: logged, as refusal() logs it.)
+    if (err instanceof TypeError || err instanceof ReferenceError) console.error('Preview:', err);
   }
   if (name && link) {
     const image = new URL('/api/mockup.png', url);
@@ -535,7 +537,10 @@ export async function preview(request, env) {
     };
     set(/(<meta property="og:title" content=")[^"]*/, name);
     // (This page is the design's own, at one address whatever else the link carried: utm_…, fbclid…)
-    const own = `${url.origin}/?${link}`;
+    // (Without the version a link notes: one address for a design, release after release.)
+    const address = new URLSearchParams(link);
+    address.delete('v');
+    const own = `${url.origin}/?${address}`;
     set(/(<meta property="og:url" content=")[^"]*/, own);
     set(/(<link rel="canonical" href=")[^"]*/, own);
     set(/(<meta property="og:image" content=")[^"]*/, image.href);
