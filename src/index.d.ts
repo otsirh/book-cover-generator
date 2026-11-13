@@ -311,7 +311,7 @@ export interface CoverOptions {
   palette?: PaletteId | 'random' | 'auto' | CustomPalette | (string & {});
   /** Controls every random choice. Defaults to the title and author (`Cover.seed` says which seed was used). */
   seed?: string | number;
-  /** Width in px, 50–10000. Default 600. */
+  /** Width in px, 50–10000. Default 600, or `height ÷ 1.5` when only a height is given (the paperback's 2:3). */
   width?: number;
   /** Height in px, 50–10000. Default `width × 1.5`. */
   height?: number;

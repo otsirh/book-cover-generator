@@ -145,8 +145,7 @@ function drawn(kind, q) {
 function mockupOptions(q) {
   const background = q.getAll('background').at(-1);
   return {
-    // (In any case, as the API's other values.)
-    kind: /** @type {import('../src/index.js').MockupKind} */ (q.getAll('kind').at(-1)?.trim().toLowerCase() || 'book'),
+    kind: /** @type {import('../src/index.js').MockupKind} */ (q.getAll('kind').at(-1) || 'book'),
     text: q.getAll('text').at(-1) ?? '',
     background: background ? hex(background) : undefined,
   };
@@ -450,7 +449,7 @@ function pngPlan(kind, q) {
   const { cover, width, height, coverScale } = drawn(kind, q);
   // At its size, or smaller to fit (a large cover, a story); a scale asked for that can't fit is
   // refused. (Auto a hair under the limit, as resvg rounds the size.)
-  const shadowed = kind === 'mockup' && /^(flat|ereader)$/.test(mockupOptions(q).kind);
+  const shadowed = kind === 'mockup' && /^(flat|ereader)$/i.test(mockupOptions(q).kind.trim());
   const most = kind === 'cover' ? COVER_PIXELS : shadowed ? SHADOWED_PIXELS : MOCKUP_PIXELS;
   const fit = Math.sqrt(most / (width * height));
   const scale = given ?? (fit >= 1 ? 1 : fit * 0.995);

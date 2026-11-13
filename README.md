@@ -205,25 +205,25 @@ Returns the SVG markup.
 
 Same as `generateCover`, but also tells you which style and palette were chosen. This is useful when either one was random. `body` is the markup inside the outer `<svg>`, for nesting the cover in a larger SVG (its ids are unique to the cover, so several can share a document).
 
-| option      | type               | default              | notes                                             |
-| ----------- | ------------------ | -------------------- | ------------------------------------------------- |
-| `title`     | `string`           | `'Untitled'`         | a line break (`\n`) breaks the title's line there |
-| `author`    | `string`           | `''`                 | optional                                          |
-| `subtitle`  | `string`           | `''`                 | optional subtitle or tagline                      |
-| `series`    | `string`           | `''`                 | a series line above the title                     |
-| `credit`    | `string`           | `''`                 | a credit under the subtitle ("Translated by…")    |
-| `badge`     | `string`           | `''`                 | a seal in a corner clear of the text              |
-| `texture`   | `boolean`          | `false`              | adds a fine film grain (any truthy value)         |
-| `style`     | `string`           | `'random'`           | a style id, see `styles`                          |
-| `palette`   | `string \| object` | `'random'`           | a palette id, or `{ bg, ink, accents: [...] }`    |
-| `seed`      | `string \| number` | the title and author | controls every random choice                      |
-| `width`     | `number`           | `600`                | px, 50–10000; aspect ratio 1:3 to 3:1             |
-| `height`    | `number`           | `width × 1.5`        | px, 50–10000                                      |
-| `lang`      | `string`           | inferred             | language of the text, such as `'ja'`              |
-| `variants`  | `object`           | `{}`                 | pin a style's choices: `{ scene: 'forest' }`      |
-| `genre`     | `string`           |                      | with a random style, one that suits this genre    |
-| `font`      | `string`           | the style's          | the title's font, one of `FONTS`                  |
-| `titleCase` | `string`           | the style's          | `'upper'` (capitals) or `'normal'` (as typed)     |
+| option      | type               | default                                | notes                                             |
+| ----------- | ------------------ | -------------------------------------- | ------------------------------------------------- |
+| `title`     | `string`           | `'Untitled'`                           | a line break (`\n`) breaks the title's line there |
+| `author`    | `string`           | `''`                                   | optional                                          |
+| `subtitle`  | `string`           | `''`                                   | optional subtitle or tagline                      |
+| `series`    | `string`           | `''`                                   | a series line above the title                     |
+| `credit`    | `string`           | `''`                                   | a credit under the subtitle ("Translated by…")    |
+| `badge`     | `string`           | `''`                                   | a seal in a corner clear of the text              |
+| `texture`   | `boolean`          | `false`                                | adds a fine film grain (any truthy value)         |
+| `style`     | `string`           | `'random'`                             | a style id, see `styles`                          |
+| `palette`   | `string \| object` | `'random'`                             | a palette id, or `{ bg, ink, accents: [...] }`    |
+| `seed`      | `string \| number` | the title and author                   | controls every random choice                      |
+| `width`     | `number`           | `600` (a height alone: `height ÷ 1.5`) | px, 50–10000; aspect ratio 1:3 to 3:1             |
+| `height`    | `number`           | `width × 1.5`                          | px, 50–10000                                      |
+| `lang`      | `string`           | inferred                               | language of the text, such as `'ja'`              |
+| `variants`  | `object`           | `{}`                                   | pin a style's choices: `{ scene: 'forest' }`      |
+| `genre`     | `string`           |                                        | with a random style, one that suits this genre    |
+| `font`      | `string`           | the style's                            | the title's font, one of `FONTS`                  |
+| `titleCase` | `string`           | the style's                            | `'upper'` (capitals) or `'normal'` (as typed)     |
 
 Styles, palettes, genres and fonts may be given by id or by name, in any case: `'artdeco'`, `'Art Deco'` and `'ART DECO'` are the same style, and a book list or a link can name them as the app's menus do.
 

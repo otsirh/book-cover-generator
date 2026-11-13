@@ -97,6 +97,24 @@ test('a listed book’s options: its own values win, and its genre picks a style
     title: 'A',
   });
   assert.deepEqual(optionsForBook({ title: 'A', height: 1500 }, {}), { width: undefined, height: 1500, title: 'A' });
+  // A size that's null or empty isn't given; one that isn't a size, or makes the other side one
+  // the library can't make, is said of the side given.
+  for (const width of [null, '']) {
+    const c = createCover(optionsForBook({ title: 'A', width: /** @type {any} */ (width) }, ebook));
+    assert.deepEqual([c.width, c.height], [600, 960]);
+  }
+  assert.throws(
+    () => createCover(optionsForBook({ title: 'A', height: /** @type {any} */ ('abc') }, ebook)),
+    /height must be a number/,
+  );
+  assert.throws(
+    () => optionsForBook({ title: 'A', height: 60 }, ebook),
+    /height 60 makes the list's 600 × 960 shape 38 px wide/,
+  );
+  assert.throws(
+    () => optionsForBook({ title: 'A', width: 8000 }, ebook),
+    /width 8000 makes the list's 600 × 960 shape 12800 px tall/,
+  );
   // With a random shared style, the genre is left to createCover, which picks; a shared style that
   // doesn't exist is reported for every book.
   for (const style of ['random', undefined]) {

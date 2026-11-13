@@ -12,7 +12,9 @@ import {
   listStyles,
 } from '../src/index.js';
 
-test('custom styles can be registered', () => {
+test('custom styles can be registered', (t) => {
+  // (Each test leaves the registry as it found it, so a later one never picks its styles.)
+  t.after(() => unregisterStyle('test-plain'));
   registerStyle({
     id: 'test-plain',
     name: 'Plain',
@@ -24,7 +26,8 @@ test('custom styles can be registered', () => {
   assert.ok(svg.includes('fill="#121212"'));
 });
 
-test('a style can be a class instance, and missing details get defaults', () => {
+test('a style can be a class instance, and missing details get defaults', (t) => {
+  t.after(() => ['test-class', 'test-undefined'].forEach((id) => unregisterStyle(id)));
   class Plain {
     id = 'test-class';
     fill = '#123456';
@@ -48,7 +51,8 @@ test('a style can be a class instance, and missing details get defaults', () => 
   });
 });
 
-test('a class style with private fields renders with itself as `this`', () => {
+test('a class style with private fields renders with itself as `this`', (t) => {
+  t.after(() => unregisterStyle('test-private'));
   class Private {
     id = 'test-private';
     #fill = '#abcdef';
@@ -94,7 +98,9 @@ test('a built-in style is replaced only when asked, and can be brought back', ()
   assert.throws(() => createCover({ style: 'test-gone' }), /Unknown style/);
 });
 
-test('palettes can be registered by id, and built-ins replaced only when asked', () => {
+test('palettes can be registered by id, and built-ins replaced only when asked', (t) => {
+  // (Put back as they were, even if an assertion fails: mint's built-in, no brand or nameless.)
+  t.after(() => ['brand', 'nameless', 'mint'].forEach((id) => unregisterPalette(id)));
   registerPalette({ id: 'brand', name: 'Brand', bg: ' #0b132b ', ink: '#f8f9fa', accents: ['#ff6b6b'] });
   const cover = createCover({ title: 'x', style: 'minimal', palette: 'brand' });
   assert.equal(cover.palette, 'brand');
@@ -137,7 +143,8 @@ test('palettes can be registered by id, and built-ins replaced only when asked',
   assert.equal(unregisterPalette('brand'), false);
 });
 
-test('a custom style can offer variants and pick them with choose', () => {
+test('a custom style can offer variants and pick them with choose', (t) => {
+  t.after(() => unregisterStyle('test-moods'));
   registerStyle({
     id: 'test-moods',
     variants: { mood: { label: 'Mood', values: { calm: 'Calm', loud: '' } } },

@@ -354,13 +354,16 @@ function resolvePalette(palette, rng, style) {
   return normalizePalette(found);
 }
 
+/** A size not given: none, or empty (as a list's empty cell). @param {unknown} value */
+const unsetSize = (value) => value == null || value === '';
+
 /**
  * @param {unknown} value
  * @param {number} fallback
  * @param {string} name
  */
 function dimension(value, fallback, name) {
-  if (value == null || value === '') {
+  if (unsetSize(value)) {
     if (fallback > sizeLimits.max) {
       throw new RangeError(
         `${name} defaults to ${Math.round(fallback)} here, which is over ${sizeLimits.max}; pass ${name} explicitly`,
@@ -461,18 +464,21 @@ export function createCover(options = {}) {
   const series = cleanText(options.series, 120);
   const credit = cleanText(options.credit, 120);
   const badge = cleanText(options.badge, 60);
-  // A width alone gives the paperback's shape (2:3), and so does a height alone.
-  /** @param {unknown} v */
-  const unset = (v) => v == null || v === '';
-  const heightAlone = unset(options.width) && !unset(options.height);
-  const H0 = heightAlone ? dimension(options.height, 900, 'height') : 0;
-  if (heightAlone && Math.round(H0 / 1.5) < sizeLimits.min) {
-    throw new RangeError(
-      `height ${H0} makes a paperback ${Math.round(H0 / 1.5)} px wide, under ${sizeLimits.min}: give a taller height, or a width too`,
-    );
+  // A width or a height alone gives the paperback's shape (2:3).
+  let W;
+  let H;
+  if (unsetSize(options.width) && !unsetSize(options.height)) {
+    H = dimension(options.height, 0, 'height');
+    W = Math.round(H / 1.5);
+    if (W < sizeLimits.min) {
+      throw new RangeError(
+        `height ${H} makes a paperback ${W} px wide, under ${sizeLimits.min}: give a taller height, or a width too`,
+      );
+    }
+  } else {
+    W = dimension(options.width, 600, 'width');
+    H = dimension(options.height, W * 1.5, 'height');
   }
-  const W = heightAlone ? Math.round(H0 / 1.5) : dimension(options.width, 600, 'width');
-  const H = heightAlone ? H0 : dimension(options.height, W * 1.5, 'height');
   const lang = resolveLang(options.lang, `${title} ${subtitle} ${author} ${series} ${credit} ${badge}`);
   const { ratio } = sizeLimits;
   if (W / H > ratio || H / W > ratio) {
@@ -598,9 +604,13 @@ export default generateCover;
  * @returns {import('./index.js').CoverOptions}
  */
 export function optionsForBook(listed, defaults = {}) {
-  // A key a book leaves undefined (an empty cell) is a key it doesn't set.
+  // A key a book leaves undefined (an empty cell) is a key it doesn't set; a size, null or empty too.
   const book = /** @type {import('./index.js').CoverOptions} */ (
-    Object.fromEntries(Object.entries(listed).filter(([, value]) => value !== undefined))
+    Object.fromEntries(
+      Object.entries(listed).filter(
+        ([key, value]) => value !== undefined && !((key === 'width' || key === 'height') && unsetSize(value)),
+      ),
+    )
   );
   // The styles as ids (undefined: picked by the seed, or for the book's, not one that exists,
   // which createCover reports). A shared style that doesn't exist is reported for every book.
@@ -626,14 +636,25 @@ export function optionsForBook(listed, defaults = {}) {
     variants = shared !== undefined ? {} : ownEntry ? pinnedVariants(variants, ownEntry, false) : variants;
   }
   // A book's own width or height alone sizes the shared shape (an ebook's, say), or the paperback's.
+  // (A side the book gives that isn't a size is left for createCover to say so, of that side.)
   const [dw, dh] = [Number(defaults.width), Number(defaults.height)];
-  const shaped = dw > 0 && dh > 0;
   /** @type {{ width?: number, height?: number }} */
   let size = {};
   if (book.width !== undefined || book.height !== undefined) {
     size = { width: undefined, height: undefined };
-    if (shaped && book.height === undefined) size.height = Math.round((Number(book.width) * dh) / dw);
-    if (shaped && book.width === undefined) size.width = Math.round((Number(book.height) * dw) / dh);
+    const alone = book.width === undefined ? 'height' : book.height === undefined ? 'width' : null;
+    const value = alone ? Number(book[alone]) : NaN;
+    const { min, max } = sizeLimits;
+    if (alone && dw > 0 && dh > 0 && value >= min && value <= max) {
+      const other = alone === 'width' ? 'height' : 'width';
+      const derived = Math.round(alone === 'width' ? (value * dh) / dw : (value * dw) / dh);
+      if (derived < min || derived > max) {
+        throw new RangeError(
+          `${alone} ${value} makes the list's ${dw} × ${dh} shape ${derived} px ${other === 'height' ? 'tall' : 'wide'}, outside ${min} to ${max}: give the ${other} too`,
+        );
+      }
+      size[other] = derived;
+    }
   }
   return {
     ...defaults,

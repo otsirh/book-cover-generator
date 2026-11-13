@@ -436,6 +436,24 @@ test('a design’s link (/?title=…) gets its own link preview; the site’s he
     )
   ).text();
   assert.match(odd, /<meta property="og:title" content="Dune"/);
+  // A link with pins but no style: the style the seed picks, with the pins it takes, as the app
+  // opens it (and its card says that style).
+  const { wholeDesign, readDesign, designOptions, lastValues } = await import('../src/link.js');
+  const { listStyles } = await import('../src/index.js');
+  for (const seed of ['a', 'b', 'c', 'd', 'e']) {
+    const query = `title=A&variant=letter.outline&seed=${seed}`;
+    const design = wholeDesign(readDesign(lastValues(new URLSearchParams(query))));
+    assert.ok(design.style, 'the style the seed picks');
+    const opened = createCover(designOptions(design, listStyles().find((x) => x.id === design.style)?.variants ?? []));
+    const page = await (
+      await worker.fetch(new Request(`https://covers.example/?${query}`), env, { waitUntil() {} })
+    ).text();
+    const pictured = new URL(
+      /<meta property="og:image" content="([^"]+)"/.exec(page)?.[1].replaceAll('&amp;', '&') ?? '',
+    );
+    assert.equal(pictured.searchParams.get('style'), opened.style, seed);
+    assert.equal(createCover(optionsFromLink(pictured.searchParams)).svg, opened.svg, seed);
+  }
   const oddImage = new URL(/<meta property="og:image" content="([^"]+)"/.exec(odd)?.[1].replaceAll('&amp;', '&') ?? '');
   for (const key of ['scale', 'download', 'text', 'variant']) assert.equal(oddImage.searchParams.get(key), null, key);
   assert.match(html, /<meta property="og:image:alt" content="The cover of Dune by Frank Herbert"/);
@@ -570,8 +588,9 @@ test('download names the file after the title, or as asked', async () => {
     asked.headers.get('content-disposition'),
     `attachment; filename="my-card.svg"; filename*=UTF-8''my-card.svg`,
   );
-  // (A mockup's kind in any case, as the API's other values.)
+  // (A mockup's kind in any case, as the library's other names: the API, MCP and createMockup.)
   assert.equal(/** @type {Response} */ (get('/api/mockup.svg?title=Dune&kind=Card')).status, 200);
+  assert.equal(createMockup(createCover({ title: 'Dune' }), { kind: /** @type {any} */ (' Story ') }).width, 1080);
   const shown = createMockup(createCover({ title: 'Dune' }), { kind: 'story' });
   assert.ok(shown.coverScale > 1, `a story shows the cover larger: ${shown.coverScale}`);
   assert.equal(createMockup(createCover({ title: 'Dune' }), { kind: 'flat' }).coverScale, 1);

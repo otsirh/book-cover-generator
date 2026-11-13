@@ -2,7 +2,6 @@ import {
   createCover,
   listStyles,
   palettes,
-  pickStyle,
   randomSeed,
   version,
   formats,
@@ -40,8 +39,9 @@ import {
   variantOf,
   readDesign,
   pinsOf,
-  formatSize,
   designOptions,
+  wholeDesign,
+  sizeOfFormat,
 } from '../src/link.js';
 import { registerServiceWorker } from './offline.js';
 
@@ -121,12 +121,7 @@ const pickOther = (arr, current) => pick(arr.filter((x) => x !== current));
 const isCustomSize = (format) => !Object.hasOwn(FORMATS, format);
 /** A format's cover size in px. @param {string} format @returns {readonly [number, number]} */
 function sizeOf(format) {
-  // (As links and the API read it; one they'd refuse, the paperback.)
-  try {
-    return formatSize(format, undefined, undefined);
-  } catch {
-    return FORMATS.paperback;
-  }
+  return sizeOfFormat(format);
 }
 
 /** The five colours the editor shows: background, text and three accents (repeating the ones given). @param {string[]} colors */
@@ -531,11 +526,7 @@ const options = (extra = {}) => optionsFor(design, extra);
  * @returns {Design}
  */
 function complete(partial) {
-  const empty = /** @type {Design} */ (Object.fromEntries(KEYS.map((key) => [key, FIELDS[key].empty])));
-  /** @type {Design} */
-  const d = { ...empty, ...partial };
-  if (!partial.style) d.style = pickStyle({ ...d, style: 'random' });
-  return d;
+  return /** @type {Design} */ (wholeDesign(partial));
 }
 
 let lastAnnouncement = '';

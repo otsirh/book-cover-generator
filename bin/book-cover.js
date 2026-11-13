@@ -55,7 +55,7 @@ ${listed(fontEntries().map((f) => f.id))}
       --format <shape>  paperback (2:3, the default), ebook (5:8), square, or a
                         shape such as 1600x2560; with --width or --height, that
                         shape at that width or height
-      --width <px>      width  (default 600)
+      --width <px>      width  (default 600, or a paperback's for --height)
       --height <px>     height (default: from the format)
       --size <WxH>      width and height at once, e.g. 1600x2560
       --lang <tag>      language of the text, e.g. ja or zh-Hant (default: inferred)

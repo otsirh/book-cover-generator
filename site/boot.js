@@ -5,7 +5,9 @@
   document.documentElement.classList.add('js');
   // (The last of a repeated key, trimmed, as the app reads links: src/link.js.)
   // (A design's link from Copy link holds it in the query until the app moves it to the hash.)
-  const link = location.hash.length > 1 ? location.hash.slice(1) : location.search.slice(1);
+  // (Only a query that is a design's link, with its title, as the app reads one.)
+  const query = new URLSearchParams(location.search);
+  const link = location.hash.length > 1 ? location.hash.slice(1) : query.has('title') ? location.search.slice(1) : '';
   // (In any case, a size as WxH, 1600X2560 or 1600 × 2560: as src/link.js reads a format.)
   const format = (new URLSearchParams(link).getAll('format').at(-1) ?? '')
     .trim()

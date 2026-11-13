@@ -3,7 +3,7 @@
 // design the app stored) and gives the field's value, or undefined for one it can't read: the app
 // drops it, the API says so. (Not part of the library's API.)
 
-import { styleIdFor, palettes, formats, sizeLimits, version } from './index.js';
+import { styleIdFor, pickStyle, palettes, formats, sizeLimits, version } from './index.js';
 import { LINE_BREAK, clipGraphemes } from './text.js';
 import {
   idFor,
@@ -164,14 +164,33 @@ export function pinsOf(variant, offered) {
 
 /**
  * A whole design from what a link names (readDesign's): each field it leaves out as LINK_FIELDS
- * has it empty (the style empty: the seed picks one).
+ * has it empty, and a style it leaves out the one the seed picks (so its pins are that style's),
+ * as the app opens it.
  * @param {Record<string, unknown>} read
  * @returns {Record<string, any>}
  */
-export const wholeDesign = (read) => ({
-  ...Object.fromEntries(Object.entries(LINK_FIELDS).map(([key, field]) => [key, field.empty])),
-  ...read,
-});
+export function wholeDesign(read) {
+  /** @type {Record<string, any>} */
+  const d = {
+    ...Object.fromEntries(Object.entries(LINK_FIELDS).map(([key, field]) => [key, field.empty])),
+    ...read,
+  };
+  if (!d.style) d.style = pickStyle({ ...d, style: 'random' });
+  return d;
+}
+
+/**
+ * A format's cover size in px, as links read it; one they'd refuse, the paperback's.
+ * @param {string} format
+ * @returns {[number, number]}
+ */
+export function sizeOfFormat(format) {
+  try {
+    return formatSize(format, undefined, undefined);
+  } catch {
+    return [...formats.paperback];
+  }
+}
 
 /**
  * Cover options for a whole design, as the app draws it: its own colours as a palette, Auto as
@@ -182,12 +201,7 @@ export const wholeDesign = (read) => ({
  * @returns {import('./index.js').CoverOptions}
  */
 export function designOptions(d, offered, extra = {}) {
-  let size;
-  try {
-    size = formatSize(d.format, undefined, undefined);
-  } catch {
-    size = [...formats.paperback];
-  }
+  const size = sizeOfFormat(d.format);
   const colors = customColors(d.palette);
   return {
     title: d.title,

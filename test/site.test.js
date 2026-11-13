@@ -140,4 +140,6 @@ test('boot.js paints a design link’s shape as the app reads it: any case, from
     '--cover-h': '2560',
   });
   assert.equal(paint('#title=x&format=paperback').shape, undefined);
+  // (A query that isn't a design's link, without its title, is no shape: the app ignores it too.)
+  assert.equal(paint('', '?format=square').shape, undefined);
 });

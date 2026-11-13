@@ -63,7 +63,9 @@ export const mockupText = (text) =>
  * @param {{ kind?: string, background?: string, text?: string }} [options]
  * @returns {{ svg: string, width: number, height: number, coverScale: number }}
  */
-export function createMockup(cover, { kind = 'book', background: given, text = '' } = {}) {
+export function createMockup(cover, { kind: named = 'book', background: given, text = '' } = {}) {
+  // (A kind in any case, as the library's other names.)
+  const kind = typeof named === 'string' ? named.trim().toLowerCase() : named;
   if (!cover || typeof cover.body !== 'string' || !(cover.width > 0) || !(cover.height > 0)) {
     throw new TypeError('createMockup: pass a cover from createCover');
   }
