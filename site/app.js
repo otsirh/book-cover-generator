@@ -376,8 +376,11 @@ function typed(field) {
     typing = true;
     typingField = field;
   } else {
-    // Later keystrokes of the burst update its step.
+    // Later keystrokes of the burst update its step, saved at once for the address the tab is at
+    // (which may be a keystroke or two behind): a reload right after typing keeps them all, without
+    // waiting on the page's last moments to save them.
     steps[stepIndex] = { ...design };
+    saveSteps();
     writeUrl(true);
   }
   clearTimeout(typingTimer);
@@ -734,6 +737,10 @@ function buildControls() {
   $('controls').addEventListener('submit', (e) => e.preventDefault());
   const value = (/** @type {Event} */ e) => /** @type {HTMLInputElement} */ (e.target).value;
   $('title').addEventListener('input', (e) => update({ title: value(e) }, 'typing'));
+  $('lang-clear').addEventListener('click', () => {
+    update({ lang: '' });
+    $('title').focus();
+  });
   $('author').addEventListener('input', (e) => update({ author: value(e) }, 'typing'));
   $('subtitle').addEventListener('input', (e) => update({ subtitle: value(e) }, 'typing'));
   $('series').addEventListener('input', (e) => update({ series: value(e) }, 'typing'));
@@ -1205,7 +1212,21 @@ function syncSize(always = false) {
   }
 }
 
+/** The language a link gave the design, named (Turkish), with a way to clear it. */
+function syncLang() {
+  $('lang-note').hidden = !design.lang;
+  if (!design.lang) return;
+  let name = design.lang;
+  try {
+    name = new Intl.DisplayNames([navigator.language, 'en'], { type: 'language' }).of(design.lang) ?? name;
+  } catch {
+    // (A tag the browser can't name: shown as it is.)
+  }
+  $('lang-name').textContent = name;
+}
+
 function syncControls() {
+  syncLang();
   const input = (/** @type {string} */ id) => /** @type {HTMLInputElement} */ ($(id));
   // A series or credit that comes from elsewhere (a link, Undo, a kept design) opens their section,
   // so it is never hidden; one typed there leaves it as it is, and closing it is up to you.
@@ -1579,14 +1600,21 @@ function markRail() {
  */
 function keptFrom(item) {
   const raw = item && typeof item === 'object' ? /** @type {Record<string, unknown>} */ (item) : {};
+  const kept = complete(sanitize(raw));
+  // The cover as it was drawn, if it is one of the design's size (a file of kept designs from
+  // elsewhere can hold anything): else it is drawn again from the design.
+  const [w, hgt] = sizeOf(kept.format);
+  const size = typeof raw.svg === 'string' ? /^<svg [^>]*?\bwidth="(\d+)" height="(\d+)"/.exec(raw.svg) : null;
   const svg =
     typeof raw.svg === 'string' &&
     raw.svg.length <= MAX_SNAPSHOT &&
-    raw.svg.startsWith('<svg ') &&
-    raw.svg.endsWith('</svg>')
+    raw.svg.endsWith('</svg>') &&
+    size !== null &&
+    Number(size[1]) === w &&
+    Number(size[2]) === hgt
       ? raw.svg
       : '';
-  return { design: complete(sanitize(raw)), svg };
+  return { design: kept, svg };
 }
 
 /**

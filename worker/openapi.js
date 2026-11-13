@@ -96,7 +96,7 @@ export function openapi(base) {
     },
   });
   const png = {
-    500: refused('resvg could not draw this design (kept for an hour): ask for the SVG.'),
+    500: refused('resvg could not draw this design: ask for the SVG, or again later.'),
     422: refused('Text in a script the PNG fonts lack (they have Latin, Greek and Cyrillic): ask for the SVG.'),
     429: drawn[429],
     503: refused('PNGs are unavailable just now: ask for the SVG.'),

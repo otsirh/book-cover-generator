@@ -10,11 +10,10 @@
 // a little differently from the app on another system, which measures with its own fonts.
 
 import { createCover, createMockup, version } from '../src/index.js';
-import { hex } from '../src/shared.js';
+import { hex, slug } from '../src/shared.js';
 import { optionsFromLink, linkOf, LINK_FIELDS } from '../src/link.js';
 import { answerPayload, catalog } from '../src/mcp.js';
 import { escapeXml } from '../src/core.js';
-import { slug } from '../src/shared.js';
 import { COVER_PIXELS, MOCKUP_PIXELS, SHADOWED_PIXELS, pngEngine } from './png.js';
 import { openapi } from './openapi.js';
 
@@ -109,8 +108,8 @@ const TOO_MANY = 'Too many requests: wait a minute, or draw covers in your own c
  */
 function disposition(q, title, ext) {
   const asked = q.getAll('download').at(-1)?.trim();
-  // (Off as the API's other switches are: 0 or false, or not given.)
-  if (asked === undefined || /^(0|false)$/i.test(asked)) return {};
+  // (Off as the API's other switches are: 0 or false, or not given, or empty.)
+  if (!asked || /^(0|false)$/i.test(asked)) return {};
   const name = `${slug(asked && !/^(1|true)$/i.test(asked) ? asked : title)}.${ext}`;
   // (A name in ASCII for older clients, and the name itself, encoded, for the rest.)
   const ascii = name.replace(/[^\x20-\x7e]/g, '_');
@@ -263,6 +262,16 @@ export function info(request) {
 /** The PNG engine, made once an instance needs it. @type {Promise<Awaited<ReturnType<typeof pngEngine>>> | null} */
 let engine = null;
 
+/**
+ * Stop handing out an engine whose resvg trapped: the next request makes a new one. (Only if the
+ * engine on hand is still that one: another request may have replaced it while this one waited.)
+ * @param {Awaited<ReturnType<typeof pngEngine>>} drawer
+ */
+async function retire(drawer) {
+  const held = engine;
+  if (held && (await held) === drawer && engine === held) engine = null;
+}
+
 /** The site's font files, read once for every engine. @type {Map<string, Promise<Uint8Array>>} */
 const fontFiles = new Map();
 
@@ -364,7 +373,7 @@ async function drawPng(request, env, url, kind) {
   }
   // (An engine whose resvg trapped on an earlier drawing draws no more: a new one takes its place.)
   if (drawer.trapped) {
-    if (engine && (await engine) === drawer) engine = null;
+    await retire(drawer);
     try {
       drawer = await pngEngineFor(env, url.origin);
     } catch (err) {
@@ -415,14 +424,10 @@ async function drawPng(request, env, url, kind) {
     } catch (err) {
       // resvg failed: our fault, not the request's. (What was drawn, without the visitor's text.)
       console.error(`PNG ${kind} in ${cover.style}, ${width} × ${height} at ${scale}:`, err);
-      // A trap may be the instance's state, not the design's: the next request gets an engine
-      // with a new resvg, and may draw it. An error resvg reports is the design's: kept at the
-      // edge for an hour, so it isn't drawn again and again meanwhile.
-      const trap = drawer.trapped;
-      if (trap && engine && (await engine) === drawer) engine = null;
-      return refusal(new Error('The PNG could not be drawn: ask for the SVG (cover.svg)'), 500, {
-        'Cache-Control': trap ? 'no-store' : 'public, max-age=3600',
-      });
+      // (Not kept: it may be this instance's state, not the design's. If resvg trapped, the next
+      // request gets an engine with a new one.)
+      if (drawer.trapped) await retire(drawer);
+      return refusal(new Error('The PNG could not be drawn: ask for the SVG (cover.svg)'), 500);
     }
     return new Response(request.method === 'HEAD' ? null : /** @type {BodyInit} */ (bytes), {
       headers: {
@@ -488,7 +493,7 @@ export async function preview(request, env) {
  */
 export const API_PARAMETERS = Object.freeze([
   ...Object.keys(LINK_FIELDS),
-  ...['genre', 'lang', 'width', 'height', 'titleCase', 'bg', 'ink', 'accent'],
+  ...['genre', 'width', 'height', 'titleCase', 'bg', 'ink', 'accent'],
   ...['kind', 'text', 'background', 'scale', 'preview', 'download'],
 ]);
 
@@ -665,7 +670,7 @@ async function handle(request, env, ctx) {
   }
   const made = api(asked) ?? info(asked) ?? (await png(asked, env));
   if (!made) return env.ASSETS ? env.ASSETS.fetch(request) : new Response('Not found\n', { status: 404 });
-  // (What it says may be kept: drawings, and a PNG resvg failed on, for a while.)
+  // (What it says may be kept: drawings, never a refusal.)
   if (cache && key && /\bpublic\b/.test(made.headers.get('Cache-Control') ?? '')) {
     ctx.waitUntil(cache.put(key, made.clone()));
   }

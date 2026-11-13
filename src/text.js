@@ -113,7 +113,10 @@ export function setTextMeasurer(fn) {
     throw new TypeError('setTextMeasurer: pass a function (text, size, font) => width in px, or null');
   }
   customMeasure = fn ?? null;
-  widthCache.clear();
+  // (Each way of measuring keeps its own widths: setting one back finds them still there.)
+  const key = customMeasure ?? BUILT_IN;
+  widthCache = widthCaches.get(key) ?? new Map();
+  widthCaches.set(key, widthCache);
 }
 
 const NARROW = new Set("iljIİ.,:;!|'’`ı".split(''));
@@ -186,8 +189,19 @@ function heuristicWidth(text, spec) {
   return w;
 }
 
-/** Widths at the reference size: per font, then per text. @type {Map<string, Map<string, number>>} */
-const widthCache = new Map();
+/** The built-in measuring (a canvas, or the widths in src/metrics.js), as a key of widthCaches. */
+const BUILT_IN = {};
+/**
+ * Widths at the reference size, for each way of measuring (the built-in, or a measurer passed to
+ * setTextMeasurer): per font, then per text.
+ * @type {WeakMap<object, Map<string, Map<string, number>>>}
+ */
+const widthCaches = new WeakMap();
+/** The widths of the way text is measured now. @type {Map<string, Map<string, number>>} */
+let widthCache = new Map();
+widthCaches.set(BUILT_IN, widthCache);
+/** The most texts a font keeps widths for: a long-lived server sees endless titles. */
+const MAX_WIDTHS = 5000;
 let lastFont = '';
 // Widths are measured once at this size and scaled: text width is linear in font size,
 // so shrinking a title to fit costs no extra measuring.
@@ -286,6 +300,7 @@ function referenceWidth(text, spec) {
   const { font, weight, key } = fontOf(spec);
   let widths = widthCache.get(key);
   if (!widths) widthCache.set(key, (widths = new Map()));
+  else if (widths.size >= MAX_WIDTHS) widths.clear();
   const cached = widths.get(text);
   if (cached !== undefined) return cached;
   let w;

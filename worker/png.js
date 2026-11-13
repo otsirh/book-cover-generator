@@ -190,7 +190,11 @@ export async function pngEngine(resvg, wasm, fontFile) {
         if (trap) trapped.add(resvg);
         throw err;
       } finally {
-        if (!trap) {
+        if (trap) {
+          // (Never freed, not even later by the glue's finalizers: that would trap again.)
+          image?.__destroy_into_raw?.();
+          r?.__destroy_into_raw?.();
+        } else {
           image?.free?.();
           r?.free?.();
         }

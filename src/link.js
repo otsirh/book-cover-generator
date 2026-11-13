@@ -268,7 +268,12 @@ export function optionsFromLink(q) {
     const raw = given(key);
     if (raw !== undefined) o[key] = LINK[key](raw) ?? raw;
   }
-  for (const key of ['genre', 'lang']) if (given(key) !== undefined) o[key] = given(key);
+  if (given('genre') !== undefined) o.genre = given('genre');
+  const lang = given('lang');
+  if (lang !== undefined) {
+    o.lang = LINK.lang(lang);
+    if (!o.lang) throw new RangeError(`lang must be a language tag such as "tr" or "zh-Hant", got "${lang}"`);
+  }
   const palette = given('palette');
   if (palette !== undefined) {
     const read = LINK.palette(palette);

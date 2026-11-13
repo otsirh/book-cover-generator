@@ -507,7 +507,7 @@ test('download names the file after the title, or as asked', async () => {
   const plain = /** @type {Response} */ (get('/api/cover.svg?title=Dune'));
   assert.equal(plain.headers.get('content-disposition'), null);
   // Off as the other switches are.
-  for (const off of ['0', 'false', 'FALSE']) {
+  for (const off of ['0', 'false', 'FALSE', '']) {
     const res = /** @type {Response} */ (get(`/api/cover.svg?title=Dune&download=${off}`));
     assert.equal(res.headers.get('content-disposition'), null, off);
   }
@@ -521,7 +521,7 @@ test('download names the file after the title, or as asked', async () => {
     asked.headers.get('content-disposition'),
     `attachment; filename="my-card.svg"; filename*=UTF-8''my-card.svg`,
   );
-  const mockup = /** @type {Response} */ (get('/api/mockup.svg?title=Dune&kind=card&download'));
+  const mockup = /** @type {Response} */ (get('/api/mockup.svg?title=Dune&kind=card&download=1'));
   assert.match(mockup.headers.get('content-disposition') ?? '', /filename="dune-card\.svg"/);
   const japanese = /** @type {Response} */ (get(`/api/cover.svg?title=${encodeURIComponent('灯台守')}&download=1`));
   assert.equal(
@@ -622,4 +622,10 @@ test('a link names its language, and the app’s link reader takes it (and only 
   const empty = Object.fromEntries(Object.entries(LINK_FIELDS).map(([k, f]) => [k, f.empty]));
   assert.equal(writeLink({ ...empty, title: 'x' }).has('lang'), false);
   assert.equal(writeLink({ ...empty, title: 'x', lang: 'tr' }).get('lang'), 'tr');
+  // The API reads it as the app does: trimmed, and an error where the app would drop it.
+  assert.equal(optionsFromLink(new URLSearchParams('title=x&lang=%20tr')).lang, 'tr');
+  assert.throws(
+    () => optionsFromLink(new URLSearchParams(`title=x&lang=en-${'a'.repeat(40)}`)),
+    /lang must be a language tag/,
+  );
 });

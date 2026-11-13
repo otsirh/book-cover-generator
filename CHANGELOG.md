@@ -12,7 +12,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - **An about page** (`/about/`, "Using your covers" in the footer): you may use the covers you make for anything, books you sell included, with no credit needed; what stays private; which fonts covers use and why a cover looks different elsewhere; and how to upload ebook and paperback covers to Amazon KDP.
 - **One file for `<book-cover>`**: `https://covers.otsirh.dev/element.js` is the element and the library as one minified module (48 KB compressed), for pages that would rather load one file than the two dozen of `/src/element.js`.
 - **The MCP registry**: the server is listed in the official MCP registry as `io.github.otsirh/book-cover-generator` (npm and the hosted `/mcp`), published by each release.
-- **A design's language in its link** (`lang=tr`): the app, the HTTP API, kept designs and the gallery draw it with that language's capitals and letterforms, and the MCP tools take `lang` too.
+- **A design's language in its link** (`lang=tr`): the app, the HTTP API, kept designs and the gallery draw it with that language's capitals and letterforms, and the MCP tools take `lang` too. The app names it under the title ("Set as Turkish text, from the link"), with a way to clear it.
 - `download=1` on any image of the HTTP API answers it as a file named after the title (`download=my-cover` names it; `download=0` doesn't).
 - **Keep is a star on the preview**: it shows whether the design on show is kept, keeps it (or press K), and pressed again removes it. Removing a kept design, here or in the tray, offers Undo.
 - Undo and Redo with Ctrl or Cmd+Z too (Shift for Redo, or Ctrl+Y), outside text fields, and with single-key shortcuts off. On a phone, Undo and Keep are in the bar along the bottom, and the previous and next style beside the pinned preview.
@@ -31,6 +31,8 @@ All notable changes to this project are documented here. The format follows [Kee
 - The dev server never serves a hidden file (`.git`, `node_modules`), however the URL spells its path.
 - A PNG resvg stops on no longer stops the site's other PNGs: the Worker starts a new resvg for the next one (its own copy of resvg's glue, `worker/resvg-glue.js`, made by `scripts/vendor-resvg.js`).
 - A link preview's picture is the site's own image whenever the design's can't be drawn (the crawler asked too much, or resvg failed), never an error.
+- The gallery reads the design you bring as the app does (the last of a repeated value; `texture=false` is off).
+- A kept design's snapshot that isn't of the design's size (from a file made elsewhere) is drawn again from the design, so its thumbnail and Download all show the design.
 - Aurora's title and author keep 3:1 against what is drawn behind them: each colour field kept it alone, but blurred fields add up where they overlap (two covers in five had a fifth of a line's outline under 3:1, down to 1.7:1). Where they would, a soft field of the background goes under that text, only as strong as it needs.
 - Blueprint no longer shrinks its title to make room for a subtitle (from 54 to 29 px on a 600 × 900 cover): on tall and square covers the title block grows into the drawing's room instead, and for a long title too.
 - Aurora, Thriller and Ribbon blur only the cover and the blur's reach around it, so their PNGs take a third of the memory they did (Aurora's up to 32 MiB of resvg's, from 98) and draw faster. `svgUtils.blurFilter(id, std, { width, height })` gives a filter that region.

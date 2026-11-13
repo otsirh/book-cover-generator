@@ -603,6 +603,11 @@ test('the last keystrokes are in the URL when the page is left or reloaded', asy
   const title = page.locator('#title');
   await title.fill('');
   await title.pressSequentially('Hello there', { delay: 5 });
+  // (Saved with each keystroke: once the browser has the save, a reload finds it. Without the wait,
+  // a loaded machine can start the reload before the browser has the tab's storage written.)
+  await expect
+    .poll(() => page.evaluate(() => sessionStorage.getItem('book-cover-generator:steps') ?? ''))
+    .toContain('Hello there');
   await page.reload();
   await expect(title).toHaveValue('Hello there');
 });
@@ -1477,7 +1482,8 @@ test('when storage is full, the oldest kept designs give up their SVG first, and
   await page.addInitScript(() => {
     if (!sessionStorage.getItem('seeded')) {
       sessionStorage.setItem('seeded', '1');
-      const svg = `<svg ${'a'.repeat(6000)}></svg>`;
+      // (Snapshots of the designs' size, 600 × 900: one of another size isn't kept.)
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="900" data-x="${'a'.repeat(6000)}"></svg>`;
       const old = ['A', 'B', 'C', 'D'].map((title) => ({ title, style: 'minimal', seed: title, svg }));
       localStorage.setItem('book-cover-generator:kept', JSON.stringify(old));
     }
@@ -2576,4 +2582,29 @@ test('a link’s language is the design’s: its capitals, and every link the ap
   await page.locator('#author').fill('Ada Yılmaz');
   await expect.poll(() => new URL(page.url()).hash).toContain('lang=tr');
   await expect.poll(() => svgSoon(page, '#preview')).toContain('İSTANBUL');
+  // It's shown by the title, and can be cleared: the text's own capitals again.
+  await expect(page.locator('#lang-note')).toBeVisible();
+  await expect(page.locator('#lang-name')).toHaveText('Turkish');
+  await page.locator('#lang-clear').click();
+  await expect(page.locator('#lang-note')).toBeHidden();
+  await expect.poll(() => new URL(page.url()).hash).not.toContain('lang=');
+  await expect.poll(() => svgSoon(page, '#preview')).toContain('ISTANBUL');
+});
+
+test('a kept design’s snapshot of another size (a file from elsewhere) is drawn again from the design', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const huge = '<svg xmlns="http://www.w3.org/2000/svg" width="100000" height="100000"><title>Not this</title></svg>';
+    localStorage.setItem(
+      'book-cover-generator:kept',
+      JSON.stringify([{ title: 'Mine', style: 'minimal', seed: 'm', svg: huge }]),
+    );
+  });
+  await page.goto('/#title=New&style=minimal&seed=n');
+  const thumb = page.locator('#kept-list li img').first();
+  await expect(thumb).toHaveAttribute('src', /.+/);
+  const src = (await thumb.getAttribute('src')) ?? '';
+  expect(decodeURIComponent(src)).not.toContain('Not this');
+  expect(decodeURIComponent(src)).toContain('Mine');
 });

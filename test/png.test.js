@@ -154,6 +154,7 @@ test('prepare: a lone filled shape’s opacity is its fill’s; others keep thei
 test('a drawing that traps resvg isn’t freed (that would trap again), and resvg draws no more', async () => {
   // A stand-in resvg whose drawing traps, as resvg 2.6 did on some designs.
   let frees = 0;
+  let detached = 0;
   const stand = () => ({
     initWasm: async () => {},
     Resvg: class {
@@ -166,6 +167,10 @@ test('a drawing that traps resvg isn’t freed (that would trap again), and resv
       free() {
         frees++;
       }
+      // (Taken from the glue's finalizers, so they never free it either.)
+      __destroy_into_raw() {
+        detached++;
+      }
     },
   });
   const fonts = FONT_FILES.slice(0, 1);
@@ -176,6 +181,7 @@ test('a drawing that traps resvg isn’t freed (that would trap again), and resv
   assert.equal(drawer.trapped, false);
   assert.throws(() => drawer.render(svg), /unreachable/);
   assert.equal(frees, 0);
+  assert.equal(detached, 1);
   assert.equal(drawer.trapped, true);
   assert.throws(() => drawer.render(svg), /draws no more/);
   // Another engine on the same resvg is no better: its WebAssembly is the one that trapped.

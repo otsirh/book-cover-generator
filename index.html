@@ -189,6 +189,11 @@
               <label class="label" for="title">Title</label>
               <textarea id="title" name="title" rows="2" maxlength="200" aria-describedby="title-hint"></textarea>
               <small class="field-hint" id="title-hint">Enter starts a new line on the cover.</small>
+              <!-- A language from a link (lang=tr): its capitals and letterforms, until cleared. -->
+              <small class="field-hint lang-note" id="lang-note" hidden>
+                Set as <b id="lang-name"></b> text, from the link.
+                <button type="button" class="link-btn" id="lang-clear">Clear</button>
+              </small>
             </div>
             <label class="field">
               <span class="label">Author</span>

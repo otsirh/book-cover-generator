@@ -3,6 +3,7 @@
 // style, left behind for another, as in the app). The header and footer links back to the app keep
 // it too, and the place they go to: "#usage&title=…" opens the design at #usage (see site/app.js).
 import { registerServiceWorker } from './offline.js';
+import { LINK, lastValues } from '../src/link.js';
 
 registerServiceWorker();
 
@@ -22,25 +23,37 @@ const DRAWN = {
 };
 
 const design = new URLSearchParams(location.hash.slice(1));
-if (design.has('title')) {
+/**
+ * The design as the app reads it (src/link.js): the last of a repeated key, each value by the
+ * app's rules, and one it would drop left out.
+ * @type {Record<string, unknown>}
+ */
+const read = {};
+for (const [key, value] of Object.entries(lastValues(design))) {
+  const reader = /** @type {Record<string, (v: unknown) => unknown>} */ (LINK)[key];
+  const got = reader?.(value);
+  if (got !== undefined) read[key] = got;
+}
+if (typeof read.title === 'string') {
   for (const link of /** @type {NodeListOf<HTMLAnchorElement>} */ (document.querySelectorAll('a[data-style]'))) {
     const q = new URLSearchParams(design);
     const style = link.dataset.style ?? '';
-    if (style !== design.get('style')) q.delete('variant');
+    const own = style === read.style;
+    if (!own) q.delete('variant');
     q.set('style', style);
     link.href = `/#${q}`;
     // The cover shows what the link opens: your book, in this style.
     const cover = link.querySelector('book-cover');
     if (!cover) continue;
     for (const [key, attribute] of Object.entries(DRAWN)) {
-      const value = q.get(key);
-      if (value === null) cover.removeAttribute(attribute);
-      else cover.setAttribute(attribute, value);
+      const value = read[key];
+      if (typeof value === 'string' && value !== '') cover.setAttribute(attribute, value);
+      else cover.removeAttribute(attribute);
     }
-    if (q.has('variant')) cover.setAttribute('variant', q.get('variant') ?? '');
-    // (On, as a boolean attribute; 0 or absent, off.)
-    const texture = q.get('texture');
-    if (texture && texture !== '0') cover.setAttribute('texture', '');
+    if (own && typeof read.variant === 'string') cover.setAttribute('variant', read.variant);
+    else cover.removeAttribute('variant');
+    // (On, as a boolean attribute.)
+    if (read.texture === true) cover.setAttribute('texture', '');
     else cover.removeAttribute('texture');
   }
   for (const link of /** @type {NodeListOf<HTMLAnchorElement>} */ (
