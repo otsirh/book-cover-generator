@@ -72,7 +72,7 @@ export interface MockupOptions {
 export declare function parseBookList(text: string): CoverOptions[];
 /**
  * Cover options for a book from a list over `defaults`, the options every book shares: the book's
- * own values win, a size it gives replaces both sides of the defaults', a book naming another
+ * own values win, a width or a height it gives alone sizes the defaults' shape, a book naming another
  * style than the defaults' drops their pinned variants (with no shared style, it keeps the ones
  * its own style offers), and one naming a genre the defaults' style doesn't suit gets a style that
  * suits it. A shared style that doesn't exist throws.
@@ -84,7 +84,13 @@ export declare function styleIdFor(name: string): string | undefined;
 export declare function createMockup(
   cover: Cover,
   options?: MockupOptions,
-): { svg: string; width: number; height: number };
+): {
+  svg: string;
+  width: number;
+  height: number;
+  /** How many times its own size the mockup shows the cover at (the largest place it shows it). */
+  coverScale: number;
+};
 
 /** A paper a paperback is printed on. `color` is KDP's standard colour; `premium-color` is thicker. */
 export type PaperType = 'white' | 'cream' | 'color' | 'premium-color';

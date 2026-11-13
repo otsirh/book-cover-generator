@@ -220,10 +220,15 @@ test('a format is a shape a width or height may scale; the library says what’s
   // (A width or a height alone sizes the paperback's shape, as the CLI does: a width alone as the
   // library takes it, rounded first; a height alone with its width, said of the height if too small.)
   assert.deepEqual(optionsFromLink(new URLSearchParams('width=1e3')), { width: 1000 });
-  assert.deepEqual(optionsFromLink(new URLSearchParams('height=1500')), { width: 1000, height: 1500 });
+  assert.deepEqual(optionsFromLink(new URLSearchParams('height=1500')), { height: 1500 });
+  const tall = createCover(optionsFromLink(new URLSearchParams('title=x&height=1500')));
+  assert.deepEqual([tall.width, tall.height], [1000, 1500]);
   const fractional = createCover(optionsFromLink(new URLSearchParams('title=x&width=600.4')));
   assert.deepEqual([fractional.width, fractional.height], [600, 900]);
-  assert.throws(() => optionsFromLink(new URLSearchParams('height=73')), /height 73 makes a paperback 49 px wide/);
+  assert.throws(
+    () => createCover(optionsFromLink(new URLSearchParams('title=x&height=73'))),
+    /height 73 makes a paperback 49 px wide/,
+  );
   assert.throws(
     () => optionsFromLink(new URLSearchParams('titleCase=bold')),
     /titleCase is upper or normal, got "bold"/,
@@ -389,6 +394,10 @@ test(
     assert.deepEqual([tallView.getUint32(16), tallView.getUint32(20)], [320, 960]);
     const unwritten = await call('灯台守');
     assert.equal(unwritten.isError, undefined);
+    // (A script the fonts lack is the design's answer: kept at the edge, as a drawing is.)
+    const lacking = await fetchPath(`/api/cover.png?title=${encodeURIComponent('灯台守')}`);
+    assert.equal(lacking.status, 422);
+    assert.match(lacking.headers.get('cache-control') ?? '', /public/);
     assert.equal(unwritten.content.filter((/** @type {{ type: string }} */ c) => c.type === 'image').length, 0);
   },
 );
@@ -409,25 +418,42 @@ test('a design’s link (/?title=…) gets its own link preview; the site’s he
     html,
     /<meta property="og:url" content="https:\/\/covers\.example\/\?title=Dune&amp;author=Frank\+Herbert/,
   );
-  assert.match(
-    html,
-    /<meta property="og:image" content="https:\/\/covers\.example\/api\/mockup\.png\?title=Dune&amp;author=Frank\+Herbert&amp;style=retro&amp;seed=s&amp;kind=card&amp;preview=1"/,
-  );
+  // The card's picture is the design's own link (as the app writes it), as a card.
+  const image = /<meta property="og:image" content="([^"]+)"/.exec(html)?.[1].replaceAll('&amp;', '&') ?? '';
+  const card = new URL(image);
+  assert.equal(card.pathname, '/api/mockup.png');
+  assert.equal(card.searchParams.get('title'), 'Dune');
+  assert.equal(card.searchParams.get('style'), 'retro');
+  assert.equal(card.searchParams.get('kind'), 'card');
+  assert.equal(card.searchParams.get('preview'), '1');
+  // A link the app opens (a pin its style doesn't take, dropped) gets its card too, and the page's
+  // other parameters (a scale, a download) never reach the picture.
+  const odd = await (
+    await worker.fetch(
+      new Request('https://covers.example/?title=Dune&style=minimal&variant=align.left&scale=0.25&download=1&text=Hi'),
+      env,
+      { waitUntil() {} },
+    )
+  ).text();
+  assert.match(odd, /<meta property="og:title" content="Dune"/);
+  const oddImage = new URL(/<meta property="og:image" content="([^"]+)"/.exec(odd)?.[1].replaceAll('&amp;', '&') ?? '');
+  for (const key of ['scale', 'download', 'text', 'variant']) assert.equal(oddImage.searchParams.get(key), null, key);
   assert.match(html, /<meta property="og:image:alt" content="The cover of Dune by Frank Herbert"/);
   // The page's validators don't describe the page rewritten.
   assert.equal(res.headers.get('etag'), null);
   // The page's security headers, which the static files' rules don't give a Worker's answer.
   assert.match(res.headers.get('content-security-policy') ?? '', /require-trusted-types-for 'script'/);
   assert.equal(res.headers.get('x-frame-options'), 'DENY');
-  // Markup in the title is escaped; a link the library refuses keeps the page as it is.
+  // Markup in the title is escaped; a style the app doesn't know is one the seed picks, as the app
+  // opens it, and its card shows that.
   const marked = await (
     await worker.fetch(new Request('https://covers.example/?title=%3Cb%3E%22x%22'), env, { waitUntil() {} })
   ).text();
   assert.match(marked, /<meta property="og:title" content="&lt;b&gt;&quot;x&quot;"/);
-  const refused = await (
+  const unknown = await (
     await worker.fetch(new Request('https://covers.example/?title=X&style=nope'), env, { waitUntil() {} })
   ).text();
-  assert.match(refused, /<meta property="og:image" content="https:\/\/covers\.otsirh\.dev\/og\.png"/);
+  assert.match(unknown, /<meta property="og:title" content="X"/);
 });
 
 test('the Worker’s pages have the site’s headers: SITE_HEADERS is public/_headers’ /* rule', async () => {
@@ -544,6 +570,11 @@ test('download names the file after the title, or as asked', async () => {
     asked.headers.get('content-disposition'),
     `attachment; filename="my-card.svg"; filename*=UTF-8''my-card.svg`,
   );
+  // (A mockup's kind in any case, as the API's other values.)
+  assert.equal(/** @type {Response} */ (get('/api/mockup.svg?title=Dune&kind=Card')).status, 200);
+  const shown = createMockup(createCover({ title: 'Dune' }), { kind: 'story' });
+  assert.ok(shown.coverScale > 1, `a story shows the cover larger: ${shown.coverScale}`);
+  assert.equal(createMockup(createCover({ title: 'Dune' }), { kind: 'flat' }).coverScale, 1);
   const mockup = /** @type {Response} */ (get('/api/mockup.svg?title=Dune&kind=card&download=1'));
   assert.match(mockup.headers.get('content-disposition') ?? '', /filename="dune-card\.svg"/);
   const japanese = /** @type {Response} */ (get(`/api/cover.svg?title=${encodeURIComponent('灯台守')}&download=1`));

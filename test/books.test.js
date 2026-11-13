@@ -78,14 +78,25 @@ test('a listed book’s options: its own values win, and its genre picks a style
     title: 'A',
     genre: 'horror',
   });
-  // A genre the shared style suits keeps it, pins and all; a size replaces both sides.
+  // A genre the shared style suits keeps it, pins and all; a width or height alone sizes the
+  // shared shape (2:3 here; an ebook's 5:8 under an ebook's size).
   assert.deepEqual(optionsForBook({ title: 'A', genre: 'children', width: 800 }, shared), {
     ...shared,
     width: 800,
-    height: undefined,
+    height: 1200,
     title: 'A',
     genre: 'children',
   });
+  const ebook = { width: 600, height: 960 };
+  assert.deepEqual(optionsForBook({ title: 'A', width: 1200 }, ebook), { width: 1200, height: 1920, title: 'A' });
+  assert.deepEqual(optionsForBook({ title: 'A', height: 1920 }, ebook), { width: 1200, height: 1920, title: 'A' });
+  // Both sides are the book's own; with no shared shape, a lone side is left to createCover (2:3).
+  assert.deepEqual(optionsForBook({ title: 'A', width: 700, height: 700 }, ebook), {
+    width: 700,
+    height: 700,
+    title: 'A',
+  });
+  assert.deepEqual(optionsForBook({ title: 'A', height: 1500 }, {}), { width: undefined, height: 1500, title: 'A' });
   // With a random shared style, the genre is left to createCover, which picks; a shared style that
   // doesn't exist is reported for every book.
   for (const style of ['random', undefined]) {

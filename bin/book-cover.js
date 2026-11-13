@@ -13,7 +13,7 @@ import {
   genres,
 } from '../src/index.js';
 import { slug, fontEntries } from '../src/shared.js';
-import { px, formatSize, sixDigits, shapelessSize } from '../src/link.js';
+import { px, formatSize, sixDigits } from '../src/link.js';
 import { answerPayload } from '../src/mcp.js';
 
 /**
@@ -206,8 +206,8 @@ function dimensions() {
   }
   const width = values.width === undefined ? undefined : px('--width', values.width);
   const height = values.height === undefined ? undefined : px('--height', values.height);
-  // The paperback shape (2:3) by default, at the width or the height given (as the HTTP API reads them).
-  if (values.format === undefined) return shapelessSize(width, height, { width: '--width', height: '--height' });
+  // Without a format, as given: the library makes a width or a height alone the paperback's shape.
+  if (values.format === undefined) return { width, height };
   // A preset or a WxH shape, at the width or height asked for (as the HTTP API reads it).
   const [w, h] = formatSize(values.format, width, height);
   return { width: w, height: h };

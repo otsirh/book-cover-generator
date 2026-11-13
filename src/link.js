@@ -163,6 +163,58 @@ export function pinsOf(variant, offered) {
 }
 
 /**
+ * A whole design from what a link names (readDesign's): each field it leaves out as LINK_FIELDS
+ * has it empty (the style empty: the seed picks one).
+ * @param {Record<string, unknown>} read
+ * @returns {Record<string, any>}
+ */
+export const wholeDesign = (read) => ({
+  ...Object.fromEntries(Object.entries(LINK_FIELDS).map(([key, field]) => [key, field.empty])),
+  ...read,
+});
+
+/**
+ * Cover options for a whole design, as the app draws it: its own colours as a palette, Auto as
+ * a palette the seed picks, only the pins its style offers (`offered`: that style's variants),
+ * its format as a size (one the reader would refuse, the paperback's).
+ * @param {Record<string, any>} d @param {readonly { name: string, values: readonly { value: string }[] }[]} offered
+ * @param {Partial<import('./index.js').CoverOptions>} [extra] options that win (a thumbnail's style, say)
+ * @returns {import('./index.js').CoverOptions}
+ */
+export function designOptions(d, offered, extra = {}) {
+  let size;
+  try {
+    size = formatSize(d.format, undefined, undefined);
+  } catch {
+    size = [...formats.paperback];
+  }
+  const colors = customColors(d.palette);
+  return {
+    title: d.title,
+    author: d.author,
+    subtitle: d.subtitle,
+    series: d.series,
+    credit: d.credit,
+    badge: d.badge,
+    style: d.style || undefined,
+    palette: colors
+      ? { bg: colors[0], ink: colors[1], accents: colors.slice(2) }
+      : d.palette === 'auto'
+        ? 'random'
+        : d.palette,
+    seed: d.seed,
+    texture: d.texture,
+    variants: pinsOf(d.variant, offered),
+    font: d.font || undefined,
+    titleCase: d.case || undefined,
+    lang: d.lang || undefined,
+    width: size[0],
+    height: size[1],
+    ...extra,
+  };
+}
+
+/**
  * A design's link (the part of an app link after #, the HTTP API's query): every field, even when
  * empty or off, so a link is the whole design, never mistaken for a hand-edited partial one (which
  * changes only the keys it names); last, the version that drew it (artwork can change between
@@ -284,25 +336,6 @@ export function formatSize(format, width, height) {
 }
 
 /**
- * A cover's size from a width or a height without a format, as the CLI and the HTTP API read them:
- * both, as given; a width alone, as the library takes it (the paperback's shape, 2:3); a height
- * alone, with the paperback's width for it, said of the height if that width is too small.
- * @param {number | undefined} width @param {number | undefined} height
- * @param {{ width: string, height: string }} [names] the parameters, as an error names them
- * @returns {{ width?: number, height?: number }}
- */
-export function shapelessSize(width, height, names = { width: 'width', height: 'height' }) {
-  if (width !== undefined || height === undefined) return { width, height };
-  const [w, h] = formatSize('paperback', undefined, height);
-  if (w < sizeLimits.min) {
-    throw new RangeError(
-      `${names.height} ${height} makes a paperback ${w} px wide, under ${sizeLimits.min}: give a taller ${names.height}, or ${names.width} too`,
-    );
-  }
-  return { width: w, height: h };
-}
-
-/**
  * Cover options from a link's query (the HTTP API's). The app's link parameters are read as the
  * app reads them, the last of a repeated one too, except that a value the app would drop is an
  * error here. Also the library's option names (`titleCase`, `genre`, `lang`, `width`, `height`)
@@ -362,11 +395,11 @@ export function optionsFromLink(q) {
   const width = given('width') === undefined ? undefined : px('width', /** @type {string} */ (given('width')));
   const height = given('height') === undefined ? undefined : px('height', /** @type {string} */ (given('height')));
   const format = given('format');
+  // (Without a format, as given: the library makes a width or a height alone the paperback's shape.)
   if (format !== undefined) [o.width, o.height] = formatSize(format, width, height);
   else {
-    const size = shapelessSize(width, height);
-    if (size.width !== undefined) o.width = size.width;
-    if (size.height !== undefined) o.height = size.height;
+    if (width !== undefined) o.width = width;
+    if (height !== undefined) o.height = height;
   }
   const [bg, ink, accent] = [given('bg'), given('ink'), given('accent')];
   if (bg || ink || accent) {

@@ -1931,7 +1931,7 @@ input[type='number'][aria-invalid='true'] {
   box-shadow:
     0 0 0 1px var(--hairline),
     0 10px 24px -14px rgb(0 0 0 / 0.5);
-  aspect-ratio: 2 / 3;
+  /* (Its shape is the cover's, which <book-cover> holds itself, a design's own format too.) */
   background: var(--surface-2);
   transition: transform 0.15s ease;
 }

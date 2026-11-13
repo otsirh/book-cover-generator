@@ -9,9 +9,20 @@
 // measured with the built-in fonts' widths (src/metrics.js), as macOS draws them, so it can break
 // a little differently from the app on another system, which measures with its own fonts.
 
-import { createCover, createMockup, version } from '../src/index.js';
+import { createCover, createMockup, listStyles, version } from '../src/index.js';
 import { hex, slug } from '../src/shared.js';
-import { optionsFromLink, linkOf, LINK_FIELDS } from '../src/link.js';
+import {
+  optionsFromLink,
+  linkOf,
+  LINK_FIELDS,
+  readDesign,
+  wholeDesign,
+  designOptions,
+  lastValues,
+  writeLink,
+  variantOf,
+  pinsOf,
+} from '../src/link.js';
 import { answerOf, answerText, catalog } from '../src/mcp.js';
 import { escapeXml } from '../src/core.js';
 import { COVER_PIXELS, MOCKUP_PIXELS, SHADOWED_PIXELS, pngEngine } from './png.js';
@@ -125,16 +136,17 @@ const fileTitle = (kind, q, title) => (kind === 'cover' ? title : `${title} ${mo
  */
 function drawn(kind, q) {
   const cover = createCover(optionsFromLink(q));
-  if (kind === 'cover') return { cover, svg: cover.svg, width: cover.width, height: cover.height };
+  if (kind === 'cover') return { cover, svg: cover.svg, width: cover.width, height: cover.height, coverScale: 1 };
   const mockup = createMockup(cover, mockupOptions(q));
-  return { cover, svg: mockup.svg, width: mockup.width, height: mockup.height };
+  return { cover, svg: mockup.svg, width: mockup.width, height: mockup.height, coverScale: mockup.coverScale };
 }
 
 /** A mockup's options from a query: kind, text and background. @param {URLSearchParams} q */
 function mockupOptions(q) {
   const background = q.getAll('background').at(-1);
   return {
-    kind: /** @type {import('../src/index.js').MockupKind} */ (q.getAll('kind').at(-1) || 'book'),
+    // (In any case, as the API's other values.)
+    kind: /** @type {import('../src/index.js').MockupKind} */ (q.getAll('kind').at(-1)?.trim().toLowerCase() || 'book'),
     text: q.getAll('text').at(-1) ?? '',
     background: background ? hex(background) : undefined,
   };
@@ -320,19 +332,6 @@ function pngEngineFor(env, origin) {
 }
 
 /**
- * How many times its own size a mockup shows the cover at (the largest place it nests it).
- * @param {string} mockup the mockup's SVG @param {{ width: number, height: number }} cover
- */
-function shownAt(mockup, cover) {
-  const nests = mockup.matchAll(
-    new RegExp(`<svg [^>]*\\bwidth="([\\d.]+)" height="([\\d.]+)" viewBox="0 0 ${cover.width} ${cover.height}"`, 'g'),
-  );
-  let most = 0;
-  for (const [, w, h] of nests) most = Math.max(most, Number(w) / cover.width, Number(h) / cover.height);
-  return most || 1;
-}
-
-/**
  * Answer an API request for PNG (or say it isn't one: null): the cover drawn by resvg with open
  * fonts, laid out in their widths. `scale` (1 to 4) multiplies its size. Text in a script the
  * fonts lack (Chinese, Japanese, Arabic…) is refused (the SVG draws it), or, for a link preview
@@ -402,6 +401,8 @@ async function drawPng(request, env, url, kind) {
         'The PNG fonts have Latin, Greek and Cyrillic letters, not all of this text: ask for the SVG (cover.svg), which your fonts draw',
       ),
       422,
+      // (The design's and this deployment's fonts' answer: kept, so asking again costs nothing.)
+      { 'Cache-Control': 'public, max-age=86400' },
     );
   }
   let bytes;
@@ -446,7 +447,7 @@ function pngPlan(kind, q) {
   if (given !== null && !(given > 0 && given <= 4)) {
     throw new RangeError(`scale must be a number above 0, at most 4, got "${asked}"`);
   }
-  const { cover, svg, width, height } = drawn(kind, q);
+  const { cover, width, height, coverScale } = drawn(kind, q);
   // At its size, or smaller to fit (a large cover, a story); a scale asked for that can't fit is
   // refused. (Auto a hair under the limit, as resvg rounds the size.)
   const shadowed = kind === 'mockup' && /^(flat|ereader)$/.test(mockupOptions(q).kind);
@@ -464,10 +465,7 @@ function pngPlan(kind, q) {
   }
   if (kind === 'cover') return { scale, pictureScale: scale };
   // (The cover's picture at the size the mockup shows it, at most COVER_PIXELS.)
-  const pictureScale = Math.min(
-    scale * shownAt(svg, cover),
-    0.995 * Math.sqrt(COVER_PIXELS / (cover.width * cover.height)),
-  );
+  const pictureScale = Math.min(scale * coverScale, 0.995 * Math.sqrt(COVER_PIXELS / (cover.width * cover.height)));
   if (Math.round(cover.width * pictureScale) < 1 || Math.round(cover.height * pictureScale) < 1) {
     throw new RangeError(`scale ${scale} draws the cover in this mockup as nothing: ask for a larger scale`);
   }
@@ -490,15 +488,22 @@ export async function preview(request, env) {
   if (!page.ok) return page;
   let html = await page.text();
   let name = '';
+  /** @type {URLSearchParams | null} */
+  let link = null;
   try {
-    const cover = createCover(optionsFromLink(url.searchParams));
+    // The design as the app opens it (a value it would drop, dropped; only pins its style takes),
+    // and its link alone (not the page's other parameters) for the card's picture.
+    const design = wholeDesign(readDesign(lastValues(url.searchParams)));
+    const offered = listStyles().find((s) => s.id === design.style)?.variants ?? [];
+    const cover = createCover(designOptions(design, offered));
     name = `${cover.title.replace(/\n/g, ' ')}${cover.author ? ` by ${cover.author}` : ''}`;
+    link = writeLink({ ...design, variant: variantOf(pinsOf(design.variant, offered)) });
   } catch {
-    // A link the library refuses: the page as it is (the app says what's wrong).
+    // A design the library can't draw: the page as it is.
   }
-  if (name) {
+  if (name && link) {
     const image = new URL('/api/mockup.png', url);
-    image.search = url.search;
+    image.search = link.toString();
     image.searchParams.set('kind', 'card');
     image.searchParams.set('preview', '1');
     /** @param {RegExp} re @param {string} value */

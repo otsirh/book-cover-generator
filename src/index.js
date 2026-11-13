@@ -461,8 +461,18 @@ export function createCover(options = {}) {
   const series = cleanText(options.series, 120);
   const credit = cleanText(options.credit, 120);
   const badge = cleanText(options.badge, 60);
-  const W = dimension(options.width, 600, 'width');
-  const H = dimension(options.height, W * 1.5, 'height');
+  // A width alone gives the paperback's shape (2:3), and so does a height alone.
+  /** @param {unknown} v */
+  const unset = (v) => v == null || v === '';
+  const heightAlone = unset(options.width) && !unset(options.height);
+  const H0 = heightAlone ? dimension(options.height, 900, 'height') : 0;
+  if (heightAlone && Math.round(H0 / 1.5) < sizeLimits.min) {
+    throw new RangeError(
+      `height ${H0} makes a paperback ${Math.round(H0 / 1.5)} px wide, under ${sizeLimits.min}: give a taller height, or a width too`,
+    );
+  }
+  const W = heightAlone ? Math.round(H0 / 1.5) : dimension(options.width, 600, 'width');
+  const H = heightAlone ? H0 : dimension(options.height, W * 1.5, 'height');
   const lang = resolveLang(options.lang, `${title} ${subtitle} ${author} ${series} ${credit} ${badge}`);
   const { ratio } = sizeLimits;
   if (W / H > ratio || H / W > ratio) {
@@ -615,9 +625,19 @@ export function optionsForBook(listed, defaults = {}) {
     // (As a style picked at random takes them: a value no style offers still throws.)
     variants = shared !== undefined ? {} : ownEntry ? pinnedVariants(variants, ownEntry, false) : variants;
   }
+  // A book's own width or height alone sizes the shared shape (an ebook's, say), or the paperback's.
+  const [dw, dh] = [Number(defaults.width), Number(defaults.height)];
+  const shaped = dw > 0 && dh > 0;
+  /** @type {{ width?: number, height?: number }} */
+  let size = {};
+  if (book.width !== undefined || book.height !== undefined) {
+    size = { width: undefined, height: undefined };
+    if (shaped && book.height === undefined) size.height = Math.round((Number(book.width) * dh) / dw);
+    if (shaped && book.width === undefined) size.width = Math.round((Number(book.height) * dw) / dh);
+  }
   return {
     ...defaults,
-    ...(book.width !== undefined || book.height !== undefined ? { width: undefined, height: undefined } : {}),
+    ...size,
     ...(variants !== defaults.variants ? { variants } : {}),
     ...(ownGenre ? { style: 'random', variants: {} } : {}),
     ...book,

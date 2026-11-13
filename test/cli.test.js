@@ -506,5 +506,5 @@ test('--height alone keeps the paperback shape, as --width alone does', async ()
 test('--height alone too small for a paperback says so of the height', async () => {
   const { code, stderr } = await cli('Dune', '--height', '60');
   assert.equal(code, 1);
-  assert.match(stderr, /--height 60 makes a paperback 40 px wide, under 50/);
+  assert.match(stderr, /height 60 makes a paperback 40 px wide, under 50/);
 });

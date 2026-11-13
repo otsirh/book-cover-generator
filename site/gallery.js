@@ -21,6 +21,7 @@ const DRAWN = {
   font: 'font',
   case: 'case',
   lang: 'lang',
+  format: 'format',
 };
 
 const design = new URLSearchParams(location.hash.slice(1));

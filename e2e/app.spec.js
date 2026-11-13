@@ -1143,7 +1143,17 @@ test('a design’s link shows that design in link previews, a PNG the site draws
   const query = 'title=Dune&author=Frank+Herbert&style=retro&seed=s';
   const html = await (await request.get(`/?${query}`)).text();
   const image = /<meta property="og:image" content="([^"]+)"/.exec(html)?.[1]?.replaceAll('&amp;', '&');
-  expect(image).toMatch(/\/api\/mockup\.png\?title=Dune&author=Frank\+Herbert&style=retro&seed=s&kind=card&preview=1$/);
+  // (The design's own link, as the app writes it, as a card.)
+  const card = new URL(/** @type {string} */ (image));
+  expect(card.pathname).toBe('/api/mockup.png');
+  expect(Object.fromEntries(card.searchParams)).toMatchObject({
+    title: 'Dune',
+    author: 'Frank Herbert',
+    style: 'retro',
+    seed: 's',
+    kind: 'card',
+    preview: '1',
+  });
   const png = await request.get(
     new URL(/** @type {string} */ (image)).pathname + new URL(/** @type {string} */ (image)).search,
   );
@@ -2633,4 +2643,17 @@ test('a link to a design this tab showed before opens that design, not the lates
   // …a new step after the latest: Undo goes back to it.
   await page.locator('#undo').click();
   await selected(page, 'bauhaus');
+});
+
+test('the gallery shows your design in its own shape, as each cover opens it', async ({ page }) => {
+  await page.goto('/gallery/#title=Square+Book&style=minimal&format=square');
+  const cover = page.locator('a[data-style="swiss"] book-cover');
+  await expect(cover).toHaveAttribute('format', 'square');
+  await cover.scrollIntoViewIfNeeded();
+  await expect
+    .poll(async () => {
+      const box = await cover.boundingBox();
+      return box ? Math.round((box.height / box.width) * 100) / 100 : 0;
+    })
+    .toBe(1);
 });

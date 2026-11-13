@@ -41,6 +41,7 @@ import {
   readDesign,
   pinsOf,
   formatSize,
+  designOptions,
 } from '../src/link.js';
 import { registerServiceWorker } from './offline.js';
 
@@ -515,31 +516,8 @@ function update(change, kind = 'discrete') {
 
 /** Cover options for a design. @param {Design} d @param {Partial<import('../src/index.js').CoverOptions>} [extra] */
 function optionsFor(d, extra = {}) {
-  const [width, height] = sizeOf(d.format);
-  const colors = customColors(d.palette);
-  return {
-    title: d.title,
-    author: d.author,
-    subtitle: d.subtitle,
-    series: d.series,
-    credit: d.credit,
-    badge: d.badge,
-    style: d.style,
-    palette: colors
-      ? { bg: colors[0], ink: colors[1], accents: colors.slice(2) }
-      : d.palette === 'auto'
-        ? 'random'
-        : d.palette,
-    seed: d.seed,
-    texture: d.texture,
-    variants: pinsFor(d.variant, extra.style ?? d.style),
-    font: d.font || undefined,
-    titleCase: /** @type {'upper' | 'normal' | undefined} */ (d.case || undefined),
-    lang: d.lang || undefined,
-    width,
-    height,
-    ...extra,
-  };
+  const style = extra.style ?? d.style;
+  return designOptions(d, STYLES.find((s) => s.id === style)?.variants ?? [], extra);
 }
 
 /** Cover options for the current design. @param {Partial<import('../src/index.js').CoverOptions>} [extra] */
