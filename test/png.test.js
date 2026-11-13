@@ -363,3 +363,11 @@ test(
     }
   },
 );
+
+test('in the PNG fonts, characters that draw nothing take no room', { skip }, () => {
+  const font = { family: FONTS.sans.family };
+  const plain = engine.fonts.measure('AB', 100, font);
+  for (const invisible of ['⁠', '️', '​', '­']) {
+    assert.equal(engine.fonts.measure(`A${invisible}B`, 100, font), plain, invisible.codePointAt(0)?.toString(16));
+  }
+});

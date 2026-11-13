@@ -3,6 +3,9 @@
 // themselves (public/fonts), so the Worker lays text out in the faces resvg then draws it in.
 // Plain JavaScript, no DOM: Node tests it with the same files.
 
+/** A character that draws nothing (Unicode's default ignorables: joiners, soft hyphens, variation selectors…). */
+const INVISIBLE = /^\p{Default_Ignorable_Code_Point}$/u;
+
 /** The fonts in public/fonts the Worker loads: open faces the built-in stacks name. */
 export const FONT_FILES = [
   'NotoSerif-Regular.ttf',
@@ -249,6 +252,8 @@ export function fontSet(faces) {
       const face = faceFor(family, weight, italic, text);
       let width = 0;
       for (const ch of text) {
+        // (A character that draws nothing takes no room, whatever glyph a face gives it.)
+        if (INVISIBLE.test(ch)) continue;
         const cp = /** @type {number} */ (ch.codePointAt(0));
         let f = face;
         let g = face.glyph(cp);

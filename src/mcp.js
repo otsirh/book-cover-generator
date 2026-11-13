@@ -13,7 +13,7 @@ import {
   sizeLimits,
   version,
 } from './index.js';
-import { optionsFromLink, linkOf, sixDigits } from './link.js';
+import { optionsFromLink, linkOf } from './link.js';
 import { mockupText } from './mockups.js';
 import { idFor, fontEntries } from './shared.js';
 
@@ -189,10 +189,10 @@ function queryFrom(args) {
     if (!Array.isArray(colors.accents) || colors.accents.length < 1 || colors.accents.length > 3) {
       throw new RangeError('colors.accents is a list of one to three colours');
     }
-    // (Each as #rrggbb, as the link of the cover will write it: the two draw the same bytes.)
-    q.set('bg', sixDigits(String(colors.bg ?? '')));
-    q.set('ink', sixDigits(String(colors.ink ?? '')));
-    q.set('accent', colors.accents.map((c) => sixDigits(String(c))).join(','));
+    // (The link reader writes each as #rrggbb, as the cover's link does: the two draw the same bytes.)
+    q.set('bg', String(colors.bg ?? ''));
+    q.set('ink', String(colors.ink ?? ''));
+    q.set('accent', colors.accents.map((c) => String(c)).join(','));
   }
   return q;
 }

@@ -31,7 +31,10 @@ export function openapi(base) {
       type: 'string',
       examples: [...styles.map((s) => s.id), 'random'],
     }),
-    param('genre', 'With no style: a style for this genre.', { type: 'string', enum: genres.map((g) => g.id) }),
+    param('genre', 'With no style: a style for this genre, by id or name in any case.', {
+      type: 'string',
+      examples: genres.map((g) => g.id),
+    }),
     param(
       'variant',
       'Choices the style lets you pin (/api/catalog.json lists them): name.value pairs joined by "-", such as scene.forest.',
@@ -44,11 +47,14 @@ export function openapi(base) {
     param('bg', 'Your own colours, with ink and accent: the background, as hex (# optional).'),
     param('ink', 'Your own colours: the text colour, as hex.'),
     param('accent', 'Your own colours: one to three accent colours, as hex, separated by commas.'),
-    param('font', "The title's font, by id or name (default: the style's own).", {
+    param('font', "The title's font, by id or name in any case (default: the style's own).", {
       type: 'string',
-      enum: fonts.map((f) => f.id),
+      examples: fonts.map((f) => f.id),
     }),
-    param('case', "The title's case (default: the style's own).", { type: 'string', enum: ['upper', 'normal'] }),
+    param('case', "The title's case, upper or normal, in any case (default: the style's own).", {
+      type: 'string',
+      examples: ['upper', 'normal'],
+    }),
     param('seed', 'Any text: the same seed draws the same cover. Default: from the title and author.'),
     param(
       'format',
@@ -65,7 +71,10 @@ export function openapi(base) {
       minimum: sizeLimits.min,
       maximum: sizeLimits.max,
     }),
-    param('texture', 'Paper grain: 1 (on) or 0 (off).', { type: 'string', enum: ['0', '1'] }),
+    param('texture', 'Paper grain: 1 or true (on), 0 or false (off).', {
+      type: 'string',
+      examples: ['1', '0', 'true', 'false'],
+    }),
     param('lang', "The text's language (BCP 47), for its capitals, such as tr."),
   ];
   const mockup = [

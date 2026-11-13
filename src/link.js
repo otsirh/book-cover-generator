@@ -16,7 +16,6 @@ import {
   VARIANT,
   LANG_TAG,
   customColors,
-  hex,
 } from './shared.js';
 
 /** Line breaks as spaces (a single-line field: the cover spaces them). @param {unknown} v */
@@ -150,8 +149,10 @@ export function writeLink(design) {
 export function linkOf(options, cover) {
   /** @type {Record<string, string>} */
   const pinned = {};
+  // (Names and values in lower case, as links hold them: the library reads them in any case.)
   for (const name of Object.keys(options.variants ?? {}).map((n) => n.toLowerCase())) {
-    if (Object.hasOwn(cover.variants, name)) pinned[name] = cover.variants[name];
+    const key = Object.keys(cover.variants).find((k) => k.toLowerCase() === name);
+    if (key !== undefined) pinned[name] = String(cover.variants[key]).toLowerCase();
   }
   const own = options.palette && typeof options.palette === 'object' ? options.palette : null;
   const preset = Object.entries(formats).find(([, [w, h]]) => w === cover.width && h === cover.height);
@@ -311,15 +312,16 @@ export function optionsFromLink(q) {
   const [bg, ink, accent] = [given('bg'), given('ink'), given('accent')];
   if (bg || ink || accent) {
     if (!bg || !ink || !accent) throw new RangeError('Your own colours need bg, ink and accent');
+    // (Each as #rrggbb, as a link writes it: the query and its link draw the same bytes.)
     const accents = accent
       .split(',')
       .filter((c) => c.trim())
-      .map(hex);
+      .map(sixDigits);
     // (As many as a link's palette holds: custom-… has one to three.)
     if (accents.length < 1 || accents.length > 3) {
       throw new RangeError(`accent is one to three colours, separated by commas; got ${accents.length}`);
     }
-    o.palette = { bg: hex(bg), ink: hex(ink), accents };
+    o.palette = { bg: sixDigits(bg), ink: sixDigits(ink), accents };
   }
   return /** @type {import('./index.js').CoverOptions} */ (o);
 }

@@ -256,8 +256,6 @@ export function unregisterStyle(id) {
   return true;
 }
 
-/** Palette ids that mean something else. */
-
 /**
  * Register a palette, so `palette: id` uses it (and `'random'` can pick it). Replacing a
  * built-in palette takes `{ replace: true }`.

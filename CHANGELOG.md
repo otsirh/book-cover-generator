@@ -32,6 +32,9 @@ All notable changes to this project are documented here. The format follows [Kee
 - A PNG resvg stops on no longer stops the site's other PNGs: the Worker starts a new resvg for the next one (its own copy of resvg's glue, `worker/resvg-glue.js`, made by `scripts/vendor-resvg.js`).
 - A link preview's picture is the site's own image whenever the design's can't be drawn (the crawler asked too much, or resvg failed), never an error.
 - The gallery reads the design you bring as the app does (the last of a repeated value; `texture=false` is off).
+- Many covers draws each book with its own text: the design on show lends its look, but no longer its subtitle, series, credit or badge, to books that don't have their own.
+- Text with characters that draw nothing (soft hyphens, zero-width spaces, word joiners) is measured as it's drawn, without room for them, in Node, the CLI and the HTTP API, SVG and PNG.
+- Your own colours in the HTTP API's query are read as a link writes them (`bg=000` as `#000000`), so `/api/cover.json`'s link draws the very bytes the query does; a registered style's pin named in capitals stays in the links the MCP server and `cover.json` write.
 - A kept design's snapshot that isn't of the design's size (from a file made elsewhere) is drawn again from the design, so its thumbnail and Download all show the design.
 - Aurora's title and author keep 3:1 against what is drawn behind them: each colour field kept it alone, but blurred fields add up where they overlap (two covers in five had a fifth of a line's outline under 3:1, down to 1.7:1). Where they would, a soft field of the background goes under that text, only as strong as it needs.
 - Blueprint no longer shrinks its title to make room for a subtitle (from 54 to 29 px on a 600 × 900 cover): on tall and square covers the title block grows into the drawing's room instead, and for a long title too.

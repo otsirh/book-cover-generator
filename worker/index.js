@@ -269,7 +269,11 @@ let engine = null;
  */
 async function retire(drawer) {
   const held = engine;
-  if (held && (await held) === drawer && engine === held) engine = null;
+  try {
+    if (held && (await held) === drawer && engine === held) engine = null;
+  } catch {
+    // (The engine on hand failed to start: pngEngineFor has let it go already.)
+  }
 }
 
 /** The site's font files, read once for every engine. @type {Map<string, Promise<Uint8Array>>} */

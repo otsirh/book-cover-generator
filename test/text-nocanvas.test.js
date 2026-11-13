@@ -68,3 +68,14 @@ test('every built-in font stack has measured widths for every character', async 
     for (const table of [...m.upright, ...m.italic]) assert.equal(table.length, [...CHARS].length * 2);
   }
 });
+
+test('characters that draw nothing take no room where text is measured without a canvas', () => {
+  const plain = measureText('Donaudampfschiff', 100, { font: FONTS.serif });
+  for (const invisible of ['­', '​', '⁠', '‎', '﻿']) {
+    assert.equal(
+      measureText(`Donau${invisible}dampf${invisible}schiff`, 100, { font: FONTS.serif }),
+      plain,
+      invisible.codePointAt(0)?.toString(16),
+    );
+  }
+});

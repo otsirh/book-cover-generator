@@ -45,7 +45,8 @@ test('every option the library has, by name', () => {
     titleCase: 'upper',
     texture: true,
     variants: { field: 'pale', emblem: 'sun' },
-    palette: { bg: '#fff', ink: '#000', accents: ['#f00', '#0f0'] },
+    // (Each colour as #rrggbb, as the cover's link writes it.)
+    palette: { bg: '#ffffff', ink: '#000000', accents: ['#ff0000', '#00ff00'] },
   });
 });
 
@@ -628,4 +629,38 @@ test('a link names its language, and the app’s link reader takes it (and only 
     () => optionsFromLink(new URLSearchParams(`title=x&lang=en-${'a'.repeat(40)}`)),
     /lang must be a language tag/,
   );
+});
+
+test('cover.json’s link draws the very bytes its query does, colours of three digits too', async () => {
+  const { info } = await import('../worker/index.js');
+  const query = 'title=Dune&bg=000&ink=FFF&accent=f00&seed=c';
+  const res = /** @type {Response} */ (info(new Request(`https://covers.example/api/cover.json?${query}`)));
+  const { link } = await res.json();
+  assert.equal(new URLSearchParams(link).get('palette'), 'custom-000000-ffffff-ff0000');
+  const direct = await /** @type {Response} */ (get(`/api/cover.svg?${query}`)).text();
+  const linked = await /** @type {Response} */ (get(`/api/cover.svg?${link}`)).text();
+  assert.equal(linked, direct);
+});
+
+test('a pin of a registered style named in capitals stays in the link, as links hold names', async () => {
+  const { registerStyle, unregisterStyle } = await import('../src/index.js');
+  const { linkOf } = await import('../src/link.js');
+  registerStyle({
+    id: 'camel-test',
+    name: 'Camel test',
+    group: 'Test',
+    description: 'A test style.',
+    variants: { bigSky: { values: { yes: 'Yes', noWay: 'No way' } } },
+    render: (/** @type {any} */ c) =>
+      `<rect width="${c.W}" height="${c.H}" fill="${c.choose('bigSky', ['yes', 'noWay']) === 'yes' ? c.p.bg : c.p.ink}"/>`,
+  });
+  try {
+    const options = { title: 'T', style: 'camel-test', seed: 's', variants: { bigSky: 'noWay' } };
+    const cover = createCover(options);
+    assert.equal(new URLSearchParams(linkOf(options, cover)).get('variant'), 'bigsky.noway');
+    // …which draws that pin again.
+    assert.deepEqual(createCover(optionsFromLink(linkOf(options, cover))).variants, cover.variants);
+  } finally {
+    unregisterStyle('camel-test');
+  }
 });

@@ -2058,7 +2058,9 @@ function listedBooks() {
  * @param {Design} [d] @param {boolean} [own]
  */
 function bookOptions(book, i, d = design, own = /** @type {HTMLInputElement} */ ($('many-palettes')).checked) {
-  const base = optionsFor({ ...d, title: '', author: '' });
+  // (The design's look for every book; its text is the book's own: one book's subtitle, series,
+  // credit or badge isn't another's.)
+  const base = optionsFor({ ...d, title: '', author: '', subtitle: '', series: '', credit: '', badge: '' });
   const start = Math.max(
     0,
     palettes.findIndex((p) => p.id === d.palette),

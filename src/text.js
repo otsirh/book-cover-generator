@@ -139,6 +139,9 @@ function latinWidth(ch) {
   return 0.54;
 }
 
+/** Text of characters that draw nothing (Unicode's default ignorables), as browsers and resvg draw them. */
+const INVISIBLE = /^\p{Default_Ignorable_Code_Point}+$/u;
+
 /** Where each measured character is in a table. */
 const CHAR_INDEX = new Map([...CHARS].map((ch, i) => [ch, i]));
 /** @typedef {{ upright: Float64Array[], italic: Float64Array[] }} WidthTables */
@@ -179,6 +182,8 @@ function heuristicWidth(text, spec) {
     : null;
   let w = 0;
   for (const g of graphemes(text)) {
+    // (Characters that draw nothing: soft hyphens, zero-width spaces and joiners, marks of direction.)
+    if (INVISIBLE.test(g)) continue;
     if (FULL_WIDTH.test(g)) w += 1;
     else if (spec.font.mono) w += 0.6;
     else {
@@ -323,7 +328,6 @@ function referenceWidth(text, spec) {
       w = c.measureText(text).width;
     } else w = heuristicWidth(text, spec) * REFERENCE;
   }
-  if (widths.size > 20000) widths.clear();
   widths.set(text, w);
   return w;
 }
