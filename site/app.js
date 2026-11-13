@@ -1798,7 +1798,8 @@ const drawingOf = (svg) => svg.replace(/\bbc[0-9a-z]+-/g, 'bc-');
 /** Open a kept design, saying so when this version draws it differently from the kept SVG. @param {Kept} k */
 function openKept(k) {
   update({ ...k.design });
-  if (k.svg && drawingOf(createCover(optionsFor(k.design)).svg) !== drawingOf(k.svg)) {
+  // (Opened, it is the design on show: drawn just now, as `current`.)
+  if (k.svg && drawingOf(current.svg) !== drawingOf(k.svg)) {
     toast('This version draws it a little differently. Download all saves it as kept.');
   }
 }
@@ -2304,8 +2305,8 @@ function printColourMenus() {
  * @param {Design} d @param {PrintSettings} settings @param {boolean} guides
  */
 function printCoverOf(d, settings, guides) {
-  // (The colours of the design drawn, not of the one on show: the same today, as callers pass it.)
-  const { colors } = createCover(optionsFor(d));
+  // (The colours of the design drawn: the one on show's, drawn already, unless it's another.)
+  const { colors } = toHash(d) === toHash(design) ? current : createCover(optionsFor(d));
   return createPrintCover(optionsFor(d), {
     trim: settings.trim,
     pages: settings.pages,

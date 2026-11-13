@@ -395,19 +395,14 @@ async function drawPng(request, env, url, kind) {
   let drawer;
   try {
     drawer = await pngEngineFor(env, url.origin);
+    // (An engine whose resvg trapped on an earlier drawing draws no more: a new one takes its place.)
+    if (drawer.trapped) {
+      await retire(drawer);
+      drawer = await pngEngineFor(env, url.origin);
+    }
   } catch (err) {
     console.error(err);
     return refusal(new Error(`PNG covers are unavailable just now: ask for the SVG (${kind}.svg)`), 503);
-  }
-  // (An engine whose resvg trapped on an earlier drawing draws no more: a new one takes its place.)
-  if (drawer.trapped) {
-    await retire(drawer);
-    try {
-      drawer = await pngEngineFor(env, url.origin);
-    } catch (err) {
-      console.error(err);
-      return refusal(new Error(`PNG covers are unavailable just now: ask for the SVG (${kind}.svg)`), 503);
-    }
   }
   const { scale, pictureScale } = plan;
   // The design again, laid out in the PNG fonts (the same size: text never changes it).

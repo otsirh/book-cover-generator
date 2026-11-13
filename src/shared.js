@@ -146,11 +146,18 @@ export function joinBytes(parts) {
  */
 export function scaleWithin(w, h, most, wanted, { round = Math.round, step = 0 } = {}) {
   const fits = (/** @type {number} */ s) => round(w * s) * round(h * s) <= most;
-  let s = Math.min(wanted, Math.sqrt(most / (w * h)));
-  if (step) s = Math.floor(s / step) * step;
-  while (s > 0 && !fits(s)) s = step ? Math.round((s - step) / step) * step : s * 0.999;
-  // (Without a float's noise, 3.51 not 3.5100000000000002, rounded down: never past the fit.)
-  return Math.max(Math.floor(s * 1e9) / 1e9, 0);
+  const best = Math.min(wanted, Math.sqrt(most / (w * h)));
+  if (step) {
+    // In whole steps, each the very number it says (2.09, not 2.0899999999999999), and checked as it is.
+    const places = Math.max(0, Math.ceil(-Math.log10(step)));
+    const at = (/** @type {number} */ k) => Number((k * step).toFixed(places));
+    let k = Math.floor(best / step + 1e-9);
+    while (k > 0 && !fits(at(k))) k--;
+    return Math.max(at(k), 0);
+  }
+  let s = best;
+  while (s > 0 && !fits(s)) s *= 0.999;
+  return Math.max(s, 0);
 }
 
 /**

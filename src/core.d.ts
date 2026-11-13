@@ -148,7 +148,11 @@ export declare function shadowFilter(
  * around it instead (in user space): for a blurred group that spans the cover, which then costs a
  * renderer less memory than room around the group's own box.
  */
-export declare function blurFilter(id: string, std: number, canvas?: { width: number; height: number }): string;
+export declare function blurFilter(
+  id: string,
+  std: number,
+  canvas?: { width: number; height: number; x?: number; y?: number },
+): string;
 
 /** `[offset 0–1, colour, opacity?]` */
 export type GradientStop = readonly [offset: number, color: string, opacity?: number];

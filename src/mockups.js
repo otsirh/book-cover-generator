@@ -1,7 +1,7 @@
 // Mockups: a cover shown as a product (a flat shot, a book, an e-reader) or on a social card,
 // for listings and cover reveals. Each is an SVG with the cover nested in it.
 
-import { n, mix, escapeXml, hashString, contrast, readable, isHex, shadowFilter } from './core.js';
+import { n, mix, escapeXml, hashString, contrast, readable, isHex, shadowFilter, blurFilter } from './core.js';
 import { FONTS, fitText, drawText, textBottom, clipGraphemes } from './text.js';
 
 /** The kinds of mockup, with the size of each (or how it follows the cover's). */
@@ -73,7 +73,9 @@ export function createMockup(cover, { kind: named = 'book', background: given, t
     typeof cover.title !== 'string' ||
     typeof cover.svg !== 'string' ||
     !cover.colors ||
-    typeof cover.colors.bg !== 'string'
+    typeof cover.colors.bg !== 'string' ||
+    typeof cover.colors.ink !== 'string' ||
+    !Array.isArray(cover.colors.accents)
   ) {
     throw new TypeError('createMockup: pass a cover from createCover');
   }
@@ -139,11 +141,19 @@ export function createMockup(cover, { kind: named = 'book', background: given, t
     const y0 = pad + CW * rise;
     const u = Math.min(CW, CH) / 600;
     const spineFill = mix(colors.bg, '#000000', 0.32);
+    /** The shadow on the floor, under the book. */
+    const floor = {
+      cx: x0 + (CW * turn) / 2,
+      cy: y0 + CH - CW * rise * 0.3,
+      rx: (CW * turn) / 2 + spine,
+      ry: CW * 0.035,
+    };
     const sag = spine * 0.32;
     return wrap(
       W,
       H,
-      `<defs>${shadow(id('soft'), 22 * u, 0, 1)}` +
+      // (The floor's shadow is the ellipse blurred alone, over its own box and all of the blur's reach.)
+      `<defs>${blurFilter(id('soft'), 16 * u, { x: floor.cx - floor.rx, y: floor.cy - floor.ry, width: floor.rx * 2, height: floor.ry * 2 })}` +
         `<linearGradient id="${id('gloss')}" x1="0" y1="0" x2="1" y2="0">` +
         `<stop offset="0" stop-color="#000" stop-opacity="0.28"/><stop offset="0.04" stop-color="#fff" stop-opacity="0.16"/>` +
         `<stop offset="0.09" stop-color="#000" stop-opacity="0.05"/><stop offset="0.6" stop-color="#fff" stop-opacity="0"/>` +
@@ -153,7 +163,7 @@ export function createMockup(cover, { kind: named = 'book', background: given, t
         `<stop offset="1" stop-color="#000" stop-opacity="0.25"/></linearGradient></defs>` +
         `<rect width="${n(W)}" height="${n(H)}" fill="${background ?? STUDIO}"/>` +
         // The shadow on the floor.
-        `<ellipse cx="${n(x0 + (CW * turn) / 2)}" cy="${n(y0 + CH - CW * rise * 0.3)}" rx="${n((CW * turn) / 2 + spine)}" ry="${n(CW * 0.035)}" fill="#000" opacity="0.28" filter="url(#${id('soft')})"/>` +
+        `<ellipse cx="${n(floor.cx)}" cy="${n(floor.cy)}" rx="${n(floor.rx)}" ry="${n(floor.ry)}" fill="#000" opacity="0.5" filter="url(#${id('soft')})"/>` +
         `<polygon points="${n(x0 - spine)},${n(y0 + sag)} ${n(x0)},${n(y0)} ${n(x0)},${n(y0 + CH)} ${n(x0 - spine)},${n(y0 + CH - sag)}" fill="${spineFill}"/>` +
         `<polygon points="${n(x0 - spine)},${n(y0 + sag)} ${n(x0)},${n(y0)} ${n(x0)},${n(y0 + CH)} ${n(x0 - spine)},${n(y0 + CH - sag)}" fill="url(#${id('spine')})"/>` +
         `<g transform="matrix(${turn} ${-rise} 0 1 ${n(x0)} ${n(y0)})">${place(0, 0, CW, CH)}` +

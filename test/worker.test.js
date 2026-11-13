@@ -822,6 +822,11 @@ test('scaleWithin: a scale whose rounded sides stay within the pixels, and the P
   const suggested = scaleWithin(127, 381, 600_000, 4, { round: Math.ceil, step: 0.01 });
   assert.ok(Math.ceil(127 * suggested) * Math.ceil(381 * suggested) <= 600_000);
   assert.equal(String(suggested), '3.51');
+  // (In whole steps, each the very number it says: 2.09, not 2.089999999.)
+  const square = scaleWithin(370, 370, 600_000, 4, { round: Math.ceil, step: 0.01 });
+  assert.equal(String(square), '2.09');
+  assert.ok(Math.ceil(370 * square) ** 2 <= 600_000);
+  assert.equal(scaleWithin(100, 100, 841, 1, { step: 0.01 }), 0.29);
   // (Never past the fit by rounding its last digits: sizes where that once happened.)
   for (const [w, h, most] of [
     [1689, 2815, 600_000],
@@ -855,4 +860,18 @@ test('createMockup says to pass a cover, of anything that isn’t a whole one', 
     () => createMockup(/** @type {any} */ ({ width: 600, height: 900, body: '<rect/>' }), { kind: 'flat' }),
     /pass a cover from createCover/,
   );
+  const cover = createCover({ title: 'Dune' });
+  for (const colors of [{ bg: '#ffffff' }, { bg: '#ffffff', ink: '#000000' }]) {
+    assert.throws(
+      () => createMockup(/** @type {any} */ ({ ...cover, colors }), { kind: 'card', text: 'Out now' }),
+      /pass a cover from createCover/,
+    );
+  }
+});
+
+test('the book’s floor shadow is its ellipse blurred alone, in a region of its own reach', () => {
+  const { svg } = createMockup(createCover({ title: 'Dune' }), { kind: 'book' });
+  const soft = /<filter id="[^"]*-soft"[^>]*>[\s\S]*?<\/filter>/.exec(svg)?.[0] ?? '';
+  assert.match(soft, /filterUnits="userSpaceOnUse"/);
+  assert.doesNotMatch(soft, /SourceGraphic/, 'no hard ellipse drawn back over the blur');
 });
