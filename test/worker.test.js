@@ -212,6 +212,7 @@ test('the app’s format and texture readers: presets, sizes it can make, on and
 const noResvg = (await import('@resvg/resvg-wasm').then(() => false).catch(() => true))
   ? 'resvg is a dev dependency: run npm ci'
   : false;
+if (noResvg && process.env.REQUIRE_RESVG) throw new Error('REQUIRE_RESVG: @resvg/resvg-wasm is not installed');
 
 /** The site's files as the Worker's ASSETS binding gives them, and resvg's WebAssembly (Node can't import it). */
 const siteEnv = async () => {
@@ -253,17 +254,33 @@ test(
     assert.equal(cover.headers.get('x-cover-style'), 'retro');
     assert.equal(cover.headers.get('access-control-allow-origin'), '*');
     assert.deepEqual(await size(cover), [600, 900]);
-    assert.deepEqual(await size(await fetchPath('/api/cover.png?title=Dune&scale=2&format=square')), [1200, 1200]);
+    assert.deepEqual(await size(await fetchPath('/api/cover.png?title=Dune&scale=1.2&format=square')), [720, 720]);
     assert.deepEqual(await size(await fetchPath('/api/mockup.png?title=Dune&kind=card')), [1200, 630]);
+    // A story at its full size: a mockup shows the cover as a picture drawn first, so it costs little.
+    assert.deepEqual(await size(await fetchPath('/api/mockup.png?title=Dune&kind=story')), [1080, 1920]);
     assert.equal(await (await fetchPath('/api/cover.png?title=Dune', 'HEAD')).text(), '');
-    // What isn't drawn: a scale out of range, too many pixels, a bad option, text the fonts lack.
+    // A large cover is drawn smaller, to fit 600,000 pixels (resvg's memory in a Worker).
+    const [w, h] = await size(await fetchPath('/api/cover.png?title=Dune&width=1600&height=2560'));
+    assert.ok(w * h <= 600_000 && w * h > 590_000 && Math.abs(w / h - 1600 / 2560) < 0.01, `${w} × ${h}`);
+    // Designs resvg 2.6 once stopped on (opacity under a blur): drawn.
+    for (const path of [
+      '/api/cover.png?title=Dune&author=Frank+Herbert&style=aurora&seed=s',
+      '/api/mockup.png?title=Dune&style=retro',
+      '/api/mockup.png?title=Dune&style=hollow&kind=flat&seed=d',
+    ]) {
+      assert.equal((await fetchPath(path)).status, 200, path);
+    }
+    // What isn't drawn: a scale out of range or too large, a bad option, text the fonts lack.
     assert.match(
       await (await fetchPath('/api/cover.png?title=Dune&scale=9')).text(),
-      /scale must be a number from 1 to 4/,
+      /scale must be a number above 0, at most 4/,
     );
-    const big = await fetchPath('/api/cover.png?title=Dune&width=4000&height=6000');
+    const big = await fetchPath('/api/cover.png?title=Dune&scale=2');
     assert.equal(big.status, 400);
-    assert.match(await big.text(), /at most 16777216 pixels/);
+    assert.match(
+      await big.text(),
+      /A cover PNG has at most 600000 pixels; 1200 × 1800 is more: ask for a scale up to 1\.05/,
+    );
     assert.equal((await fetchPath('/api/cover.png?title=Dune&style=nope')).status, 400);
     const japanese = await fetchPath(`/api/cover.png?title=${encodeURIComponent('灯台守')}`);
     assert.equal(japanese.status, 422);
@@ -285,7 +302,8 @@ test('a design’s link (/?title=…) gets its own link preview; the site’s he
   );
   assert.equal(res.status, 200);
   const html = await res.text();
-  assert.match(html, /<title>Dune by Frank Herbert · Book Cover Generator<\/title>/);
+  // (The page's own title stays the app's: the design changes as soon as it opens.)
+  assert.match(html, /<title>Book Cover Generator: covers from a title and an author<\/title>/);
   assert.match(html, /<meta property="og:title" content="Dune by Frank Herbert"/);
   assert.match(
     html,
@@ -303,7 +321,7 @@ test('a design’s link (/?title=…) gets its own link preview; the site’s he
   const marked = await (
     await worker.fetch(new Request('https://covers.example/?title=%3Cb%3E%22x%22'), env, { waitUntil() {} })
   ).text();
-  assert.match(marked, /<title>&lt;b&gt;&quot;x&quot; · Book Cover Generator<\/title>/);
+  assert.match(marked, /<meta property="og:title" content="&lt;b&gt;&quot;x&quot;"/);
   const refused = await (
     await worker.fetch(new Request('https://covers.example/?title=X&style=nope'), env, { waitUntil() {} })
   ).text();

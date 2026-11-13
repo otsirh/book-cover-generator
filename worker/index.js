@@ -12,7 +12,7 @@ import { hex } from '../src/shared.js';
 import { optionsFromLink } from '../src/link.js';
 import { answerPayload } from '../src/mcp.js';
 import { escapeXml } from '../src/core.js';
-import { MAX_PIXELS, pngEngine } from './png.js';
+import { COVER_PIXELS, MOCKUP_PIXELS, pngEngine } from './png.js';
 
 /**
  * The site's headers (public/_headers, /*), for the pages the Worker answers itself: the static
@@ -79,13 +79,25 @@ const refusal = (err, status = 400) =>
 function drawn(kind, q) {
   const cover = createCover(optionsFromLink(q));
   if (kind === 'cover') return { cover, svg: cover.svg, width: cover.width, height: cover.height };
+  const mockup = createMockup(cover, mockupOptions(q));
+  return { cover, svg: mockup.svg, width: mockup.width, height: mockup.height };
+}
+
+/** A mockup's options from a query: kind, text and background. @param {URLSearchParams} q */
+function mockupOptions(q) {
   const background = q.getAll('background').at(-1);
-  const mockup = createMockup(cover, {
+  return {
     kind: /** @type {import('../src/index.js').MockupKind} */ (q.getAll('kind').at(-1) || 'book'),
     text: q.getAll('text').at(-1) ?? '',
     background: background ? hex(background) : undefined,
-  });
-  return { cover, svg: mockup.svg, width: mockup.width, height: mockup.height };
+  };
+}
+
+/** Bytes as base64 (btoa takes a binary string; made in slices, so no argument list grows too long). @param {Uint8Array} bytes */
+function base64(bytes) {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(binary);
 }
 
 /** What every drawn answer says of the cover. @param {ReturnType<typeof createCover>} cover */
@@ -178,8 +190,10 @@ export async function png(request, env) {
   if (refused) return refused;
   const q = url.searchParams;
   const asked = q.getAll('scale').at(-1);
-  const scale = asked === undefined || asked === '' ? 1 : Number(asked);
-  if (!(scale >= 1 && scale <= 4)) return refusal(new RangeError(`scale must be a number from 1 to 4, got "${asked}"`));
+  const given = asked === undefined || asked === '' ? null : Number(asked);
+  if (given !== null && !(given > 0 && given <= 4)) {
+    return refusal(new RangeError(`scale must be a number above 0, at most 4, got "${asked}"`));
+  }
   let drawer;
   try {
     drawer = await pngEngineFor(env, url.origin);
@@ -189,10 +203,15 @@ export async function png(request, env) {
   }
   try {
     const { cover, svg, width, height } = drawer.laidOut(() => drawn(kind, q));
-    const [w, h] = [Math.round(width * scale), Math.round(height * scale)];
-    if (w * h > MAX_PIXELS) {
+    // At its size, or smaller to fit (a large cover, a story); a scale asked for that can't fit is
+    // refused. (Auto a hair under the limit, as resvg rounds the size.)
+    const most = kind === 'cover' ? COVER_PIXELS : MOCKUP_PIXELS;
+    const fit = Math.sqrt(most / (width * height));
+    const scale = given ?? Math.min(1, fit * 0.995);
+    const [w, h] = [Math.ceil(width * scale), Math.ceil(height * scale)];
+    if (w * h > most) {
       throw new RangeError(
-        `A PNG has at most ${MAX_PIXELS} pixels; ${w} × ${h} is more: ask for a smaller size or scale, or the SVG`,
+        `A ${kind} PNG has at most ${most} pixels; ${w} × ${h} is more: ask for a scale up to ${Math.floor(fit * 100) / 100}, the SVG, or a large PNG from the app`,
       );
     }
     if (!drawer.draws(svg)) {
@@ -204,7 +223,28 @@ export async function png(request, env) {
         422,
       );
     }
-    const bytes = drawer.render(svg, scale);
+    let bytes;
+    try {
+      if (kind === 'cover') bytes = drawer.render(svg, scale);
+      else {
+        // The cover drawn first, then shown in the mockup as that picture: its own filters, under
+        // the mockup's shadow, would take resvg several times the memory.
+        // (At the mockup's scale, as a mockup shows the cover at its own size or smaller; at most
+        // COVER_PIXELS.)
+        const picture = drawer.render(
+          cover.svg,
+          Math.min(scale, 0.995 * Math.sqrt(COVER_PIXELS / (cover.width * cover.height))),
+        );
+        const body = `<image width="${cover.width}" height="${cover.height}" href="data:image/png;base64,${base64(picture)}"/>`;
+        const flat = drawer.laidOut(() => createMockup({ ...cover, body }, mockupOptions(q)));
+        bytes = drawer.render(flat.svg, scale);
+      }
+    } catch (err) {
+      // resvg failed: our fault, not the request's; the next one gets a new engine.
+      console.error(err);
+      if (engine && (await engine) === drawer) engine = null;
+      return refusal(new Error('The PNG could not be drawn: ask for the SVG (cover.svg)'), 500);
+    }
     return new Response(request.method === 'HEAD' ? null : /** @type {BodyInit} */ (bytes), {
       headers: { ...COMMON, 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400', ...about(cover) },
     });
@@ -216,7 +256,8 @@ export async function png(request, env) {
 /**
  * The app's page for a design's link (/?title=…, as Copy link makes it): with the design's own
  * title and picture for link previews (a social card of it), which a link's #fragment can't give
- * (it never reaches the server). The app moves the design to the #fragment as it opens.
+ * (it never reaches the server). The app moves the design to the #fragment as it opens. (Only the
+ * og: tags change: the page's own <title> stays the app's, as the design changes as soon as it opens.)
  * @param {Request} request @param {Env} env
  * @returns {Promise<Response | null>}
  */
@@ -243,7 +284,6 @@ export async function preview(request, env) {
     const set = (re, value) => {
       html = html.replace(re, (_, start) => `${start}${escapeXml(value)}`);
     };
-    set(/(<title>)[^<]*/, `${name} · Book Cover Generator`);
     set(/(<meta property="og:title" content=")[^"]*/, name);
     set(/(<meta property="og:url" content=")[^"]*/, url.href);
     set(/(<meta property="og:image" content=")[^"]*/, image.href);

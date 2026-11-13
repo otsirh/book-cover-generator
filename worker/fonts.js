@@ -35,6 +35,9 @@ export const FONT_FILES = [
   'texgyreadventor-bolditalic.otf',
 ];
 
+/** Spacing, joiners and variation selectors: they draw nothing, so no face needs them. @param {number} cp */
+const silent = (cp) => cp <= 0x20 || (cp >= 0x200b && cp <= 0x200f) || cp === 0x2060 || (cp >= 0xfe00 && cp <= 0xfe0f);
+
 /** The faces generic family names stand for (and any stack falls back to). */
 export const GENERIC = { serif: 'Noto Serif', 'sans-serif': 'Liberation Sans', monospace: 'Liberation Mono' };
 
@@ -161,26 +164,44 @@ export function fontSet(faces) {
     families.set(key, [...(families.get(key) ?? []), face]);
   }
 
-  /**
-   * The family a CSS font-family list is drawn in: its first there is (generic names as GENERIC
-   * says), else the serif.
-   * @param {string} stack
-   */
-  const familyFor = (stack) => {
-    const names = stack.split(',').map((s) => s.trim().replace(/^['"]|['"]$/g, ''));
-    const found = names
-      .map((n) => families.get((GENERIC[/** @type {keyof typeof GENERIC} */ (n)] ?? n).toLowerCase()))
-      .find(Boolean);
-    return /** @type {Face[]} */ (found ?? families.get(GENERIC.serif.toLowerCase()));
+  /** Whether a face has every character of a text (bar spacing, joiners and variation selectors). @param {Face} face @param {string} text */
+  const has = (face, text) => {
+    for (const ch of text) {
+      const cp = /** @type {number} */ (ch.codePointAt(0));
+      if (silent(cp) || /\s/u.test(ch)) continue;
+      if (!face.glyph(cp)) return false;
+    }
+    return true;
   };
 
   /**
-   * The face a CSS font-family list (with a weight and slant) is drawn in: in its family (see
-   * familyFor), the weight CSS matches: the nearest, lighter first up to 500.
-   * @param {string} stack @param {number} weight @param {boolean} italic
+   * The family a CSS font-family list sets a text in: the first family there is that has every
+   * character of the text (as a browser falls back along the list), else its first there is,
+   * else the serif. Generic names are the faces GENERIC says.
+   * @param {string} stack @param {string} [text]
    */
-  const faceFor = (stack, weight, italic) => {
-    const list = familyFor(stack);
+  const familyFor = (stack, text = '') => {
+    const names = stack.split(',').map((s) => s.trim().replace(/^['"]|['"]$/g, ''));
+    const found = /** @type {Face[][]} */ (
+      names
+        .map((n) => families.get((GENERIC[/** @type {keyof typeof GENERIC} */ (n)] ?? n).toLowerCase()))
+        .filter(Boolean)
+    );
+    const serif = /** @type {Face[]} */ (families.get(GENERIC.serif.toLowerCase()));
+    if (text) {
+      // (Down the list, then the generic faces, which have Latin, Greek and Cyrillic.)
+      for (const list of [...found, serif]) if (has(list[0], text)) return list;
+    }
+    return found[0] ?? serif;
+  };
+
+  /**
+   * The face a CSS font-family list (with a weight and slant) sets a text in: in its family (see
+   * familyFor), the weight CSS matches: the nearest, lighter first up to 500.
+   * @param {string} stack @param {number} weight @param {boolean} italic @param {string} [text]
+   */
+  const faceFor = (stack, weight, italic, text) => {
+    const list = familyFor(stack, text);
     const slanted = list.filter((f) => f.italic === italic);
     const pool = slanted.length ? slanted : list;
     /** CSS's order of preference among weights. @param {Face} f */
@@ -196,20 +217,24 @@ export function fontSet(faces) {
     return pool.reduce((best, f) => (rank(f) < rank(best) ? f : best));
   };
 
-  /** Every face, for characters a family lacks (as resvg falls back to any font that has them). */
+  /** Every face, for characters no family of the list has (as resvg falls back to any font). */
   const fallbacks = [...families.values()].flat();
 
   return {
     faceFor,
-    /** The name of the family a CSS font-family list is drawn in. @param {string} stack */
-    familyOf: (stack) => familyFor(stack)[0].family,
+    /**
+     * The name of the family a CSS font-family list sets a text in (see familyFor): render() names
+     * it on each line, so resvg draws the line in the face it was measured in.
+     * @param {string} stack @param {string} [text]
+     */
+    familyOf: (stack, text) => familyFor(stack, text)[0].family,
     /**
      * Width in px of `text` at `size` px in a font-family list: a setTextMeasurer measurer.
      * (Advance widths, without kerning, which only ever narrows a line.)
      * @param {string} text @param {number} size @param {{ family: string, weight?: number, italic?: boolean }} font
      */
     measure(text, size, { family, weight = 400, italic = false }) {
-      const face = faceFor(family, weight, italic);
+      const face = faceFor(family, weight, italic, text);
       let width = 0;
       for (const ch of text) {
         const cp = /** @type {number} */ (ch.codePointAt(0));
@@ -230,9 +255,7 @@ export function fontSet(faces) {
     covers(text) {
       for (const ch of text) {
         const cp = /** @type {number} */ (ch.codePointAt(0));
-        // (Spacing, joiners and variation selectors draw nothing.)
-        if (cp <= 0x20 || (cp >= 0x200b && cp <= 0x200f) || cp === 0x2060 || (cp >= 0xfe00 && cp <= 0xfe0f)) continue;
-        if (/\s/u.test(ch)) continue;
+        if (silent(cp) || /\s/u.test(ch)) continue;
         if (!fallbacks.some((f) => f.glyph(cp))) return false;
       }
       return true;

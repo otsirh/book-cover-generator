@@ -47,7 +47,10 @@ async function networkFirst(request) {
   try {
     const response = await fetch(request);
     if (response.ok && response.type === 'basic' && !response.redirected) {
-      cache.put(request, response.clone()).catch(() => {});
+      // A page is kept once, by its address without the query: every shared design's link
+      // (/?title=…) is the app, and isn't kept again for each design.
+      const key = request.mode === 'navigate' ? new URL(request.url).pathname : request;
+      cache.put(key, response.clone()).catch(() => {});
     }
     return response;
   } catch (err) {

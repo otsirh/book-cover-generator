@@ -36,6 +36,10 @@ jobs:
       - run: npm run lint:package
       # Property-based fuzzing (fast-check, a dev dependency: the unit test jobs install nothing).
       - run: npm run test:fuzz
+      # PNG covers (resvg, a dev dependency, which the bare unit jobs don't install): required here.
+      - run: node --test test/png.test.js test/worker.test.js
+        env:
+          REQUIRE_RESVG: '1'
       # JSR (for Deno) takes the package as it is: fast types too, which its server requires (no
       # global types, for one).
       - run: npx --yes jsr@0.14.3 publish --dry-run

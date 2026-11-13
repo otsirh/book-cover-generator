@@ -5,8 +5,19 @@
 import { setTextMeasurer } from '../src/text.js';
 import { FONT_FILES, GENERIC, fontSet, readFont } from './fonts.js';
 
-/** The most pixels a PNG may have: as many as a phone's canvas, and kind to the Worker's memory. */
-export const MAX_PIXELS = 16_777_216;
+/**
+ * The most pixels a cover is drawn at. resvg's memory grows with the pixels and the cover's
+ * filters (blurs, grain): the heaviest style, Aurora, peaks near 140 bytes a pixel, and a Worker
+ * has 128 MB in all, its WebAssembly's included (which never shrinks). 600 × 900 px fits; larger
+ * PNGs come from the app, which draws them in the browser.
+ */
+export const COVER_PIXELS = 600_000;
+
+/**
+ * The most pixels a mockup is drawn at: it shows the cover as a picture already drawn (see
+ * worker/index.js), so it costs little more than its pixels. A story (1080 × 1920) fits.
+ */
+export const MOCKUP_PIXELS = 2_100_000;
 
 /** @param {string} s */
 const unescape = (s) =>
@@ -24,6 +35,51 @@ const unescape = (s) =>
  */
 export const drawnText = (svg) =>
   [...svg.matchAll(/<(?:text|tspan)\b[^>]*>([^<]*)/g)].map((m) => unescape(/** @type {string} */ (m[1]))).join(' ');
+
+/**
+ * The SVG as resvg is to draw it:
+ * - each line names the one family it was measured in (resvg's own choice from a list can differ:
+ *   it skips a condensed face that isn't first, and sets a line a face lacks a letter of in
+ *   another face whole), and each group its list's family;
+ * - a lone filled shape's opacity is its fill's (the same drawing), as resvg 2.6 can stop on
+ *   opacity layers under a blur (Aurora's glows).
+ * @param {string} svg @param {ReturnType<typeof fontSet>} fonts
+ */
+export function prepare(svg, fonts) {
+  /** The font-family list in force, by open element. @type {(string | undefined)[]} */
+  const lists = [];
+  const named = svg.replace(
+    /<(\/?)(g|text|tspan)\b([^>]*?)(\/?)>([^<]*)/g,
+    (all, closing, tag, attrs, self, content) => {
+      if (closing) {
+        lists.pop();
+        return all;
+      }
+      const own = /\sfont-family="([^"]*)"/.exec(attrs)?.[1];
+      const list = own === undefined ? lists.at(-1) : unescape(own);
+      if (!self) lists.push(list);
+      const text = tag === 'g' ? '' : unescape(content).trim();
+      if (list === undefined || (own === undefined && !text)) return all;
+      const family = fonts.familyOf(list, text).replace(/[<>&"']/g, '');
+      const rest = attrs.replace(/\sfont-family="[^"]*"/, '');
+      return `<${tag}${rest} font-family="${family}"${self}>${content}`;
+    },
+  );
+  return named.replace(
+    /<(circle|ellipse|rect|path|polygon)\b([^>]*?)\sopacity="([\d.]+)"([^>]*?)(\/?)>/g,
+    (all, tag, before, opacity, after, self) => {
+      const attrs = before + after;
+      if (
+        /\sstroke="(?!none")/.test(attrs) ||
+        /\s(?:fill-opacity|filter|mask|clip-path)=/.test(attrs) ||
+        /\sfill="none"/.test(attrs)
+      ) {
+        return all;
+      }
+      return `<${tag}${before} fill-opacity="${opacity}"${after}${self}>`;
+    },
+  );
+}
 
 /** resvg's WebAssembly, started once per resvg (it refuses a second start). @type {WeakMap<object, Promise<void>>} */
 const started = new WeakMap();
@@ -43,7 +99,10 @@ export async function pngEngine(resvg, wasm, fontFile) {
   }
   await start;
   const buffers = await Promise.all(FONT_FILES.map(fontFile));
-  const fonts = fontSet(buffers.map(readFont));
+  const faces = buffers.map(readFont);
+  const fonts = fontSet(faces);
+  /** Why resvg can't be used again, once it has failed. @type {Error | null} */
+  let broken = null;
   return {
     fonts,
     /**
@@ -66,16 +125,16 @@ export async function pngEngine(resvg, wasm, fontFile) {
      * @returns {Uint8Array}
      */
     render(svg, scale = 1) {
-      // Each font-family list named by the one family it is measured in: resvg's own choice from
-      // a list can differ (it skips a condensed face that isn't first), and then text won't fit.
-      const named = svg.replace(
-        /font-family="([^"]*)"/g,
-        (_, stack) => `font-family="${fonts.familyOf(unescape(stack)).replace(/[<>&"']/g, '')}"`,
-      );
-      const r = new resvg.Resvg(named, {
+      if (broken) throw broken;
+      const ready = prepare(svg, fonts);
+      // Only the families it names (prepare names one on each line), and the serif resvg falls
+      // back to: the fonts are copied into resvg's memory for each drawing.
+      const named = new Set([GENERIC.serif, ...[...ready.matchAll(/\sfont-family="([^"]*)"/g)].map((m) => m[1])]);
+      const fontBuffers = buffers.filter((_, i) => named.has(faces[i].family));
+      const r = new resvg.Resvg(ready, {
         fitTo: { mode: 'zoom', value: scale },
         font: {
-          fontBuffers: buffers,
+          fontBuffers,
           loadSystemFonts: false,
           defaultFontFamily: GENERIC.serif,
           serifFamily: GENERIC.serif,
@@ -83,16 +142,25 @@ export async function pngEngine(resvg, wasm, fontFile) {
           monospaceFamily: GENERIC.monospace,
         },
       });
+      let image;
       try {
-        const image = r.render();
-        try {
-          return image.asPng();
-        } finally {
-          image.free?.();
-        }
+        image = r.render();
+        return image.asPng();
+      } catch (err) {
+        // resvg stopped (a WebAssembly trap): what it held isn't safe to free or to use again, so
+        // this engine draws no more; the next request makes a new one.
+        broken = err instanceof Error ? err : new Error(String(err));
+        throw broken;
       } finally {
-        r.free?.();
+        if (!broken) {
+          image?.free?.();
+          r.free?.();
+        }
       }
+    },
+    /** Whether resvg failed (the Worker then makes a new engine). */
+    get broken() {
+      return Boolean(broken);
     },
   };
 }
