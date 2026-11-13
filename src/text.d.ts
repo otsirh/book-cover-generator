@@ -96,6 +96,10 @@ export declare function clipGraphemes(str: string, max: number, options?: { unit
  * `breaks`, typed line breaks stay, as "\n" (empty lines dropped).
  */
 export declare function cleanText(value: unknown, max: number, options?: { breaks?: boolean }): string;
+/** Text in capitals as `lang` writes them (default: the language of the cover being drawn). */
+export declare function toUpper(text: string, lang?: string): string;
+/** Run `draw` with `lang` as the language capitals are set in. */
+export declare function inLanguage<T>(lang: string, draw: () => T): T;
 /**
  * A paragraph wrapped to `maxWidth` px at `size` px, line by line as prose is set: breaking where
  * a line may (spaces, between words of scripts without them, not around punctuation that must
@@ -132,6 +136,8 @@ export interface FitOptions {
   maxLines?: number;
   /** Set the text in capitals. Default `false`. */
   upper?: boolean;
+  /** The language whose capitals `upper` uses (Turkish i is İ). Default: the cover's, while one is drawn. */
+  lang?: string;
   /** Even out line lengths (default `true`). */
   balance?: boolean;
   /** Count the descenders below the last line in `maxHeight`. */

@@ -18,7 +18,7 @@ import {
   shadowFilter,
   linearGradient,
 } from '../core.js';
-import { FONTS, fitText, drawText, textBottom, typedLines, noteText } from '../text.js';
+import { FONTS, fitText, drawText, textBottom, typedLines, noteText, toUpper } from '../text.js';
 import { titleBlock, authorFit } from '../type.js';
 import { strongAccents, textPanel } from './util.js';
 
@@ -925,13 +925,13 @@ export const pixel = {
       s += rect(0, y, W, g, mix(ground, groundC, 0.25));
 
     // Title in pixel letters when possible, otherwise in a monospaced face.
-    const title = c.title.toUpperCase();
+    const title = toUpper(c.title);
     const ink = inkOn(skyTop, p);
     const box = { w: W - m * 2, h: horizon - m * 2.2 - sr * g * 1.6 };
     // The subtitle is fitted first so the title leaves room for it (only if the title can be
     // drawn in pixel letters at all: otherwise titleBlock sets both).
     const drawable = pixelable(title);
-    const subText = c.subtitle.toUpperCase();
+    const subText = toUpper(c.subtitle);
     const sfit =
       drawable && c.subtitle && pixelable(subText) ? fitPixelText(subText, box.w, S * 0.08, S * 0.008) : null;
     const sText =
@@ -1008,7 +1008,7 @@ export const pixel = {
     const bandEnd = Math.min(horizon, Math.ceil((textEnd + g * 1.5) / g) * g);
     s += rect(0, 0, W, bandEnd, skyTop);
     for (const [x, y] of stars) if (y >= bandEnd) s += rect(x, y, g, g, p.paper, 'opacity="0.7"');
-    const author = c.author.toUpperCase();
+    const author = toUpper(c.author);
     const groundInk = inkOn(ground, p);
     const afit = author && pixelable(author) ? fitPixelText(author, W - m * 2, H - horizon - m * 2, S * 0.007) : null;
     if (afit) text += drawPixelText(afit, W / 2, H - m * 1.2 - afit.height, 'middle', groundInk);

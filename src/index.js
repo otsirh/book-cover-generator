@@ -6,7 +6,7 @@
 
 import { createRng, hashString, isHex, luminance, escapeXml, grain } from './core.js';
 import { palettes } from './palettes.js';
-import { FONTS, cleanText, recordText } from './text.js';
+import { FONTS, cleanText, inLanguage, recordText } from './text.js';
 import { drawBadge } from './badge.js';
 import { idFor, fontEntries, reserved, STYLE_WORDS, PALETTE_WORDS } from './shared.js';
 import { styleList, genreList, builtInGenres } from './styles/index.js';
@@ -532,9 +532,10 @@ export function createCover(options = {}) {
   };
 
   // The text the style draws is recorded, so a badge can go where there is none.
-  const { result: drawn, boxes } = recordText(() => style.render(ctx));
+  // (In the cover's language, so its capitals are the language's: Turkish i is İ.)
+  const { result: drawn, boxes } = recordText(() => inLanguage(lang, () => style.render(ctx)));
   let body = drawn;
-  if (badge) body += drawBadge(ctx, badge, boxes);
+  if (badge) body += inLanguage(lang, () => drawBadge(ctx, badge, boxes));
   if (options.texture) {
     // Film grain over the whole cover. Styles paint their own backgrounds, so lay
     // dark and light specks (from different noise) to show on any colour.

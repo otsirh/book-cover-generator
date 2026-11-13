@@ -14,6 +14,7 @@ import {
   measureText,
   spacingShift,
   textGroupAttrs,
+  toUpper,
   wrapText,
 } from './text.js';
 import { strongAccents, textColor } from './styles/util.js';
@@ -248,14 +249,7 @@ export function createPrintCover(coverOptions = {}, print = /** @type {any} */ (
   const across = spine * PX - 2 * 0.0625 * PX;
   const spineFont = titleFont ?? FONTS.sans;
   // (In the cover's language: Turkish "istanbul" is İSTANBUL.)
-  const upper = (/** @type {string} */ t) => {
-    try {
-      return t.toLocaleUpperCase(front.lang || undefined);
-    } catch {
-      // A tag the cover takes but Intl doesn't (en-GB-oed): capitals without the language's rules.
-      return t.toUpperCase();
-    }
-  };
+  const upper = (/** @type {string} */ t) => toUpper(t, front.lang);
   const spineTitle = upper(front.title.replace(/\n/g, ' '));
   const author = upper(front.author);
   // As large as the line's ink fits across, accents above and tails below included (É, Ç, Q, 夜).

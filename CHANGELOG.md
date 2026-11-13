@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Fixed
+
+- Capitals follow the cover's language (`lang`): a Turkish or Azeri title's i is İ in every style that sets capitals, on its badge and its mockups, as on the print cover's spine. `fitText` takes a `lang` for its `upper`.
+
 ## [1.10.0] - 2026-11-13
 
 A paperback for print: the back, the spine and the front as the PDF Amazon KDP takes. Covers are drawn as in 1.9.2, but for Typewriter's square covers with a series.

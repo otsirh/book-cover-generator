@@ -1,7 +1,7 @@
 /* @ts-self-types="./util.d.ts" */
 import { n, circle, contrast, readable, clamp, mix, inkCandidates, hexToRgb } from '../core.js';
 import { titleBlock } from '../type.js';
-import { graphemes } from '../text.js';
+import { graphemes, toUpper } from '../text.js';
 
 /** @typedef {import('../type.js').TitleBlock} TitleBlock */
 
@@ -13,7 +13,7 @@ import { graphemes } from '../text.js';
  * @param {string} title
  */
 export function initialChars(title) {
-  const chars = graphemes(title.trim().toUpperCase());
+  const chars = graphemes(toUpper(title.trim()));
   const start = chars.findIndex((ch) => ch.trim() && !/^\p{P}+$/u.test(ch));
   return start > 0 ? chars.slice(start) : chars;
 }

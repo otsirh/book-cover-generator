@@ -781,6 +781,39 @@ export function descentOf(line) {
   return Math.max(letters, markExtent(line).below);
 }
 
+/** The language of the cover being drawn (see inLanguage), for its capitals. */
+let coverLang = '';
+
+/**
+ * Text in capitals as its language writes them (Turkish and Azeri i is İ; Greek drops its accents):
+ * in `lang`, else in the language of the cover being drawn; plain capitals for none, or for a tag
+ * Intl doesn't know (en-GB-oed).
+ * @param {string} text @param {string} [lang]
+ */
+export function toUpper(text, lang = coverLang) {
+  if (!lang) return text.toUpperCase();
+  try {
+    return text.toLocaleUpperCase(lang);
+  } catch {
+    return text.toUpperCase();
+  }
+}
+
+/**
+ * Run `draw` with `lang` as the language its capitals are set in: createCover runs a style so, and
+ * fitText's `upper` (and titleBlock's, and the initials) follow it.
+ * @template T @param {string} lang @param {() => T} draw @returns {T}
+ */
+export function inLanguage(lang, draw) {
+  const before = coverLang;
+  coverLang = lang;
+  try {
+    return draw();
+  } finally {
+    coverLang = before;
+  }
+}
+
 /**
  * Wrap and shrink `text` until it fits the box.
  *
@@ -813,7 +846,7 @@ export function fitText(text, opts) {
     .map((line) => line.replace(BREAKING_SPACE, ' ').trim())
     .filter(Boolean)
     .join('\n');
-  if (opts.upper) str = str.toUpperCase();
+  if (opts.upper) str = toUpper(str, opts.lang || undefined);
   const base = { ...spec, lineHeight, cap, above: 0, below: DESCENT };
   if (!str) return { ...base, lines: [], size: 0, width: 0, height: 0, truncated: false };
 

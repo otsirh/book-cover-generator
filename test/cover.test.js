@@ -1566,3 +1566,37 @@ test('Typewriter keeps a tall title block below its typed header, square covers 
   const [header, series] = bands;
   assert.ok(series.top >= header.bottom, `the series (from ${series.top}) overprints the header (to ${header.bottom})`);
 });
+
+test('capitals are the language’s: Turkish i is İ in every style, its badge and its mockups', async () => {
+  const { createMockup, mockupKinds } = await import('../src/index.js');
+  const turkish = {
+    title: 'istanbul',
+    author: 'ilkay şimşek',
+    subtitle: 'bir roman',
+    series: 'kitap iki',
+    badge: 'ilk baskı',
+    lang: 'tr',
+    seed: 's',
+  };
+  const capitals = new Set();
+  for (const style of builtIn) {
+    for (const titleCase of /** @type {const} */ ([undefined, 'upper'])) {
+      const cover = createCover({ ...turkish, style, titleCase });
+      // (The text as drawn: outside <title> and aria-label, which keep it as typed.)
+      const drawn = cover.body.replace(/aria-label="[^"]*"/g, '');
+      for (const word of ['ISTANBUL', 'ILKAY', 'BIR ROMAN', 'KITAP', 'ILK BASKI']) {
+        assert.ok(!drawn.includes(word), `${style} ${titleCase}: ${word} without its dot`);
+      }
+      // (The badge sets its words on lines of their own.)
+      for (const word of ['İSTANBUL', 'İLKAY', '>İLK<']) if (drawn.includes(word)) capitals.add(word);
+    }
+    for (const kind of mockupKinds) {
+      const { svg } = createMockup(createCover({ ...turkish, style }), { kind });
+      assert.ok(!svg.replace(/aria-label="[^"]*"/g, '').includes('ILKAY'), `${style} ${kind}`);
+    }
+  }
+  // (And capitals are set: the test isn't passing for want of any.)
+  assert.deepEqual([...capitals].sort(), ['>İLK<', 'İLKAY', 'İSTANBUL']);
+  // Without a language, capitals as before.
+  assert.match(createCover({ title: 'istanbul', style: 'swiss', titleCase: 'upper', seed: 's' }).body, /ISTANBUL/);
+});

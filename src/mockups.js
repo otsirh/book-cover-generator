@@ -200,6 +200,7 @@ export function createMockup(cover, { kind = 'book', background, text = '' } = {
         font: FONTS.sans,
         weight: 600,
         upper: true,
+        lang: cover.lang,
         letterSpacing: 0.12,
         maxWidth: box.w,
         maxSize: authorSize,

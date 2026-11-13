@@ -24,6 +24,7 @@ import {
   trackingFor,
   descentOf,
   markExtent,
+  toUpper,
 } from './text.js';
 
 // Leading articles (English, French, Spanish, Italian, German). "Die" is left out: "Die Hard".
@@ -108,7 +109,7 @@ export function fitStack(text, o) {
     italic: !!o.italic,
     letterSpacing: trackingFor(text, o.letterSpacing ?? 0),
   };
-  const source = o.upper ? text.toUpperCase() : text;
+  const source = o.upper ? toUpper(text) : text;
   const lines = stackLines(source);
   if (lines.length < 2 || lines.length > (o.maxLines ?? 5)) return null;
   const cap = font.cap ?? 0.72;
