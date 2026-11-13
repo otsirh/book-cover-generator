@@ -12,7 +12,8 @@ All notable changes to this project are documented here. The format follows [Kee
 - **An about page** (`/about/`, "Using your covers" in the footer): you may use the covers you make for anything, books you sell included, with no credit needed; what stays private; which fonts covers use and why a cover looks different elsewhere; and how to upload ebook and paperback covers to Amazon KDP.
 - **One file for `<book-cover>`**: `https://covers.otsirh.dev/element.js` is the element and the library as one minified module (48 KB compressed), for pages that would rather load one file than the two dozen of `/src/element.js`.
 - **The MCP registry**: the server is listed in the official MCP registry as `io.github.otsirh/book-cover-generator` (npm and the hosted `/mcp`), published by each release.
-- `download=1` on any image of the HTTP API answers it as a file named after the title (`download=my-cover` names it).
+- **A design's language in its link** (`lang=tr`): the app, the HTTP API, kept designs and the gallery draw it with that language's capitals and letterforms, and the MCP tools take `lang` too.
+- `download=1` on any image of the HTTP API answers it as a file named after the title (`download=my-cover` names it; `download=0` doesn't).
 - **Keep is a star on the preview**: it shows whether the design on show is kept, keeps it (or press K), and pressed again removes it. Removing a kept design, here or in the tray, offers Undo.
 - Undo and Redo with Ctrl or Cmd+Z too (Shift for Redo, or Ctrl+Y), outside text fields, and with single-key shortcuts off. On a phone, Undo and Keep are in the bar along the bottom, and the previous and next style beside the pinned preview.
 
@@ -28,6 +29,8 @@ All notable changes to this project are documented here. The format follows [Kee
 - A design's link from Copy link opens in its shape at once (an eBook or square no longer starts as a paperback), and leaves out pins its style doesn't have, which cost it its link preview.
 - `wrapText` no longer repeats a line when a long word's last letter is wider than the line by itself.
 - The dev server never serves a hidden file (`.git`, `node_modules`), however the URL spells its path.
+- A PNG resvg stops on no longer stops the site's other PNGs: the Worker starts a new resvg for the next one (its own copy of resvg's glue, `worker/resvg-glue.js`, made by `scripts/vendor-resvg.js`).
+- A link preview's picture is the site's own image whenever the design's can't be drawn (the crawler asked too much, or resvg failed), never an error.
 - Aurora's title and author keep 3:1 against what is drawn behind them: each colour field kept it alone, but blurred fields add up where they overlap (two covers in five had a fifth of a line's outline under 3:1, down to 1.7:1). Where they would, a soft field of the background goes under that text, only as strong as it needs.
 - Blueprint no longer shrinks its title to make room for a subtitle (from 54 to 29 px on a 600 × 900 cover): on tall and square covers the title block grows into the drawing's room instead, and for a long title too.
 - Aurora, Thriller and Ribbon blur only the cover and the blur's reach around it, so their PNGs take a third of the memory they did (Aurora's up to 32 MiB of resvg's, from 98) and draw faster. `svgUtils.blurFilter(id, std, { width, height })` gives a filter that region.
@@ -45,7 +48,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Changed
 
-- The site's PNGs not yet cached are limited to 240 a minute for each client, and MCP requests to 120 (`429` with `Retry-After`); SVGs aren't limited. The README says how to run your own copy. The site's Worker keeps its errors in Workers Logs, without query strings, and a daily check of the live site (pages, API, MCP, link previews and the version) runs in CI and after every deploy.
+- The site's PNGs not yet cached are limited to 240 a minute for each client, and MCP requests to 600 (`429` with `Retry-After`); SVGs aren't limited. The README says how to run your own copy. The site's Worker keeps its errors in Workers Logs, without query strings, and a daily check of the live site (pages, API, MCP, link previews and the version) runs in CI and after every deploy.
 - **Back leaves the site**: changes no longer add browser history entries (nine changes took ten Back presses to leave). Undo and Redo keep their steps in the page, and through a reload; the URL still holds the design, and links work as before.
 - **Laptops**: from 1280 px the downloads are a column beside the cover, so every export is in view with it, and the whole preview stays in view as the controls scroll. From 1024 px the styles are beside the preview (they were 800 px below it), and Browse scrolls the styles, not the page.
 - The exports are in groups, "Also as" and "Copy"; Copy image link is Copy embed link. For an eBook the main download is a JPEG, the file KDP takes.

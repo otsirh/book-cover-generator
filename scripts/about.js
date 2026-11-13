@@ -15,7 +15,7 @@ const QUESTIONS = [
     id: 'privacy',
     q: 'Is anything I type sent anywhere?',
     a: `<p>No. The app draws every cover in your browser. There are no accounts, no cookies and no analytics; designs you keep stay in your browser's storage on this device.</p>
-      <p>A design leaves your device only when you send it: a link you copy holds the design (anyone with the link sees it), and an image link or <a href="https://github.com/otsirh/book-cover-generator#http-api">the HTTP API</a> asks this site to draw it, which it does without keeping it.</p>`,
+      <p>A design leaves your device only when you send it: a link you copy holds the design (anyone with the link sees it), and an image link or <a href="https://github.com/otsirh/book-cover-generator#http-api">the HTTP API</a> asks this site to draw it. The site draws it on Cloudflare's servers and keeps the picture in their cache for up to a day, so the same link loads quickly; it keeps no log of what it drew or for whom.</p>`,
   },
   {
     id: 'fonts',

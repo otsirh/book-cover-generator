@@ -2,7 +2,8 @@ import js from '@eslint/js';
 import globals from 'globals';
 
 export default [
-  { ignores: ['dist/', 'coverage/', 'playwright-report/', 'test-results/', '.wrangler/'] },
+  // (worker/resvg-glue.js is @resvg/resvg-wasm's own code, copied by scripts/vendor-resvg.js.)
+  { ignores: ['dist/', 'coverage/', 'playwright-report/', 'test-results/', '.wrangler/', 'worker/resvg-glue.js'] },
   js.configs.recommended,
   {
     languageOptions: {

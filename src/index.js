@@ -8,7 +8,7 @@ import { createRng, hashString, isHex, luminance, escapeXml, grain } from './cor
 import { palettes } from './palettes.js';
 import { FONTS, cleanText, inLanguage, recordText } from './text.js';
 import { drawBadge } from './badge.js';
-import { idFor, fontEntries, reserved, STYLE_WORDS, PALETTE_WORDS } from './shared.js';
+import { idFor, fontEntries, reserved, STYLE_WORDS, PALETTE_WORDS, LANG_TAG } from './shared.js';
 import { styleList, genreList, builtInGenres } from './styles/index.js';
 
 export { palettes } from './palettes.js';
@@ -409,8 +409,6 @@ function typeOptions(options) {
   };
 }
 
-/** A BCP 47 language tag, loosely: `ja`, `zh-Hant`, `pt-BR`, `sr-Latn-RS`. */
-const LANG_TAG = /^[a-z]{2,3}(?:-[a-z\d]{1,8})*$/i;
 const KANA = /[\p{Script=Hiragana}\p{Script=Katakana}]/u;
 const HANGUL = /\p{Script=Hangul}/u;
 

@@ -14,6 +14,7 @@ import {
   CUSTOM_PALETTE,
   CUSTOM_SIZE,
   VARIANT,
+  LANG_TAG,
   customColors,
   hex,
 } from './shared.js';
@@ -71,6 +72,8 @@ export const LINK = {
       const size = CUSTOM_SIZE.exec(f);
       return size !== null && fits(Number(size[1]), Number(size[2]));
     }),
+  /** The text's language, a tag such as tr or zh-Hant. @param {unknown} v */
+  lang: (v) => oneOf(oneLine(v)?.trim(), (t) => t.length <= 35 && LANG_TAG.test(t)),
   /** On or off: 1, 0, true or false, in any case. @param {unknown} v */
   texture: (v) => {
     const t = typeof v === 'string' ? v.trim().toLowerCase() : v;
@@ -117,6 +120,8 @@ export const LINK_FIELDS = {
   format: { read: LINK.format, empty: 'paperback' },
   // On or off; any other value (texture=yes) is dropped like other unknown values.
   texture: { read: LINK.texture, write: (v) => (v ? '1' : '0'), empty: false, optional: true },
+  // (Since 1.13.0.) The text's language, for its capitals and letterforms: '' leaves it to the text.
+  lang: { read: LINK.lang, empty: '', optional: true, omitEmpty: true },
 };
 
 /**
@@ -150,7 +155,7 @@ export function linkOf(options, cover) {
   }
   const own = options.palette && typeof options.palette === 'object' ? options.palette : null;
   const preset = Object.entries(formats).find(([, [w, h]]) => w === cover.width && h === cover.height);
-  const link = writeLink({
+  return writeLink({
     title: cover.title,
     author: cover.author,
     subtitle: options.subtitle ?? '',
@@ -166,10 +171,9 @@ export function linkOf(options, cover) {
     seed: options.seed != null ? cover.seed : '',
     format: preset ? preset[0] : `${cover.width}x${cover.height}`,
     texture: options.texture === true,
+    // (A language given; one the text implies, the text implies again.)
+    lang: options.lang ? (cover.lang ?? '') : '',
   });
-  // (The language a link gave, which the app infers but the API takes: the same capitals and forms.)
-  if (options.lang && cover.lang) link.set('lang', cover.lang);
-  return link;
 }
 
 /**

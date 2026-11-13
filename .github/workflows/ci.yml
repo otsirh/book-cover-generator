@@ -12,11 +12,6 @@ on:
 permissions:
   contents: read
 
-env:
-  # The MCP registry's publisher (github.com/modelcontextprotocol/registry), and its archive's hash.
-  MCP_PUBLISHER_VERSION: v1.8.9
-  MCP_PUBLISHER_SHA256: 4d527ca8f1ced0394c962dc925c2a4a4addef441cbefd62501c875e9481823a8
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -41,6 +36,9 @@ jobs:
       - run: npm run lint:package
       # Property-based fuzzing (fast-check, a dev dependency: the unit test jobs install nothing).
       - run: npm run test:fuzz
+      # The Worker's copy of resvg's glue is the installed package's (after a Dependabot update, run
+      # node scripts/vendor-resvg.js).
+      - run: node scripts/vendor-resvg.js --check
       # PNG covers (resvg, a dev dependency, which the bare unit jobs don't install): required here.
       - run: node --test test/png.test.js test/worker.test.js
         env:
@@ -58,12 +56,7 @@ jobs:
           DENO_DISABLE_PEDANTIC_NODE_WARNINGS: 'true'
       # The Worker as Cloudflare would take it: the config, its bindings and the bundle.
       - run: npx wrangler deploy --dry-run --outdir .wrangler/dry-run
-      - name: The MCP registry's publisher (pinned, checked)
-        run: |
-          curl -fsSLo mcp-publisher.tar.gz "https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/mcp-publisher_linux_amd64.tar.gz"
-          echo "${MCP_PUBLISHER_SHA256}  mcp-publisher.tar.gz" | sha256sum -c -
-          tar xzf mcp-publisher.tar.gz mcp-publisher
-          rm mcp-publisher.tar.gz
+      - uses: ./.github/actions/mcp-publisher
       - name: The MCP registry takes server.json
         run: ./mcp-publisher validate server.json
       - run: npm audit --audit-level=moderate

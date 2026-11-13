@@ -83,6 +83,11 @@ function designProperties(ctx) {
         .join(', ')}.`,
     },
     case: { type: 'string', enum: ['upper', 'normal'], description: 'The title in capitals, or as typed.' },
+    lang: {
+      type: 'string',
+      description:
+        "The text's language, a tag such as tr or zh-Hant, for its capitals (Turkish İ) and letterforms. Default: from the text.",
+    },
     texture: { type: 'boolean', description: 'A fine film grain.' },
     variants: {
       type: 'object',
@@ -166,6 +171,7 @@ function queryFrom(args) {
     'format',
     'font',
     'case',
+    'lang',
   ]) {
     const value = args[key];
     if (value != null && value !== '') q.set(key, String(value));

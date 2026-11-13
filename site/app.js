@@ -30,7 +30,7 @@ import {
   svgToBlob,
 } from '../src/browser.js';
 import { hashString, contrast } from '../src/core.js';
-import { CUSTOM_SIZE, customColors, slug } from '../src/shared.js';
+import { CUSTOM_SIZE, customColors, slug, familyName } from '../src/shared.js';
 import { LINK_FIELDS, fits, lastValues, writeLink, customPalette, variantOf } from '../src/link.js';
 import { registerServiceWorker } from './offline.js';
 
@@ -51,6 +51,7 @@ import { registerServiceWorker } from './offline.js';
  * @property {string} seed      '' means "from the title"
  * @property {string} format    a preset, or a size in px ('1600x2560')
  * @property {boolean} texture
+ * @property {string} lang      the text's language tag ('tr', 'zh-Hant'), or '' to leave it to the text
  */
 /** @typedef {{ design: Design, svg: string }} Kept  a kept design, and the cover as it was drawn then ('' if unknown) */
 /** @typedef {{ button: HTMLButtonElement, img: HTMLImageElement, visible: boolean, dirty: boolean }} Tile  visible: on screen or close to it */
@@ -147,6 +148,7 @@ const design = {
   case: '',
   format: 'paperback',
   texture: false,
+  lang: '',
 };
 const ui = {
   /** Export scale for the preset formats, and for custom sizes (whose 1× is the size asked for). */
@@ -518,6 +520,7 @@ function optionsFor(d, extra = {}) {
     variants: pinsFor(d.variant, extra.style ?? d.style),
     font: d.font || undefined,
     titleCase: /** @type {'upper' | 'normal' | undefined} */ (d.case || undefined),
+    lang: d.lang || undefined,
     width,
     height,
     ...extra,
@@ -898,7 +901,7 @@ function buildControls() {
       const scale = scaleFor(design.format);
       try {
         await copyImage(current.svg, { scale });
-        toast(`Image copied · ${w * scale} × ${hgt * scale} px`);
+        toast(`Image copied · ${Math.round(w * scale)} × ${Math.round(hgt * scale)} px`);
       } catch (err) {
         console.warn(err);
         fail('Could not copy the image. Try Download PNG.');
@@ -1398,13 +1401,6 @@ let railOrder = /** @type {string[]} */ ([]);
 // observer's margin, so look ahead by position in the rail instead.
 const LOOKAHEAD = 6;
 
-/**
- * A family of styles as the page names it: the library's Genre family (its styles drawn for one
- * genre each) is "Themed" here, where Genre is the menu that filters the styles.
- * @param {string} group
- */
-const familyName = (group) => (group === 'Genre' ? 'Themed' : group);
-
 function buildRail() {
   const observer = new IntersectionObserver(
     (entries) => {
@@ -1715,11 +1711,23 @@ const keptThumbs = new Map();
 /** @type {{ img: HTMLImageElement, kept: Kept, hash: string }[]} */
 let keptQueue = [];
 
+/** Each kept design's SVG hashed once (an SVG can be 400 KB, the tray holds a hundred). @type {WeakMap<Kept, number>} */
+const keptSvgHashes = new WeakMap();
+/** @param {Kept} k */
+function keptSvgHash(k) {
+  let hash = keptSvgHashes.get(k);
+  if (hash === undefined) {
+    hash = k.svg ? hashString(k.svg) : 0;
+    keptSvgHashes.set(k, hash);
+  }
+  return hash;
+}
+
 /** @param {Kept[]} [list] the kept designs, if already loaded */
 function renderKept(list = loadKept()) {
   const hashes = list.map((k) => toHash(k.design));
   // Thumbnails by the SVG kept too: a design kept again with a new drawing shows the new one.
-  const thumbKeys = list.map((k, i) => `${hashes[i]}|${k.svg ? hashString(k.svg) : ''}`);
+  const thumbKeys = list.map((k, i) => `${hashes[i]}|${k.svg ? keptSvgHash(k) : ''}`);
   for (const key of keptThumbs.keys()) if (!thumbKeys.includes(key)) keptThumbs.delete(key);
   keptQueue = [];
   keptHashes = new Set(hashes);
@@ -1935,7 +1943,9 @@ async function exportAs(format, button) {
       const ext = saved.slice(saved.lastIndexOf('.') + 1);
       // Safari makes a PNG when asked for WebP.
       const fallback = format === 'webp' && ext !== 'webp' ? ' (this browser can’t make WebP)' : '';
-      toast(`Saved ${ext === 'jpg' ? 'JPEG' : ext.toUpperCase()} · ${w * scale} × ${hgt * scale} px${fallback}`);
+      toast(
+        `Saved ${ext === 'jpg' ? 'JPEG' : ext.toUpperCase()} · ${Math.round(w * scale)} × ${Math.round(hgt * scale)} px${fallback}`,
+      );
     } catch (err) {
       console.error(err);
       fail('Export failed. Try SVG instead.');

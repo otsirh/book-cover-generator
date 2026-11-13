@@ -21,9 +21,11 @@
   },
   // How many requests a client (by address, at each Cloudflare location) may make a minute: PNGs
   // that aren't cached yet (resvg is the costly part), and MCP requests. SVGs are never limited.
+  // (MCP's is high: a hosted connector's many users share its few addresses. Its pictures count as
+  // PNGs, and past that limit an answer comes without them.)
   "ratelimits": [
     { "name": "PNG_LIMIT", "namespace_id": "1001", "simple": { "limit": 240, "period": 60 } },
-    { "name": "MCP_LIMIT", "namespace_id": "1002", "simple": { "limit": 120, "period": 60 } },
+    { "name": "MCP_LIMIT", "namespace_id": "1002", "simple": { "limit": 600, "period": 60 } },
   ],
   // The most CPU time one request may take: the slowest PNG takes under 2 s.
   "limits": { "cpu_ms": 10000 },

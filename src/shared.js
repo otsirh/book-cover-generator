@@ -62,6 +62,15 @@ export const PALETTE_WORDS = ['random', 'auto'];
 export const CUSTOM_SIZE = /^([1-9]\d{1,4})x([1-9]\d{1,4})$/;
 /** Your own colours in a link: background, text and one to three accents. */
 export const CUSTOM_PALETTE = /^custom(?:-[0-9a-f]{6}){3,5}$/;
+/**
+ * A family of styles as the site's pages name it: the library's Genre family (its styles drawn
+ * for one genre each) is "Themed", where Genre is the menu that filters the styles.
+ * @param {string} group
+ */
+export const familyName = (group) => (group === 'Genre' ? 'Themed' : group);
+
+/** A BCP 47 language tag, loosely: `ja`, `zh-Hant`, `pt-BR`, `sr-Latn-RS`. */
+export const LANG_TAG = /^[a-z]{2,3}(?:-[a-z\d]{1,8})*$/i;
 /** Pinned variants in a link: name.value pairs joined by '-'. */
 export const VARIANT = /^[a-z][a-z0-9]*\.[a-z][a-z0-9]*(?:-[a-z][a-z0-9]*\.[a-z][a-z0-9]*)*$/;
 

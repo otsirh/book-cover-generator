@@ -88,8 +88,14 @@ const refusal = (err, status = 400, extra = {}) =>
  */
 async function allowed(request, limiter) {
   if (!limiter) return true;
-  const { success } = await limiter.limit({ key: request.headers.get('cf-connecting-ip') ?? 'unknown' });
-  return success;
+  try {
+    const { success } = await limiter.limit({ key: request.headers.get('cf-connecting-ip') ?? 'unknown' });
+    return success;
+  } catch (err) {
+    // (The limit is a courtesy: a fault in it never stops a drawing.)
+    console.error('Rate limiter:', err);
+    return true;
+  }
 }
 
 /** What a client that asked too much is told, and when to ask again. */
@@ -102,8 +108,9 @@ const TOO_MANY = 'Too many requests: wait a minute, or draw covers in your own c
  * @returns {Record<string, string>}
  */
 function disposition(q, title, ext) {
-  if (!q.has('download')) return {};
-  const asked = q.getAll('download').at(-1)?.trim() ?? '';
+  const asked = q.getAll('download').at(-1)?.trim();
+  // (Off as the API's other switches are: 0 or false, or not given.)
+  if (asked === undefined || /^(0|false)$/i.test(asked)) return {};
   const name = `${slug(asked && !/^(1|true)$/i.test(asked) ? asked : title)}.${ext}`;
   // (A name in ASCII for older clients, and the name itself, encoded, for the rest.)
   const ascii = name.replace(/[^\x20-\x7e]/g, '_');
@@ -256,24 +263,39 @@ export function info(request) {
 /** The PNG engine, made once an instance needs it. @type {Promise<Awaited<ReturnType<typeof pngEngine>>> | null} */
 let engine = null;
 
+/** The site's font files, read once for every engine. @type {Map<string, Promise<Uint8Array>>} */
+const fontFiles = new Map();
+
 /**
- * resvg and the fonts, ready: its WebAssembly comes with the Worker (in Node, as env.RESVG_WASM),
- * the fonts are the site's own files (public/fonts).
+ * resvg and the fonts, ready: a copy of resvg of its own (worker/resvg-glue.js), so an engine
+ * whose resvg trapped is replaced by a new one, on the WebAssembly that comes with the Worker (in
+ * Node, as env.RESVG_WASM); the fonts are the site's own files (public/fonts).
  * @param {Env} env @param {string} origin
  */
 function pngEngineFor(env, origin) {
   if (!engine) {
+    /** @param {string} file */
+    const fontFile = (file) => {
+      let read = fontFiles.get(file);
+      if (!read) {
+        read = (async () => {
+          if (!env.ASSETS) throw new Error('No site files to read the fonts from');
+          const res = await env.ASSETS.fetch(new Request(new URL(`/fonts/${file}`, origin)));
+          if (!res.ok) throw new Error(`fonts/${file}: ${res.status}`);
+          return new Uint8Array(await res.arrayBuffer());
+        })();
+        fontFiles.set(file, read);
+        // (A failure isn't kept: the next engine reads it again.)
+        read.catch(() => fontFiles.delete(file));
+      }
+      return read;
+    };
     const made = (async () => {
-      const [resvg, wasm] = await Promise.all([
-        import('@resvg/resvg-wasm'),
+      const [{ createResvg }, wasm] = await Promise.all([
+        import('./resvg-glue.js'),
         env.RESVG_WASM ?? import('./resvg-wasm.js').then((m) => m.default),
       ]);
-      return pngEngine(resvg, wasm, async (file) => {
-        if (!env.ASSETS) throw new Error('No site files to read the fonts from');
-        const res = await env.ASSETS.fetch(new Request(new URL(`/fonts/${file}`, origin)));
-        if (!res.ok) throw new Error(`fonts/${file}: ${res.status}`);
-        return new Uint8Array(await res.arrayBuffer());
-      });
+      return pngEngine(createResvg(), wasm, fontFile);
     })();
     // (A failure isn't kept: the next request tries again.)
     made.catch(() => {
@@ -309,6 +331,21 @@ export async function png(request, env) {
   const url = new URL(request.url);
   const kind = url.pathname === '/api/cover.png' ? 'cover' : url.pathname === '/api/mockup.png' ? 'mockup' : null;
   if (!kind) return null;
+  const answer = await drawPng(request, env, url, kind);
+  // A link preview's picture that can't be drawn (too many asked of the crawler's address, resvg
+  // unavailable or failed, a script the fonts lack) is the site's own: never an error card.
+  if (!answer.ok && answer.status !== 405 && url.searchParams.has('preview')) {
+    return Response.redirect(new URL('/og.png', url).href, 302);
+  }
+  return answer;
+}
+
+/**
+ * A PNG answer: the picture, or why not.
+ * @param {Request} request @param {Env} env @param {URL} url @param {'cover' | 'mockup'} kind
+ * @returns {Promise<Response>}
+ */
+async function drawPng(request, env, url, kind) {
   const refused = notGet(request);
   if (refused) return refused;
   const q = url.searchParams;
@@ -325,9 +362,16 @@ export async function png(request, env) {
     console.error(err);
     return refusal(new Error('PNG covers are unavailable just now: ask for the SVG (cover.svg)'), 503);
   }
-  // (resvg trapped on an earlier drawing in this instance of the Worker: none until the next.)
-  if (drawer.trapped)
-    return refusal(new Error('PNG covers are unavailable just now: ask for the SVG (cover.svg)'), 503);
+  // (An engine whose resvg trapped on an earlier drawing draws no more: a new one takes its place.)
+  if (drawer.trapped) {
+    if (engine && (await engine) === drawer) engine = null;
+    try {
+      drawer = await pngEngineFor(env, url.origin);
+    } catch (err) {
+      console.error(err);
+      return refusal(new Error('PNG covers are unavailable just now: ask for the SVG (cover.svg)'), 503);
+    }
+  }
   try {
     const { cover, svg, width, height } = drawer.laidOut(() => drawn(kind, q));
     // At its size, or smaller to fit (a large cover, a story); a scale asked for that can't fit is
@@ -346,7 +390,6 @@ export async function png(request, env) {
       throw new RangeError(`scale ${scale} draws ${width} × ${height} as nothing: ask for a larger scale`);
     }
     if (!drawer.draws(svg)) {
-      if (q.has('preview')) return Response.redirect(new URL('/og.png', url).href, 302);
       return refusal(
         new RangeError(
           'The PNG fonts have Latin, Greek and Cyrillic letters, not all of this text: ask for the SVG (cover.svg), which your fonts draw',
@@ -372,9 +415,13 @@ export async function png(request, env) {
     } catch (err) {
       // resvg failed: our fault, not the request's. (What was drawn, without the visitor's text.)
       console.error(`PNG ${kind} in ${cover.style}, ${width} × ${height} at ${scale}:`, err);
-      // (Kept at the edge for an hour, so the same design isn't drawn again and again meanwhile.)
+      // A trap may be the instance's state, not the design's: the next request gets an engine
+      // with a new resvg, and may draw it. An error resvg reports is the design's: kept at the
+      // edge for an hour, so it isn't drawn again and again meanwhile.
+      const trap = drawer.trapped;
+      if (trap && engine && (await engine) === drawer) engine = null;
       return refusal(new Error('The PNG could not be drawn: ask for the SVG (cover.svg)'), 500, {
-        'Cache-Control': 'public, max-age=3600',
+        'Cache-Control': trap ? 'no-store' : 'public, max-age=3600',
       });
     }
     return new Response(request.method === 'HEAD' ? null : /** @type {BodyInit} */ (bytes), {

@@ -108,8 +108,8 @@ function prepared(svg, fonts) {
 const started = new WeakMap();
 /**
  * resvgs that trapped: a trapped WebAssembly instance is in no state to draw again (what it held
- * is never freed, its stack is where the trap left it), and it can't be started anew, so every
- * engine on it draws no more. The runtime's next instance of the Worker has a fresh one.
+ * is never freed, its stack is where the trap left it), so every engine on it draws no more. The
+ * Worker makes a new engine on a copy of resvg of its own (worker/resvg-glue.js).
  * @type {WeakSet<object>}
  */
 const trapped = new WeakSet();

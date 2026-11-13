@@ -90,7 +90,7 @@ The query takes the options' own names (`title`, `author`, `subtitle`, `series`,
 
 A title breaks its line at `%0A`. A design's link from the app (Copy link: `https://covers.otsirh.dev/?title=…`) shows that design in link previews, as a social card drawn by `/api/mockup.png`. Anyone may embed the answers (CORS and `Cross-Origin-Resource-Policy` allow it), and the headers `X-Cover-Style`, `X-Cover-Palette` and `X-Cover-Version` say what was drawn. The same URL always draws the same cover in a version of the library, so answers are cached for a day. Options the library rejects get a `400` with the reason as plain text. Add `download=1` to any image to get it as a file named after the title (or `download=my-cover` to name it).
 
-The API is free to use. PNGs not yet cached are limited to 240 a minute for each client, and MCP requests to 120 (`429` with `Retry-After` beyond that); SVGs aren't limited. If you need more, draw the covers in your own code with the library, or run your own copy: fork the repository, set your `account_id` and `routes` (or `"workers_dev": true`) in `wrangler.jsonc`, and run `npx wrangler deploy`.
+The API is free to use. PNGs not yet cached are limited to 240 a minute for each client, and MCP requests to 600 (`429` with `Retry-After` beyond that); SVGs aren't limited. If you need more, draw the covers in your own code with the library, or run your own copy: fork the repository, set your `account_id` and `routes` (or `"workers_dev": true`) in `wrangler.jsonc`, and run `npx wrangler deploy`.
 
 ## On any page: `<book-cover>`
 

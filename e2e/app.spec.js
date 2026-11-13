@@ -2568,3 +2568,12 @@ test('the dev server never serves hidden files, however the URL spells the path'
     expect(await res.text(), path).not.toMatch(/ref: refs|"lockfileVersion"|Content-Security-Policy/);
   }
 });
+
+test('a link’s language is the design’s: its capitals, and every link the app writes', async ({ page }) => {
+  await page.goto('/#title=istanbul&author=Ada&style=bigtype&case=upper&seed=t&lang=tr');
+  await ready(page);
+  await expect.poll(() => svgSoon(page, '#preview')).toContain('İSTANBUL');
+  await page.locator('#author').fill('Ada Yılmaz');
+  await expect.poll(() => new URL(page.url()).hash).toContain('lang=tr');
+  await expect.poll(() => svgSoon(page, '#preview')).toContain('İSTANBUL');
+});

@@ -506,6 +506,11 @@ test('the API describes itself: what a query draws, the catalog, and OpenAPI', a
 test('download names the file after the title, or as asked', async () => {
   const plain = /** @type {Response} */ (get('/api/cover.svg?title=Dune'));
   assert.equal(plain.headers.get('content-disposition'), null);
+  // Off as the other switches are.
+  for (const off of ['0', 'false', 'FALSE']) {
+    const res = /** @type {Response} */ (get(`/api/cover.svg?title=Dune&download=${off}`));
+    assert.equal(res.headers.get('content-disposition'), null, off);
+  }
   const named = /** @type {Response} */ (get('/api/cover.svg?title=The+Café+Days&download=1'));
   assert.equal(
     named.headers.get('content-disposition'),
@@ -553,6 +558,14 @@ test('PNGs and MCP requests past a client’s limit are refused with 429; cached
   const svg = await worker.fetch(new Request('https://covers.example/api/cover.svg?title=Dune', { headers }), env, ctx);
   assert.equal(svg.status, 200);
   assert.equal(png.keys.length, 1);
+  // A link preview's picture is never an error: past the limit, it's the site's own image.
+  const preview = await worker.fetch(
+    new Request('https://covers.example/api/mockup.png?title=Dune&kind=card&preview=1', { headers }),
+    env,
+    ctx,
+  );
+  assert.equal(preview.status, 302);
+  assert.equal(preview.headers.get('location'), 'https://covers.example/og.png');
   const post = new Request('https://covers.example/mcp', {
     method: 'POST',
     headers: { ...headers, 'content-type': 'application/json' },
@@ -562,6 +575,22 @@ test('PNGs and MCP requests past a client’s limit are refused with 429; cached
   assert.equal(refused.status, 429);
   assert.equal(refused.headers.get('retry-after'), '60');
   assert.equal((await refused.json()).error.code, -32000);
+  // A limiter that fails stops nothing: the limit is a courtesy.
+  const broken = {
+    async limit() {
+      throw new Error('binding down');
+    },
+  };
+  const unlimited = await worker.fetch(
+    new Request('https://covers.example/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping' }),
+    }),
+    { MCP_LIMIT: broken },
+    ctx,
+  );
+  assert.equal(unlimited.status, 200);
   // Within the limit, the answer.
   const open = await worker.fetch(
     new Request('https://covers.example/mcp', {
@@ -583,4 +612,14 @@ test('the cache key keeps every parameter the API reads (OpenAPI’s, at least)'
     for (const p of /** @type {any} */ (item).get?.parameters ?? [])
       assert.ok(API_PARAMETERS.includes(p.name), `${path} ${p.name}`);
   }
+});
+
+test('a link names its language, and the app’s link reader takes it (and only a tag)', async () => {
+  const { LINK, writeLink, LINK_FIELDS } = await import('../src/link.js');
+  assert.equal(LINK.lang(' tr '), 'tr');
+  assert.equal(LINK.lang('zh-Hant'), 'zh-Hant');
+  for (const bad of ['', 'turkish!', 'x', `en-${'a'.repeat(40)}`]) assert.equal(LINK.lang(bad), undefined, bad);
+  const empty = Object.fromEntries(Object.entries(LINK_FIELDS).map(([k, f]) => [k, f.empty]));
+  assert.equal(writeLink({ ...empty, title: 'x' }).has('lang'), false);
+  assert.equal(writeLink({ ...empty, title: 'x', lang: 'tr' }).get('lang'), 'tr');
 });

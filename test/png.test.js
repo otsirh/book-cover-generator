@@ -2,6 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { FONT_FILES, GENERIC, fontSet, readFont } from '../worker/fonts.js';
 import { pngEngine, drawnText, prepare, COVER_PIXELS } from '../worker/png.js';
 import { createCover, createMockup, styles, palettes, FONTS, measureText } from '../src/index.js';
@@ -335,3 +336,24 @@ test('Aurora sets its text at 3:1 or more against the pixels around it, over eve
     }
   });
 });
+
+test(
+  'the Worker’s copy of resvg (worker/resvg-glue.js) is the package’s, and each copy has an instance of its own',
+  { skip },
+  async () => {
+    const { execFileSync } = await import('node:child_process');
+    execFileSync(process.execPath, [fileURLToPath(new URL('../scripts/vendor-resvg.js', import.meta.url)), '--check']);
+    const { createResvg } = await import('../worker/resvg-glue.js');
+    const wasm = await WebAssembly.compile(file('node_modules/@resvg/resvg-wasm/index_bg.wasm'));
+    const fonts = FONT_FILES.slice(0, 1);
+    const [one, two] = [createResvg(), createResvg()];
+    assert.notEqual(one.Resvg, two.Resvg);
+    const svg =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="10"><rect width="20" height="10" fill="#c00"/></svg>';
+    for (const copy of [one, two]) {
+      const drawer = await pngEngine(copy, wasm, async () => file(`public/fonts/${fonts[0]}`));
+      const png = drawer.render(svg);
+      assert.deepEqual([...png.subarray(1, 4)], [0x50, 0x4e, 0x47]);
+    }
+  },
+);

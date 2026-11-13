@@ -1,0 +1,18 @@
+name: MCP registry publisher
+description: >
+  The official MCP registry's publisher (github.com/modelcontextprotocol/registry), pinned to a
+  version and its archive's hash, as ./mcp-publisher. One copy for CI and the release.
+
+runs:
+  using: composite
+  steps:
+    - name: Download and check mcp-publisher
+      shell: bash
+      env:
+        VERSION: v1.8.9
+        SHA256: 4d527ca8f1ced0394c962dc925c2a4a4addef441cbefd62501c875e9481823a8
+      run: |
+        curl -fsSLo mcp-publisher.tar.gz "https://github.com/modelcontextprotocol/registry/releases/download/${VERSION}/mcp-publisher_linux_amd64.tar.gz"
+        echo "${SHA256}  mcp-publisher.tar.gz" | sha256sum -c -
+        tar xzf mcp-publisher.tar.gz mcp-publisher
+        rm mcp-publisher.tar.gz

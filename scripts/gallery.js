@@ -2,6 +2,7 @@
 // opening the app in that style. Written by scripts/build.js; the dev server answers it too.
 import { readFileSync } from 'node:fs';
 import { escapeXml as esc } from '../src/core.js';
+import { familyName } from '../src/shared.js';
 import { aboutHtml } from './about.js';
 import { listStyles, genres } from '../src/index.js';
 
@@ -57,13 +58,6 @@ const BY_GENRE = {
   children: ['The Brave Little Fox', 'Pip Hollins', ''],
   nonfiction: ['The Habit Engine', 'Yuki Tanaka', 'How small changes compound'],
 };
-
-/**
- * A family of styles as the pages name it: the library's Genre family (styles drawn for one genre
- * each) is "Themed", as in the app, where Genre is the menu that filters the styles.
- * @param {string} group
- */
-const familyName = (group) => (group === 'Genre' ? 'Themed' : group);
 
 /**
  * The app's header and footer (index.html), for one of the site's pages: one copy of the site's
