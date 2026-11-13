@@ -217,9 +217,13 @@ test('the API and the app read one link alike: the last of a repeated key, CRLF,
 test('a format is a shape a width or height may scale; the library says what’s wrong with a size', () => {
   assert.deepEqual(optionsFromLink(new URLSearchParams('format=10x16&width=1600')), { width: 1600, height: 2560 });
   assert.deepEqual(optionsFromLink(new URLSearchParams('format=16x25&height=2500')), { width: 1600, height: 2500 });
-  // (A width or a height alone sizes the paperback's shape, as the CLI does.)
-  assert.deepEqual(optionsFromLink(new URLSearchParams('width=1e3')), { width: 1000, height: 1500 });
+  // (A width or a height alone sizes the paperback's shape, as the CLI does: a width alone as the
+  // library takes it, rounded first; a height alone with its width, said of the height if too small.)
+  assert.deepEqual(optionsFromLink(new URLSearchParams('width=1e3')), { width: 1000 });
   assert.deepEqual(optionsFromLink(new URLSearchParams('height=1500')), { width: 1000, height: 1500 });
+  const fractional = createCover(optionsFromLink(new URLSearchParams('title=x&width=600.4')));
+  assert.deepEqual([fractional.width, fractional.height], [600, 900]);
+  assert.throws(() => optionsFromLink(new URLSearchParams('height=73')), /height 73 makes a paperback 49 px wide/);
   assert.throws(
     () => optionsFromLink(new URLSearchParams('titleCase=bold')),
     /titleCase is upper or normal, got "bold"/,
@@ -574,7 +578,14 @@ test('PNGs and MCP requests past a client’s limit are refused with 429; cached
   assert.match(await busy.text(), /Too many requests/);
   assert.deepEqual(png.keys, ['203.0.113.9']);
   // A query the library refuses is refused before the limit is asked (or resvg started).
-  for (const query of ['title=Dune&style=nope', 'title=Dune&scale=9', 'title=Dune&kind=nope']) {
+  for (const query of [
+    'title=Dune&style=nope',
+    'title=Dune&scale=9',
+    'title=Dune&scale=4',
+    'title=Dune&scale=0.0001',
+    'title=Dune&kind=nope',
+    'title=Dune&kind=story&scale=4',
+  ]) {
     const path = query.includes('kind') ? '/api/mockup.png' : '/api/cover.png';
     const bad = await worker.fetch(new Request(`https://covers.example${path}?${query}`, { headers }), env, ctx);
     assert.equal(bad.status, 400, query);

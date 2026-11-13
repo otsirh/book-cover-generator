@@ -6,7 +6,6 @@ import { parseArgs } from 'node:util';
 import {
   createCover,
   createPrintCover,
-  sizeLimits,
   listStyles,
   palettes,
   parseBookList,
@@ -14,7 +13,7 @@ import {
   genres,
 } from '../src/index.js';
 import { slug, fontEntries } from '../src/shared.js';
-import { px, formatSize, sixDigits } from '../src/link.js';
+import { px, formatSize, sixDigits, shapelessSize } from '../src/link.js';
 import { answerPayload } from '../src/mcp.js';
 
 /**
@@ -200,28 +199,15 @@ function dimensions() {
     if (values.width !== undefined || values.height !== undefined || values.format !== undefined) {
       throw new Error('--size sets the width and height: use it without --width, --height or --format');
     }
-    // (A size of its own, read as --format and links read one.)
-    if (!/^\s*\d+\s*[x×]\s*\d+\s*$/i.test(values.size)) {
-      throw new RangeError(`--size must look like 1600x2560, got "${values.size}"`);
-    }
-    const [width, height] = formatSize(values.size, undefined, undefined);
-    return { width, height };
+    // (A width and a height at once, read as --width and --height read theirs.)
+    const m = /^\s*([^x×\s]+)\s*[x×]\s*([^x×\s]+)\s*$/i.exec(values.size);
+    if (!m) throw new RangeError(`--size must look like 1600x2560, got "${values.size}"`);
+    return { width: px('--size', m[1]), height: px('--size', m[2]) };
   }
   const width = values.width === undefined ? undefined : px('--width', values.width);
   const height = values.height === undefined ? undefined : px('--height', values.height);
-  if (values.format === undefined) {
-    // The paperback shape (2:3) by default, at the width or the height given: the library makes
-    // a width alone that shape; a height alone gets its width here.
-    if (width !== undefined || height === undefined) return { width, height };
-    const [w, h] = formatSize('paperback', undefined, height);
-    // (Said of the height given, not of the width it makes.)
-    if (w < sizeLimits.min) {
-      throw new RangeError(
-        `--height ${height} makes a paperback ${w} px wide, under ${sizeLimits.min}: give a taller --height, or --width too`,
-      );
-    }
-    return { width: w, height: h };
-  }
+  // The paperback shape (2:3) by default, at the width or the height given (as the HTTP API reads them).
+  if (values.format === undefined) return shapelessSize(width, height, { width: '--width', height: '--height' });
   // A preset or a WxH shape, at the width or height asked for (as the HTTP API reads it).
   const [w, h] = formatSize(values.format, width, height);
   return { width: w, height: h };

@@ -9,11 +9,11 @@
 // measured with the built-in fonts' widths (src/metrics.js), as macOS draws them, so it can break
 // a little differently from the app on another system, which measures with its own fonts.
 
-import { createCover, createMockup, mockupKinds, version } from '../src/index.js';
+import { createCover, createMockup, version } from '../src/index.js';
 import { hex, slug } from '../src/shared.js';
 import { optionsFromLink, linkOf, LINK_FIELDS } from '../src/link.js';
-import { answerPayload, catalog } from '../src/mcp.js';
-import { escapeXml, isHex } from '../src/core.js';
+import { answerOf, answerText, catalog } from '../src/mcp.js';
+import { escapeXml } from '../src/core.js';
 import { COVER_PIXELS, MOCKUP_PIXELS, SHADOWED_PIXELS, pngEngine } from './png.js';
 import { openapi } from './openapi.js';
 
@@ -362,24 +362,10 @@ async function drawPng(request, env, url, kind) {
   const refused = notGet(request);
   if (refused) return refused;
   const q = url.searchParams;
-  // A query the library refuses is refused before anything costly (the limit, resvg, the fonts):
-  // the scale, the cover's options, and the mockup's. (The cover is drawn again, laid out in the
-  // PNG fonts.)
-  const asked = q.getAll('scale').at(-1);
-  const given = asked === undefined || asked === '' ? null : Number(asked);
-  if (given !== null && !(given > 0 && given <= 4)) {
-    return refusal(new RangeError(`scale must be a number above 0, at most 4, got "${asked}"`));
-  }
+  // A query that can't be drawn is refused before anything costly (the limit, resvg, the fonts).
+  let plan;
   try {
-    createCover(optionsFromLink(q));
-    if (kind === 'mockup') {
-      const { kind: shape, background } = mockupOptions(q);
-      if (!mockupKinds.includes(shape))
-        throw new RangeError(`Unknown mockup "${shape}". Available: ${mockupKinds.join(', ')}`);
-      if (background !== undefined && !isHex(background)) {
-        throw new RangeError(`background must be a hex colour, got ${JSON.stringify(background)}`);
-      }
-    }
+    plan = pngPlan(kind, q);
   } catch (err) {
     return refusal(err);
   }
@@ -401,72 +387,91 @@ async function drawPng(request, env, url, kind) {
       return refusal(new Error('PNG covers are unavailable just now: ask for the SVG (cover.svg)'), 503);
     }
   }
+  const { scale, pictureScale } = plan;
+  // The design again, laid out in the PNG fonts (the same size: text never changes it).
+  let laid;
   try {
-    const { cover, svg, width, height } = drawer.laidOut(() => drawn(kind, q));
-    // At its size, or smaller to fit (a large cover, a story); a scale asked for that can't fit is
-    // refused. (Auto a hair under the limit, as resvg rounds the size.)
-    const shadowed = /^(flat|ereader)$/.test(mockupOptions(q).kind);
-    const most = kind === 'cover' ? COVER_PIXELS : shadowed ? SHADOWED_PIXELS : MOCKUP_PIXELS;
-    const fit = Math.sqrt(most / (width * height));
-    const scale = given ?? (fit >= 1 ? 1 : fit * 0.995);
-    const [w, h] = [Math.ceil(width * scale), Math.ceil(height * scale)];
-    if (w * h > most) {
-      throw new RangeError(
-        `A ${kind} PNG has at most ${most} pixels; ${w} × ${h} is more: ask for a scale up to ${Math.floor(fit * 100) / 100}, the SVG, or a large PNG from the app`,
-      );
-    }
-    if (Math.round(width * scale) < 1 || Math.round(height * scale) < 1) {
-      throw new RangeError(`scale ${scale} draws ${width} × ${height} as nothing: ask for a larger scale`);
-    }
-    if (!drawer.draws(svg)) {
-      return refusal(
-        new RangeError(
-          'The PNG fonts have Latin, Greek and Cyrillic letters, not all of this text: ask for the SVG (cover.svg), which your fonts draw',
-        ),
-        422,
-      );
-    }
-    let bytes;
-    try {
-      if (kind === 'cover') bytes = drawer.render(svg, scale);
-      else {
-        // The cover drawn first, then shown in the mockup as that picture: its own filters, under
-        // the mockup's shadow, would take resvg several times the memory.
-        // (At the size the mockup shows it, at most COVER_PIXELS.)
-        const pictureScale = Math.min(
-          scale * shownAt(svg, cover),
-          0.995 * Math.sqrt(COVER_PIXELS / (cover.width * cover.height)),
-        );
-        if (Math.round(cover.width * pictureScale) < 1 || Math.round(cover.height * pictureScale) < 1) {
-          return refusal(
-            new RangeError(`scale ${scale} draws the cover in this mockup as nothing: ask for a larger scale`),
-          );
-        }
-        const picture = drawer.render(cover.svg, pictureScale);
-        const body = `<image width="${cover.width}" height="${cover.height}" href="data:image/png;base64,${base64(picture)}"/>`;
-        const flat = drawer.laidOut(() => createMockup({ ...cover, body }, mockupOptions(q)));
-        bytes = drawer.render(flat.svg, scale);
-      }
-    } catch (err) {
-      // resvg failed: our fault, not the request's. (What was drawn, without the visitor's text.)
-      console.error(`PNG ${kind} in ${cover.style}, ${width} × ${height} at ${scale}:`, err);
-      // (Not kept: it may be this instance's state, not the design's. If resvg trapped, the next
-      // request gets an engine with a new one.)
-      if (drawer.trapped) await retire(drawer);
-      return refusal(new Error('The PNG could not be drawn: ask for the SVG (cover.svg)'), 500);
-    }
-    return new Response(request.method === 'HEAD' ? null : /** @type {BodyInit} */ (bytes), {
-      headers: {
-        ...COMMON,
-        'Content-Type': 'image/png',
-        'Cache-Control': 'public, max-age=86400',
-        ...about(cover),
-        ...disposition(q, fileTitle(kind, q, cover.title), 'png'),
-      },
-    });
+    laid = drawer.laidOut(() => drawn(kind, q));
   } catch (err) {
     return refusal(err);
   }
+  const { cover, svg, width, height } = laid;
+  if (!drawer.draws(svg)) {
+    return refusal(
+      new RangeError(
+        'The PNG fonts have Latin, Greek and Cyrillic letters, not all of this text: ask for the SVG (cover.svg), which your fonts draw',
+      ),
+      422,
+    );
+  }
+  let bytes;
+  try {
+    if (kind === 'cover') bytes = drawer.render(svg, scale);
+    else {
+      // The cover drawn first, then shown in the mockup as that picture: its own filters, under
+      // the mockup's shadow, would take resvg several times the memory.
+      const picture = drawer.render(cover.svg, pictureScale);
+      const body = `<image width="${cover.width}" height="${cover.height}" href="data:image/png;base64,${base64(picture)}"/>`;
+      const flat = drawer.laidOut(() => createMockup({ ...cover, body }, mockupOptions(q)));
+      bytes = drawer.render(flat.svg, scale);
+    }
+  } catch (err) {
+    // resvg failed: our fault, not the request's. (What was drawn, without the visitor's text.)
+    console.error(`PNG ${kind} in ${cover.style}, ${width} × ${height} at ${scale}:`, err);
+    // (Not kept: it may be this instance's state, not the design's. If resvg trapped, the next
+    // request gets an engine with a new one.)
+    if (drawer.trapped) await retire(drawer);
+    return refusal(new Error('The PNG could not be drawn: ask for the SVG (cover.svg)'), 500);
+  }
+  return new Response(request.method === 'HEAD' ? null : /** @type {BodyInit} */ (bytes), {
+    headers: {
+      ...COMMON,
+      'Content-Type': 'image/png',
+      'Cache-Control': 'public, max-age=86400',
+      ...about(cover),
+      ...disposition(q, fileTitle(kind, q, cover.title), 'png'),
+    },
+  });
+}
+
+/**
+ * How a PNG of a query is drawn, or why it can't be (a RangeError, the request's fault): its
+ * scale, and for a mockup the scale of the cover's picture in it. The design is drawn (with the
+ * library's own checks of the cover's and the mockup's options) for its size.
+ * @param {'cover' | 'mockup'} kind @param {URLSearchParams} q
+ */
+function pngPlan(kind, q) {
+  const asked = q.getAll('scale').at(-1);
+  const given = asked === undefined || asked === '' ? null : Number(asked);
+  if (given !== null && !(given > 0 && given <= 4)) {
+    throw new RangeError(`scale must be a number above 0, at most 4, got "${asked}"`);
+  }
+  const { cover, svg, width, height } = drawn(kind, q);
+  // At its size, or smaller to fit (a large cover, a story); a scale asked for that can't fit is
+  // refused. (Auto a hair under the limit, as resvg rounds the size.)
+  const shadowed = kind === 'mockup' && /^(flat|ereader)$/.test(mockupOptions(q).kind);
+  const most = kind === 'cover' ? COVER_PIXELS : shadowed ? SHADOWED_PIXELS : MOCKUP_PIXELS;
+  const fit = Math.sqrt(most / (width * height));
+  const scale = given ?? (fit >= 1 ? 1 : fit * 0.995);
+  const [w, h] = [Math.ceil(width * scale), Math.ceil(height * scale)];
+  if (w * h > most) {
+    throw new RangeError(
+      `A ${kind} PNG has at most ${most} pixels; ${w} × ${h} is more: ask for a scale up to ${Math.floor(fit * 100) / 100}, the SVG, or a large PNG from the app`,
+    );
+  }
+  if (Math.round(width * scale) < 1 || Math.round(height * scale) < 1) {
+    throw new RangeError(`scale ${scale} draws ${width} × ${height} as nothing: ask for a larger scale`);
+  }
+  if (kind === 'cover') return { scale, pictureScale: scale };
+  // (The cover's picture at the size the mockup shows it, at most COVER_PIXELS.)
+  const pictureScale = Math.min(
+    scale * shownAt(svg, cover),
+    0.995 * Math.sqrt(COVER_PIXELS / (cover.width * cover.height)),
+  );
+  if (Math.round(cover.width * pictureScale) < 1 || Math.round(cover.height * pictureScale) < 1) {
+    throw new RangeError(`scale ${scale} draws the cover in this mockup as nothing: ask for a larger scale`);
+  }
+  return { scale, pictureScale };
 }
 
 /**
@@ -622,9 +627,10 @@ export async function mcp(request, env = {}, draw) {
   } catch {
     return json(400, { jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } });
   }
-  const answer = answerPayload(message, { base: url.origin, pictures: Boolean(draw) });
+  const answer = answerOf(message, { base: url.origin, pictures: Boolean(draw) });
   if (answer === null) return new Response(null, { status: 202, headers: MCP_HEADERS });
-  return jsonText(200, draw ? await withPictures(answer, url.origin, draw) : answer);
+  if (draw) await withPictures(answer, url.origin, draw);
+  return jsonText(200, answerText(answer));
 }
 
 /** The most pictures one MCP answer holds (a batch can draw twenty covers). */
@@ -634,15 +640,15 @@ const MCP_PICTURE_WIDTH = 480;
 const MCP_PICTURE_HEIGHT = 960;
 
 /**
- * An MCP answer (JSON) with the picture added to each cover or mockup it drew (the first few), as
+ * An MCP answer with the picture added to each cover or mockup it drew (the first few), as
  * an image the assistant can see and the client can show: the PNG the HTTP API draws, at most
  * MCP_PICTURE_WIDTH wide. A cover whose PNG can't be drawn (a script the fonts lack) keeps its links.
- * @param {string} answer @param {string} origin
+ * @param {any} answer  its objects, which the pictures are added to
+ * @param {string} origin
  * @param {(url: URL) => Promise<Response>} draw  fetches a PNG of the API
  */
 async function withPictures(answer, origin, draw) {
-  const parsed = JSON.parse(answer);
-  const results = (Array.isArray(parsed) ? parsed : [parsed])
+  const results = (Array.isArray(answer) ? answer : [answer])
     .map((message) => message?.result)
     .filter((result) => !result?.isError && typeof result?.structuredContent?.pngUrl === 'string')
     .filter((result) => new URL(result.structuredContent.pngUrl).origin === origin)
@@ -663,7 +669,6 @@ async function withPictures(answer, origin, draw) {
       }
     }),
   );
-  return JSON.stringify(parsed);
 }
 
 /**

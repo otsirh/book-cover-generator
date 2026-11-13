@@ -6,7 +6,11 @@
   // (The last of a repeated key, trimmed, as the app reads links: src/link.js.)
   // (A design's link from Copy link holds it in the query until the app moves it to the hash.)
   const link = location.hash.length > 1 ? location.hash.slice(1) : location.search.slice(1);
-  const format = (new URLSearchParams(link).getAll('format').at(-1) ?? '').trim();
+  // (In any case, a size as WxH, 1600X2560 or 1600 × 2560: as src/link.js reads a format.)
+  const format = (new URLSearchParams(link).getAll('format').at(-1) ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/^(\d+)\s*[x×]\s*(\d+)$/, '$1x$2');
   const root = document.documentElement;
   if (format === 'ebook' || format === 'square') root.dataset.coverFormat = format;
   // A size of its own, such as 1600x2560, if the library can make it (sizeLimits: 50 to 10,000 px,

@@ -336,17 +336,38 @@ export function handlePayload(payload, ctx = {}) {
 }
 
 /**
- * The answer to what a client sent as the JSON text to send back, or null for none. Whatever goes
- * wrong while answering is an internal error, not a crash of the server.
+ * The answer to what a client sent, as objects (null when nothing needs one): an error in answering
+ * is the Internal error answer, never a throw.
  * @param {unknown} payload @param {Context} [ctx]
  */
-export function answerPayload(payload, ctx = {}) {
+export function answerOf(payload, ctx = {}) {
   try {
-    const answer = handlePayload(payload, ctx);
-    return answer ? JSON.stringify(answer) : null;
+    return handlePayload(payload, ctx);
+  } catch {
+    return failure(null, -32603, 'Internal error');
+  }
+}
+
+/**
+ * An answer as JSON text (one that can't be written, an id nested too deep say, the Internal error).
+ * @param {unknown} answer
+ */
+export function answerText(answer) {
+  try {
+    return JSON.stringify(answer);
   } catch {
     return JSON.stringify(failure(null, -32603, 'Internal error'));
   }
+}
+
+/**
+ * The answer to what a client sent, as the JSON text a transport sends (null when nothing needs
+ * one).
+ * @param {unknown} payload @param {Context} [ctx]
+ */
+export function answerPayload(payload, ctx = {}) {
+  const answer = answerOf(payload, ctx);
+  return answer ? answerText(answer) : null;
 }
 
 /** @param {unknown} id @param {unknown} result */

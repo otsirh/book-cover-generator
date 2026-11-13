@@ -581,7 +581,7 @@ function render({ fade = false, announce = false } = {}) {
   applyShape();
   renderPreview(fade, announce);
   // The list's preview follows the design too (not its title and author, which the list replaces).
-  const manyKey = JSON.stringify({ ...design, title: '', author: '' });
+  const manyKey = JSON.stringify(lookOf(design));
   if (manyKey !== lastManyKey && /** @type {HTMLDetailsElement} */ ($('many')).open) {
     lastManyKey = manyKey;
     clearTimeout(manyTimer);
@@ -2060,7 +2060,7 @@ function listedBooks() {
 function bookOptions(book, i, d = design, own = /** @type {HTMLInputElement} */ ($('many-palettes')).checked) {
   // (The design's look for every book; its text is the book's own: one book's subtitle, series,
   // credit, badge or language isn't another's. A list can give each its own.)
-  const base = optionsFor({ ...d, title: '', author: '', subtitle: '', series: '', credit: '', badge: '', lang: '' });
+  const base = optionsFor(lookOf(d));
   const start = Math.max(
     0,
     palettes.findIndex((p) => p.id === d.palette),
@@ -2070,6 +2070,15 @@ function bookOptions(book, i, d = design, own = /** @type {HTMLInputElement} */ 
     ...base,
     ...(own && !book.palette ? { palette: palettes[(start + i) % palettes.length].id } : {}),
   });
+}
+
+/**
+ * A design's look, without its text: what Many covers lends every book (its subtitle, series,
+ * credit, badge and language are each book's own), and what its preview is drawn again for.
+ * @param {Design} d
+ */
+function lookOf(d) {
+  return { ...d, title: '', author: '', subtitle: '', series: '', credit: '', badge: '', lang: '' };
 }
 
 /** @type {ReturnType<typeof setTimeout> | undefined} */
@@ -2097,7 +2106,7 @@ function renderMany() {
   const extra = books.length > MAX_BOOKS ? ` (the first ${MAX_BOOKS} are made)` : '';
   $('many-count').textContent =
     error || (books.length ? `${books.length} book${books.length === 1 ? '' : 's'}${extra}` : '');
-  lastManyKey = JSON.stringify({ ...design, title: '', author: '' });
+  lastManyKey = JSON.stringify(lookOf(design));
   manyQueue = [];
   $('many-preview').replaceChildren(
     ...books.slice(0, PREVIEWED).map((book, i) => {

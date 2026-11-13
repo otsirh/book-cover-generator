@@ -284,6 +284,25 @@ export function formatSize(format, width, height) {
 }
 
 /**
+ * A cover's size from a width or a height without a format, as the CLI and the HTTP API read them:
+ * both, as given; a width alone, as the library takes it (the paperback's shape, 2:3); a height
+ * alone, with the paperback's width for it, said of the height if that width is too small.
+ * @param {number | undefined} width @param {number | undefined} height
+ * @param {{ width: string, height: string }} [names] the parameters, as an error names them
+ * @returns {{ width?: number, height?: number }}
+ */
+export function shapelessSize(width, height, names = { width: 'width', height: 'height' }) {
+  if (width !== undefined || height === undefined) return { width, height };
+  const [w, h] = formatSize('paperback', undefined, height);
+  if (w < sizeLimits.min) {
+    throw new RangeError(
+      `${names.height} ${height} makes a paperback ${w} px wide, under ${sizeLimits.min}: give a taller ${names.height}, or ${names.width} too`,
+    );
+  }
+  return { width: w, height: h };
+}
+
+/**
  * Cover options from a link's query (the HTTP API's). The app's link parameters are read as the
  * app reads them, the last of a repeated one too, except that a value the app would drop is an
  * error here. Also the library's option names (`titleCase`, `genre`, `lang`, `width`, `height`)
@@ -343,11 +362,12 @@ export function optionsFromLink(q) {
   const width = given('width') === undefined ? undefined : px('width', /** @type {string} */ (given('width')));
   const height = given('height') === undefined ? undefined : px('height', /** @type {string} */ (given('height')));
   const format = given('format');
-  // (A width or a height alone sizes the default shape, the paperback's, as the CLI does; both
-  // are a size of their own.)
   if (format !== undefined) [o.width, o.height] = formatSize(format, width, height);
-  else if (width !== undefined && height !== undefined) [o.width, o.height] = [width, height];
-  else if (width !== undefined || height !== undefined) [o.width, o.height] = formatSize('paperback', width, height);
+  else {
+    const size = shapelessSize(width, height);
+    if (size.width !== undefined) o.width = size.width;
+    if (size.height !== undefined) o.height = size.height;
+  }
   const [bg, ink, accent] = [given('bg'), given('ink'), given('accent')];
   if (bg || ink || accent) {
     if (!bg || !ink || !accent) throw new RangeError('Your own colours need bg, ink and accent');

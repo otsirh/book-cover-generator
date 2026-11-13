@@ -115,3 +115,29 @@ test('the about page answers what people ask, in the site’s chrome, and the si
   for (const path of ['/', ...Object.keys(PAGES)])
     assert.ok(sitemap.includes(`<loc>https://covers.otsirh.dev${path}</loc>`), path);
 });
+
+test('boot.js paints a design link’s shape as the app reads it: any case, from the hash or the query', async () => {
+  const { runInNewContext } = await import('node:vm');
+  const code = readFileSync(new URL('../site/boot.js', import.meta.url), 'utf8');
+  /** @param {string} hash @param {string} [search] */
+  const paint = (hash, search = '') => {
+    /** @type {Record<string, string>} */
+    const props = {};
+    const root = {
+      classList: { add() {} },
+      dataset: /** @type {Record<string, string>} */ ({}),
+      style: { setProperty: (/** @type {string} */ k, /** @type {string} */ v) => (props[k] = v) },
+    };
+    runInNewContext(code, { location: { hash, search }, document: { documentElement: root }, URLSearchParams });
+    return { shape: root.dataset.coverFormat, ...props };
+  };
+  assert.equal(paint('#title=x&format=Ebook').shape, 'ebook');
+  assert.equal(paint('#title=x&format=SQUARE').shape, 'square');
+  assert.deepEqual(paint('#title=x&format=1600X2560'), { shape: 'custom', '--cover-w': '1600', '--cover-h': '2560' });
+  assert.deepEqual(paint('', '?title=x&format=1600%20%C3%97%202560'), {
+    shape: 'custom',
+    '--cover-w': '1600',
+    '--cover-h': '2560',
+  });
+  assert.equal(paint('#title=x&format=paperback').shape, undefined);
+});
