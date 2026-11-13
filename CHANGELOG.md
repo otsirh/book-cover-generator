@@ -25,9 +25,10 @@ All notable changes to this project are documented here. The format follows [Kee
 - `parseBookList` reads only its own column names: a `constructor` or `__proto__` column is ignored like any other unknown one.
 - `create_mockup`'s image link holds its line as the mockup draws it (at most 80 characters).
 - The HTTP API takes one to three accents for your own colours, as a link's palette holds (four or more gave links that drew nothing), and the links `/api/cover.json` and the MCP server write keep the language a query gave (`lang=tr`), so they draw the same capitals.
-- On an iPhone or iPad, a size of your own too large for the device's canvas even at 1× exports as large as the device can draw, rather than failing.
+- On an iPhone or iPad, a size of your own too large for the device's canvas even at 1× exports as large as the device can draw, rather than failing; exports and mockups (a Kindle-size cover's flat or 3D book) count their sides as the canvas rounds them, so none lands a few pixels over the device's limit.
 - A design's link from Copy link opens in its shape at once (an eBook or square no longer starts as a paperback), and leaves out pins its style doesn't have, which cost it its link preview.
 - `wrapText` no longer repeats a line when a long word's last letter is wider than the line by itself; in a very narrow box, `fitText` never adds a hyphen past the edge, never makes a line of a lone space, and shortens to an ellipsis that fits.
+- A PNG too large for the scale asked suggests a scale it then takes; a mockup's PNG refusal points at `mockup.svg`, which draws the mockup; the MCP server's links pin only what the cover took (a style the seed picked that lacks a pin draws its own); a design's link preview has one address whatever tracking the link carried.
 - A design's link preview page names itself as its canonical address; `preview=0` is off, as the API's other switches are; a custom palette's `dark` must be true or false (`'false'` made it dark); the back cover's text budget counts an emoji as one character, as it clips them; `setTextMeasurer` returns the measurer it replaces, and the Worker's PNG layout puts yours back; the style rail draws other styles without your style's pins, as picking one draws it, and a pin redraws only your style's tile; `svgUtils.shadowFilter` takes a `margin` for its region.
 - The MCP server names a mockup as the library read its kind (`Ereader` is "an ereader mockup"); a mockup's background of spaces is none; the print panel offers each of your own colours once.
 - The dev server never serves a hidden file (`.git`, `node_modules`), however the URL spells its path.
@@ -61,7 +62,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Security
 
-- The MCP server run locally (`book-cover --mcp`) saves a cover (`output`) only as an `.svg` file, and never over a file that isn't an SVG, so an assistant talked into a path can't replace other files.
+- The MCP server run locally (`book-cover --mcp`) saves a cover (`output`) only as an `.svg` file, never over a file that isn't an SVG and never through a link, so an assistant talked into a path can't replace or make other files.
 - Releases: the job that publishes to npm runs none of the repository's code; it publishes the package the checks passed, which is the one the GitHub release signs. JSR is checked and published with a pinned Deno instead of a package fetched at run time.
 
 ### Changed

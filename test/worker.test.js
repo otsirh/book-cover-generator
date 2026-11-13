@@ -2,6 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import worker, { api } from '../worker/index.js';
+import { handleMessage } from '../src/mcp.js';
 import { optionsFromLink } from '../src/link.js';
 import { createCover, createMockup, version } from '../src/index.js';
 
@@ -338,7 +339,16 @@ test(
     assert.equal((await fetchPath('/api/cover.png?title=Dune&style=nope')).status, 400);
     const japanese = await fetchPath(`/api/cover.png?title=${encodeURIComponent('灯台守')}`);
     assert.equal(japanese.status, 422);
-    assert.match(await japanese.text(), /ask for the SVG/);
+    assert.match(await japanese.text(), /ask for the SVG \(cover\.svg\)/);
+    // (A mockup's refusal names the mockup's SVG, which draws what was asked.)
+    assert.match(
+      await (await fetchPath(`/api/mockup.png?kind=card&title=${encodeURIComponent('灯台守')}`)).text(),
+      /mockup\.svg/,
+    );
+    // The scale a too-large PNG suggests is one it takes.
+    const tooBig = await (await fetchPath('/api/cover.png?title=Dune&width=127&height=381&scale=4')).text();
+    const suggestion = /a scale up to ([\d.]+)/.exec(tooBig)?.[1];
+    assert.equal((await fetchPath(`/api/cover.png?title=Dune&width=127&height=381&scale=${suggestion}`)).status, 200);
     // For a link preview, the site's own picture instead.
     const fallback = await fetchPath(`/api/mockup.png?kind=card&preview=1&title=${encodeURIComponent('灯台守')}`);
     assert.equal(fallback.status, 302);
@@ -464,6 +474,12 @@ test('a design’s link (/?title=…) gets its own link preview; the site’s he
   const oddImage = new URL(/<meta property="og:image" content="([^"]+)"/.exec(odd)?.[1].replaceAll('&amp;', '&') ?? '');
   for (const key of ['scale', 'download', 'text', 'variant']) assert.equal(oddImage.searchParams.get(key), null, key);
   assert.match(html, /<meta property="og:image:alt" content="The cover of Dune by Frank Herbert"/);
+  // The page is the design's own, at one address: its canonical and og:url, whatever else the link
+  // carried (utm_…).
+  const tracked = await (
+    await worker.fetch(new Request('https://covers.example/?title=Dune&utm_source=x&fbclid=y'), env, { waitUntil() {} })
+  ).text();
+  assert.doesNotMatch(/<meta property="og:url" content="([^"]+)"/.exec(tracked)?.[1] ?? '', /utm_source|fbclid/);
   // The page is the design's own: its canonical address too.
   assert.match(html, /<link rel="canonical" href="https:\/\/covers\.example\/\?title=Dune&amp;author=Frank\+Herbert/);
   // The page's validators don't describe the page rewritten.
@@ -776,4 +792,31 @@ test('sizeOfFormat reads a format as links do: one they refuse is the paperback;
   for (const refused of ['10x10', '99999x99999', '100x1000', 'nope'])
     assert.deepEqual(sizeOfFormat(refused), [600, 900], refused);
   assert.equal(createMockup(createCover({ title: 'x' }), { kind: /** @type {any} */ ('Flat') }).kind, 'flat');
+});
+
+test('scaleWithin: a scale whose rounded sides stay within the pixels, and the PNG’s suggestion is one it takes', async () => {
+  const { scaleWithin } = await import('../src/shared.js');
+  const flat = scaleWithin(2048, 3008, 16_777_216, 2);
+  assert.ok(Math.round(2048 * flat) * Math.round(3008 * flat) <= 16_777_216);
+  const tall = scaleWithin(2413, 7239, 16_777_216, 1, { step: 0.01 });
+  assert.equal(tall, 0.97);
+  assert.equal(scaleWithin(600, 900, Infinity, 2), 2);
+  const suggested = scaleWithin(127, 381, 600_000, 4, { round: Math.ceil, step: 0.01 });
+  assert.ok(Math.ceil(127 * suggested) * Math.ceil(381 * suggested) <= 600_000);
+  assert.equal(String(suggested), '3.51');
+});
+
+test('an MCP cover’s link pins only what the cover took (a style the seed picked may not offer a pin)', () => {
+  for (const seed of ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']) {
+    const answer = /** @type {any} */ (
+      handleMessage({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: { name: 'create_cover', arguments: { title: 'X', seed, variants: { layout: 'open' }, svg: true } },
+      })
+    ).result;
+    const link = new URL(answer.structuredContent.imageUrl).searchParams;
+    assert.equal(createCover(optionsFromLink(link)).svg, answer.content[1].text, seed);
+  }
 });

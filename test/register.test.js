@@ -69,7 +69,9 @@ test('a class style with private fields renders with itself as `this`', (t) => {
   assert.equal(style.calls, 1, 'writes to `this` reach the instance');
 });
 
-test('a built-in style is replaced only when asked, and can be brought back', () => {
+test('a built-in style is replaced only when asked, and can be brought back', (t) => {
+  // (The built-in back, and no test style left, even if an assertion fails.)
+  t.after(() => ['minimal', 'test-gone'].forEach((id) => unregisterStyle(id)));
   const plain = { id: 'minimal', render: () => '<rect width="1" height="1" fill="#abc123"/>' };
   assert.throws(() => registerStyle(plain), /built-in style; pass \{ replace: true \}/);
   assert.throws(() => registerStyle({ id: 'random', render: () => '' }), /picks one/);

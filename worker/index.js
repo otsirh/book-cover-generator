@@ -10,7 +10,7 @@
 // a little differently from the app on another system, which measures with its own fonts.
 
 import { createCover, createMockup, listStyles, version } from '../src/index.js';
-import { hex, slug, joinBytes } from '../src/shared.js';
+import { hex, slug, joinBytes, scaleWithin } from '../src/shared.js';
 import {
   optionsFromLink,
   linkOf,
@@ -80,11 +80,17 @@ function notGet(request) {
 }
 
 /** @param {unknown} err @param {number} [status] @param {Record<string, string>} [extra] headers */
-const refusal = (err, status = 400, extra = {}) =>
-  new Response(`${err instanceof Error ? err.message : String(err)}\n`, {
+const refusal = (err, status = 400, extra = {}) => {
+  // (A TypeError or ReferenceError is the code's fault more likely than the query's: logged, so it
+  // shows. The library says what's wrong with options as Error and RangeError.)
+  if (status === 400 && (!(err instanceof Error) || err instanceof TypeError || err instanceof ReferenceError)) {
+    console.error('Refused:', err);
+  }
+  return new Response(`${err instanceof Error ? err.message : String(err)}\n`, {
     status,
     headers: { ...COMMON, 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store', ...extra },
   });
+};
 
 /**
  * @typedef {{ limit(options: { key: string }): Promise<{ success: boolean }> }} RateLimit
@@ -391,7 +397,7 @@ async function drawPng(request, env, url, kind) {
     drawer = await pngEngineFor(env, url.origin);
   } catch (err) {
     console.error(err);
-    return refusal(new Error('PNG covers are unavailable just now: ask for the SVG (cover.svg)'), 503);
+    return refusal(new Error(`PNG covers are unavailable just now: ask for the SVG (${kind}.svg)`), 503);
   }
   // (An engine whose resvg trapped on an earlier drawing draws no more: a new one takes its place.)
   if (drawer.trapped) {
@@ -400,7 +406,7 @@ async function drawPng(request, env, url, kind) {
       drawer = await pngEngineFor(env, url.origin);
     } catch (err) {
       console.error(err);
-      return refusal(new Error('PNG covers are unavailable just now: ask for the SVG (cover.svg)'), 503);
+      return refusal(new Error(`PNG covers are unavailable just now: ask for the SVG (${kind}.svg)`), 503);
     }
   }
   const { scale, pictureScale } = plan;
@@ -415,7 +421,7 @@ async function drawPng(request, env, url, kind) {
   if (!drawer.draws(svg)) {
     return refusal(
       new RangeError(
-        'The PNG fonts have Latin, Greek and Cyrillic letters, not all of this text: ask for the SVG (cover.svg), which your fonts draw',
+        `The PNG fonts have Latin, Greek and Cyrillic letters, not all of this text: ask for the SVG (${kind}.svg), which your fonts draw`,
       ),
       422,
       // (The design's and this deployment's fonts' answer: kept, so asking again costs nothing.)
@@ -439,7 +445,7 @@ async function drawPng(request, env, url, kind) {
     // (Not kept: it may be this instance's state, not the design's. If resvg trapped, the next
     // request gets an engine with a new one.)
     if (drawer.trapped) await retire(drawer);
-    return refusal(new Error('The PNG could not be drawn: ask for the SVG (cover.svg)'), 500);
+    return refusal(new Error(`The PNG could not be drawn: ask for the SVG (${kind}.svg)`), 500);
   }
   return new Response(request.method === 'HEAD' ? null : /** @type {BodyInit} */ (bytes), {
     headers: {
@@ -474,7 +480,7 @@ function pngPlan(kind, q) {
   const [w, h] = [Math.ceil(width * scale), Math.ceil(height * scale)];
   if (w * h > most) {
     throw new RangeError(
-      `A ${kind} PNG has at most ${most} pixels; ${w} × ${h} is more: ask for a scale up to ${Math.floor(fit * 100) / 100}, the SVG, or a large PNG from the app`,
+      `A ${kind} PNG has at most ${most} pixels; ${w} × ${h} is more: ask for a scale up to ${scaleWithin(width, height, most, 4, { round: Math.ceil, step: 0.01 })}, the SVG (${kind}.svg), or a large PNG from the app`,
     );
   }
   if (Math.round(width * scale) < 1 || Math.round(height * scale) < 1) {
@@ -528,9 +534,10 @@ export async function preview(request, env) {
       html = html.replace(re, (_, start) => `${start}${escapeXml(value)}`);
     };
     set(/(<meta property="og:title" content=")[^"]*/, name);
-    set(/(<meta property="og:url" content=")[^"]*/, url.href);
-    // (This page is the design's own, not a copy of the app's home page.)
-    set(/(<link rel="canonical" href=")[^"]*/, url.href);
+    // (This page is the design's own, at one address whatever else the link carried: utm_…, fbclid…)
+    const own = `${url.origin}/?${link}`;
+    set(/(<meta property="og:url" content=")[^"]*/, own);
+    set(/(<link rel="canonical" href=")[^"]*/, own);
     set(/(<meta property="og:image" content=")[^"]*/, image.href);
     set(/(<meta property="og:image:alt" content=")[^"]*/, `The cover of ${name}`);
   }

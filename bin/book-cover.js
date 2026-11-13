@@ -1,5 +1,15 @@
 #!/usr/bin/env node
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, statSync, writeFileSync } from 'node:fs';
+import {
+  closeSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  readSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { parseArgs } from 'node:util';
@@ -437,6 +447,15 @@ function run() {
   }
 }
 
+/** Whether a path is a symbolic link (one that points nowhere yet too). @param {string} path */
+function isLink(path) {
+  try {
+    return lstatSync(path).isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+
 /** Whether a file is an SVG (a file, its start an SVG's), as a cover saved before is. @param {string} file */
 function isSvgFile(file) {
   if (!statSync(file).isFile()) return false;
@@ -489,6 +508,8 @@ function serveMcp() {
     const file = resolve(path);
     // Only an SVG, and never over a file of another kind (an assistant can be talked into a path).
     if (!/\.svg$/i.test(file)) throw new Error(`output must name an .svg file, got "${path}"`);
+    // (Nor through a link, which would write wherever it points, whatever that is called.)
+    if (isLink(file)) throw new Error(`${file} is a link: not followed`);
     if (existsSync(file) && !isSvgFile(file)) throw new Error(`${file} is there and isn't an SVG: not replaced`);
     mkdirSync(dirname(file), { recursive: true });
     writeFileSync(file, data);

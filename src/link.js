@@ -251,10 +251,13 @@ export function writeLink(design) {
 export function linkOf(options, cover) {
   /** @type {Record<string, string>} */
   const pinned = {};
-  // (Names and values in lower case, as links hold them: the library reads them in any case.)
-  for (const name of Object.keys(options.variants ?? {}).map((n) => n.toLowerCase())) {
+  // (Names and values in lower case, as links hold them: the library reads them in any case.
+  // Only a pin the cover took: a style the seed picked may not offer it, and then drew its own.)
+  for (const [given, value] of Object.entries(options.variants ?? {})) {
+    const name = given.toLowerCase();
     const key = Object.keys(cover.variants).find((k) => k.toLowerCase() === name);
-    if (key !== undefined) pinned[name] = String(cover.variants[key]).toLowerCase();
+    const drawn = key === undefined ? undefined : String(cover.variants[key]).toLowerCase();
+    if (drawn !== undefined && drawn === String(value).toLowerCase()) pinned[name] = drawn;
   }
   const own = options.palette && typeof options.palette === 'object' ? options.palette : null;
   const preset = Object.entries(formats).find(([, [w, h]]) => w === cover.width && h === cover.height);

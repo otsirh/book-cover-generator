@@ -135,3 +135,20 @@ export function joinBytes(parts) {
   }
   return out;
 }
+
+/**
+ * The largest scale, at most `wanted`, that draws a w × h picture within `most` pixels, its sides
+ * counted as drawn (`round`: Math.round as a canvas rounds them, Math.ceil as resvg does), in steps
+ * of `step` when given (0.01: a scale people read). Rounding a side up can take a scale that fits
+ * on paper just over the limit; this one never is.
+ * @param {number} w @param {number} h @param {number} most @param {number} wanted
+ * @param {{ round?: (v: number) => number, step?: number }} [how]
+ */
+export function scaleWithin(w, h, most, wanted, { round = Math.round, step = 0 } = {}) {
+  const fits = (/** @type {number} */ s) => round(w * s) * round(h * s) <= most;
+  let s = Math.min(wanted, Math.sqrt(most / (w * h)));
+  if (step) s = Math.floor(s / step) * step;
+  while (s > 0 && !fits(s)) s = step ? Math.round((s - step) / step) * step : s * 0.999;
+  // (Without a float's noise: 3.51, not 3.5100000000000002.)
+  return Math.max(Math.round(s * 1e9) / 1e9, 0);
+}

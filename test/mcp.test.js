@@ -416,3 +416,37 @@ test('create_mockup names the kind as the library read it', () => {
     assert.equal(new URL(answer.structuredContent.imageUrl).searchParams.get('kind'), made);
   }
 });
+
+test(
+  'book-cover --mcp never writes through a link, even one that points nowhere yet',
+  { skip: process.platform === 'win32' && 'links need privileges on Windows' },
+  async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'book-cover-mcp-'));
+    try {
+      const { symlink } = await import('node:fs/promises');
+      const { existsSync } = await import('node:fs');
+      await symlink(join(dir, 'autostart.desktop'), join(dir, 'link.svg'));
+      const child = spawn(
+        process.execPath,
+        [fileURLToPath(new URL('../bin/book-cover.js', import.meta.url)), '--mcp'],
+        { cwd: dir },
+      );
+      let out = '';
+      child.stdout.on('data', (d) => (out += d));
+      const save = {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: { name: 'create_cover', arguments: { title: 'X', output: join(dir, 'link.svg') } },
+      };
+      child.stdin.end(`${JSON.stringify(save)}\n`);
+      await new Promise((resolve) => child.on('close', resolve));
+      const result = JSON.parse(out.trim()).result;
+      assert.equal(result.isError, true);
+      assert.match(result.content[0].text, /is a link: not followed/);
+      assert.equal(existsSync(join(dir, 'autostart.desktop')), false);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  },
+);

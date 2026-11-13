@@ -29,7 +29,7 @@ import {
   svgToBlob,
 } from '../src/browser.js';
 import { hashString, contrast } from '../src/core.js';
-import { customColors, slug, familyName } from '../src/shared.js';
+import { customColors, slug, familyName, scaleWithin } from '../src/shared.js';
 import {
   LINK_FIELDS,
   fits,
@@ -581,14 +581,16 @@ function render({ fade = false, announce = false } = {}) {
     if (typing) galleryTimer = setTimeout(invalidateGallery, 200);
     else invalidateGallery();
   } else if (`${design.style}|${design.variant}` !== lastGalleryPins) {
-    // (The style that had them, and the one that has them now.)
-    const before = lastGalleryPins.split('|')[0];
+    // (The style that had pins, and the one that has them now: none to redraw without any.)
+    const [before, hadPins] = lastGalleryPins.split('|');
     lastGalleryPins = `${design.style}|${design.variant}`;
-    for (const style of new Set([before, design.style])) {
-      const tile = tiles.get(style);
-      if (tile) tile.dirty = true;
+    if (hadPins || design.variant) {
+      for (const style of new Set([before, design.style])) {
+        const tile = tiles.get(style);
+        if (tile) tile.dirty = true;
+      }
+      scheduleGallery();
     }
-    scheduleGallery();
   }
   const variantsKey = JSON.stringify(design);
   if (variantsKey !== lastVariantsKey) {
@@ -952,9 +954,10 @@ function buildControls() {
       // Product shots follow the cover's size: twice it, for sharpness, within what the browser can
       // draw (10,000 px a side, and about 16.7 million pixels on iPhones). Cards have their own size.
       const card = ['card', 'square', 'story'].includes(kind);
+      // (Its sides as the canvas rounds them within the device's pixels, not just on paper.)
       const scale = card
         ? 1
-        : Math.min(2, MAX_SIDE / Math.max(m.width, m.height), Math.sqrt(CANVAS_PIXELS / (m.width * m.height)));
+        : Math.min(MAX_SIDE / Math.max(m.width, m.height), scaleWithin(m.width, m.height, CANVAS_PIXELS, 2));
       const [pw, ph] = [Math.round(m.width * scale), Math.round(m.height * scale)];
       try {
         await downloadCover(m.svg, 'png', `${slug(oneLine(design.title))}-${kind}`, {
@@ -1173,9 +1176,9 @@ const colorInputs = () =>
  * @param {number} w @param {number} hgt
  */
 const maxScaleOf = (w, hgt) => {
-  const fit = Math.sqrt(CANVAS_PIXELS / (w * hgt));
-  const most = Math.min(4, Math.floor(MAX_SIDE / Math.max(w, hgt)), Math.floor(fit));
-  return most >= 1 ? most : Math.floor(fit * 100) / 100;
+  const most = Math.min(4, Math.floor(MAX_SIDE / Math.max(w, hgt)), Math.floor(Math.sqrt(CANVAS_PIXELS / (w * hgt))));
+  // (Below 1×, in hundredths, its sides as the canvas rounds them within the device's pixels.)
+  return most >= 1 ? most : scaleWithin(w, hgt, CANVAS_PIXELS, 1, { step: 0.01 });
 };
 /** The largest export scale for a format. @param {string} format */
 const maxScale = (format) => maxScaleOf(...sizeOf(format));
