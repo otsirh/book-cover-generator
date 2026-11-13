@@ -13,7 +13,7 @@ export default defineConfig({
   retries: CI ? 1 : 0,
   reporter: CI ? [['github'], ['html', { open: 'never' }]] : [['list']],
   use: {
-    baseURL: BASE_URL ?? 'http://127.0.0.1:41730',
+    baseURL: BASE_URL ?? 'http://127.0.0.1:31730',
     trace: 'retain-on-failure',
   },
   projects: [
@@ -26,8 +26,9 @@ export default defineConfig({
     ? undefined
     : {
         // Its own port, so a running `npm run dev` (port 4173, source tree) or another local server is never mistaken for the build.
-        command: 'npm run build && node scripts/serve.js 41730 dist',
-        url: 'http://127.0.0.1:41730',
+        // (Below Linux's ephemeral range, 32768-60999: the browser's own local connections can't take it first.)
+        command: 'npm run build && node scripts/serve.js 31730 dist',
+        url: 'http://127.0.0.1:31730',
         // Never reuse one: a server left on the port would serve an old build.
         reuseExistingServer: false,
       },

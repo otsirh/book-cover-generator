@@ -2,15 +2,21 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
-import * as resvg from '@resvg/resvg-wasm';
 import { FONT_FILES, fontSet, readFont } from '../worker/fonts.js';
 import { pngEngine, drawnText } from '../worker/png.js';
 import { createCover, createMockup, styles, FONTS, measureText } from '../src/index.js';
 import { textBoxes, extentOf } from './svg-text.js';
 
 const file = (/** @type {string} */ path) => new Uint8Array(readFileSync(new URL(`../${path}`, import.meta.url)));
-const wasm = file('node_modules/@resvg/resvg-wasm/index_bg.wasm');
-const engine = await pngEngine(resvg, wasm, async (name) => file(`public/fonts/${name}`));
+// resvg is a dev dependency (the site's, not the library's): where it isn't installed, as in CI's
+// jobs that test the library bare, these tests are skipped; the checks job runs them.
+const resvg = await import('@resvg/resvg-wasm').catch(() => null);
+const skip = resvg ? false : 'resvg is a dev dependency: run npm ci';
+const engine = resvg
+  ? await pngEngine(resvg, file('node_modules/@resvg/resvg-wasm/index_bg.wasm'), async (name) =>
+      file(`public/fonts/${name}`),
+    )
+  : /** @type {never} */ (null);
 
 /** A PNG's width and height, from its header. @param {Uint8Array} png */
 const sizeOf = (png) => {
@@ -45,7 +51,7 @@ test('the fonts the Worker loads are the files in public/fonts, and each stack h
   assert.equal(set.covers('مرحبا'), false);
 });
 
-test('text measured in the PNG fonts is as wide as resvg draws it', () => {
+test('text measured in the PNG fonts is as wide as resvg draws it', { skip }, () => {
   for (const [family, text] of [
     ["Georgia, 'Noto Serif', serif", 'The Lighthouse Keeper'],
     ["'Helvetica Neue', 'Liberation Sans', sans-serif", 'MARA ELLISON'],
@@ -56,7 +62,7 @@ test('text measured in the PNG fonts is as wide as resvg draws it', () => {
     // resvg's own box of the line's ink (a little inside the advance widths at either end), in the
     // family render() names for the list, as it draws covers.
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="3000" height="200"><text x="10" y="120" font-family="${engine.fonts.familyOf(family)}" font-size="100">${text}</text></svg>`;
-    const r = new resvg.Resvg(svg, {
+    const r = new /** @type {typeof import('@resvg/resvg-wasm')} */ (resvg).Resvg(svg, {
       font: { fontBuffers: FONT_FILES.map((f) => file(`public/fonts/${f}`)), loadSystemFonts: false },
     });
     const ink = r.getBBox()?.width ?? 0;
@@ -72,7 +78,7 @@ test('text measured in the PNG fonts is as wide as resvg draws it', () => {
   assert.equal(measureText('Keeper', 100, { font: FONTS.serif }), before);
 });
 
-test('every style laid out in the PNG fonts keeps its text inside the cover, and draws as a PNG', () => {
+test('every style laid out in the PNG fonts keeps its text inside the cover, and draws as a PNG', { skip }, () => {
   for (const style of styles) {
     for (const [width, height] of [
       [600, 900],

@@ -208,6 +208,11 @@ test('the app’s format and texture readers: presets, sizes it can make, on and
   assert.equal(LINK.texture('yes'), undefined);
 });
 
+// (resvg is a dev dependency: the PNG tests are skipped where it isn't installed, as in CI's bare jobs.)
+const noResvg = (await import('@resvg/resvg-wasm').then(() => false).catch(() => true))
+  ? 'resvg is a dev dependency: run npm ci'
+  : false;
+
 /** The site's files as the Worker's ASSETS binding gives them, and resvg's WebAssembly (Node can't import it). */
 const siteEnv = async () => {
   const { readFile } = await import('node:fs/promises');
@@ -221,48 +226,55 @@ const siteEnv = async () => {
         return new Response(await readFile(new URL(`../${file}`, import.meta.url)));
       },
     },
-    RESVG_WASM: await readFile(new URL('../node_modules/@resvg/resvg-wasm/index_bg.wasm', import.meta.url)),
+    // (Only the PNG tests need it.)
+    RESVG_WASM: await readFile(new URL('../node_modules/@resvg/resvg-wasm/index_bg.wasm', import.meta.url)).catch(
+      () => undefined,
+    ),
   };
 };
 
-test('PNG covers and mockups: drawn with open fonts, scaled, capped, and refused for scripts they lack', async () => {
-  const env = await siteEnv();
-  const ctx = { waitUntil() {} };
-  /** @param {string} path @param {string} [method] */
-  const fetchPath = (path, method = 'GET') =>
-    worker.fetch(new Request(`https://covers.example${path}`, { method }), env, ctx);
-  /** @param {Response} res */
-  const size = async (res) => {
-    const view = new DataView(await res.arrayBuffer());
-    return [view.getUint32(16), view.getUint32(20)];
-  };
-  const cover = await fetchPath('/api/cover.png?title=Dune&author=Frank+Herbert&style=retro&seed=s');
-  assert.equal(cover.status, 200);
-  assert.equal(cover.headers.get('content-type'), 'image/png');
-  assert.equal(cover.headers.get('x-cover-style'), 'retro');
-  assert.equal(cover.headers.get('access-control-allow-origin'), '*');
-  assert.deepEqual(await size(cover), [600, 900]);
-  assert.deepEqual(await size(await fetchPath('/api/cover.png?title=Dune&scale=2&format=square')), [1200, 1200]);
-  assert.deepEqual(await size(await fetchPath('/api/mockup.png?title=Dune&kind=card')), [1200, 630]);
-  assert.equal(await (await fetchPath('/api/cover.png?title=Dune', 'HEAD')).text(), '');
-  // What isn't drawn: a scale out of range, too many pixels, a bad option, text the fonts lack.
-  assert.match(
-    await (await fetchPath('/api/cover.png?title=Dune&scale=9')).text(),
-    /scale must be a number from 1 to 4/,
-  );
-  const big = await fetchPath('/api/cover.png?title=Dune&width=4000&height=6000');
-  assert.equal(big.status, 400);
-  assert.match(await big.text(), /at most 16777216 pixels/);
-  assert.equal((await fetchPath('/api/cover.png?title=Dune&style=nope')).status, 400);
-  const japanese = await fetchPath(`/api/cover.png?title=${encodeURIComponent('灯台守')}`);
-  assert.equal(japanese.status, 422);
-  assert.match(await japanese.text(), /ask for the SVG/);
-  // For a link preview, the site's own picture instead.
-  const fallback = await fetchPath(`/api/mockup.png?kind=card&preview=1&title=${encodeURIComponent('灯台守')}`);
-  assert.equal(fallback.status, 302);
-  assert.equal(fallback.headers.get('location'), 'https://covers.example/og.png');
-  assert.equal((await fetchPath('/api/cover.png', 'POST')).status, 405);
-});
+test(
+  'PNG covers and mockups: drawn with open fonts, scaled, capped, and refused for scripts they lack',
+  { skip: noResvg },
+  async () => {
+    const env = await siteEnv();
+    const ctx = { waitUntil() {} };
+    /** @param {string} path @param {string} [method] */
+    const fetchPath = (path, method = 'GET') =>
+      worker.fetch(new Request(`https://covers.example${path}`, { method }), env, ctx);
+    /** @param {Response} res */
+    const size = async (res) => {
+      const view = new DataView(await res.arrayBuffer());
+      return [view.getUint32(16), view.getUint32(20)];
+    };
+    const cover = await fetchPath('/api/cover.png?title=Dune&author=Frank+Herbert&style=retro&seed=s');
+    assert.equal(cover.status, 200);
+    assert.equal(cover.headers.get('content-type'), 'image/png');
+    assert.equal(cover.headers.get('x-cover-style'), 'retro');
+    assert.equal(cover.headers.get('access-control-allow-origin'), '*');
+    assert.deepEqual(await size(cover), [600, 900]);
+    assert.deepEqual(await size(await fetchPath('/api/cover.png?title=Dune&scale=2&format=square')), [1200, 1200]);
+    assert.deepEqual(await size(await fetchPath('/api/mockup.png?title=Dune&kind=card')), [1200, 630]);
+    assert.equal(await (await fetchPath('/api/cover.png?title=Dune', 'HEAD')).text(), '');
+    // What isn't drawn: a scale out of range, too many pixels, a bad option, text the fonts lack.
+    assert.match(
+      await (await fetchPath('/api/cover.png?title=Dune&scale=9')).text(),
+      /scale must be a number from 1 to 4/,
+    );
+    const big = await fetchPath('/api/cover.png?title=Dune&width=4000&height=6000');
+    assert.equal(big.status, 400);
+    assert.match(await big.text(), /at most 16777216 pixels/);
+    assert.equal((await fetchPath('/api/cover.png?title=Dune&style=nope')).status, 400);
+    const japanese = await fetchPath(`/api/cover.png?title=${encodeURIComponent('灯台守')}`);
+    assert.equal(japanese.status, 422);
+    assert.match(await japanese.text(), /ask for the SVG/);
+    // For a link preview, the site's own picture instead.
+    const fallback = await fetchPath(`/api/mockup.png?kind=card&preview=1&title=${encodeURIComponent('灯台守')}`);
+    assert.equal(fallback.status, 302);
+    assert.equal(fallback.headers.get('location'), 'https://covers.example/og.png');
+    assert.equal((await fetchPath('/api/cover.png', 'POST')).status, 405);
+  },
+);
 
 test('a design’s link (/?title=…) gets its own link preview; the site’s headers come with it', async () => {
   const env = await siteEnv();
