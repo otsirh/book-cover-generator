@@ -148,16 +148,21 @@ test('a line a face lacks a letter of is set, measured and drawn, in a family th
   }
 });
 
-test('prepare: a lone filled shape’s opacity is its fill’s; others keep theirs', { skip }, () => {
-  const svg =
-    '<svg xmlns="http://www.w3.org/2000/svg"><g filter="url(#b)"><circle r="5" fill="#f00" opacity="0.5"/>' +
-    '<rect width="5" height="5" fill="#0f0" stroke="#000" opacity="0.4"/><path d="M0 0" fill="none" stroke="#000" opacity="0.3"/>' +
-    '<g opacity="0.2"><circle r="1" fill="#00f"/></g></g></svg>';
-  const ready = prepare(svg, engine.fonts);
-  assert.match(ready, /<circle r="5" fill="#f00" fill-opacity="0.5"\/>/);
-  assert.match(ready, /<rect [^>]*stroke="#000" opacity="0.4"\/>/);
-  assert.match(ready, /<path [^>]*fill="none" [^>]*opacity="0.3"\/>/);
-  assert.match(ready, /<g opacity="0.2">/);
+test('the blurred styles draw without stopping resvg, their opacity as it is', { skip }, async () => {
+  const { createResvg } = await import('../worker/resvg-glue.js');
+  const wasm = await WebAssembly.compile(file('node_modules/@resvg/resvg-wasm/index_bg.wasm'));
+  // (A resvg of its own: one that stopped would draw no more.)
+  const drawer = await pngEngine(createResvg(), wasm, async (name) => file(`public/fonts/${name}`));
+  for (const style of ['aurora', 'thriller', 'ribbon']) {
+    for (const seed of ['s', 'c', 'x1', 'x5', 't0', 't1', 't2', 't3']) {
+      const cover = drawer.laidOut(() =>
+        createCover({ title: 'The Lighthouse Keeper', author: 'Mara Ellison', style, seed }),
+      );
+      assert.ok(prepare(cover.svg, drawer.fonts).includes(' opacity="'), 'opacity left as it is');
+      drawer.render(cover.svg, 1);
+      assert.equal(drawer.trapped, false, `${style} ${seed}`);
+    }
+  }
 });
 
 test('a drawing that traps resvg isn’t freed (that would trap again), and resvg draws no more', async () => {

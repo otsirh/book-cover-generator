@@ -395,6 +395,9 @@ function designOptions() {
 
 function run() {
   try {
+    if (values.print !== undefined && values['out-dir'] !== undefined) {
+      throw new Error('--out-dir is where --batch writes its covers: for the print cover, use --out');
+    }
     if (values.print !== undefined) {
       printCover({
         title: positionals[0],
@@ -408,6 +411,9 @@ function run() {
       if (values[/** @type {keyof typeof values} */ (name)] !== undefined) {
         throw new Error(`--${name} is for a print cover: add --print with the trim, e.g. --print 6x9`);
       }
+    }
+    if (values['out-dir'] !== undefined && values.batch === undefined) {
+      throw new Error('--out-dir is where --batch writes its covers: for one cover, use --out');
     }
     if (values.batch !== undefined) {
       batch({

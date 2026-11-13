@@ -127,7 +127,7 @@ function disposition(q, title, ext) {
   const asked = q.getAll('download').at(-1)?.trim();
   if (!switchedOn(asked)) return {};
   // (A name given with its extension keeps it once: my-cover.png is my-cover.png.)
-  const given = /^(1|true)$/i.test(asked ?? '') ? title : (asked ?? '').replace(/\.(svg|png|json)$/i, '');
+  const given = /^(1|true)$/i.test(asked ?? '') ? title : (asked ?? '').replace(/\.(svg|png)$/i, '');
   const name = `${slug(given)}.${ext}`;
   // (A name in ASCII for older clients, and the name itself, encoded, for the rest.)
   const ascii = name.replace(/[^\x20-\x7e]/g, '_');

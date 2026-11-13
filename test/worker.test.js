@@ -822,6 +822,17 @@ test('scaleWithin: a scale whose rounded sides stay within the pixels, and the P
   const suggested = scaleWithin(127, 381, 600_000, 4, { round: Math.ceil, step: 0.01 });
   assert.ok(Math.ceil(127 * suggested) * Math.ceil(381 * suggested) <= 600_000);
   assert.equal(String(suggested), '3.51');
+  // (Never past the fit by rounding its last digits: sizes where that once happened.)
+  for (const [w, h, most] of [
+    [1689, 2815, 600_000],
+    [3860, 9264, 600_000],
+    [1500, 3150, 2_100_000],
+  ]) {
+    const s = scaleWithin(w, h, most, 1, { round: Math.ceil });
+    assert.ok(Math.ceil(w * s) * Math.ceil(h * s) <= most, `${w}x${h}`);
+  }
+  const ios = scaleWithin(7860, 6192, 16_777_216, 2);
+  assert.ok(Math.round(7860 * ios) * Math.round(6192 * ios) <= 16_777_216);
 });
 
 test('an MCP cover’s link pins only what the cover took (a style the seed picked may not offer a pin)', () => {

@@ -149,8 +149,8 @@ export function scaleWithin(w, h, most, wanted, { round = Math.round, step = 0 }
   let s = Math.min(wanted, Math.sqrt(most / (w * h)));
   if (step) s = Math.floor(s / step) * step;
   while (s > 0 && !fits(s)) s = step ? Math.round((s - step) / step) * step : s * 0.999;
-  // (Without a float's noise: 3.51, not 3.5100000000000002.)
-  return Math.max(Math.round(s * 1e9) / 1e9, 0);
+  // (Without a float's noise, 3.51 not 3.5100000000000002, rounded down: never past the fit.)
+  return Math.max(Math.floor(s * 1e9) / 1e9, 0);
 }
 
 /**

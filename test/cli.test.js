@@ -508,3 +508,14 @@ test('--height alone too small for a paperback says so of the height', async () 
   assert.equal(code, 1);
   assert.match(stderr, /height 60 makes a paperback 40 px wide, under 50/);
 });
+
+test('--out-dir is for --batch: alone, or with --print, it is refused, not ignored', async () => {
+  for (const args of [
+    ['X', '--out-dir', 'covers'],
+    ['X', '--print', '6x9', '--pages', '300', '--out-dir', 'covers'],
+  ]) {
+    const { stderr, code } = await cli(...args);
+    assert.equal(code, 1, args.join(' '));
+    assert.match(stderr, /--out-dir is where --batch writes its covers/);
+  }
+});

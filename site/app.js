@@ -2304,7 +2304,8 @@ function printColourMenus() {
  * @param {Design} d @param {PrintSettings} settings @param {boolean} guides
  */
 function printCoverOf(d, settings, guides) {
-  const { colors } = current;
+  // (The colours of the design drawn, not of the one on show: the same today, as callers pass it.)
+  const { colors } = createCover(optionsFor(d));
   return createPrintCover(optionsFor(d), {
     trim: settings.trim,
     pages: settings.pages,

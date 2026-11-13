@@ -41,12 +41,11 @@ export const drawnText = (svg) =>
   [...svg.matchAll(/<(?:text|tspan)\b[^>]*>([^<]*)/g)].map((m) => unescape(/** @type {string} */ (m[1]))).join(' ');
 
 /**
- * The SVG as resvg is to draw it:
- * - each line names the one family it was measured in (resvg's own choice from a list can differ:
- *   it skips a condensed face that isn't first, and sets a line a face lacks a letter of in
- *   another face whole), and each group its list's family;
- * - a lone filled shape's opacity is its fill's (the same drawing), as resvg 2.6 can stop on
- *   opacity layers under a blur (Aurora's glows).
+ * The SVG as resvg is to draw it: each line names the one family it was measured in (resvg's own
+ * choice from a list can differ: it skips a condensed face that isn't first, and sets a line a face
+ * lacks a letter of in another face whole), and each group its list's family. (Opacity is drawn
+ * as it is: resvg 2.6 stopped on opacity under Aurora's blurs only while their region was the
+ * group's 220%; blurFilter's canvas region ended that.)
  * @param {string} svg @param {ReturnType<typeof fontSet>} fonts
  */
 export function prepare(svg, fonts) {
@@ -88,21 +87,7 @@ function prepared(svg, fonts) {
       return `<${tag}${rest} font-family="${family}"${self}>${content}`;
     },
   );
-  const flat = named.replace(
-    /<(circle|ellipse|rect|path|polygon)\b([^>]*?)\sopacity="([\d.]+)"([^>]*?)(\/?)>/g,
-    (all, tag, before, opacity, after, self) => {
-      const attrs = before + after;
-      if (
-        /\sstroke="(?!none")/.test(attrs) ||
-        /\s(?:fill-opacity|filter|mask|clip-path)=/.test(attrs) ||
-        /\sfill="none"/.test(attrs)
-      ) {
-        return all;
-      }
-      return `<${tag}${before} fill-opacity="${opacity}"${after}${self}>`;
-    },
-  );
-  return { svg: flat, whole };
+  return { svg: named, whole };
 }
 
 /** resvg's WebAssembly, started once per resvg (it refuses a second start). @type {WeakMap<object, Promise<void>>} */
@@ -122,6 +107,8 @@ const trapped = new WeakSet();
  * @param {(file: string) => Promise<Uint8Array>} fontFile  a file of public/fonts, by name
  */
 export async function pngEngine(resvg, wasm, fontFile) {
+  // (The fonts first: without them there's no engine, and no WebAssembly started for nothing.)
+  const buffers = await Promise.all(FONT_FILES.map(fontFile));
   let start = started.get(resvg);
   if (!start) {
     start = resvg.initWasm(wasm);
@@ -129,7 +116,6 @@ export async function pngEngine(resvg, wasm, fontFile) {
     start.catch(() => started.delete(resvg));
   }
   await start;
-  const buffers = await Promise.all(FONT_FILES.map(fontFile));
   const faces = buffers.map(readFont);
   const fonts = fontSet(faces);
   return {
