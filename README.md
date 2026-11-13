@@ -6,6 +6,7 @@
 ![Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)
 ![Types](https://img.shields.io/badge/types-included-blue)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/otsirh/book-cover-generator/badge)](https://scorecard.dev/viewer/?uri=github.com/otsirh/book-cover-generator)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/16646/badge)](https://www.bestpractices.dev/projects/16646)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 Generate book covers from a **title** and an **author**. 39 styles, 28 palettes or your own colours, a seeded randomizer, any size, and export to **SVG, PNG, JPEG or WebP**. The library has no dependencies and ships TypeScript types. It's written as plain ES modules, so it runs in the browser, Node, Deno and Bun.
