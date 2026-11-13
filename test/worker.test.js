@@ -890,7 +890,8 @@ test('the book’s floor shadow is its ellipse blurred alone, in a region of its
 });
 
 test('sizes and scales are read in decimal, as written (0x258 isn’t 600)', async () => {
-  const { px, decimal } = await import('../src/link.js');
+  const { px } = await import('../src/link.js');
+  const { decimal } = await import('../src/shared.js');
   assert.equal(px('width', '600'), 600);
   assert.equal(px('width', '1e3'), 1000);
   assert.equal(px('width', ' 1.5 '), 1.5);
@@ -922,4 +923,11 @@ test('the MCP server takes pins and colours as given, and says what’s wrong in
     /not both/,
   );
   assert.equal(call({ colors: { bg: '000', ink: 'fff', accents: ['f00'] } }).structuredContent.palette, 'custom');
+});
+
+test('a size in decimal everywhere: createCover’s and a list’s too; a format scaled from a rounded side', () => {
+  assert.throws(() => createCover({ title: 'x', width: /** @type {any} */ ('0x258') }), /width must be a number/);
+  assert.equal(createCover({ title: 'x', width: /** @type {any} */ ('700') }).width, 700);
+  const ebook = createCover(optionsFromLink(new URLSearchParams('title=x&format=ebook&width=1600.4')));
+  assert.deepEqual([ebook.width, ebook.height], [1600, 2560]);
 });

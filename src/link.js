@@ -16,6 +16,7 @@ import {
   VARIANT,
   LANG_TAG,
   customColors,
+  decimal,
 } from './shared.js';
 
 /** Line breaks as spaces (a single-line field: the cover spaces them). @param {unknown} v */
@@ -190,6 +191,15 @@ export function sizeOfFormat(format) {
 }
 
 /**
+ * A link's own colours (custom-…) as a palette, or null for a palette's id or auto.
+ * @param {string} palette
+ */
+export function paletteOfLink(palette) {
+  const colors = customColors(palette);
+  return colors ? { bg: colors[0], ink: colors[1], accents: colors.slice(2) } : null;
+}
+
+/**
  * Cover options for a whole design, as the app draws it: its own colours as a palette, Auto as
  * a palette the seed picks, only the pins its style offers (`offered`: that style's variants),
  * its format as a size (one the reader would refuse, the paperback's).
@@ -199,7 +209,7 @@ export function sizeOfFormat(format) {
  */
 export function designOptions(d, offered, extra = {}) {
   const size = sizeOfFormat(d.format);
-  const colors = customColors(d.palette);
+  const own = paletteOfLink(d.palette);
   return {
     title: d.title,
     author: d.author,
@@ -208,11 +218,7 @@ export function designOptions(d, offered, extra = {}) {
     credit: d.credit,
     badge: d.badge,
     style: d.style || undefined,
-    palette: colors
-      ? { bg: colors[0], ink: colors[1], accents: colors.slice(2) }
-      : d.palette === 'auto'
-        ? 'random'
-        : d.palette,
+    palette: own ?? (d.palette === 'auto' ? 'random' : d.palette),
     seed: d.seed,
     texture: d.texture,
     variants: pinsOf(d.variant, offered),
@@ -324,12 +330,6 @@ export function px(key, raw) {
 }
 
 /**
- * A number written in decimal (600, 1.5, 1e3), or NaN: not hex, binary or octal (0x258 isn't 600).
- * @param {string} raw
- */
-export const decimal = (raw) => (/^\s*[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?\s*$/i.test(raw) ? Number(raw) : NaN);
-
-/**
  * Your own colours (background, text, one to three accents), each read as #rrggbb, as links,
  * the HTTP API, the MCP server and the CLI all take them.
  * @param {string} bg @param {string} ink @param {readonly string[]} accents
@@ -363,8 +363,9 @@ export function formatSize(format, width, height) {
     throw new RangeError('A format sets the shape: give it a width or a height, not both');
   }
   const [w, h] = size;
-  if (width !== undefined) return [width, Math.round((width * h) / w)];
-  if (height !== undefined) return [Math.round((height * w) / h), height];
+  // (The side given rounded first, as the library rounds it, so the other follows the shape.)
+  if (width !== undefined) return [Math.round(width), Math.round((Math.round(width) * h) / w)];
+  if (height !== undefined) return [Math.round((Math.round(height) * w) / h), Math.round(height)];
   return [w, h];
 }
 
@@ -402,8 +403,8 @@ export function optionsFromLink(q) {
   const palette = given('palette');
   if (palette !== undefined) {
     const read = LINK.palette(palette);
-    const colors = read ? customColors(read) : null;
-    if (colors) o.palette = { bg: colors[0], ink: colors[1], accents: colors.slice(2) };
+    const own = read ? paletteOfLink(read) : null;
+    if (own) o.palette = own;
     else if (read !== 'auto') o.palette = read ?? palette;
   }
   const caseKey = given('case') !== undefined ? 'case' : 'titleCase';

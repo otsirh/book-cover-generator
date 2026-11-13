@@ -536,15 +536,19 @@ let lastGalleryPins = '';
 /** @type {ReturnType<typeof setTimeout> | undefined} */
 let galleryTimer;
 
-/** The app's links to the gallery page (site/gallery.js keeps the design they carry). */
-const galleryLinks = /** @type {NodeListOf<HTMLAnchorElement>} */ (document.querySelectorAll('a[href^="/gallery/"]'));
+/** The app's links to the site's other pages (site/carry.js keeps the design they carry). */
+const galleryLinks = /** @type {NodeListOf<HTMLAnchorElement>} */ (
+  document.querySelectorAll('a[href^="/gallery/"], a[href^="/about/"]')
+);
 /**
  * Keep the design in the gallery links, so its covers open your book: always, so a link opened
  * in a new tab, copied or long-pressed carries it as a click does.
  */
 function linkGallery() {
-  const href = `/gallery/${toHash(design)}`;
-  for (const a of galleryLinks) if (a.getAttribute('href') !== href) a.setAttribute('href', href);
+  for (const a of galleryLinks) {
+    const href = `${new URL(a.href).pathname}${toHash(design)}`;
+    if (a.getAttribute('href') !== href) a.setAttribute('href', href);
+  }
 }
 
 /** @param {{ fade?: boolean, announce?: boolean }} [opts] */
@@ -2358,7 +2362,7 @@ function renderPrint() {
       `Whole cover ${inches(width)} × ${inches(height)} in, spine ${inches(spine)} in` +
       (print.spineText ? '' : ` (no spine text: ${settings.pages < 80 ? 'under 80 pages' : 'too thin to read'})`);
   } catch (err) {
-    keep({ ...settings, pages: savedPrint().pages });
+    // (Settings it can't draw are never kept: the next visit opens on the last that it could.)
     preview.removeAttribute('src');
     $('print-size').textContent = err instanceof Error ? err.message : String(err);
     // (The field says what's wrong: the status line under it describes it.)

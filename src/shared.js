@@ -164,3 +164,9 @@ export function scaleWithin(w, h, most, wanted, { round = Math.round, step = 0 }
  * @param {string | null | undefined} value the last value given, if any
  */
 export const switchedOn = (value) => value != null && !/^(0|false)?$/i.test(value.trim());
+
+/**
+ * A number written in decimal (600, 1.5, 1e3), or NaN: not hex, binary or octal (0x258 isn't 600).
+ * @param {string} raw
+ */
+export const decimal = (raw) => (/^\s*[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?\s*$/i.test(raw) ? Number(raw) : NaN);

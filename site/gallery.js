@@ -3,6 +3,7 @@
 // style, left behind for another, as in the app). The header and footer links back to the app keep
 // it too, and the place they go to: "#usage&title=…" opens the design at #usage (see site/app.js).
 import { registerServiceWorker } from './offline.js';
+import { carryDesign } from './carry.js';
 import { lastValues, readDesign, pinsOf, variantOf, wholeDesign } from '../src/link.js';
 import { COVER_ATTRIBUTES } from '../src/shared.js';
 import { listStyles } from '../src/index.js';
@@ -50,11 +51,17 @@ if (typeof read.title === 'string') {
     if (read.texture === true) cover.setAttribute('texture', '');
     else cover.removeAttribute('texture');
   }
-  for (const link of /** @type {NodeListOf<HTMLAnchorElement>} */ (
-    document.querySelectorAll('.site-header a[href^="/"], .site-footer a[href^="/"], a[data-app]')
-  )) {
-    const { pathname, hash } = new URL(link.href);
-    if (pathname === '/') link.href = hash.length > 1 ? `/${hash}&${design}` : `/#${design}`;
-    else if (pathname === '/gallery/') link.href = `/gallery/#${design}`;
-  }
+}
+carryDesign(design);
+
+// The family links scroll to their family, keeping your design in the address (a #g-scenic would
+// take its place, and a reload or a shared link would lose it).
+for (const link of /** @type {NodeListOf<HTMLAnchorElement>} */ (document.querySelectorAll('.gallery-families a'))) {
+  link.addEventListener('click', (e) => {
+    const target = document.getElementById(link.hash.slice(1));
+    if (!target) return;
+    e.preventDefault();
+    target.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    target.querySelector('a')?.focus({ preventScroll: true });
+  });
 }

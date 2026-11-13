@@ -10,7 +10,7 @@
 // a little differently from the app on another system, which measures with its own fonts.
 
 import { createCover, createMockup, listStyles, version } from '../src/index.js';
-import { slug, joinBytes, scaleWithin, switchedOn } from '../src/shared.js';
+import { slug, joinBytes, scaleWithin, switchedOn, decimal } from '../src/shared.js';
 import {
   optionsFromLink,
   linkOf,
@@ -23,7 +23,6 @@ import {
   writeLink,
   variantOf,
   pinsOf,
-  decimal,
 } from '../src/link.js';
 import { answerOf, answerText, catalog } from '../src/mcp.js';
 import { escapeXml } from '../src/core.js';

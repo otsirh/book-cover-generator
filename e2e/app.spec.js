@@ -2729,3 +2729,17 @@ test('<book-cover> with a lang that isn’t a tag (en_US) draws, as a browser ta
   });
   expect(drawn).toBe('cover');
 });
+
+test('the about page keeps your design on its links, and the gallery’s family links keep it in the address', async ({
+  page,
+}) => {
+  await page.goto('/#title=Kept+Here&style=retro&seed=k');
+  await ready(page);
+  const about = page.locator('a[href^="/about/"]').first();
+  await expect(about).toHaveAttribute('href', /title=Kept\+Here/);
+  await page.goto('/about/#title=Kept+Here&style=retro&seed=k');
+  await expect(page.locator('.site-header a.brand')).toHaveAttribute('href', /title=Kept\+Here/);
+  await page.goto('/gallery/#title=Kept+Here&style=retro&seed=k');
+  await page.locator('.gallery-families a').nth(2).click();
+  await expect.poll(() => new URL(page.url()).hash).toContain('title=Kept');
+});
