@@ -178,7 +178,9 @@ export function fontSet(faces) {
   }
 
   /** Whether a face has every character of a text that needs a glyph. @param {Face} face @param {string} text */
-  const has = (face, text) => needed(text).every((cp) => face.glyph(cp));
+  const has = (face, text) => hasAll(face, needed(text));
+  /** Whether a face has all these code points. @param {Face} face @param {readonly number[]} cps */
+  const hasAll = (face, cps) => cps.every((cp) => face.glyph(cp));
 
   /**
    * The face of a family CSS picks for a weight and slant: the slant if the family has it, then
@@ -217,8 +219,10 @@ export function fontSet(faces) {
     );
     const serif = /** @type {Face[]} */ (families.get(GENERIC.serif.toLowerCase()));
     if (text) {
+      // (The characters it needs, found once for all the families tried.)
+      const cps = needed(text);
       for (const list of [...found, serif, ...families.values()])
-        if (has(pick(list, weight, italic), text)) return list;
+        if (hasAll(pick(list, weight, italic), cps)) return list;
     }
     return found[0] ?? serif;
   };

@@ -318,9 +318,28 @@ export const lastValues = (q) => /** @type {Record<string, string>} */ (Object.f
 
 /** A size in px, as the CLI reads one (the library checks its range), else an error naming the parameter. @param {string} key @param {string} raw */
 export function px(key, raw) {
-  const value = Number(raw);
-  if (!raw.trim() || !Number.isFinite(value)) throw new RangeError(`${key} must be a number, got "${raw}"`);
+  const value = decimal(raw);
+  if (!Number.isFinite(value)) throw new RangeError(`${key} must be a number, got "${raw}"`);
   return value;
+}
+
+/**
+ * A number written in decimal (600, 1.5, 1e3), or NaN: not hex, binary or octal (0x258 isn't 600).
+ * @param {string} raw
+ */
+export const decimal = (raw) => (/^\s*[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?\s*$/i.test(raw) ? Number(raw) : NaN);
+
+/**
+ * Your own colours (background, text, one to three accents), each read as #rrggbb, as links,
+ * the HTTP API, the MCP server and the CLI all take them.
+ * @param {string} bg @param {string} ink @param {readonly string[]} accents
+ */
+export function ownColours(bg, ink, accents) {
+  const read = accents.filter((c) => c.trim()).map(sixDigits);
+  // (As many as a link's palette holds: custom-… has one to three.)
+  if (read.length < 1 || read.length > 3)
+    throw new RangeError(`Your own colours have one to three accents; got ${read.length}`);
+  return { bg: sixDigits(bg), ink: sixDigits(ink), accents: read };
 }
 
 /**
@@ -423,15 +442,7 @@ export function optionsFromLink(q) {
       throw new RangeError('Use palette or your own colours (bg, ink, accent), not both');
     }
     // (Each as #rrggbb, as a link writes it: the query and its link draw the same bytes.)
-    const accents = accent
-      .split(',')
-      .filter((c) => c.trim())
-      .map(sixDigits);
-    // (As many as a link's palette holds: custom-… has one to three.)
-    if (accents.length < 1 || accents.length > 3) {
-      throw new RangeError(`accent is one to three colours, separated by commas; got ${accents.length}`);
-    }
-    o.palette = { bg: sixDigits(bg), ink: sixDigits(ink), accents };
+    o.palette = ownColours(bg, ink, accent.split(','));
   }
   return /** @type {import('./index.js').CoverOptions} */ (o);
 }

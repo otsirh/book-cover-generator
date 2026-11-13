@@ -23,6 +23,7 @@ import {
   writeLink,
   variantOf,
   pinsOf,
+  decimal,
 } from '../src/link.js';
 import { answerOf, answerText, catalog } from '../src/mcp.js';
 import { escapeXml } from '../src/core.js';
@@ -125,7 +126,7 @@ const TOO_MANY = 'Too many requests: wait a minute, or draw covers in your own c
  * @returns {Record<string, string>}
  */
 function disposition(q, title, ext) {
-  const asked = q.getAll('download').at(-1)?.trim();
+  const asked = lastValues(q).download?.trim();
   if (!switchedOn(asked)) return {};
   // (A name given with its extension keeps it once: my-cover.png is my-cover.png.)
   const given = /^(1|true)$/i.test(asked ?? '') ? title : (asked ?? '').replace(/\.(svg|png)$/i, '');
@@ -160,10 +161,11 @@ function drawn(kind, q) {
 
 /** A mockup's options from a query: kind, text and background. @param {URLSearchParams} q */
 function mockupOptions(q) {
-  const background = q.getAll('background').at(-1)?.trim();
+  const read = lastValues(q);
+  const background = read.background?.trim();
   return {
-    kind: /** @type {import('../src/index.js').MockupKind} */ (q.getAll('kind').at(-1) || 'book'),
-    text: q.getAll('text').at(-1) ?? '',
+    kind: /** @type {import('../src/index.js').MockupKind} */ (read.kind || 'book'),
+    text: read.text ?? '',
     // (As your own colours are read: #rrggbb, the # optional, an alpha dropped.)
     background: background ? sixDigits(background) : undefined,
   };
@@ -364,7 +366,7 @@ export async function png(request, env) {
   // A link preview's picture that can't be drawn (too many asked of the crawler's address, resvg
   // unavailable or failed, a script the fonts lack) is the site's own: never an error card.
   // (On as the API's other switches are: given, and not 0 or false.)
-  if (!answer.ok && answer.status !== 405 && switchedOn(url.searchParams.getAll('preview').at(-1))) {
+  if (!answer.ok && answer.status !== 405 && switchedOn(lastValues(url.searchParams).preview)) {
     // (Kept, as the 422 is, when the design's text can't be drawn: that answer won't change.)
     return new Response(null, {
       status: 302,
@@ -462,8 +464,9 @@ async function drawPng(request, env, url, kind) {
  * @param {'cover' | 'mockup'} kind @param {URLSearchParams} q
  */
 function pngPlan(kind, q) {
-  const asked = q.getAll('scale').at(-1);
-  const given = asked === undefined || asked === '' ? null : Number(asked);
+  // (The last given, as links are read; in decimal, as sizes are: 0x1 isn't 1.)
+  const asked = lastValues(q).scale;
+  const given = asked === undefined || asked === '' ? null : decimal(asked);
   if (given !== null && !(given > 0 && given <= 4)) {
     throw new RangeError(`scale must be a number above 0, at most 4, got "${asked}"`);
   }

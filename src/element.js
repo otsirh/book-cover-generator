@@ -147,7 +147,9 @@ export class BookCover extends Base {
     const q = new URLSearchParams();
     for (const [attribute, key] of Object.entries(ATTRIBUTES)) {
       const value = this.getAttribute(attribute);
-      if (value != null) q.set(key, value);
+      // (lang is HTML's own attribute too: one that isn't a tag, en_US say, is no language, as a
+      // browser takes it, not an error.)
+      if (value != null && !(key === 'lang' && LINK.lang(value) === undefined)) q.set(key, value);
     }
     // (Present is on, as a boolean attribute; 0 and false, as links write them, are off.)
     const texture = this.getAttribute('texture');

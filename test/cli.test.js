@@ -521,3 +521,9 @@ test('--out-dir is for --batch: alone, or with --print, it is refused, not ignor
     assert.match(stderr, /--out-dir is where --batch writes its covers/);
   }
 });
+
+test('the CLI takes one to three accents, as links and the API do', async () => {
+  const { code, stderr } = await cli('Dune', '--bg', '000', '--ink', 'fff', '--accent', 'a00,0b0,00c,ddd');
+  assert.equal(code, 1);
+  assert.match(stderr, /one to three accents/);
+});

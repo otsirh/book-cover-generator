@@ -2710,3 +2710,22 @@ test('a page count the print cover can’t take isn’t kept for the next visit'
   await expect(page.locator('#print-pages')).not.toHaveValue('0');
   await expect(page.locator('#print-pages')).not.toHaveAttribute('aria-invalid', 'true');
 });
+
+test('<book-cover> with a lang that isn’t a tag (en_US) draws, as a browser takes it: no language', async ({
+  page,
+}) => {
+  await page.goto('/about/');
+  const drawn = await page.evaluate(async () => {
+    await import('/element.js');
+    const el = document.createElement('book-cover');
+    el.setAttribute('cover-title', 'Dune');
+    el.setAttribute('lang', 'en_US');
+    const done = new Promise((resolve) => {
+      el.addEventListener('cover', () => resolve('cover'), { once: true });
+      el.addEventListener('cover-error', () => resolve('error'), { once: true });
+    });
+    document.body.append(el);
+    return done;
+  });
+  expect(drawn).toBe('cover');
+});

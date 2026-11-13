@@ -23,7 +23,7 @@ import {
   genres,
 } from '../src/index.js';
 import { slug, fontEntries } from '../src/shared.js';
-import { px, formatSize, sixDigits } from '../src/link.js';
+import { px, formatSize, ownColours } from '../src/link.js';
 import { answerPayload } from '../src/mcp.js';
 
 /**
@@ -233,8 +233,8 @@ function palette() {
   if (values.bg === undefined || values.ink === undefined || !accents.length) {
     throw new Error('Your own colours need --bg, --ink and at least one --accent');
   }
-  // (Each as #rrggbb, as a link and the HTTP API read them: the same colours draw the same bytes.)
-  return { bg: sixDigits(values.bg), ink: sixDigits(values.ink), accents: accents.map(sixDigits) };
+  // (Each as #rrggbb, one to three accents, as a link and the HTTP API read them.)
+  return ownColours(values.bg, values.ink, accents);
 }
 
 // A reader that stops early (book-cover … | head) closes the pipe: that's fine, not a crash.

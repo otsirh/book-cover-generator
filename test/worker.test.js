@@ -575,7 +575,7 @@ test('the API describes itself: what a query draws, the catalog, and OpenAPI', a
   assert.equal((await ask('/api/cover.json?title=A&bg=000&ink=fff&accent=f00,0f0,00f')).res.status, 200);
   const four = await ask('/api/cover.json?title=A&bg=000&ink=fff&accent=f00,0f0,00f,ff0');
   assert.equal(four.res.status, 400);
-  assert.match(four.body, /accent is one to three colours/);
+  assert.match(four.body, /one to three accents/);
   assert.equal((await ask('/api/cover.json?style=nope')).res.status, 400);
   assert.equal((await ask('/api/cover.json?title=x', 'HEAD')).body, '');
 
@@ -887,4 +887,39 @@ test('the book’s floor shadow is its ellipse blurred alone, in a region of its
   const soft = /<filter id="[^"]*-soft"[^>]*>[\s\S]*?<\/filter>/.exec(svg)?.[0] ?? '';
   assert.match(soft, /filterUnits="userSpaceOnUse"/);
   assert.doesNotMatch(soft, /SourceGraphic/, 'no hard ellipse drawn back over the blur');
+});
+
+test('sizes and scales are read in decimal, as written (0x258 isn’t 600)', async () => {
+  const { px, decimal } = await import('../src/link.js');
+  assert.equal(px('width', '600'), 600);
+  assert.equal(px('width', '1e3'), 1000);
+  assert.equal(px('width', ' 1.5 '), 1.5);
+  for (const odd of ['0x258', '0b1001011000', '0o1130', '', 'abc'])
+    assert.throws(() => px('width', odd), /width must be a number/, odd);
+  assert.ok(Number.isNaN(decimal('0x1')));
+  assert.equal(/** @type {Response} */ (get('/api/cover.svg?title=Dune&width=0x258')).status, 400);
+});
+
+test('the MCP server takes pins and colours as given, and says what’s wrong in the library’s terms', () => {
+  /** @param {Record<string, unknown>} args */
+  const call = (args) =>
+    /** @type {any} */ (
+      handleMessage({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: { name: 'create_cover', arguments: { title: 'Dune', ...args } },
+      })
+    ).result;
+  assert.match(
+    call({ style: 'silhouette', variants: { scene: 'Forest Night' } }).content[0].text,
+    /has no scene "Forest Night"/,
+  );
+  const commas = call({ colors: { bg: '#000', ink: '#fff', accents: ['#f00,#0f0'] } });
+  assert.equal(commas.isError, true);
+  assert.match(
+    call({ palette: 'mint', colors: { bg: '#000', ink: '#fff', accents: ['#f00'] } }).content[0].text,
+    /not both/,
+  );
+  assert.equal(call({ colors: { bg: '000', ink: 'fff', accents: ['f00'] } }).structuredContent.palette, 'custom');
 });

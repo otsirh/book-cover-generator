@@ -13,9 +13,9 @@ import {
   sizeLimits,
   version,
 } from './index.js';
-import { optionsFromLink, linkOf } from './link.js';
+import { optionsFromLink, linkOf, ownColours } from './link.js';
 import { mockupText } from './mockups.js';
-import { idFor, fontEntries } from './shared.js';
+import { idFor, fontEntries, reserved, PALETTE_WORDS } from './shared.js';
 
 /** The site that draws covers from links, and edits them. */
 export const SITE = 'https://covers.otsirh.dev';
@@ -177,24 +177,36 @@ function queryFrom(args) {
     if (value != null && value !== '') q.set(key, String(value));
   }
   if (typeof args.texture === 'boolean') q.set('texture', args.texture ? '1' : '0');
+  return q;
+}
+
+/**
+ * The cover options for a tool's arguments: the link's, then the pins and your own colours as
+ * they are given (not as link text, whose rules for names and commas aren't the assistant's), so
+ * the library says what's wrong with one in its own terms.
+ * @param {Record<string, unknown>} args
+ */
+function optionsOf(args) {
+  const options = optionsFromLink(queryFrom(args));
   if (args.variants && typeof args.variants === 'object') {
     // (An empty pin leaves the choice to the seed, as the library takes it.)
-    const pairs = Object.entries(args.variants)
+    const pins = Object.entries(args.variants)
       .filter(([, value]) => value != null && value !== '')
-      .map(([name, value]) => `${name}.${String(value)}`);
-    if (pairs.length) q.set('variant', pairs.join('-'));
+      .map(([name, value]) => [name, String(value)]);
+    if (pins.length) options.variants = Object.fromEntries(pins);
   }
   const colors = /** @type {{ bg?: unknown, ink?: unknown, accents?: unknown } | undefined} */ (args.colors);
   if (colors && typeof colors === 'object') {
     if (!Array.isArray(colors.accents) || colors.accents.length < 1 || colors.accents.length > 3) {
       throw new RangeError('colors.accents is a list of one to three colours');
     }
-    // (The link reader writes each as #rrggbb, as the cover's link does: the two draw the same bytes.)
-    q.set('bg', String(colors.bg ?? ''));
-    q.set('ink', String(colors.ink ?? ''));
-    q.set('accent', colors.accents.map((c) => String(c)).join(','));
+    if (typeof args.palette === 'string' && args.palette && !reserved(args.palette, PALETTE_WORDS)) {
+      throw new RangeError('Use palette or your own colours (colors), not both');
+    }
+    // (Each as #rrggbb, as the cover's link writes it: the two draw the same bytes.)
+    options.palette = ownColours(String(colors.bg ?? ''), String(colors.ink ?? ''), colors.accents.map(String));
   }
-  return q;
+  return options;
 }
 
 /**
@@ -264,7 +276,7 @@ function callTool(tool, args, ctx) {
     }
     if (tool !== 'create_cover' && tool !== 'create_mockup') return null;
     if (typeof args.title !== 'string' || !args.title.trim()) throw new TypeError('A cover needs a title');
-    const options = optionsFromLink(queryFrom(args));
+    const options = optionsOf(args);
     const cover = createCover(options);
     const link = linkOf(options, cover);
     let [width, height] = [cover.width, cover.height];
