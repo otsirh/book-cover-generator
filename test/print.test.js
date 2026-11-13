@@ -54,7 +54,7 @@ test('the whole cover is bleed, back, spine, front and bleed, in inches and in C
   ])) {
     assert.deepEqual(createPrintCover(book, { trim, pages: 100 }).inches.trim, size, String(trim));
   }
-  for (const trim of ['3x5', '9x12', 'A5', [6], [6, 9, 1], [NaN, 9]]) {
+  for (const trim of ['3x5', '9x12', 'A5', [6], [6, 9, 1], [NaN, 9], ['6', '9']]) {
     assert.throws(() => createPrintCover(book, { trim: /** @type {any} */ (trim), pages: 100 }), /trim must be/);
   }
   assert.throws(() => createPrintCover(book, /** @type {any} */ ({})), /pages must be a whole number/);
@@ -266,6 +266,67 @@ test('the spine keeps the ink of accents and tails 1/16 in from its edges too', 
         `${title}: "${line.text}" from ${top} to ${bottom}, within ±${half}`,
       );
     }
+  }
+});
+
+test('no type on the spine or the back under 6 pt: the author is left off a thin spine, a long imprint cut', () => {
+  const spineLines = (/** @type {object} */ cover, /** @type {object} */ print) => {
+    const svg = createPrintCover(/** @type {any} */ (cover), /** @type {any} */ (print)).svg;
+    const group = /rotate\(90\)">([\s\S]*?)<\/g><\/g>/.exec(svg)?.[1] ?? '';
+    return textBoxes(`<g>${group}</g></g>`).map((b) => ({ text: b.text, pt: (b.size * 72) / 96 }));
+  };
+  for (const [cover, print] of /** @type {const} */ ([
+    [{ title: 'Dune', author: 'Frank Herbert', style: 'minimal' }, { pages: 88 }],
+    [book, { pages: 80, paper: 'cream' }],
+    [book, { pages: 400 }],
+  ])) {
+    const lines = spineLines(cover, print);
+    assert.ok(lines.length >= 1, JSON.stringify(print));
+    for (const line of lines) assert.ok(line.pt >= 6 - 0.01, `${line.text} at ${line.pt.toFixed(2)} pt`);
+  }
+  // Dune on 88 pages: the title alone; on 400, the author too.
+  assert.deepEqual(
+    spineLines({ title: 'Dune', author: 'Frank Herbert', style: 'minimal' }, { pages: 88 }).map((l) => l.text),
+    ['DUNE'],
+  );
+  assert.deepEqual(
+    spineLines(book, { pages: 400 }).map((l) => l.text),
+    ['THE LIGHTHOUSE KEEPER', 'MARA ELLISON'],
+  );
+  // The spine's capitals are the cover's language's: Turkish i is İ.
+  assert.deepEqual(
+    spineLines({ title: 'istanbul', author: 'Orhan Pamuk', lang: 'tr', style: 'minimal' }, { pages: 300 }).map(
+      (l) => l.text,
+    ),
+    ['İSTANBUL', 'ORHAN PAMUK'],
+  );
+  // An imprint too long for its line: at 6 pt, cut with an ellipsis (not shrunk below it).
+  const imprint = createPrintCover(book, {
+    trim: '5x8',
+    pages: 200,
+    blurb: BLURB,
+    imprint: 'https://www.harbourandlighthousepress.co.uk/books/the-lighthouse-keeper',
+  });
+  const foot = textBoxes(imprint.svg).filter((b) => !b.moved && /harbour/i.test(b.text));
+  assert.equal(foot.length, 1);
+  assert.ok((foot[0].size * 72) / 96 >= 6 - 0.01, `${foot[0].size} px`);
+  assert.match(foot[0].text, /…$/);
+  assertBackText(imprint, 'long imprint');
+});
+
+test('the back’s grain is as fine as the front’s, on landscape trims too', () => {
+  for (const trim of /** @type {const} */ (['6x9', [8.25, 6], '8.5x8.5'])) {
+    const print = createPrintCover({ ...book, texture: true }, { pages: 200, trim });
+    const [tw, th] = print.inches.trim;
+    // Per printed px: the front's frequency is per its own units (600 across the trim's width).
+    const front = /** @type {number} */ (
+      Number(/<symbol[\s\S]*?<feTurbulence[^>]*baseFrequency="([\d.]+)"/.exec(print.svg)?.[1]) / ((tw * 96) / 600)
+    );
+    const back = Number(
+      /id="pc[^"]*-texture-dark"[^>]*><feTurbulence[^>]*baseFrequency="([\d.]+)"/.exec(print.svg)?.[1],
+    );
+    assert.ok(Number.isFinite(front) && Number.isFinite(back), String(trim));
+    assert.ok(Math.abs(front - back) / back < 0.01, `${trim}: front ${front}, back ${back} per px (${th})`);
   }
 });
 

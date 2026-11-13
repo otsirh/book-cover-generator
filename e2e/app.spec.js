@@ -1863,9 +1863,22 @@ test('a print cover too large for one canvas is drawn in strips', async ({ page 
     // (A "$&" in the title, which a string replacement would read as a pattern.)
     const print = createPrintCover({ title: 'Rock$&Roll', style: 'minimal', seed: 's' }, { pages: 100, trim: '5x8' });
     const blob = await svgToPdf(print.svg, { dpi: 100, maxPixels: 300_000, bleed: 0.125 });
+    // What would make a malformed PDF, or a page of the wrong size, is refused.
+    /** @param {string} svg @param {object} opts */
+    const refused = (svg, opts) =>
+      svgToPdf(svg, opts).then(
+        () => 'made',
+        (err) => String(err.message),
+      );
+    const errors = await Promise.all([
+      refused(print.svg, { bleed: Number.NaN }),
+      refused(print.svg, { bleed: 5 }),
+      refused('<svg xmlns="http://www.w3.org/2000/svg" width="330mm" height="235mm" viewBox="0 0 330 235"/>', {}),
+    ]);
     const text = new TextDecoder('latin1').decode(await blob.arrayBuffer());
     return {
       type: blob.type,
+      errors,
       images: [...text.matchAll(/\/Subtype \/Image \/Width (\d+) \/Height (\d+)/g)].map((m) => [
         Number(m[1]),
         Number(m[2]),
@@ -1873,6 +1886,9 @@ test('a print cover too large for one canvas is drawn in strips', async ({ page 
     };
   });
   expect(result.type).toBe('application/pdf');
+  expect(result.errors[0]).toMatch(/bleed must be a number of inches/);
+  expect(result.errors[1]).toMatch(/bleed must be a number of inches/);
+  expect(result.errors[2]).toMatch(/width is in mm; give it in px/);
   // 10.475 × 8.25 in at 100 dpi is 1048 × 825 px: three strips of at most 300,000 px, side by side.
   expect(result.images.length).toBe(3);
   expect(result.images.reduce((sum, [w]) => sum + w, 0)).toBe(1048);

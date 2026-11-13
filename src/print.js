@@ -103,7 +103,8 @@ function trimOf(trim) {
   const named =
     typeof trim === 'string' ? /^\s*(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(?:in)?\s*$/i.exec(trim) : null;
   const size = named ? [Number(named[1]), Number(named[2])] : trim;
-  const [w, h] = Array.isArray(size) && size.length === 2 ? size : [NaN, NaN];
+  const [w, h] =
+    Array.isArray(size) && size.length === 2 && size.every((v) => typeof v === 'number') ? size : [NaN, NaN];
   const [[w0, w1], [h0, h1]] = [printLimits.width, printLimits.height];
   if (!(w >= w0 && w <= w1 && h >= h0 && h <= h1)) {
     throw new RangeError(
@@ -222,16 +223,17 @@ export function createPrintCover(coverOptions = {}, print = /** @type {any} */ (
   const foot = trimBottom - margin;
   let bottom = foot;
   if (imprint) {
+    const room = (box ? box.x - 0.25 * PX : right) - left;
     const fit = fitText(imprint, {
       font: FONTS.sans,
       weight: 600,
-      maxWidth: (box ? box.x - 0.25 * PX : right) - left,
+      maxWidth: room,
       maxSize: 8 * PT,
       minSize: 6 * PT,
       maxLines: 1,
       letterSpacing: 0.04,
     });
-    s += lines(fit, left, foot - fit.height, bodyColor);
+    s += lines(atLeast(fit, imprint, 6 * PT, room), left, foot - fit.height, bodyColor);
     bottom = foot - fit.height - 0.2 * PX;
   }
   if (box) bottom = Math.min(bottom, box.y - 0.25 * PX);
@@ -242,33 +244,48 @@ export function createPrintCover(coverOptions = {}, print = /** @type {any} */ (
   let spineText = false;
   const across = spine * PX - 2 * 0.0625 * PX;
   const spineFont = titleFont ?? FONTS.sans;
-  const spineTitle = front.title.replace(/\n/g, ' ').toUpperCase();
-  const author = front.author.toUpperCase();
+  // (In the cover's language: Turkish "istanbul" is İSTANBUL.)
+  const upper = (/** @type {string} */ t) => t.toLocaleUpperCase(front.lang || undefined);
+  const spineTitle = upper(front.title.replace(/\n/g, ' '));
+  const author = upper(front.author);
   // As large as the line's ink fits across, accents above and tails below included (É, Ç, Q, 夜).
   const sizeMax = Math.min(across / inkHeight(spineTitle, spineFont), 22 * PT);
   if (pages >= printLimits.spineTextPages && sizeMax >= 6 * PT) {
     const along = th * PX - 2 * 0.375 * PX;
     const spineInk = textColor(p, spineBg, [front.colors.bg, ink]);
-    const title = fitText(spineTitle, {
-      font: spineFont,
-      weight: 700,
-      maxWidth: author ? along * 0.62 : along,
-      maxSize: sizeMax,
-      minSize: 6 * PT,
-      maxLines: 1,
-      letterSpacing: 0.08,
-    });
-    const by = author
-      ? fitText(author, {
-          font: FONTS.sans,
-          weight: 500,
-          maxWidth: along * 0.32,
-          maxSize: Math.min(across / inkHeight(author, FONTS.sans), sizeMax * 0.8, title.size),
-          minSize: 6 * PT,
-          maxLines: 1,
-          letterSpacing: 0.08,
-        })
-      : null;
+    const title = atLeast(
+      fitText(spineTitle, {
+        font: spineFont,
+        weight: 700,
+        maxWidth: author ? along * 0.62 : along,
+        maxSize: sizeMax,
+        minSize: 6 * PT,
+        maxLines: 1,
+        letterSpacing: 0.08,
+      }),
+      spineTitle,
+      6 * PT,
+      author ? along * 0.62 : along,
+    );
+    // The author too, when the spine is thick enough for them at 6 pt or more; else the title alone.
+    const byMax = Math.min(across / inkHeight(author, FONTS.sans), sizeMax * 0.8, title.size);
+    const by =
+      author && byMax >= 6 * PT
+        ? atLeast(
+            fitText(author, {
+              font: FONTS.sans,
+              weight: 500,
+              maxWidth: along * 0.32,
+              maxSize: byMax,
+              minSize: 6 * PT,
+              maxLines: 1,
+              letterSpacing: 0.08,
+            }),
+            author,
+            6 * PT,
+            along * 0.32,
+          )
+        : null;
     const cx = (backRight + spineRight) / 2;
     s += `<g transform="translate(${n(cx)} ${n(trimTop + 0.375 * PX)}) rotate(90)">`;
     s += spineLine(title, 0, 'start', spineInk);
@@ -279,7 +296,13 @@ export function createPrintCover(coverOptions = {}, print = /** @type {any} */ (
 
   // Film grain over the back and spine too, as the front has it.
   if (coverOptions.texture) {
-    const c = { id: (/** @type {string} */ name) => `${uid}-${name}`, u: (tw * PX) / 600, W: spineRight, H };
+    // (Its grain as fine as the front's, which scales with the front's shorter side.)
+    const c = {
+      id: (/** @type {string} */ name) => `${uid}-${name}`,
+      u: (Math.min(tw, th) * PX) / 600,
+      W: spineRight,
+      H,
+    };
     const darkGrain = grain(c, { opacity: 0.1, id: 'texture-dark', seed: 3 });
     const lightGrain = grain(c, { opacity: 0.08, light: true, id: 'texture-light', seed: 11 });
     s += `<defs>${darkGrain.defs}${lightGrain.defs}</defs>${darkGrain.layer}${lightGrain.layer}`;
@@ -343,6 +366,33 @@ export function createPrintCover(coverOptions = {}, print = /** @type {any} */ (
     barcode: box,
     front,
   };
+}
+
+/**
+ * `text` cut to `width` at `size` with an ellipsis, if it's wider: whole words dropped from its
+ * end where it has spaces, else characters (Japanese, Thai, a long address), so something is
+ * always left before the ellipsis.
+ * @param {string} text @param {number} size @param {number} width @param {import('./text.js').TextSpec} spec
+ */
+function ellipsized(text, size, width, spec) {
+  if (measureText(text, size, spec) <= width) return text;
+  let cut = text;
+  while (cut && measureText(`${cut}…`, size, spec) > width) {
+    cut = /\s\S/.test(cut) ? cut.replace(/\s*\S+\s*$/, '') : graphemes(cut).slice(0, -1).join('');
+  }
+  return `${cut.replace(/[\s,;:.·]+$/, '')}…`;
+}
+
+/**
+ * A one-line fit at `min` at least: fitText goes below its smallest size for a word that won't
+ * fit; this sets the line at `min` instead, cut with an ellipsis to `width`.
+ * @param {import('./text.js').TextFit} fit @param {string} text @param {number} min @param {number} width
+ */
+function atLeast(fit, text, min, width) {
+  if (fit.size >= min - 0.01) return fit;
+  const spec = { font: fit.font, weight: fit.weight, italic: fit.italic, letterSpacing: fit.letterSpacing };
+  const line = ellipsized(text, min, width, spec);
+  return { ...fit, size: min, lines: [line], width: measureText(line, min, spec) };
 }
 
 /**
@@ -444,14 +494,8 @@ function blurbText(paragraphs, x, y, width, height, fill) {
   }
   if (cut && rows.length) {
     const last = rows[rows.length - 1];
-    const spec = { font };
-    let text = last.line;
-    // Drop whole words from its end where it has spaces; else characters (Japanese, Thai, a long
-    // address), so a row is never left with nothing but the ellipsis.
-    while (text && measureText(`${text}…`, size, spec) > width) {
-      text = /\s\S/.test(text) ? text.replace(/\s*\S+\s*$/, '') : graphemes(text).slice(0, -1).join('');
-    }
-    last.line = `${text.replace(/[\s,;:.]+$/, '')}…`;
+    // (The row's own text, then an ellipsis: what follows it was cut.)
+    last.line = ellipsized(`${last.line.replace(/[\s,;:.]+$/, '')}…`, size, width, { font });
   }
   const attrs = textGroupAttrs({ font, size, weight: 400, fill });
   return `<g ${attrs}>${rows.map((r) => `<text x="${n(x)}" y="${n(r.baseline)}">${escapeXml(r.line)}</text>`).join('')}</g>`;

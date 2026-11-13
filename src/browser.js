@@ -97,6 +97,14 @@ export async function rasterize(
 export async function svgToPdf(svg, { dpi = 300, quality = 0.95, bleed = 0, title = '', maxPixels = 16_777_216 } = {}) {
   const size = svgSize(svg);
   if (!size) throw new RangeError('svgToPdf: the SVG needs a width and height (or a viewBox)');
+  // Its size in CSS px (or unitless): a size in mm, in, pt or % would make a page of the wrong size.
+  const tag = /<svg\b[^>]*>/i.exec(svg)?.[0] ?? '';
+  for (const name of ['width', 'height']) {
+    const unit = new RegExp(`\\s${name}="\\s*[\\d.]+\\s*([a-z%]+)\\s*"`, 'i').exec(tag)?.[1];
+    if (unit && unit.toLowerCase() !== 'px') {
+      throw new RangeError(`svgToPdf: the SVG's ${name} is in ${unit}; give it in px, 96 to the inch`);
+    }
+  }
   for (const [name, value] of /** @type {const} */ ([
     ['dpi', dpi],
     ['quality', quality],
@@ -105,12 +113,16 @@ export async function svgToPdf(svg, { dpi = 300, quality = 0.95, bleed = 0, titl
     if (!(Number.isFinite(value) && value > 0)) throw new RangeError(`svgToPdf: ${name} must be a positive number`);
   }
   const [sw, sh] = size;
+  if (!(Number.isFinite(bleed) && bleed >= 0 && 2 * bleed < Math.min(sw, sh) / 96)) {
+    throw new RangeError(`svgToPdf: bleed must be a number of inches from 0, less than half the page, got ${bleed}`);
+  }
   const [pageW, pageH] = [(sw / 96) * 72, (sh / 96) * 72];
   const [pw, ph] = [Math.max(1, Math.round((sw / 96) * dpi)), Math.max(1, Math.round((sh / 96) * dpi))];
-  const strips = Math.max(1, Math.ceil((pw * ph) / maxPixels));
-  const stripPixels = Math.ceil(pw / strips);
+  // Strips as wide as fit maxPixels at the page's height, so none is over it.
+  const stripPixels = Math.min(pw, Math.floor(maxPixels / ph));
+  if (stripPixels < 1) throw new RangeError(`svgToPdf: a page ${ph} px tall can't be drawn in ${maxPixels} pixels`);
+  const strips = Math.ceil(pw / stripPixels);
   // The root's viewBox, which each strip narrows to its own part.
-  const tag = /<svg\b[^>]*>/i.exec(svg)?.[0] ?? '';
   const box = /\sviewBox="\s*([-\d.]+)[\s,]+([-\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)\s*"/.exec(tag);
   const [vx, vy, vw, vh] = box ? box.slice(1, 5).map(Number) : [0, 0, sw, sh];
   /** @type {import('./pdf.js').PdfImage[]} */
