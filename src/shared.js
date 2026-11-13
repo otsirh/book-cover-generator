@@ -149,7 +149,9 @@ export function scaleWithin(w, h, most, wanted, { round = Math.round, step = 0 }
   const best = Math.min(wanted, Math.sqrt(most / (w * h)));
   if (step) {
     // In whole steps, each the very number it says (2.09, not 2.0899999999999999), and checked as it is.
-    const places = Math.max(0, Math.ceil(-Math.log10(step)));
+    // (As many places as the step has: 0.25 has two, 2.5e-7 eight.)
+    const [, digits = '', exp = '0'] = /^\d+(?:\.(\d+))?(?:e-(\d+))?$/.exec(String(step)) ?? [];
+    const places = Math.min(20, digits.length + Number(exp));
     const at = (/** @type {number} */ k) => Number((k * step).toFixed(places));
     let k = Math.floor(best / step + 1e-9);
     while (k > 0 && !fits(at(k))) k--;

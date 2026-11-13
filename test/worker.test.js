@@ -185,6 +185,8 @@ test('the API reads a link as the app does, and sizes a format as the CLI does',
 });
 
 test('a mockup background without its #, and a preflight for any header', async () => {
+  // (A background is read as your own colours are: an alpha dropped, the # optional.)
+  assert.equal(/** @type {Response} */ (get('/api/mockup.svg?title=x&background=11223344')).status, 200);
   // (A background of spaces is none: the mockup's own.)
   assert.equal(/** @type {Response} */ (get('/api/mockup.svg?title=x&background=%20')).status, 200);
   const res = /** @type {Response} */ (get('/api/mockup.svg?title=x&background=ffffff'));
@@ -827,6 +829,7 @@ test('scaleWithin: a scale whose rounded sides stay within the pixels, and the P
   assert.equal(String(square), '2.09');
   assert.ok(Math.ceil(370 * square) ** 2 <= 600_000);
   assert.equal(scaleWithin(100, 100, 841, 1, { step: 0.01 }), 0.29);
+  assert.equal(scaleWithin(600, 900, 1e9, 0.25, { step: 0.25 }), 0.25);
   // (Never past the fit by rounding its last digits: sizes where that once happened.)
   for (const [w, h, most] of [
     [1689, 2815, 600_000],

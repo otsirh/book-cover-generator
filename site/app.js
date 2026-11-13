@@ -2271,7 +2271,13 @@ function printColourMenus() {
     const group = $(id);
     const fallback = id === 'print-back' ? 'bg' : 'ink';
     const chosen = group.dataset.value ?? (id === 'print-back' ? savedPrint().back : savedPrint().spine);
-    group.dataset.value = choices.some(([key]) => key === chosen) ? chosen : fallback;
+    // The choice is kept as a place in the palette, even one this palette shows no swatch for (its
+    // accents are fewer, or the same): the swatch of that colour is the one marked.
+    group.dataset.value = chosen;
+    const chosenColour = paletteColour(chosen, colors);
+    group.dataset.shown = choices.some(([key]) => key === chosen)
+      ? chosen
+      : (choices.find(([key]) => paletteColour(key, colors) === chosenColour)?.[0] ?? fallback);
     const labels = choices.map(([key, name]) => `${key}:${name}:${paletteColour(key, colors)}`).join('|');
     if (group.dataset.labels !== labels) {
       group.dataset.labels = labels;
@@ -2295,7 +2301,7 @@ function printColourMenus() {
       );
     }
     for (const b of group.querySelectorAll('button')) {
-      b.setAttribute('aria-pressed', String(b.getAttribute('data-key') === group.dataset.value));
+      b.setAttribute('aria-pressed', String(b.getAttribute('data-key') === group.dataset.shown));
     }
   }
 }

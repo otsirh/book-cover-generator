@@ -427,7 +427,15 @@ function atLeast(fit, text, min, width) {
   if (fit.size >= min - 0.01) return fit;
   const spec = { font: fit.font, weight: fit.weight, italic: fit.italic, letterSpacing: fit.letterSpacing };
   const line = ellipsized(text, min, width, spec);
-  return { ...fit, size: min, lines: [line], width: measureText(line, min, spec) };
+  // (A fit of its own at that size: its height and the rest are that size's.)
+  const one = fitText(line, {
+    ...spec,
+    maxWidth: Math.max(width, measureText(line, min, spec)),
+    maxSize: min,
+    minSize: min,
+    maxLines: 1,
+  });
+  return { ...one, truncated: fit.truncated || line !== text };
 }
 
 /**

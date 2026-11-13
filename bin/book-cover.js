@@ -464,7 +464,10 @@ function isLink(path) {
 
 /** Whether a file is an SVG (a file, its start an SVG's), as a cover saved before is. @param {string} file */
 function isSvgFile(file) {
-  if (!statSync(file).isFile()) return false;
+  const stat = statSync(file);
+  if (!stat.isFile()) return false;
+  // (An empty file holds nothing to keep: one made ready for the cover, say.)
+  if (stat.size === 0) return true;
   const fd = openSync(file, 'r');
   try {
     const start = Buffer.alloc(16384);

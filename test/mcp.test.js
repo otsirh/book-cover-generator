@@ -221,6 +221,8 @@ test('book-cover --mcp saves only an .svg, and never over a file of another kind
       join(dir, 'old.svg'),
       '<?xml version="1.0"?>\n<!-- kept --><svg xmlns="http://www.w3.org/2000/svg"/>',
     );
+    // (An empty file, made ready for the cover, holds nothing to keep.)
+    await writeFile(join(dir, 'empty.svg'), '');
     // (Many comments and no SVG: read one by one, at once, not by a pattern that tries every split.)
     await writeFile(join(dir, 'comments.svg'), '<!---->'.repeat(73));
     // An editor's SVG: a generator's comment, a DOCTYPE, and a licence longer than 512 bytes.
@@ -245,10 +247,11 @@ test('book-cover --mcp saves only an .svg, and never over a file of another kind
       save(3, join(dir, 'old.svg')),
       save(4, join(dir, 'comments.svg')),
       save(5, join(dir, 'drawn.svg')),
+      save(6, join(dir, 'empty.svg')),
     ];
     child.stdin.end(`${lines.map((l) => JSON.stringify(l)).join('\n')}\n`);
     await new Promise((resolve) => child.on('close', resolve));
-    const [other, notSvg, svg, comments, drawn] = out
+    const [other, notSvg, svg, comments, drawn, empty] = out
       .trim()
       .split('\n')
       .map((l) => JSON.parse(l).result);
@@ -262,6 +265,8 @@ test('book-cover --mcp saves only an .svg, and never over a file of another kind
     assert.match(comments.content[0].text, /isn't an SVG: not replaced/);
     assert.equal(drawn.isError, undefined);
     assert.match(await readFile(join(dir, 'drawn.svg'), 'utf8'), /^<svg [\s\S]*Saved/);
+    assert.equal(empty.isError, undefined);
+    assert.match(await readFile(join(dir, 'empty.svg'), 'utf8'), /^<svg /);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

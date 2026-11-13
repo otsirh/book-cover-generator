@@ -10,10 +10,11 @@
 // a little differently from the app on another system, which measures with its own fonts.
 
 import { createCover, createMockup, listStyles, version } from '../src/index.js';
-import { hex, slug, joinBytes, scaleWithin, switchedOn } from '../src/shared.js';
+import { slug, joinBytes, scaleWithin, switchedOn } from '../src/shared.js';
 import {
   optionsFromLink,
   linkOf,
+  sixDigits,
   LINK_FIELDS,
   readDesign,
   wholeDesign,
@@ -163,7 +164,8 @@ function mockupOptions(q) {
   return {
     kind: /** @type {import('../src/index.js').MockupKind} */ (q.getAll('kind').at(-1) || 'book'),
     text: q.getAll('text').at(-1) ?? '',
-    background: background ? hex(background) : undefined,
+    // (As your own colours are read: #rrggbb, the # optional, an alpha dropped.)
+    background: background ? sixDigits(background) : undefined,
   };
 }
 

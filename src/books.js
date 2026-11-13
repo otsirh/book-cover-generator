@@ -136,10 +136,14 @@ export function parseBookList(text) {
   } else {
     // A header row names a "title" column, separated by tabs, commas or semicolons (as
     // spreadsheets in many countries save CSV).
+    // (Not a plain list's line: "Title, Volume One | Ann Lee" is a book, not a header.)
     const first = lines[0].line;
-    const delimiter = ['\t', ',', ';'].find((d) =>
-      (csvRows(first, d)[0] ?? []).some((name) => name.trim().toLowerCase() === 'title'),
-    );
+    const plain = LINE_SEPARATORS.some((sep) => sep !== '\t' && first.includes(sep));
+    const delimiter = plain
+      ? undefined
+      : ['\t', ',', ';'].find((d) =>
+          (csvRows(first, d)[0] ?? []).some((name) => name.trim().toLowerCase() === 'title'),
+        );
     if (delimiter) {
       const [names, ...rows] = csvRows(src, delimiter);
       books = rows.map((row) => optionsFrom(Object.fromEntries(names.map((name, i) => [name, row[i] ?? '']))));

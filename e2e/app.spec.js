@@ -2686,3 +2686,16 @@ test('the gallery gives your pins to the style the app opens your design in, one
   await page.goto(`/gallery/#title=A&seed=${found.seed}&variant=${found.pin}`);
   await expect(page.locator(`a[data-style="${found.style}"] book-cover`)).toHaveAttribute('variant', found.pin);
 });
+
+test('a back colour chosen as an accent stays chosen through a palette without that accent', async ({ page }) => {
+  await page.goto('/#title=Kept&style=minimal&palette=riso&seed=k');
+  await page.locator('#print summary').click();
+  await page.locator('#print-back [data-key="a2"]').click();
+  await expect(page.locator('#print-back [data-key="a2"]')).toHaveAttribute('aria-pressed', 'true');
+  // Your own colours with one accent: no third accent, so its colour (the one accent's) is marked.
+  await page.goto('/#title=Kept&style=minimal&palette=custom-000000-ffffff-ff0000&seed=k');
+  await expect(page.locator('#print-back [data-key="a0"]')).toHaveAttribute('aria-pressed', 'true');
+  // …and back in Riso, it's still the third accent.
+  await page.goto('/#title=Kept&style=minimal&palette=riso&seed=k');
+  await expect(page.locator('#print-back [data-key="a2"]')).toHaveAttribute('aria-pressed', 'true');
+});

@@ -216,3 +216,11 @@ test('a quoted field may follow the space people type after a comma', () => {
     { title: 'Night', subtitle: 'A Tale, Retold' },
   ]);
 });
+
+test('a plain list whose first book has a comma and the word Title is a list, not a header', () => {
+  assert.deepEqual(parseBookList('Title, Volume One | Ann Lee\nSecond Book | Bo Ray\nThird | Cy\n'), [
+    { title: 'Title, Volume One', author: 'Ann Lee' },
+    { title: 'Second Book', author: 'Bo Ray' },
+    { title: 'Third', author: 'Cy' },
+  ]);
+});
