@@ -531,6 +531,8 @@ function complete(partial) {
 
 let lastAnnouncement = '';
 let lastGalleryKey = '';
+/** The style and pins the rail's current tile was last drawn with. */
+let lastGalleryPins = '';
 /** @type {ReturnType<typeof setTimeout> | undefined} */
 let galleryTimer;
 
@@ -568,13 +570,25 @@ function render({ fade = false, announce = false } = {}) {
     clearTimeout(printTimer);
     printTimer = setTimeout(renderPrint, typing ? 250 : 0);
   }
-  // The gallery shows every style, so it only changes when something other than the style does.
-  const key = JSON.stringify({ ...design, style: '' });
+  // The gallery shows every style, so it only changes when something other than the style does;
+  // pins are the current style's alone (a tile of another style is drawn as picking it would draw
+  // it, without them), so a pin changes only the current style's tile.
+  const key = JSON.stringify({ ...design, style: '', variant: '' });
   if (key !== lastGalleryKey) {
     lastGalleryKey = key;
+    lastGalleryPins = `${design.style}|${design.variant}`;
     clearTimeout(galleryTimer);
     if (typing) galleryTimer = setTimeout(invalidateGallery, 200);
     else invalidateGallery();
+  } else if (`${design.style}|${design.variant}` !== lastGalleryPins) {
+    // (The style that had them, and the one that has them now.)
+    const before = lastGalleryPins.split('|')[0];
+    lastGalleryPins = `${design.style}|${design.variant}`;
+    for (const style of new Set([before, design.style])) {
+      const tile = tiles.get(style);
+      if (tile) tile.dirty = true;
+    }
+    scheduleGallery();
   }
   const variantsKey = JSON.stringify(design);
   if (variantsKey !== lastVariantsKey) {
@@ -1543,7 +1557,8 @@ const scheduleGallery = sliced(() => {
   }
   if (!next) return false;
   const [style, tile] = next;
-  tile.img.src = svgToDataUrl(createCover(options({ style })).svg);
+  // (Another style is drawn as picking it draws it: without the current style's pins.)
+  tile.img.src = svgToDataUrl(createCover(options(style === design.style ? { style } : { style, variants: {} })).svg);
   tile.dirty = false;
   return true;
 });

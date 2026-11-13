@@ -154,7 +154,8 @@ function paragraphsOf(value, max) {
     const para = cleanText(typed, room);
     if (!para) continue;
     out.push(para);
-    room -= para.length;
+    // (In characters as cleanText counts them: an emoji is one.)
+    room -= graphemes(para).length;
   }
   return out;
 }

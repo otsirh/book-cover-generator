@@ -1680,3 +1680,18 @@ test('Turkish capitals: Big Letter pairs a narrow İ, ids tell the languages apa
   const font = { name: 'Mine', family: "'My Display', sans-serif", cap: 0.7 };
   assert.equal(measureText('İSTİKLAL', 100, { font }), measureText('ISTIKLAL', 100, { font }));
 });
+
+test('a custom palette’s dark is true or false, not a string', () => {
+  assert.throws(
+    () =>
+      createCover({
+        title: 'x',
+        palette: { bg: '#ffffff', ink: '#111111', accents: ['#f00'], dark: /** @type {any} */ ('false') },
+      }),
+    /dark is true or false/,
+  );
+  assert.equal(
+    createCover({ title: 'x', palette: { bg: '#ffffff', ink: '#111111', accents: ['#f00'], dark: true } }).colors.dark,
+    true,
+  );
+});

@@ -50,8 +50,9 @@ export type TextMeasurer = (
 /**
  * Override text measurement (e.g. with a real font engine in Node). The measurer is called once per
  * string and font at a reference size of 100 px, and other sizes are scaled from it. Pass `null` to restore the default.
+ * Returns the measurer it replaces (null for the default), to put back after.
  */
-export declare function setTextMeasurer(fn: TextMeasurer | null): void;
+export declare function setTextMeasurer(fn: TextMeasurer | null): TextMeasurer | null;
 /**
  * The width in px of `text` at `size` px, letter-spacing included: measured with the function set
  * by `setTextMeasurer`, else with a canvas, else from the built-in fonts' character widths (other

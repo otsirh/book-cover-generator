@@ -134,12 +134,13 @@ export declare function grain(
 ): { defs: string; layer: string };
 /**
  * A soft drop-shadow `<filter>` with this id: the shape over its shadow, blurred by `blur` (a
- * standard deviation) and moved down by `dy`, both times `u`, at `opacity` (defaults 4, 2 and 0.35).
+ * standard deviation) and moved down by `dy`, both times `u`, at `opacity` (defaults 4, 2 and 0.35),
+ * in a region `margin` of the shape's size larger on every side (default 0.2).
  */
 export declare function shadowFilter(
   id: string,
   u: number,
-  opts?: { blur?: number; dy?: number; opacity?: number },
+  opts?: { blur?: number; dy?: number; opacity?: number; margin?: number },
 ): string;
 /**
  * A Gaussian-blur `<filter>` with this id and standard deviation `std` (px), with room around the

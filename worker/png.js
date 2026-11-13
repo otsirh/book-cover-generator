@@ -139,11 +139,12 @@ export async function pngEngine(resvg, wasm, fontFile) {
      * @template T @param {() => T} draw @returns {T}
      */
     laidOut(draw) {
-      setTextMeasurer(fonts.measure);
+      // (The measurer in force before, put back after: a caller's own, or the built-in.)
+      const before = setTextMeasurer(fonts.measure);
       try {
         return draw();
       } finally {
-        setTextMeasurer(null);
+        setTextMeasurer(before);
       }
     },
     /** Whether resvg trapped on an earlier drawing (it then draws no more). */

@@ -1,7 +1,7 @@
 // Mockups: a cover shown as a product (a flat shot, a book, an e-reader) or on a social card,
 // for listings and cover reveals. Each is an SVG with the cover nested in it.
 
-import { n, mix, escapeXml, hashString, contrast, readable, isHex } from './core.js';
+import { n, mix, escapeXml, hashString, contrast, readable, isHex, shadowFilter } from './core.js';
 import { FONTS, fitText, drawText, textBottom, clipGraphemes } from './text.js';
 
 /** The kinds of mockup, with the size of each (or how it follows the cover's). */
@@ -30,14 +30,10 @@ const nest = (cover, x, y, w, h) =>
   `<svg x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" viewBox="0 0 ${cover.width} ${cover.height}" preserveAspectRatio="none" overflow="hidden">${cover.body}</svg>`;
 
 /**
- * A soft shadow under a shape: blurred black, offset down.
+ * A soft shadow under a shape: blurred black, offset down (src/core.js's, with room for its reach).
  * @param {string} id @param {number} blur @param {number} dy @param {number} opacity
  */
-const shadow = (id, blur, dy, opacity) =>
-  `<filter id="${id}" x="-30%" y="-30%" width="160%" height="160%">` +
-  `<feGaussianBlur in="SourceAlpha" stdDeviation="${n(blur)}"/><feOffset dy="${n(dy)}"/>` +
-  `<feComponentTransfer><feFuncA type="linear" slope="${opacity}"/></feComponentTransfer>` +
-  `<feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
+const shadow = (id, blur, dy, opacity) => shadowFilter(id, 1, { blur, dy, opacity, margin: 0.3 });
 
 /**
  * A mockup's line as it draws it: on one line, at most 80 characters (cut between whole

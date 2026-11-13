@@ -106,17 +106,20 @@ let customMeasure = null;
  * Override text measurement. `fn(text, sizePx, { family, weight, italic })` must
  * return the advance width in px. It is called once per string and font at a
  * reference size of 100 px; other sizes are scaled from that. Pass `null` to
- * restore the default.
+ * restore the default. Returns the measurer it replaces (null for the default), to put back after.
+ * @param {((text: string, size: number, font: { family: string, weight: number, italic: boolean }) => number) | null} fn
  */
 export function setTextMeasurer(fn) {
   if (fn != null && typeof fn !== 'function') {
     throw new TypeError('setTextMeasurer: pass a function (text, size, font) => width in px, or null');
   }
+  const previous = customMeasure;
   customMeasure = fn ?? null;
   // (Each way of measuring keeps its own widths: setting one back finds them still there.)
   const key = customMeasure ?? BUILT_IN;
   widthCache = widthCaches.get(key) ?? new Map();
   widthCaches.set(key, widthCache);
+  return previous;
 }
 
 const NARROW = new Set("iljIİ.,:;!|'’`ı".split(''));

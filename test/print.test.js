@@ -393,3 +393,12 @@ test('KDP’s trims, and the largest of them take fewer pages (and not every pap
   assert.ok(createPrintCover(big, { trim: [8.4, 11], pages: 800 }));
   assert.ok(createPrintCover(big, { trim: '6x9', pages: 828 }));
 });
+
+test('the blurb’s budget counts characters as cleanText does: emoji first don’t crowd out what follows', () => {
+  const emoji = '🙂'.repeat(1600);
+  const print = createPrintCover(
+    { title: 'x', seed: 's' },
+    { trim: '6x9', pages: 200, blurb: `${emoji}\n\nThe second paragraph.` },
+  );
+  assert.match(print.svg, /The second paragraph/);
+});

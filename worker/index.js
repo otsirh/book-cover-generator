@@ -354,7 +354,9 @@ export async function png(request, env) {
   const answer = await drawPng(request, env, url, kind);
   // A link preview's picture that can't be drawn (too many asked of the crawler's address, resvg
   // unavailable or failed, a script the fonts lack) is the site's own: never an error card.
-  if (!answer.ok && answer.status !== 405 && url.searchParams.has('preview')) {
+  // (On as the API's other switches are: given, and not 0 or false.)
+  const forPreview = url.searchParams.getAll('preview').at(-1)?.trim();
+  if (!answer.ok && answer.status !== 405 && forPreview !== undefined && !/^(0|false)$/i.test(forPreview)) {
     // (Kept, as the 422 is, when the design's text can't be drawn: that answer won't change.)
     return new Response(null, {
       status: 302,
@@ -527,6 +529,8 @@ export async function preview(request, env) {
     };
     set(/(<meta property="og:title" content=")[^"]*/, name);
     set(/(<meta property="og:url" content=")[^"]*/, url.href);
+    // (This page is the design's own, not a copy of the app's home page.)
+    set(/(<link rel="canonical" href=")[^"]*/, url.href);
     set(/(<meta property="og:image" content=")[^"]*/, image.href);
     set(/(<meta property="og:image:alt" content=")[^"]*/, `The cover of ${name}`);
   }

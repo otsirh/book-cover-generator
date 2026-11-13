@@ -239,9 +239,10 @@ export function grain(c, { opacity = 0.12, light = false, freq = 0.75, id: name 
 }
 
 /** Soft drop shadow filter definition. */
-export function shadowFilter(id, u, { blur = 4, dy = 2, opacity = 0.35 } = {}) {
+export function shadowFilter(id, u, { blur = 4, dy = 2, opacity = 0.35, margin = 0.2 } = {}) {
+  const m = Math.round(margin * 100);
   return (
-    `<filter id="${id}" x="-20%" y="-20%" width="140%" height="140%">` +
+    `<filter id="${id}" x="-${m}%" y="-${m}%" width="${100 + 2 * m}%" height="${100 + 2 * m}%">` +
     `<feGaussianBlur in="SourceAlpha" stdDeviation="${n(blur * u)}"/>` +
     `<feOffset dy="${n(dy * u)}"/>` +
     `<feComponentTransfer><feFuncA type="linear" slope="${opacity}"/></feComponentTransfer>` +

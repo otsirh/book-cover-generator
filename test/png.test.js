@@ -5,7 +5,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { FONT_FILES, GENERIC, fontSet, readFont } from '../worker/fonts.js';
 import { pngEngine, drawnText, prepare, COVER_PIXELS } from '../worker/png.js';
-import { createCover, createMockup, styles, palettes, FONTS, measureText } from '../src/index.js';
+import { createCover, createMockup, styles, palettes, FONTS, measureText, setTextMeasurer } from '../src/index.js';
 import { contrast } from '../src/core.js';
 import { textBoxes, extentOf } from './svg-text.js';
 
@@ -74,6 +74,15 @@ test('text measured in the PNG fonts is as wide as resvg draws it', { skip }, ()
       Math.abs(measured - ink) / measured < 0.06,
       `${family}: measured ${measured.toFixed(1)}, drawn ${ink.toFixed(1)}`,
     );
+  }
+  // laidOut puts back the measurer in force before it, a caller's own too.
+  const own = () => 1;
+  setTextMeasurer(own);
+  try {
+    engine.laidOut(() => measureText('Keeper', 100, { font: FONTS.serif }));
+    assert.equal(setTextMeasurer(own), own);
+  } finally {
+    setTextMeasurer(null);
   }
   // Outside laidOut, text is measured as before.
   const before = measureText('Keeper', 100, { font: FONTS.serif });

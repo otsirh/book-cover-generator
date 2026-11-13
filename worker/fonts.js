@@ -44,6 +44,13 @@ export const FONT_FILES = [
  */
 const silent = (ch) => /** @type {number} */ (ch.codePointAt(0)) <= 0x20 || INVISIBLE.test(ch);
 
+/**
+ * The characters of a text that need a glyph (not spacing or one that draws nothing), as code points.
+ * @param {string} text
+ */
+const needed = (text) =>
+  [...text].filter((ch) => !silent(ch) && !/\s/u.test(ch)).map((ch) => /** @type {number} */ (ch.codePointAt(0)));
+
 /** The faces generic family names stand for (and any stack falls back to). */
 export const GENERIC = { serif: 'Noto Serif', 'sans-serif': 'Liberation Sans', monospace: 'Liberation Mono' };
 
@@ -170,15 +177,8 @@ export function fontSet(faces) {
     families.set(key, [...(families.get(key) ?? []), face]);
   }
 
-  /** Whether a face has every character of a text (bar spacing, joiners and variation selectors). @param {Face} face @param {string} text */
-  const has = (face, text) => {
-    for (const ch of text) {
-      const cp = /** @type {number} */ (ch.codePointAt(0));
-      if (silent(ch) || /\s/u.test(ch)) continue;
-      if (!face.glyph(cp)) return false;
-    }
-    return true;
-  };
+  /** Whether a face has every character of a text that needs a glyph. @param {Face} face @param {string} text */
+  const has = (face, text) => needed(text).every((cp) => face.glyph(cp));
 
   /**
    * The face of a family CSS picks for a weight and slant: the slant if the family has it, then
@@ -279,12 +279,7 @@ export function fontSet(faces) {
      * @param {string} text
      */
     covers(text) {
-      for (const ch of text) {
-        const cp = /** @type {number} */ (ch.codePointAt(0));
-        if (silent(ch) || /\s/u.test(ch)) continue;
-        if (!fallbacks.some((f) => f.glyph(cp))) return false;
-      }
-      return true;
+      return needed(text).every((cp) => fallbacks.some((f) => f.glyph(cp)));
     },
   };
 }

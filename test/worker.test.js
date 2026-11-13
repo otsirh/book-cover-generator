@@ -345,6 +345,9 @@ test(
     assert.equal(fallback.headers.get('location'), 'https://covers.example/og.png');
     // (Kept, as the 422 is: the design's text won't draw any better next time.)
     assert.match(fallback.headers.get('cache-control') ?? '', /public/);
+    // preview=0 is off, as the API's other switches are: the refusal itself.
+    const off = await fetchPath(`/api/mockup.png?kind=card&preview=0&title=${encodeURIComponent('灯台守')}`);
+    assert.equal(off.status, 422);
     assert.equal((await fetchPath('/api/cover.png', 'POST')).status, 405);
     // A scale that draws the cover in a mockup as nothing is the request's fault, as for a cover.
     const nothing = await fetchPath('/api/mockup.png?title=x&format=3000x1000&kind=card&scale=0.001');
@@ -461,6 +464,8 @@ test('a design’s link (/?title=…) gets its own link preview; the site’s he
   const oddImage = new URL(/<meta property="og:image" content="([^"]+)"/.exec(odd)?.[1].replaceAll('&amp;', '&') ?? '');
   for (const key of ['scale', 'download', 'text', 'variant']) assert.equal(oddImage.searchParams.get(key), null, key);
   assert.match(html, /<meta property="og:image:alt" content="The cover of Dune by Frank Herbert"/);
+  // The page is the design's own: its canonical address too.
+  assert.match(html, /<link rel="canonical" href="https:\/\/covers\.example\/\?title=Dune&amp;author=Frank\+Herbert/);
   // The page's validators don't describe the page rewritten.
   assert.equal(res.headers.get('etag'), null);
   // The page's security headers, which the static files' rules don't give a Worker's answer.

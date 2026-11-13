@@ -336,6 +336,9 @@ function normalizePalette(p) {
   while (accents.length < 3) accents.push(accents[accents.length % count]);
   const bg = p.bg.trim();
   const ink = p.ink.trim();
+  if (p.dark != null && typeof p.dark !== 'boolean') {
+    throw new TypeError(`A custom palette's dark is true or false, got ${JSON.stringify(p.dark)}`);
+  }
   const dark = p.dark ?? luminance(bg) < luminance(ink);
   return { id: p.id || 'custom', name: p.name || 'Custom', bg, ink, accents, dark };
 }
