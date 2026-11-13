@@ -4,10 +4,18 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-11-13
+
+PNG covers from the site, and link previews of a design. Covers are drawn as in 1.11.0.
+
 ### Added
 
 - **PNG from the HTTP API**: `/api/cover.png` and `/api/mockup.png` draw what the `.svg` endpoints do as PNG, for email, chat and social posts: a cover up to 600,000 pixels (600 × 900), a mockup up to 2.1 million (a 1080 × 1920 story; a flat or e-reader shot 1.3 million), larger ones drawn smaller to fit (`scale` to choose). The site's Worker draws them with resvg and open fonts (Noto, Liberation, EB Garamond, Roboto Condensed, Anton, TeX Gyre Adventor), laying the text out in their own widths; text in a script they lack gets a `422` (the SVG draws it).
 - **Link previews of a design**: Copy link gives a link that holds the design in its query, `https://covers.otsirh.dev/?title=…`, and a link preview of it (on X, Facebook, Slack, Discord, iMessage…) shows that design, as a social card. The app opens it as before.
+
+### Fixed
+
+- `createPrintCover`'s trim no longer makes a slow pattern of a long run of spaces (a CodeQL finding): the text is trimmed and capped first.
 
 ## [1.11.0] - 2026-11-13
 
@@ -344,7 +352,8 @@ A redesign of the covers and the app, based on a design review.
 
 - First release: 27 styles, 20 palettes, seeded randomizer, text fitting, CLI and the web app with SVG, PNG and JPEG export.
 
-[Unreleased]: https://github.com/otsirh/book-cover-generator/compare/v1.11.0...HEAD
+[Unreleased]: https://github.com/otsirh/book-cover-generator/compare/v1.12.0...HEAD
+[1.12.0]: https://github.com/otsirh/book-cover-generator/compare/v1.11.0...v1.12.0
 [1.11.0]: https://github.com/otsirh/book-cover-generator/compare/v1.10.0...v1.11.0
 [1.10.0]: https://github.com/otsirh/book-cover-generator/compare/v1.9.2...v1.10.0
 [1.9.2]: https://github.com/otsirh/book-cover-generator/compare/v1.9.1...v1.9.2
