@@ -411,7 +411,9 @@ export const typewriter = {
       underline +
       (sub ? gap * 0.6 + textBottom(sub, 0) : 0) +
       (by ? gap + textBottom(by, 0) : 0);
-    let y = H * 0.42 - blockH / 2;
+    // Centred a little above the middle, but below the typed header (a tall block on a square
+    // cover would reach it).
+    let y = Math.max(H * 0.42 - blockH / 2, headY + small * 0.5 + gap * 0.5);
     if (series && seriesH) {
       series.lines.forEach((ln, i) => {
         s += typedLine(ln, W / 2, baselineOf(series, y, i), series.size, 400, rng, ink, 'middle');

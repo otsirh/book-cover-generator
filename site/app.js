@@ -14,6 +14,7 @@ import {
   genres,
   createPrintCover,
   trimSizes,
+  printLimits,
 } from '../src/index.js';
 import {
   svgToDataUrl,
@@ -1352,6 +1353,13 @@ function syncVariants() {
   const offered = STYLES.find((s) => s.id === design.style)?.variants ?? [];
   if (variantsBuiltFor !== design.style) {
     variantsBuiltFor = design.style;
+    // A chip with focus is about to go: focus moves to its place in the new ones (or the style's name).
+    const focused = box.contains(document.activeElement);
+    queueMicrotask(() => {
+      if (!focused || box.contains(document.activeElement)) return;
+      const chip = /** @type {HTMLElement | null} */ (box.querySelector('button[aria-pressed="true"]'));
+      (chip && !box.hidden ? chip : $('style-name')).focus();
+    });
     box.replaceChildren(
       ...offered.map((v) => {
         const labelId = `variant-${v.name}`;
@@ -1724,7 +1732,9 @@ let keptQueue = [];
 /** @param {Kept[]} [list] the kept designs, if already loaded */
 function renderKept(list = loadKept()) {
   const hashes = list.map((k) => toHash(k.design));
-  for (const hash of keptThumbs.keys()) if (!hashes.includes(hash)) keptThumbs.delete(hash);
+  // Thumbnails by the SVG kept too: a design kept again with a new drawing shows the new one.
+  const thumbKeys = list.map((k, i) => `${hashes[i]}|${k.svg ? hashString(k.svg) : ''}`);
+  for (const key of keptThumbs.keys()) if (!thumbKeys.includes(key)) keptThumbs.delete(key);
   keptQueue = [];
   $('kept-empty').hidden = list.length > 0;
   for (const id of ['kept-all', 'kept-export']) $(id).hidden = list.length === 0;
@@ -1733,9 +1743,9 @@ function renderKept(list = loadKept()) {
       const d = k.design;
       const hash = hashes[i];
       const img = /** @type {HTMLImageElement} */ (h('img', { alt: '' }));
-      const thumb = keptThumbs.get(hash);
+      const thumb = keptThumbs.get(thumbKeys[i]);
       if (thumb) img.src = thumb;
-      else keptQueue.push({ img, kept: k, hash });
+      else keptQueue.push({ img, kept: k, hash: thumbKeys[i] });
       const styleName = STYLES.find((s) => s.id === d.style)?.name ?? d.style;
       const paletteName = customColors(d.palette)
         ? 'Custom'
@@ -1853,6 +1863,7 @@ async function importKept(file) {
   const have = new Set(list.map((k) => toHash(k.design)));
   /** @type {Kept[]} */
   const added = [];
+  let designs = 0;
   for (const item of items) {
     // (Only designs: an entry naming nothing a design has would come out as an empty cover.)
     if (
@@ -1862,6 +1873,7 @@ async function importKept(file) {
     ) {
       continue;
     }
+    designs += 1;
     const k = keptFrom(item);
     const hash = toHash(k.design);
     if (have.has(hash)) continue;
@@ -1870,6 +1882,10 @@ async function importKept(file) {
   }
   const room = Math.max(0, MAX_KEPT - list.length);
   const taken = added.slice(0, room);
+  if (!designs) {
+    toast('That file has no kept designs in it');
+    return;
+  }
   if (!taken.length) {
     toast(
       added.length ? `The tray is full: it holds ${MAX_KEPT} designs` : 'Nothing new: those designs are kept already',
@@ -2141,6 +2157,26 @@ async function downloadMany() {
 /* ------------------------------------------------------------------- print */
 
 const PRINT_KEY = 'book-cover-generator:print';
+/**
+ * On a phone the preview is pinned at the top: what gets focus under it is scrolled clear (WCAG
+ * 2.4.11). The page's scroll-padding does this in Chrome and Firefox; Safari scrolls only for what
+ * is outside the window, so it's checked here once the browser has done its own scrolling.
+ */
+function keepFocusInView() {
+  const wrap = /** @type {HTMLElement} */ (document.querySelector('.preview-wrap'));
+  document.addEventListener('focusin', (e) => {
+    const target = e.target;
+    if (!(target instanceof HTMLElement) || wrap.contains(target)) return;
+    requestAnimationFrame(() => {
+      if (getComputedStyle(wrap).position !== 'sticky') return;
+      const [covered, r] = [wrap.getBoundingClientRect(), target.getBoundingClientRect()];
+      if (r.height && r.bottom > covered.top && r.top < covered.bottom) {
+        window.scrollBy({ top: r.top - covered.bottom - 12, behavior: 'instant' });
+      }
+    });
+  });
+}
+
 /** The paperback's settings, as the print form holds them. */
 const PRINT_DEFAULTS = {
   trim: '6x9',
@@ -2239,6 +2275,9 @@ function renderPrint() {
   if (!(/** @type {HTMLDetailsElement} */ ($('print')).open)) return;
   printColourMenus();
   const settings = printSettings();
+  // The page count the paper takes (standard colour 72 to 600…), for the field's arrows.
+  const range = printLimits.pages[/** @type {keyof typeof printLimits.pages} */ (settings.paper)];
+  if (range) [field('print-pages').min, field('print-pages').max] = range.map(String);
   lastPrintKey = JSON.stringify({ design, settings });
   try {
     localStorage.setItem(PRINT_KEY, JSON.stringify(settings));
@@ -2249,6 +2288,7 @@ function renderPrint() {
   try {
     const print = printCoverOf(design, settings, true);
     preview.src = svgToDataUrl(print.svg);
+    field('print-pages').removeAttribute('aria-invalid');
     const { width, height, spine } = print.inches;
     const inches = (/** @type {number} */ v) => v.toFixed(3).replace(/\.?0+$/, '');
     $('print-size').textContent =
@@ -2257,6 +2297,8 @@ function renderPrint() {
   } catch (err) {
     preview.removeAttribute('src');
     $('print-size').textContent = err instanceof Error ? err.message : String(err);
+    // (The field says what's wrong: the status line under it describes it.)
+    if (/pages/.test(String(err))) field('print-pages').setAttribute('aria-invalid', 'true');
   }
 }
 
@@ -2381,6 +2423,7 @@ history.scrollRestoration = 'manual';
 stamp();
 entryHash = location.hash;
 registerServiceWorker();
+keepFocusInView();
 buildControls();
 buildRail();
 buildVariations();

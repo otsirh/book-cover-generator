@@ -197,6 +197,47 @@ test('a word wider than the back (a web address) is broken to fit, after a / whe
   assert.deepEqual(plain, ['Short words only here.']);
 });
 
+test('the back’s text breaks lines as each language does, quickly, and cuts without losing a row', () => {
+  /** @param {string} blurb @param {string} trim */
+  const rows = (blurb, trim = '5x8') =>
+    textBoxes(createPrintCover({ ...book, style: 'minimal' }, { trim, pages: 200, blurb }).svg)
+      .filter((b) => !b.moved && b.family?.includes('Georgia'))
+      .map((b) => b.text);
+  // French: no line starts with ? ! ; : » or ends with «.
+  const fr = rows(
+    'Qui a éteint le phare ? Et pourquoi personne sur l’île ne veut-il en parler ? Le gardien murmure : « Certaines lumières restent allumées pour une raison. » Ada rame dans la tempête ; elle trouve le journal du gardien !'.repeat(
+      2,
+    ),
+    '5.25x8',
+  );
+  for (const row of fr) assert.ok(!/^[?!;:»]/.test(row) && !/«$/.test(row), row);
+  // Japanese: no line starts with 。、」 or ends with 「.
+  const ja = rows(
+    '灯台の灯りが九十年ぶりに消えた夜、エイダは嵐の中を漕ぎ出して、その理由を確かめに行く。「彼女が見つけたのは、灯台守の日誌だった。」'.repeat(
+      6,
+    ),
+    '8.5x11',
+  );
+  assert.ok(ja.length > 2);
+  for (const row of ja) assert.ok(!/^[。、」』）]/.test(row) && !/[「『（]$/.test(row), row);
+  // Thai: lines break between words, as the segmenter finds them, not inside one.
+  const thaiWords = ['เมื่อ', 'ไฟ', 'ประภาคาร', 'ดับ', 'ลง', 'เป็น', 'ครั้ง', 'แรก', 'ใน', 'รอบ', 'เก้าสิบ', 'ปี'];
+  const th = rows(thaiWords.join('').repeat(12));
+  const words = new Set(thaiWords);
+  const segmenter = new Intl.Segmenter('th', { granularity: 'word' });
+  for (const row of th) {
+    const parts = [...segmenter.segment(row)].map((p) => p.segment);
+    assert.ok(words.has(parts[0]) && words.has(parts[parts.length - 1]), row);
+  }
+  // A long blurb without spaces: cut at its end with an ellipsis after text, never a row of "…" alone.
+  const long = rows('灯台の灯りが消えた夜、エイダは嵐の中を漕ぎ出した。'.repeat(80));
+  assert.match(long[long.length - 1], /.…$/u);
+  // Quickly, however long (once wrapping measured ever longer prefixes of it).
+  const started = performance.now();
+  rows('灯台の灯りが九十年ぶりに消えた夜、エイダは嵐の中を漕ぎ出した。'.repeat(70), '6x9');
+  assert.ok(performance.now() - started < 400, `${Math.round(performance.now() - started)} ms`);
+});
+
 test('the spine keeps the ink of accents and tails 1/16 in from its edges too', () => {
   for (const [title, font, pages, paper] of /** @type {const} */ ([
     ['Été à Paris', undefined, 120, 'white'],
@@ -204,6 +245,12 @@ test('the spine keeps the ink of accents and tails 1/16 in from its edges too', 
     ['Ça Ira', 'serif', 120, 'white'],
     ['Quiet Days', 'serif', 120, 'white'],
     ['夜の図書館', undefined, 120, 'white'],
+    // Old-style figures hang below the baseline in Georgia and Hoefler Text; brackets and bars too.
+    ['Fahrenheit 451', 'serif', 120, 'white'],
+    ['Summer of 1969', 'serif', 100, 'white'],
+    ['Jade', 'garamond', 100, 'white'],
+    ['[Redacted]', undefined, 100, 'white'],
+    ['A|B', undefined, 100, 'white'],
   ])) {
     const print = createPrintCover({ title, author: 'Ann Lee', font, seed: 's', style: 'minimal' }, { pages, paper });
     assert.equal(print.spineText, true, title);

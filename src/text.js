@@ -608,6 +608,69 @@ function hardWrap(tokens, maxWidth, measure) {
   return wrapGreedy(pieces, maxWidth, measure) ?? pieces.map((piece) => piece.text);
 }
 
+/**
+ * Prose wrapped to a width at a size, line by line as prose is set (not balanced, not shrunk): it
+ * breaks where a line may (at spaces, between words of scripts written without them, never
+ * before closing or after opening punctuation). A unit wider than the width (a web address, say)
+ * is broken too, its first piece filling what's left of the line, after a / - . or the like
+ * where one is near the end of what fits.
+ * @param {string} text  one paragraph, its spaces single
+ * @param {number} size @param {number} maxWidth @param {import('./text.js').TextSpec} spec
+ * @returns {string[]}
+ */
+export function wrapText(text, size, maxWidth, spec) {
+  const fits = (/** @type {string} */ s) => measureText(s, size, spec) <= maxWidth;
+  /** @type {string[]} */
+  const lines = [];
+  let cur = '';
+  for (const token of tokenize(text)) {
+    const cand = append(cur, token);
+    if (fits(cand)) {
+      cur = cand;
+      continue;
+    }
+    if (fits(token.text)) {
+      if (cur) lines.push(cur);
+      cur = token.text;
+      continue;
+    }
+    let chars = graphemes(token.text);
+    let lead = cur ? `${cur}${token.space ? ' ' : ''}` : '';
+    while (chars.length) {
+      // The most characters that fit after what the line holds (by halves: a unit can be long).
+      let lo = 0;
+      let hi = chars.length;
+      while (lo < hi) {
+        const mid = Math.ceil((lo + hi) / 2);
+        if (fits(lead + chars.slice(0, mid).join(''))) lo = mid;
+        else hi = mid - 1;
+      }
+      if (lo === chars.length) {
+        cur = lead + chars.join('');
+        break;
+      }
+      // Too little room left on this line: the unit starts the next one.
+      if (lead && lo < Math.min(4, chars.length)) {
+        lines.push(lead.trimEnd());
+        lead = '';
+        continue;
+      }
+      let cut = Math.max(1, lo);
+      for (let k = cut; k > cut / 2; k--) {
+        if (/[/\-.?&=_:,;)]/.test(chars[k - 1])) {
+          cut = k;
+          break;
+        }
+      }
+      lines.push(lead + chars.slice(0, cut).join(''));
+      lead = '';
+      chars = chars.slice(cut);
+    }
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
+
 // Words that can take a hyphen when broken: alphabetic scripts written with spaces.
 const HYPHENABLE = /^[\p{Script=Latin}\p{Script=Cyrillic}\p{Script=Greek}\p{M}]+$/u;
 const VOWEL = /^[aeiouyàáâäãåæèéêëìíîïòóôöõøœùúûüýÿаеёиоуыэюяіїєαεηιουωάέήίόύώ]/iu;

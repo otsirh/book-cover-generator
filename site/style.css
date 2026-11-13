@@ -692,6 +692,11 @@ input[type='number'][aria-invalid='true'] {
   color: var(--muted);
 }
 
+.segmented button[aria-disabled='true'] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .segmented button[aria-pressed='true'] {
   background: var(--surface);
   color: var(--text);
@@ -1757,6 +1762,13 @@ pre {
     display: contents;
   }
 
+  /* Whatever gets focus or is jumped to scrolls clear of the pinned preview (36vh and its padding)
+     and the bar along the bottom (WCAG 2.4.11: focus not hidden). */
+  html:has(body.app-page) {
+    scroll-padding-top: calc(36vh + 44px);
+    scroll-padding-bottom: 80px;
+  }
+
   .preview-wrap {
     position: sticky;
     top: 0;
@@ -1800,12 +1812,6 @@ pre {
 
   .rail {
     order: 6;
-  }
-
-  /* Jumps to the styles land below the pinned preview (36vh plus its padding), not under it. */
-  .rail,
-  .rail-group {
-    scroll-margin-top: calc(36vh + 32px);
   }
 
   .rail-grid {

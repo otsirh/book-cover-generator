@@ -485,3 +485,20 @@ test('--print: the whole paperback cover, sized from the trim and the pages', as
     assert.match(stderr, message, args.join(' '));
   }
 });
+
+test('--height alone keeps the paperback shape, as --width alone does', async () => {
+  for (const [args, size] of /** @type {const} */ ([
+    [
+      ['--height', '1200'],
+      [800, 1200],
+    ],
+    [
+      ['--width', '800'],
+      [800, 1200],
+    ],
+  ])) {
+    const { stdout } = await cli('Dune', ...args, '--json');
+    const { width, height } = JSON.parse(stdout);
+    assert.deepEqual([width, height], size, args.join(' '));
+  }
+});

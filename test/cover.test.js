@@ -1536,3 +1536,33 @@ test('a name as written but for case wins over an id only spelled alike', async 
     unregisterStyle('art-deco');
   }
 });
+
+test('Typewriter keeps a tall title block below its typed header, square covers too', () => {
+  const cover = createCover({
+    title: 'A Brief History of Nearly Everything in the Known Universe',
+    author: 'Bartholomew Featherstonehaugh-Cholmondeley',
+    subtitle: 'A Novel',
+    series: 'Book Two of the Ember Cycle',
+    credit: 'Translated by Edith Grossman',
+    style: 'typewriter',
+    seed: 'a',
+    width: 600,
+    height: 600,
+  });
+  // (Typewriter types each letter on its own.) Its lines, top to bottom: the header (author and
+  // word count, typed small), then the series.
+  /** @type {{ top: number, bottom: number }[]} */
+  const bands = [];
+  for (const b of textBoxes(cover.svg)
+    .filter((x) => !x.moved)
+    .sort((a, z) => a.y - z.y)) {
+    const [top, bottom] = [b.y - b.size * 0.8, b.y + b.size * 0.3];
+    const last = bands.at(-1);
+    if (last && b.y - (last.bottom - 0.3 * b.size) < 4) {
+      last.top = Math.min(last.top, top);
+      last.bottom = Math.max(last.bottom, bottom);
+    } else bands.push({ top, bottom });
+  }
+  const [header, series] = bands;
+  assert.ok(series.top >= header.bottom, `the series (from ${series.top}) overprints the header (to ${header.bottom})`);
+});

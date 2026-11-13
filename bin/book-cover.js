@@ -191,7 +191,13 @@ function dimensions() {
   }
   const width = values.width === undefined ? undefined : px('--width', values.width);
   const height = values.height === undefined ? undefined : px('--height', values.height);
-  if (values.format === undefined) return { width, height };
+  if (values.format === undefined) {
+    // The paperback shape (2:3) by default, at the width or the height given: the library makes
+    // a width alone that shape; a height alone gets its width here.
+    if (width !== undefined || height === undefined) return { width, height };
+    const [w, h] = formatSize('paperback', undefined, height);
+    return { width: w, height: h };
+  }
   // A preset or a WxH shape, at the width or height asked for (as the HTTP API reads it).
   const [w, h] = formatSize(values.format, width, height);
   return { width: w, height: h };

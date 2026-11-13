@@ -14,6 +14,7 @@ import {
   measureText,
   spacingShift,
   textGroupAttrs,
+  wrapText,
 } from './text.js';
 import { strongAccents, textColor } from './styles/util.js';
 import { fontEntries, idFor } from './shared.js';
@@ -370,8 +371,7 @@ function spineLine(fit, x, anchor, fill) {
   const ls = letterSpacing * size;
   const attrs = textGroupAttrs({ font, size, weight, letterSpacing: ls, fill, anchor });
   // The line's ink centred on the spine: from its accents' tops to its tails' bottoms.
-  const up = (font.cap ?? 0.72) + markExtent(line).above;
-  const baseline = ((up - descentOf(line)) / 2) * size;
+  const baseline = ((inkAbove(line, font) - inkBelow(line)) / 2) * size;
   return `<g ${attrs}><text x="${n(x + spacingShift(anchor, ls))}" y="${n(baseline)}">${escapeXml(line)}</text></g>`;
 }
 
@@ -380,54 +380,16 @@ function spineLine(fit, x, anchor, fill) {
  * marks below the baseline; with a little to spare, as fonts differ from the measured ones.
  * @param {string} text @param {import('./text.js').FontSpec} font
  */
-const inkHeight = (text, font) => ((font.cap ?? 0.72) + markExtent(text).above + descentOf(text)) * 1.08;
+const inkHeight = (text, font) => (inkAbove(text, font) + inkBelow(text)) * 1.08;
 
-/**
- * Prose wrapped to a width at a size, line by line (not balanced, as a title is). A word wider
- * than the column, such as a long web address, is broken where it must be: after a / - . or the
- * like if one is near the end of what fits, else between any two characters.
- * @param {string} text @param {number} size @param {number} width @param {import('./text.js').FontSpec} font
- */
-function wrapProse(text, size, width, font) {
-  const spec = { font };
-  const fits = (/** @type {string} */ s) => measureText(s, size, spec) <= width;
-  /** @type {string[]} */
-  const out = [];
-  let line = '';
-  for (const word of text.split(' ')) {
-    if (!word) continue;
-    const joined = line ? `${line} ${word}` : word;
-    if (fits(joined)) {
-      line = joined;
-      continue;
-    }
-    if (line) out.push(line);
-    let rest = word;
-    while (!fits(rest)) {
-      const chars = graphemes(rest);
-      // The most characters that fit (at least one, so a line always moves on).
-      let lo = 1;
-      let hi = chars.length - 1;
-      while (lo < hi) {
-        const mid = Math.ceil((lo + hi) / 2);
-        if (fits(chars.slice(0, mid).join(''))) lo = mid;
-        else hi = mid - 1;
-      }
-      let cut = lo;
-      for (let k = lo; k > lo / 2; k--) {
-        if (/[/\-.?&=_:,;)]/.test(chars[k - 1])) {
-          cut = k;
-          break;
-        }
-      }
-      out.push(chars.slice(0, cut).join(''));
-      rest = chars.slice(cut).join('');
-    }
-    line = rest;
-  }
-  if (line) out.push(line);
-  return out;
-}
+// Characters whose ink reaches past what descentOf and markExtent allow for in some fonts:
+// old-style figures (Georgia, Hoefler Text: 3 4 5 7 9 hang below), a J with a tail, brackets, bars.
+const LOW = /[0-9J[\]{}|$@/\\]/;
+const TALL = /[[\]{}()|$@/\\]/;
+/** How far a line's ink reaches above its baseline, in em. @param {string} line @param {import('./text.js').FontSpec} font */
+const inkAbove = (line, font) => (font.cap ?? 0.72) + Math.max(markExtent(line).above, TALL.test(line) ? 0.1 : 0);
+/** How far a line's ink reaches below its baseline, in em. @param {string} line */
+const inkBelow = (line) => Math.max(descentOf(line), LOW.test(line) ? 0.24 : 0);
 
 /**
  * The blurb's paragraphs, as large as fits the column (12 pt down to 8 pt), cut with an ellipsis
@@ -440,7 +402,7 @@ function blurbText(paragraphs, x, y, width, height, fill) {
   const cap = font.cap ?? 0.72;
   /** @param {number} size */
   const layout = (size) => {
-    const wrapped = paragraphs.map((p) => wrapProse(p, size, width, font));
+    const wrapped = paragraphs.map((p) => wrapText(p, size, width, { font }));
     const count = wrapped.reduce((sum, l) => sum + l.length, 0);
     const tall = cap * size + (count - 1) * size * lineHeight + (wrapped.length - 1) * size * 0.7 + size * 0.3;
     return { wrapped, tall };
@@ -478,7 +440,11 @@ function blurbText(paragraphs, x, y, width, height, fill) {
     const last = rows[rows.length - 1];
     const spec = { font };
     let text = last.line;
-    while (text && measureText(`${text}…`, size, spec) > width) text = text.replace(/\s*\S+\s*$/, '');
+    // Drop whole words from its end where it has spaces; else characters (Japanese, Thai, a long
+    // address), so a row is never left with nothing but the ellipsis.
+    while (text && measureText(`${text}…`, size, spec) > width) {
+      text = /\s\S/.test(text) ? text.replace(/\s*\S+\s*$/, '') : graphemes(text).slice(0, -1).join('');
+    }
     last.line = `${text.replace(/[\s,;:.]+$/, '')}…`;
   }
   const attrs = textGroupAttrs({ font, size, weight: 400, fill });

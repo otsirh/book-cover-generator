@@ -1118,6 +1118,37 @@ test('the tools under the preview: never covered by it while it stays in view, a
   expect(await top('#many summary')).toBeGreaterThan(await top('#preview'));
 });
 
+test('keyboard focus: kept on a variant chip when the style changes, and clear of the pinned preview on a phone', async ({
+  page,
+}) => {
+  await page.goto('/#title=Probe&style=minimal&seed=s');
+  await ready(page);
+  // The title field is named by its label alone (its hint describes it).
+  await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toBeVisible();
+  await page.locator('#style-variants button[data-value=""]').first().focus();
+  await page.keyboard.press('ArrowRight');
+  await expect.poll(() => page.locator('.tile[aria-pressed="true"]').getAttribute('data-style')).not.toBe('minimal');
+  expect(await page.evaluate(() => document.activeElement?.tagName)).not.toBe('BODY');
+  // On a phone, a field reached by Shift+Tab scrolls clear of the pinned preview.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('#texture').focus();
+  for (let i = 0; i < 12; i++) {
+    await page.keyboard.press('Shift+Tab');
+    // (Polled: the app may scroll it clear on the next frame.)
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const el = document.activeElement;
+          const r = el?.getBoundingClientRect();
+          const p = document.querySelector('.preview-wrap')?.getBoundingClientRect();
+          if (!r || !p || !r.height || el === document.body) return 'clear';
+          return r.top >= p.bottom - 1 || r.bottom <= p.top ? 'clear' : `#${el?.id || el?.tagName} under the preview`;
+        }),
+      )
+      .toBe('clear');
+  }
+});
+
 test('the toast shows at the top on wide screens, clear of the export buttons', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/#title=Toast&style=minimal&seed=t');
@@ -1454,6 +1485,12 @@ test('kept designs export to a file and import back', async ({ page }) => {
     .locator('#kept-file')
     .setInputFiles({ name: 'x.json', mimeType: 'application/json', buffer: Buffer.from('not json') });
   await expect(page.locator('#toast')).toContainText('no kept designs');
+  // Nor is a list of things that aren't designs "kept already".
+  await page.locator('#toast').evaluate((el) => el.classList.remove('show'));
+  await page
+    .locator('#kept-file')
+    .setInputFiles({ name: 'y.json', mimeType: 'application/json', buffer: Buffer.from('[{"foo":1}]') });
+  await expect(page.locator('#toast')).toContainText('That file has no kept designs in it');
 });
 
 test('a kept design shows the cover as it was kept, and says when this version draws it differently', async ({
@@ -1472,6 +1509,10 @@ test('a kept design shows the cover as it was kept, and says when this version d
   await page.locator('.kept-open').click();
   await selected(page, 'minimal');
   await expect(page.locator('#toast')).toContainText('draws it a little differently');
+  // Kept again: the tray shows the drawing kept now, not the old one.
+  await page.locator('#keep').click();
+  await expect.poll(() => svgOf(page, '.kept-open img')).not.toBe(snapshot);
+  expect(await svgOf(page, '.kept-open img')).toBe(await svgOf(page, '#preview'));
 });
 
 test('a kept design drawn the same but for its ids opens without a warning', async ({ page }) => {
@@ -1743,7 +1784,14 @@ test('a paperback for print: the whole cover, sized from the trim and pages, as 
   await page.locator('#print-pages').fill('10');
   await expect(page.locator('#print-size')).toContainText('pages must be a whole number from 24 to 776 on cream paper');
   await expect(page.locator('#print-preview')).not.toHaveAttribute('src');
+  await expect(page.locator('#print-pages')).toHaveAttribute('aria-invalid', 'true');
+  // The field's range follows the paper (standard colour takes 72 to 600 pages).
+  await page.locator('#print-paper').selectOption('color');
+  await expect(page.locator('#print-pages')).toHaveAttribute('min', '72');
+  await expect(page.locator('#print-pages')).toHaveAttribute('max', '600');
+  await page.locator('#print-paper').selectOption('cream');
   await page.locator('#print-pages').fill('240');
+  await expect(page.locator('#print-pages')).not.toHaveAttribute('aria-invalid');
   // The PDF: one page, the whole cover at 300 dpi, its trim box an eighth of an inch in.
   const [download] = await Promise.all([page.waitForEvent('download'), page.locator('#print-pdf').click()]);
   expect(download.suggestedFilename()).toBe('the-lighthouse-keeper-paperback-5.5x8.5.pdf');
@@ -1776,6 +1824,9 @@ test('the spine keeps 1/16 in clear of the ink of accents and tails, in this bro
       ['Ça Ira', 'serif'],
       ['Quiet Days', 'serif'],
       ['The Lighthouse Keeper', undefined],
+      ['Fahrenheit 451', 'serif'],
+      ['Jade', 'garamond'],
+      ['[Redacted]', undefined],
     ]) {
       const print = createPrintCover({ title, author: 'Ann Lee', font, seed: 's', style: 'minimal' }, { pages: 120 });
       // (Read from the markup: the page's Trusted Types policy rightly refuses DOMParser.)
@@ -1796,7 +1847,7 @@ test('the spine keeps 1/16 in clear of the ink of accents and tails, in this bro
     }
     return out;
   });
-  expect(rows.length).toBe(8);
+  expect(rows.length).toBe(14);
   for (const { line, top, bottom, half } of rows) {
     expect(top, `${line}: ink top`).toBeGreaterThanOrEqual(-half - 0.5);
     expect(bottom, `${line}: ink bottom`).toBeLessThanOrEqual(half + 0.5);

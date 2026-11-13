@@ -96,6 +96,12 @@ export declare function clipGraphemes(str: string, max: number, options?: { unit
  * `breaks`, typed line breaks stay, as "\n" (empty lines dropped).
  */
 export declare function cleanText(value: unknown, max: number, options?: { breaks?: boolean }): string;
+/**
+ * A paragraph wrapped to `maxWidth` px at `size` px, line by line as prose is set: breaking where
+ * a line may (spaces, between words of scripts without them, not around punctuation that must
+ * stay), and breaking a word wider than the width.
+ */
+export declare function wrapText(text: string, size: number, maxWidth: number, spec: TextSpec): string[];
 /** Split a string into user-perceived characters. */
 export declare function graphemes(str: string): string[];
 

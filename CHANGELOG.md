@@ -12,6 +12,11 @@ All notable changes to this project are documented here. The format follows [Kee
 
 - On phones, **Many covers** sat above the preview at the top of the page; it now follows the export buttons, with Kept designs and the print panel. On wider screens, the preview stays in view beside the controls however many designs are kept, and never covers what's under it.
 - On tablets, the controls (kept in view as the page scrolls) no longer lie over the styles below them.
+- On phones, a field reached with the keyboard is scrolled clear of the pinned preview, in Safari too (it stayed under it). Focus on a variation chip stays on one when the style changes, rather than falling back to the page.
+- Typewriter keeps a tall title block below its typed header on square covers (a series line could overprint it).
+- Kept designs: one kept again with a new drawing shows the new one in the tray; importing a file with no designs in it says so (not "kept already").
+- The Title field is named by its label alone (its hint describes it, and was read twice); disabled export sizes look disabled.
+- CLI: `--height` alone keeps the paperback shape, as `--width` alone does.
 
 ## [1.9.2] - 2026-11-13
 
