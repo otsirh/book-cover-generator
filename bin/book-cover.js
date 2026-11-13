@@ -314,9 +314,10 @@ function batch(defaults) {
       const cover = createCover({ ...optionsForBook(book, defaults), seed: book.seed ?? values.seed });
       const file = join(dir, `${String(n).padStart(digits, '0')}-${slug(cover.title)}.svg`);
       writeFileSync(file, cover.svg);
-      const { style, palette: paletteId, seed, width, height } = cover;
-      if (values.json)
-        process.stdout.write(JSON.stringify({ file, style, palette: paletteId, seed, width, height }) + '\n');
+      const { style, palette: paletteId, seed, width, height, lang } = cover;
+      // (As a single cover's --json says it.)
+      const choices = { style, palette: paletteId, seed, width, height, lang, variants: cover.variants };
+      if (values.json) process.stdout.write(JSON.stringify({ file, ...choices }) + '\n');
     } catch (err) {
       failed += 1;
       console.error(`Book ${n} ("${book.title}"): ${err instanceof Error ? err.message : String(err)}`);

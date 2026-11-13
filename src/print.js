@@ -309,23 +309,31 @@ export function createPrintCover(coverOptions = {}, print = /** @type {any} */ (
         along * 0.32,
       );
     let by = author && byCap >= 6 * PT ? byline(byCap) : null;
-    const room = by ? along - by.width - gap : along;
-    const title = atLeast(
-      fitText(spineTitle, {
-        font: spineFont,
-        weight: 700,
-        maxWidth: room,
-        maxSize: sizeMax,
-        minSize: 6 * PT,
-        maxLines: 1,
-        letterSpacing: 0.08,
-      }),
-      spineTitle,
-      6 * PT,
-      room,
-    );
-    // (Never larger than the title: smaller again if the title came out smaller.)
-    if (by && by.size > title.size + 0.01) by = byline(Math.max(title.size, 6 * PT));
+    /** The title in the room the byline leaves. @param {typeof by} beside */
+    const titled = (beside) => {
+      const room = beside ? along - beside.width - gap : along;
+      return atLeast(
+        fitText(spineTitle, {
+          font: spineFont,
+          weight: 700,
+          maxWidth: room,
+          maxSize: sizeMax,
+          minSize: 6 * PT,
+          maxLines: 1,
+          letterSpacing: 0.08,
+        }),
+        spineTitle,
+        6 * PT,
+        room,
+      );
+    };
+    let title = titled(by);
+    // (Never larger than the title: smaller again if the title came out smaller, and the title
+    // then fitted to the room that gives back.)
+    if (by && by.size > title.size + 0.01) {
+      by = byline(Math.max(title.size, 6 * PT));
+      title = titled(by);
+    }
     const cx = (backRight + spineRight) / 2;
     s += `<g transform="translate(${n(cx)} ${n(trimTop + 0.375 * PX)}) rotate(90)">`;
     s += spineLine(title, 0, 'start', spineInk);

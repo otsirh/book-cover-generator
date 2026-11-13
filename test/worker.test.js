@@ -566,6 +566,11 @@ test('the API describes itself: what a query draws, the catalog, and OpenAPI', a
   const direct = /** @type {Response} */ (get('/api/cover.svg?title=istanbul&lang=tr&style=bigtype&case=upper&seed=t'));
   const linked = /** @type {Response} */ (get(new URL(turkish.urls.svg).pathname + new URL(turkish.urls.svg).search));
   assert.equal(await linked.text(), await direct.text());
+  // A palette and your own colours: one or the other, as the CLI says.
+  const both = await ask('/api/cover.json?title=A&palette=mint&bg=000&ink=fff&accent=f00');
+  assert.equal(both.res.status, 400);
+  assert.match(both.body, /palette or your own colours/);
+  assert.equal((await ask('/api/cover.json?title=A&palette=auto&bg=000&ink=fff&accent=f00')).res.status, 200);
   // Your own colours: one to three accents, as a link's palette holds.
   assert.equal((await ask('/api/cover.json?title=A&bg=000&ink=fff&accent=f00,0f0,00f')).res.status, 200);
   const four = await ask('/api/cover.json?title=A&bg=000&ink=fff&accent=f00,0f0,00f,ff0');

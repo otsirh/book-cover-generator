@@ -418,6 +418,10 @@ export function optionsFromLink(q) {
   const [bg, ink, accent] = [given('bg'), given('ink'), given('accent')];
   if (bg || ink || accent) {
     if (!bg || !ink || !accent) throw new RangeError('Your own colours need bg, ink and accent');
+    // (As the CLI says it: one or the other, never a palette quietly set aside.)
+    if (palette !== undefined && !reserved(palette, PALETTE_WORDS)) {
+      throw new RangeError('Use palette or your own colours (bg, ink, accent), not both');
+    }
     // (Each as #rrggbb, as a link writes it: the query and its link draw the same bytes.)
     const accents = accent
       .split(',')

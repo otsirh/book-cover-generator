@@ -2227,6 +2227,9 @@ function savedPrint() {
     for (const key of PRINT_FIELDS) {
       if (typeof saved?.[key] === typeof PRINT_DEFAULTS[key]) /** @type {any} */ (out)[key] = saved[key];
     }
+    // (A page count the paper doesn't take, from an older version say: the default's.)
+    const [least, most] = printLimits.pages[/** @type {keyof typeof printLimits.pages} */ (out.paper)] ?? [0, 0];
+    if (!Number.isInteger(out.pages) || out.pages < least || out.pages > most) out.pages = PRINT_DEFAULTS.pages;
   } catch {
     // Storage blocked, or something else there: the defaults.
   }
@@ -2335,14 +2338,18 @@ function renderPrint() {
   const range = printLimits.pages[/** @type {keyof typeof printLimits.pages} */ (settings.paper)];
   if (range) [field('print-pages').min, field('print-pages').max] = range.map(String);
   lastPrintKey = JSON.stringify({ design, settings });
-  try {
-    localStorage.setItem(PRINT_KEY, JSON.stringify(settings));
-  } catch {
-    // Storage blocked: the settings last as long as the page.
-  }
+  /** Keep the settings for the next visit (a page count it can't draw: the last that it could). @param {PrintSettings} kept */
+  const keep = (kept) => {
+    try {
+      localStorage.setItem(PRINT_KEY, JSON.stringify(kept));
+    } catch {
+      // Storage blocked: the settings last as long as the page.
+    }
+  };
   const preview = /** @type {HTMLImageElement} */ ($('print-preview'));
   try {
     const print = printCoverOf(design, settings, true);
+    keep(settings);
     preview.src = svgToDataUrl(print.svg);
     field('print-pages').removeAttribute('aria-invalid');
     const { width, height, spine } = print.inches;
@@ -2351,6 +2358,7 @@ function renderPrint() {
       `Whole cover ${inches(width)} × ${inches(height)} in, spine ${inches(spine)} in` +
       (print.spineText ? '' : ` (no spine text: ${settings.pages < 80 ? 'under 80 pages' : 'too thin to read'})`);
   } catch (err) {
+    keep({ ...settings, pages: savedPrint().pages });
     preview.removeAttribute('src');
     $('print-size').textContent = err instanceof Error ? err.message : String(err);
     // (The field says what's wrong: the status line under it describes it.)

@@ -2699,3 +2699,14 @@ test('a back colour chosen as an accent stays chosen through a palette without t
   await page.goto('/#title=Kept&style=minimal&palette=riso&seed=k');
   await expect(page.locator('#print-back [data-key="a2"]')).toHaveAttribute('aria-pressed', 'true');
 });
+
+test('a page count the print cover can’t take isn’t kept for the next visit', async ({ page }) => {
+  await page.goto('/#title=Pages&style=minimal&seed=p');
+  await page.locator('#print summary').click();
+  await page.locator('#print-pages').fill('');
+  await expect(page.locator('#print-pages')).toHaveAttribute('aria-invalid', 'true');
+  await page.reload();
+  await page.locator('#print summary').click();
+  await expect(page.locator('#print-pages')).not.toHaveValue('0');
+  await expect(page.locator('#print-pages')).not.toHaveAttribute('aria-invalid', 'true');
+});

@@ -315,6 +315,8 @@ test('--batch writes a cover per book, with the other options for every book', a
       .trim()
       .split('\n')
       .map((l) => JSON.parse(l));
+    // (Each line says what a single cover's --json says: its language and pins too.)
+    for (const line of lines) assert.ok('lang' in line && 'variants' in line, JSON.stringify(line));
     assert.deepEqual(
       lines.map((l) => [l.file, l.style, l.palette, l.seed]),
       [

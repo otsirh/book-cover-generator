@@ -415,3 +415,18 @@ test('the spine’s title has all the room the author leaves: the whole title, w
     assert.doesNotMatch(/<text[^>]*>([^<]*)</.exec(spine)?.[1] ?? '', /…/);
   }
 });
+
+test('the spine’s title takes back the room a byline gives when it shrinks to the title’s size', () => {
+  const print = createPrintCover(
+    {
+      title: 'The Lighthouse Keeper of Wimbledon Common and Other Stories',
+      author: 'Frank Herbert',
+      style: 'minimal',
+      seed: 'x',
+    },
+    { trim: '5x8', pages: 300 },
+  );
+  const spine = print.svg.slice(print.svg.indexOf('rotate(90)'));
+  const size = Number(/font-size="([\d.]+)"/.exec(spine)?.[1]);
+  assert.ok(size > 12, `the title at ${size} px`);
+});
