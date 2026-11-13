@@ -54,6 +54,10 @@ test('the whole cover is bleed, back, spine, front and bleed, in inches and in C
   ])) {
     assert.deepEqual(createPrintCover(book, { trim, pages: 100 }).inches.trim, size, String(trim));
   }
+  // (A long run of spaces is refused at once: no pattern tries every way of reading it.)
+  const started = performance.now();
+  assert.throws(() => createPrintCover(book, { trim: `9x9${' '.repeat(50_000)}!`, pages: 100 }), /trim must be/);
+  assert.ok(performance.now() - started < 100, `${performance.now() - started} ms`);
   for (const trim of ['3x5', '9x12', 'A5', [6], [6, 9, 1], [NaN, 9], ['6', '9']]) {
     assert.throws(() => createPrintCover(book, { trim: /** @type {any} */ (trim), pages: 100 }), /trim must be/);
   }

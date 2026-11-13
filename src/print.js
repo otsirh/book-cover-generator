@@ -101,8 +101,9 @@ export function spineWidth(pages, paper = 'white') {
 
 /** A trim size, named ("6x9", "6 × 9") or as [width, height] in inches. @param {unknown} trim */
 function trimOf(trim) {
-  const named =
-    typeof trim === 'string' ? /^\s*(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(?:in)?\s*$/i.exec(trim) : null;
+  // (Trimmed and capped first, so the pattern has no runs of optional spaces to try every way of.)
+  const typed = typeof trim === 'string' && trim.length <= 40 ? trim.trim() : null;
+  const named = typed === null ? null : /^(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)(?: ?in)?$/i.exec(typed);
   const size = named ? [Number(named[1]), Number(named[2])] : trim;
   const [w, h] =
     Array.isArray(size) && size.length === 2 && size.every((v) => typeof v === 'number') ? size : [NaN, NaN];
