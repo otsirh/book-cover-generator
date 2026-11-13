@@ -395,7 +395,7 @@ The site is a [Cloudflare Workers](https://developers.cloudflare.com/workers/sta
 
 ## Contributing
 
-Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md), and report security issues as described in [SECURITY.md](SECURITY.md).
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md), and report security issues as described in [SECURITY.md](SECURITY.md). Questions, ideas and covers you've made go in [Discussions](https://github.com/otsirh/book-cover-generator/discussions).
 
 ## License
 
