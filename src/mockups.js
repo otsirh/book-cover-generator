@@ -42,7 +42,13 @@ const shadow = (id, blur, dy, opacity) =>
  * characters: an emoji or accented letter is never split).
  * @param {unknown} text
  */
-export const mockupText = (text) => clipGraphemes(String(text).replace(/\s+/g, ' ').trim(), 80).trim();
+export const mockupText = (text) =>
+  clipGraphemes(
+    String(text ?? '')
+      .replace(/\s+/g, ' ')
+      .trim(),
+    80,
+  ).trim();
 
 /**
  * The cover as a product or a social card.

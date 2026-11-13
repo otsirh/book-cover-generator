@@ -454,7 +454,24 @@ function isSvgFile(file) {
   try {
     const start = Buffer.alloc(512);
     const read = readSync(fd, start, 0, start.length, 0);
-    return /^\uFEFF?\s*(<\?xml[^>]*>\s*)?(<!--[\s\S]*?-->\s*)*<svg[\s>]/.test(start.subarray(0, read).toString('utf8'));
+    // (Past a byte order mark, an XML declaration and comments, read one by one: a pattern that
+    // tried every way to split a run of comments could take forever on a file made to.)
+    let text = start
+      .subarray(0, read)
+      .toString('utf8')
+      .replace(/^\uFEFF/, '')
+      .trimStart();
+    if (text.startsWith('<?xml')) {
+      const end = text.indexOf('?>');
+      if (end < 0) return false;
+      text = text.slice(end + 2).trimStart();
+    }
+    while (text.startsWith('<!--')) {
+      const end = text.indexOf('-->', 4);
+      if (end < 0) return false;
+      text = text.slice(end + 3).trimStart();
+    }
+    return /^<svg[\s>]/.test(text);
   } finally {
     closeSync(fd);
   }

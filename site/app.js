@@ -31,7 +31,7 @@ import {
 } from '../src/browser.js';
 import { hashString, contrast } from '../src/core.js';
 import { CUSTOM_SIZE, customColors, slug, familyName } from '../src/shared.js';
-import { LINK_FIELDS, fits, lastValues, writeLink, customPalette, variantOf } from '../src/link.js';
+import { LINK_FIELDS, fits, lastValues, writeLink, customPalette, variantOf, readDesign, pinsOf } from '../src/link.js';
 import { registerServiceWorker } from './offline.js';
 
 /** @typedef {keyof typeof formats} Preset */
@@ -59,8 +59,11 @@ import { registerServiceWorker } from './offline.js';
 /** The preset formats (the library's, as the CLI's --format has them too). */
 const FORMATS = formats;
 const MAX_SIDE = sizeLimits.max;
-/** The most pixels an image is drawn with where it needn't be larger (iOS Safari's canvas limit). */
-const MAX_PIXELS = 16_000_000;
+/** iPhones and iPads draw a canvas of at most about 16.7 million pixels; other browsers far more. */
+const CANVAS_PIXELS =
+  /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Mac/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
+    ? 16_777_216
+    : Infinity;
 /** Pixels per inch recorded in PNG and JPEG downloads, so print software sizes them right. */
 const DPI = 300;
 const STYLES = listStyles();
@@ -177,13 +180,7 @@ const KEYS = /** @type {(keyof Design)[]} */ (Object.keys(FIELDS));
 
 /** Validate a design-like object (from the URL, storage or a file); unknown values are dropped. @param {Record<string, unknown>} raw */
 function sanitize(raw) {
-  /** @type {Record<string, unknown>} */
-  const out = {};
-  for (const key of KEYS) {
-    const value = Object.hasOwn(raw, key) ? FIELDS[key].read(raw[key]) : undefined;
-    if (value !== undefined) out[key] = value;
-  }
-  return /** @type {Partial<Design>} */ (out);
+  return /** @type {Partial<Design>} */ (readDesign(raw));
 }
 
 /** @param {string} hash */
@@ -295,13 +292,22 @@ let urlTimer;
 let urlDirty = false;
 
 /**
+ * The last addresses this tab was at: a reload begun at one of them opens there, though the page
+ * may have written a newer one before it went (a timer's write, in the moment a reload starts).
+ * @type {string[]}
+ */
+const recentUrls = [];
+const RECENT_URLS = 8;
+
+/**
  * Save the steps for this tab, with the addresses it may be loaded at again (reloaded, or come
  * back to): opened at one of them, the app goes on from the steps rather than from the address.
  * @param {string[]} [urls]
  */
 function saveSteps(urls = [location.hash]) {
   try {
-    sessionStorage.setItem(STEPS_KEY, JSON.stringify({ steps, index: stepIndex, urls }));
+    const all = [...new Set([...recentUrls, ...urls])];
+    sessionStorage.setItem(STEPS_KEY, JSON.stringify({ steps, index: stepIndex, urls: all }));
   } catch {
     // Storage blocked or full: Undo starts afresh after a reload.
   }
@@ -309,6 +315,9 @@ function saveSteps(urls = [location.hash]) {
 
 /** Write the design to the URL and the steps to the tab's storage, now. */
 function flushUrl() {
+  // (The address it leaves is one a reload may have begun at.)
+  if (!recentUrls.includes(location.hash)) recentUrls.push(location.hash);
+  if (recentUrls.length > RECENT_URLS) recentUrls.splice(0, recentUrls.length - RECENT_URLS);
   const hash = toHash(design);
   // A write can be refused (rate-limited browsers throw) or ignored silently (Chrome): checked, so
   // the timer tries again.
@@ -610,14 +619,7 @@ function render({ fade = false, announce = false } = {}) {
  * @param {string} variant @param {string} style @returns {Record<string, string>}
  */
 function pinsFor(variant, style) {
-  /** @type {Record<string, string>} */
-  const pins = {};
-  const offered = STYLES.find((s) => s.id === style)?.variants ?? [];
-  for (const pair of variant ? variant.split('-') : []) {
-    const [name, value] = pair.split('.');
-    if (offered.some((v) => v.name === name && v.values.some((x) => x.value === value))) pins[name] = value;
-  }
-  return pins;
+  return pinsOf(variant, STYLES.find((s) => s.id === style)?.variants ?? []);
 }
 
 /** Give the preview and the thumbnails the cover's shape (as site/boot.js does before first paint). */
@@ -961,12 +963,12 @@ function buildControls() {
     busyWhile(mockupButton, async () => {
       const kind = /** @type {import('../src/index.js').MockupKind} */ (mockupKind.value);
       const m = createMockup(current, { kind, text: mockupText.value });
-      // Product shots follow the cover's size: twice it, for sharpness, within what browsers can
-      // draw (10,000 px a side, and about 16 million pixels on phones). Cards have their own size.
+      // Product shots follow the cover's size: twice it, for sharpness, within what the browser can
+      // draw (10,000 px a side, and about 16.7 million pixels on iPhones). Cards have their own size.
       const card = ['card', 'square', 'story'].includes(kind);
       const scale = card
         ? 1
-        : Math.min(2, MAX_SIDE / Math.max(m.width, m.height), Math.sqrt(MAX_PIXELS / (m.width * m.height)));
+        : Math.min(2, MAX_SIDE / Math.max(m.width, m.height), Math.sqrt(CANVAS_PIXELS / (m.width * m.height)));
       const [pw, ph] = [Math.round(m.width * scale), Math.round(m.height * scale)];
       try {
         await downloadCover(m.svg, 'png', `${slug(oneLine(design.title))}-${kind}`, {
@@ -1178,11 +1180,6 @@ function syncPaletteName() {
 const colorInputs = () =>
   ['color-bg', 'color-ink', 'color-a1', 'color-a2', 'color-a3'].map((id) => /** @type {HTMLInputElement} */ ($(id)));
 
-/** iPhones and iPads draw a canvas of at most about 16.7 million pixels; other browsers far more. */
-const CANVAS_PIXELS =
-  /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Mac/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
-    ? 16_777_216
-    : Infinity;
 /**
  * The largest export scale for a cover this size: its long side within 10,000 px, and the image
  * within what the device can draw. A cover too large for an iPhone's canvas even at 1× is drawn

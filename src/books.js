@@ -50,8 +50,11 @@ function csvRows(text, delimiter) {
         i++;
       } else if (ch === '"') quoted = false;
       else field += ch;
-    } else if (ch === '"' && field === '') quoted = true;
-    else if (ch === delimiter) {
+    } else if (ch === '"' && field.trim() === '') {
+      // (A quoted field, after the spaces people type after a comma: the spaces aren't part of it.)
+      quoted = true;
+      field = '';
+    } else if (ch === delimiter) {
       row.push(field);
       field = '';
     } else if (ch === '\n' || ch === '\r') {

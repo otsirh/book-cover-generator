@@ -3,7 +3,8 @@
 // style, left behind for another, as in the app). The header and footer links back to the app keep
 // it too, and the place they go to: "#usage&title=…" opens the design at #usage (see site/app.js).
 import { registerServiceWorker } from './offline.js';
-import { LINK, lastValues } from '../src/link.js';
+import { lastValues, readDesign, pinsOf, variantOf } from '../src/link.js';
+import { listStyles } from '../src/index.js';
 
 registerServiceWorker();
 
@@ -23,17 +24,10 @@ const DRAWN = {
 };
 
 const design = new URLSearchParams(location.hash.slice(1));
-/**
- * The design as the app reads it (src/link.js): the last of a repeated key, each value by the
- * app's rules, and one it would drop left out.
- * @type {Record<string, unknown>}
- */
-const read = {};
-for (const [key, value] of Object.entries(lastValues(design))) {
-  const reader = /** @type {Record<string, (v: unknown) => unknown>} */ (LINK)[key];
-  const got = reader?.(value);
-  if (got !== undefined) read[key] = got;
-}
+/** The design as the app reads it (src/link.js): the last of a repeated key, each by the app's rules. */
+const read = readDesign(lastValues(design));
+/** Each style's variants, for the pins it can take. */
+const offered = new Map(listStyles().map((s) => [s.id, s.variants]));
 if (typeof read.title === 'string') {
   for (const link of /** @type {NodeListOf<HTMLAnchorElement>} */ (document.querySelectorAll('a[data-style]'))) {
     const q = new URLSearchParams(design);
@@ -50,7 +44,10 @@ if (typeof read.title === 'string') {
       if (typeof value === 'string' && value !== '') cover.setAttribute(attribute, value);
       else cover.removeAttribute(attribute);
     }
-    if (own && typeof read.variant === 'string') cover.setAttribute('variant', read.variant);
+    // (Your pins for your own style, those it can take, as the app draws them.)
+    const pins =
+      own && typeof read.variant === 'string' ? variantOf(pinsOf(read.variant, offered.get(style) ?? [])) : '';
+    if (pins) cover.setAttribute('variant', pins);
     else cover.removeAttribute('variant');
     // (On, as a boolean attribute.)
     if (read.texture === true) cover.setAttribute('texture', '');

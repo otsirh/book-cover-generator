@@ -124,6 +124,39 @@ export const LINK_FIELDS = {
 };
 
 /**
+ * A design from a link's values or a stored design: each field it names (its own properties only,
+ * not an object's like `valueOf`), read as links are read; a value a reader can't read is left
+ * out. (The app and the gallery read designs so.)
+ * @param {Record<string, unknown>} raw
+ * @returns {Record<string, unknown>}
+ */
+export function readDesign(raw) {
+  /** @type {Record<string, unknown>} */
+  const out = {};
+  for (const [key, field] of Object.entries(LINK_FIELDS)) {
+    const value = Object.hasOwn(raw, key) ? field.read(raw[key]) : undefined;
+    if (value !== undefined) out[key] = value;
+  }
+  return out;
+}
+
+/**
+ * Of a design's pins (name.value pairs joined by '-'), the ones a style offers: one left from
+ * another style, or from an old link, is dropped, as the app draws it.
+ * @param {string} variant @param {readonly { name: string, values: readonly { value: string }[] }[]} offered the style's variants
+ * @returns {Record<string, string>}
+ */
+export function pinsOf(variant, offered) {
+  /** @type {Record<string, string>} */
+  const pins = {};
+  for (const pair of variant ? variant.split('-') : []) {
+    const [name, value] = pair.split('.');
+    if (offered.some((v) => v.name === name && v.values.some((x) => x.value === value))) pins[name] = value;
+  }
+  return pins;
+}
+
+/**
  * A design's link (the part of an app link after #, the HTTP API's query): every field, even when
  * empty or off, so a link is the whole design, never mistaken for a hand-edited partial one (which
  * changes only the keys it names); last, the version that drew it (artwork can change between
@@ -173,7 +206,7 @@ export function linkOf(options, cover) {
     format: preset ? preset[0] : `${cover.width}x${cover.height}`,
     texture: options.texture === true,
     // (A language given; one the text implies, the text implies again.)
-    lang: options.lang ? (cover.lang ?? '') : '',
+    lang: options.lang ? cover.lang : '',
   });
 }
 

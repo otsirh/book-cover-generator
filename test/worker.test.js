@@ -460,8 +460,14 @@ test('the API describes itself: what a query draws, the catalog, and OpenAPI', a
   assert.equal(body.urls.svg, `https://covers.example/api/cover.svg?${body.link}`);
   assert.equal(body.urls.edit, `https://covers.example/#${body.link}`);
   assert.equal(body.version, version);
-  // A seed from the title stays one.
+  // A seed from the title stays one, and a cover without a language says so as null too.
   assert.equal((await ask('/api/cover.json?title=Dune')).body.seed, null);
+  assert.equal((await ask('/api/cover.json?title=Dune')).body.lang, null);
+  // A mockup's line that is null is no line (not the word "null").
+  assert.doesNotMatch(
+    createMockup(createCover({ title: 'Dune' }), { kind: 'card', text: /** @type {any} */ (null) }).svg,
+    />null</,
+  );
   // Its links draw the cover it describes, in the language the query gave (Turkish capitals).
   const turkish = (await ask('/api/cover.json?title=istanbul&lang=tr&style=bigtype&case=upper&seed=t')).body;
   assert.equal(new URLSearchParams(turkish.link).get('lang'), 'tr');

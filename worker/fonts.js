@@ -38,8 +38,12 @@ export const FONT_FILES = [
   'texgyreadventor-bolditalic.otf',
 ];
 
-/** Spacing, joiners and variation selectors: they draw nothing, so no face needs them. @param {number} cp */
-const silent = (cp) => cp <= 0x20 || (cp >= 0x200b && cp <= 0x200f) || cp === 0x2060 || (cp >= 0xfe00 && cp <= 0xfe0f);
+/**
+ * Control characters and Unicode's default ignorables (joiners, soft hyphens, variation selectors,
+ * marks of direction…): they draw nothing, so no face needs them, and they take no room.
+ * @param {string} ch
+ */
+const silent = (ch) => /** @type {number} */ (ch.codePointAt(0)) <= 0x20 || INVISIBLE.test(ch);
 
 /** The faces generic family names stand for (and any stack falls back to). */
 export const GENERIC = { serif: 'Noto Serif', 'sans-serif': 'Liberation Sans', monospace: 'Liberation Mono' };
@@ -171,7 +175,7 @@ export function fontSet(faces) {
   const has = (face, text) => {
     for (const ch of text) {
       const cp = /** @type {number} */ (ch.codePointAt(0));
-      if (silent(cp) || /\s/u.test(ch)) continue;
+      if (silent(ch) || /\s/u.test(ch)) continue;
       if (!face.glyph(cp)) return false;
     }
     return true;
@@ -238,6 +242,15 @@ export function fontSet(faces) {
      */
     familyOf: (stack, text, weight = 400, italic = false) => familyFor(stack, text, weight, italic)[0].family,
     /**
+     * At once, the family a list sets a text in (familyOf) and whether its face has every character
+     * of the text (whole): what render() needs of each line, found once.
+     * @param {string} stack @param {string} text @param {number} [weight] @param {boolean} [italic]
+     */
+    setIn: (stack, text, weight = 400, italic = false) => {
+      const list = familyFor(stack, text, weight, italic);
+      return { family: list[0].family, whole: !text || has(pick(list, weight, italic), text) };
+    },
+    /**
      * Whether one family's face (at the weight and slant) has every character of the text: else
      * resvg sets it from several fonts, and needs them all.
      * @param {string} stack @param {string} text @param {number} [weight] @param {boolean} [italic]
@@ -252,7 +265,7 @@ export function fontSet(faces) {
       const face = faceFor(family, weight, italic, text);
       let width = 0;
       for (const ch of text) {
-        // (A character that draws nothing takes no room, whatever glyph a face gives it.)
+        // (A character that draws nothing takes no room, whatever glyph a face gives it. Spaces do.)
         if (INVISIBLE.test(ch)) continue;
         const cp = /** @type {number} */ (ch.codePointAt(0));
         let f = face;
@@ -272,7 +285,7 @@ export function fontSet(faces) {
     covers(text) {
       for (const ch of text) {
         const cp = /** @type {number} */ (ch.codePointAt(0));
-        if (silent(cp) || /\s/u.test(ch)) continue;
+        if (silent(ch) || /\s/u.test(ch)) continue;
         if (!fallbacks.some((f) => f.glyph(cp))) return false;
       }
       return true;

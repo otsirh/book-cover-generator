@@ -81,8 +81,9 @@ function prepared(svg, fonts) {
       if (!self) open.push(state);
       const text = tag === 'g' ? '' : unescape(content).trim();
       if (state.list === undefined || (own === undefined && !text)) return all;
-      if (text && !fonts.whole(state.list, text, state.weight, state.italic)) whole = false;
-      const family = fonts.familyOf(state.list, text, state.weight, state.italic).replace(/[<>&"']/g, '');
+      const set = fonts.setIn(state.list, text, state.weight, state.italic);
+      if (!set.whole) whole = false;
+      const family = set.family.replace(/[<>&"']/g, '');
       const rest = attrs.replace(/\sfont-family="[^"]*"/, '');
       return `<${tag}${rest} font-family="${family}"${self}>${content}`;
     },

@@ -204,7 +204,7 @@ function described(q, base) {
     seed: options.seed != null ? cover.seed : null,
     width: cover.width,
     height: cover.height,
-    lang: cover.lang ?? null,
+    lang: cover.lang || null,
     variants: cover.variants,
     link: link.toString(),
     urls: {

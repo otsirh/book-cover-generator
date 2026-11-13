@@ -129,7 +129,6 @@ const FULL_WIDTH =
 /** @param {string} ch */
 function latinWidth(ch) {
   if (ch === ' ' || ch === '\u00A0' || NARROW.has(ch)) return 0.28;
-  if (ch === '\uFEFF') return 0;
   if (ch === '\u202F') return 0.2;
   if (ch === '\u2007') return 0.56;
   if (SEMI.has(ch)) return 0.38;

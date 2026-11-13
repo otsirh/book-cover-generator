@@ -181,3 +181,9 @@ test('only the list’s own column names are read, not an object’s (constructo
   assert.deepEqual(parseBookList('title,constructor,__proto__,toString\nDune,x,y,z\n'), [{ title: 'Dune' }]);
   assert.deepEqual(parseBookList('{"title":"Dune","constructor":"x","__proto__":{"a":1}}\n'), [{ title: 'Dune' }]);
 });
+
+test('a quoted field may follow the space people type after a comma', () => {
+  assert.deepEqual(parseBookList('title, subtitle\nNight, "A Tale, Retold"\n'), [
+    { title: 'Night', subtitle: 'A Tale, Retold' },
+  ]);
+});

@@ -371,3 +371,8 @@ test('in the PNG fonts, characters that draw nothing take no room', { skip }, ()
     assert.equal(engine.fonts.measure(`A${invisible}B`, 100, font), plain, invisible.codePointAt(0)?.toString(16));
   }
 });
+
+test('a character that draws nothing never makes the PNG fonts refuse a line (U+061C, U+180E)', { skip }, () => {
+  for (const ch of ['؜', '᠎', '⁠', '­'])
+    assert.equal(engine.fonts.covers(`Night${ch}fall`), true, ch.codePointAt(0)?.toString(16));
+});

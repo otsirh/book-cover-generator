@@ -217,7 +217,12 @@ test('book-cover --mcp saves only an .svg, and never over a file of another kind
   try {
     const { writeFile } = await import('node:fs/promises');
     await writeFile(join(dir, 'notes.svg'), 'export PATH=/usr/bin\n');
-    await writeFile(join(dir, 'old.svg'), '<?xml version="1.0"?>\n<svg xmlns="http://www.w3.org/2000/svg"/>');
+    await writeFile(
+      join(dir, 'old.svg'),
+      '<?xml version="1.0"?>\n<!-- kept --><svg xmlns="http://www.w3.org/2000/svg"/>',
+    );
+    // (Many comments and no SVG: read one by one, at once, not by a pattern that tries every split.)
+    await writeFile(join(dir, 'comments.svg'), '<!---->'.repeat(73));
     const child = spawn(process.execPath, [fileURLToPath(new URL('../bin/book-cover.js', import.meta.url)), '--mcp'], {
       cwd: dir,
     });
@@ -229,10 +234,15 @@ test('book-cover --mcp saves only an .svg, and never over a file of another kind
       method: 'tools/call',
       params: { name: 'create_cover', arguments: { title: 'Saved', output } },
     });
-    const lines = [save(1, join(dir, '.zshrc')), save(2, join(dir, 'notes.svg')), save(3, join(dir, 'old.svg'))];
+    const lines = [
+      save(1, join(dir, '.zshrc')),
+      save(2, join(dir, 'notes.svg')),
+      save(3, join(dir, 'old.svg')),
+      save(4, join(dir, 'comments.svg')),
+    ];
     child.stdin.end(`${lines.map((l) => JSON.stringify(l)).join('\n')}\n`);
     await new Promise((resolve) => child.on('close', resolve));
-    const [other, notSvg, svg] = out
+    const [other, notSvg, svg, comments] = out
       .trim()
       .split('\n')
       .map((l) => JSON.parse(l).result);
@@ -243,6 +253,7 @@ test('book-cover --mcp saves only an .svg, and never over a file of another kind
     assert.equal(await readFile(join(dir, 'notes.svg'), 'utf8'), 'export PATH=/usr/bin\n');
     assert.equal(svg.isError, undefined);
     assert.match(await readFile(join(dir, 'old.svg'), 'utf8'), /^<svg [\s\S]*Saved/);
+    assert.match(comments.content[0].text, /isn't an SVG: not replaced/);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

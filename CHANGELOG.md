@@ -31,7 +31,9 @@ All notable changes to this project are documented here. The format follows [Kee
 - The dev server never serves a hidden file (`.git`, `node_modules`), however the URL spells its path.
 - A PNG resvg stops on no longer stops the site's other PNGs: the Worker starts a new resvg for the next one (its own copy of resvg's glue, `worker/resvg-glue.js`, made by `scripts/vendor-resvg.js`).
 - A link preview's picture is the site's own image whenever the design's can't be drawn (the crawler asked too much, or resvg failed), never an error.
-- The gallery reads the design you bring as the app does (the last of a repeated value; `texture=false` is off).
+- The gallery reads the design you bring as the app does, with the app's own reader (the last of a repeated value; `texture=false` is off; only pins the style takes; a name like `valueOf` in the link no longer stops it).
+- A list of books may quote a field after the space typed after a comma (`Night, "A Tale, Retold"`).
+- A PNG of text with a character that draws nothing (an Arabic letter mark, a Mongolian vowel separator) is no longer refused for want of a font; `createMockup`'s `text: null` is no line, not the word "null".
 - Many covers draws each book with its own text: the design on show lends its look, but no longer its subtitle, series, credit or badge, to books that don't have their own.
 - Text with characters that draw nothing (soft hyphens, zero-width spaces, word joiners) is measured as it's drawn, without room for them, in Node, the CLI and the HTTP API, SVG and PNG.
 - Your own colours in the HTTP API's query are read as a link writes them (`bg=000` as `#000000`), so `/api/cover.json`'s link draws the very bytes the query does; a registered style's pin named in capitals stays in the links the MCP server and `cover.json` write.
@@ -54,7 +56,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Changed
 
 - The site's PNGs not yet cached are limited to 240 a minute for each client, and MCP requests to 600 (`429` with `Retry-After`); SVGs aren't limited. The README says how to run your own copy. The site's Worker keeps its errors in Workers Logs, without query strings, and a daily check of the live site (pages, API, MCP, link previews and the version) runs in CI and after every deploy.
-- **Back leaves the site**: changes no longer add browser history entries (nine changes took ten Back presses to leave). Undo and Redo keep their steps in the page, and through a reload; the URL still holds the design, and links work as before.
+- **Back leaves the site**: changes no longer add browser history entries (nine changes took ten Back presses to leave). Undo and Redo keep their steps in the page, and through a reload, even one right after typing; the URL still holds the design, and links work as before.
 - **Laptops**: from 1280 px the downloads are a column beside the cover, so every export is in view with it, and the whole preview stays in view as the controls scroll. From 1024 px the styles are beside the preview (they were 800 px below it), and Browse scrolls the styles, not the page.
 - The exports are in groups, "Also as" and "Copy"; Copy image link is Copy embed link. For an eBook the main download is a JPEG, the file KDP takes.
 - Format comes right after the text, with a link to the paperback's back and spine. Many covers and Paperback for print open from cards that say what they make, with full-size buttons; the print panel's Back colour and Spine colour are swatches; and a book Many covers can't make is listed in the panel, with why.

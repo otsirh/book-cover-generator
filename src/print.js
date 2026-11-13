@@ -8,6 +8,7 @@ import {
   FONTS,
   cleanText,
   descentOf,
+  drawText,
   fitText,
   graphemes,
   markExtent,
@@ -246,7 +247,7 @@ export function createPrintCover(coverOptions = {}, print = /** @type {any} */ (
       lineHeight: 1.2,
     });
     const color = textColor(p, bg, strongAccents(p, bg, 3));
-    s += lines(fit, left, top, color);
+    s += drawText(fit, { x: left, y: top, fill: color });
     top += fit.height + fit.size * 0.3 + 0.25 * PX;
   }
   // The imprint (publisher, website) at the foot, beside the barcode's box.
@@ -266,7 +267,7 @@ export function createPrintCover(coverOptions = {}, print = /** @type {any} */ (
     // (Its baseline on the foot margin, at the size it is set: 6 pt, if fitText went below.)
     const set = atLeast(fit, imprint, 6 * PT, room);
     const above = set.size * ((set.above ?? 0) + set.cap);
-    s += lines(set, left, foot - above, bodyColor);
+    s += drawText(set, { x: left, y: foot - above, fill: bodyColor });
     bottom = foot - above - 0.2 * PX;
   }
   if (box) bottom = Math.min(bottom, box.y - 0.25 * PX);
@@ -426,21 +427,6 @@ function atLeast(fit, text, min, width) {
   const spec = { font: fit.font, weight: fit.weight, italic: fit.italic, letterSpacing: fit.letterSpacing };
   const line = ellipsized(text, min, width, spec);
   return { ...fit, size: min, lines: [line], width: measureText(line, min, spec) };
-}
-
-/**
- * A fit's lines, left-aligned, the block's top at `y`.
- * @param {import('./text.js').TextFit} fit @param {number} x @param {number} y @param {string} fill
- */
-function lines(fit, x, y, fill) {
-  if (!fit.lines.length) return '';
-  const { size, font, weight, italic, letterSpacing } = fit;
-  const attrs = textGroupAttrs({ font, size, weight, italic, letterSpacing: letterSpacing * size, fill });
-  const first = y + size * ((fit.above ?? 0) + fit.cap);
-  const rows = fit.lines.map(
-    (line, i) => `<text x="${n(x)}" y="${n(first + i * size * fit.lineHeight)}">${escapeXml(line)}</text>`,
-  );
-  return `<g ${attrs}>${rows.join('')}</g>`;
 }
 
 /**

@@ -603,11 +603,8 @@ test('the last keystrokes are in the URL when the page is left or reloaded', asy
   const title = page.locator('#title');
   await title.fill('');
   await title.pressSequentially('Hello there', { delay: 5 });
-  // (Saved with each keystroke: once the browser has the save, a reload finds it. Without the wait,
-  // a loaded machine can start the reload before the browser has the tab's storage written.)
-  await expect
-    .poll(() => page.evaluate(() => sessionStorage.getItem('book-cover-generator:steps') ?? ''))
-    .toContain('Hello there');
+  // (At once: the reload begins at an address a keystroke or more behind, and the page may write a
+  // newer one as it goes.)
   await page.reload();
   await expect(title).toHaveValue('Hello there');
 });
@@ -2607,4 +2604,18 @@ test('a kept design’s snapshot of another size (a file from elsewhere) is draw
   const src = (await thumb.getAttribute('src')) ?? '';
   expect(decodeURIComponent(src)).not.toContain('Not this');
   expect(decodeURIComponent(src)).toContain('Mine');
+});
+
+test('the gallery reads the design you bring as the app does: no object names, only pins a style takes', async ({
+  page,
+}) => {
+  /** @type {string[]} */
+  const errors = [];
+  page.on('pageerror', (err) => errors.push(err.message));
+  await page.goto('/gallery/#valueOf=1&__proto__=x&title=Dune&style=stripes&variant=layout.top');
+  const stripes = page.locator('a[data-style="stripes"] book-cover');
+  await expect(stripes).toHaveAttribute('cover-title', 'Dune');
+  // (Stripes has no layout.top: the app drops that pin, so the gallery does.)
+  await expect(stripes).not.toHaveAttribute('variant', /./);
+  expect(errors).toEqual([]);
 });
