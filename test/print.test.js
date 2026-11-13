@@ -300,6 +300,13 @@ test('no type on the spine or the back under 6 pt: the author is left off a thin
     ),
     ['İSTANBUL', 'ORHAN PAMUK'],
   );
+  // A language tag the cover takes but Intl doesn't: capitals all the same.
+  assert.deepEqual(
+    spineLines({ title: 'Istanbul', author: 'Ann', lang: 'en-GB-oed', style: 'minimal' }, { pages: 300 }).map(
+      (l) => l.text,
+    ),
+    ['ISTANBUL', 'ANN'],
+  );
   // An imprint too long for its line: at 6 pt, cut with an ellipsis (not shrunk below it).
   const imprint = createPrintCover(book, {
     trim: '5x8',

@@ -233,8 +233,11 @@ export function createPrintCover(coverOptions = {}, print = /** @type {any} */ (
       maxLines: 1,
       letterSpacing: 0.04,
     });
-    s += lines(atLeast(fit, imprint, 6 * PT, room), left, foot - fit.height, bodyColor);
-    bottom = foot - fit.height - 0.2 * PX;
+    // (Its baseline on the foot margin, at the size it is set: 6 pt, if fitText went below.)
+    const set = atLeast(fit, imprint, 6 * PT, room);
+    const above = set.size * ((set.above ?? 0) + set.cap);
+    s += lines(set, left, foot - above, bodyColor);
+    bottom = foot - above - 0.2 * PX;
   }
   if (box) bottom = Math.min(bottom, box.y - 0.25 * PX);
   if (blurb.length) s += blurbText(blurb, left, top, column, Math.max(0, bottom - top), bodyColor);
@@ -245,7 +248,14 @@ export function createPrintCover(coverOptions = {}, print = /** @type {any} */ (
   const across = spine * PX - 2 * 0.0625 * PX;
   const spineFont = titleFont ?? FONTS.sans;
   // (In the cover's language: Turkish "istanbul" is İSTANBUL.)
-  const upper = (/** @type {string} */ t) => t.toLocaleUpperCase(front.lang || undefined);
+  const upper = (/** @type {string} */ t) => {
+    try {
+      return t.toLocaleUpperCase(front.lang || undefined);
+    } catch {
+      // A tag the cover takes but Intl doesn't (en-GB-oed): capitals without the language's rules.
+      return t.toUpperCase();
+    }
+  };
   const spineTitle = upper(front.title.replace(/\n/g, ' '));
   const author = upper(front.author);
   // As large as the line's ink fits across, accents above and tails below included (É, Ç, Q, 夜).

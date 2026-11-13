@@ -122,9 +122,14 @@ export async function svgToPdf(svg, { dpi = 300, quality = 0.95, bleed = 0, titl
   const stripPixels = Math.min(pw, Math.floor(maxPixels / ph));
   if (stripPixels < 1) throw new RangeError(`svgToPdf: a page ${ph} px tall can't be drawn in ${maxPixels} pixels`);
   const strips = Math.ceil(pw / stripPixels);
-  // The root's viewBox, which each strip narrows to its own part.
-  const box = /\sviewBox="\s*([-\d.]+)[\s,]+([-\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)\s*"/.exec(tag);
-  const [vx, vy, vw, vh] = box ? box.slice(1, 5).map(Number) : [0, 0, sw, sh];
+  // For strips: the SVG as it is (its viewBox and how it fits it untouched), at its size, inside one
+  // that crops a strip of it in CSS px: each strip is then just what the whole page shows there.
+  // (The tag goes in with a function: a "$&" in its text isn't a replacement pattern.)
+  const whole = svg
+    .slice(Math.max(0, svg.search(/<svg\b/i)))
+    .replace(tag, () =>
+      tag.replace(/\s(width|height)="[^"]*"/g, '').replace(/^<svg\b/i, `<svg width="${sw}" height="${sh}"`),
+    );
   /** @type {import('./pdf.js').PdfImage[]} */
   const images = [];
   for (let x0 = 0; x0 < pw; x0 += stripPixels) {
@@ -132,17 +137,7 @@ export async function svgToPdf(svg, { dpi = 300, quality = 0.95, bleed = 0, titl
     const part =
       strips === 1
         ? svg
-        : svg.replace(
-            tag,
-            // (A function, so a "$&" in the tag's text isn't read as a replacement pattern.)
-            () =>
-              tag
-                .replace(/\s(width|height|viewBox)="[^"]*"/g, '')
-                .replace(
-                  /^<svg\b/i,
-                  `<svg width="${(w / pw) * sw}" height="${sh}" viewBox="${vx + (x0 / pw) * vw} ${vy} ${(w / pw) * vw} ${vh}"`,
-                ),
-          );
+        : `<svg xmlns="http://www.w3.org/2000/svg" width="${(w / pw) * sw}" height="${sh}" viewBox="${(x0 / pw) * sw} 0 ${(w / pw) * sw} ${sh}">${whole}</svg>`;
     const jpeg = await rasterize(part, { type: 'image/jpeg', width: w, height: ph, quality, background: '#ffffff' });
     images.push({
       jpeg: new Uint8Array(await jpeg.arrayBuffer()),

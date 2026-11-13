@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-11-13
+
+A paperback for print: the back, the spine and the front as the PDF Amazon KDP takes. Covers are drawn as in 1.9.2, but for Typewriter's square covers with a series.
+
 ### Added
 
 - **A paperback for print**: the whole cover of a printed book, the back, the spine and the front, as the PDF Amazon KDP takes. In the app, **Paperback for print** sizes it from the trim, the page count and the paper (an eighth of an inch of bleed, a spine as wide as the pages are thick, blank under 80 pages as KDP requires), sets your headline, back cover text and imprint on the back with the barcode's box left clear, carries the front's art into the bleed, and downloads a PDF at 300 dpi with its trim marked. In the library, `createPrintCover(cover, print)` makes it as SVG and `svgToPdf` (in `./browser`) the PDF; `spineWidth`, `trimSizes`, `paperTypes` and `printLimits` give the numbers. On the command line, `--print 6x9 --pages 320`.
@@ -325,7 +329,8 @@ A redesign of the covers and the app, based on a design review.
 
 - First release: 27 styles, 20 palettes, seeded randomizer, text fitting, CLI and the web app with SVG, PNG and JPEG export.
 
-[Unreleased]: https://github.com/otsirh/book-cover-generator/compare/v1.9.2...HEAD
+[Unreleased]: https://github.com/otsirh/book-cover-generator/compare/v1.10.0...HEAD
+[1.10.0]: https://github.com/otsirh/book-cover-generator/compare/v1.9.2...v1.10.0
 [1.9.2]: https://github.com/otsirh/book-cover-generator/compare/v1.9.1...v1.9.2
 [1.9.1]: https://github.com/otsirh/book-cover-generator/compare/v1.9.0...v1.9.1
 [1.9.0]: https://github.com/otsirh/book-cover-generator/compare/v1.8.0...v1.9.0

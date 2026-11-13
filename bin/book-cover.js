@@ -6,6 +6,7 @@ import { parseArgs } from 'node:util';
 import {
   createCover,
   createPrintCover,
+  sizeLimits,
   listStyles,
   palettes,
   parseBookList,
@@ -196,6 +197,12 @@ function dimensions() {
     // a width alone that shape; a height alone gets its width here.
     if (width !== undefined || height === undefined) return { width, height };
     const [w, h] = formatSize('paperback', undefined, height);
+    // (Said of the height given, not of the width it makes.)
+    if (w < sizeLimits.min) {
+      throw new RangeError(
+        `--height ${height} makes a paperback ${w} px wide, under ${sizeLimits.min}: give a taller --height, or --width too`,
+      );
+    }
     return { width: w, height: h };
   }
   // A preset or a WxH shape, at the width or height asked for (as the HTTP API reads it).

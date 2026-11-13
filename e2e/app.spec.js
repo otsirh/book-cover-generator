@@ -1889,6 +1889,43 @@ test('a print cover too large for one canvas is drawn in strips', async ({ page 
   expect(result.errors[0]).toMatch(/bleed must be a number of inches/);
   expect(result.errors[1]).toMatch(/bleed must be a number of inches/);
   expect(result.errors[2]).toMatch(/width is in mm; give it in px/);
+  // In strips, an SVG whose viewBox isn't the shape of its size is drawn as it is whole: each strip
+  // is the part of the whole page it covers (here, a square centred on a 2:1 page).
+  const red = await page.evaluate(async () => {
+    const { svgToPdf } = await import('/src/browser.js');
+    const svg =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="960" height="480" viewBox="0 0 100 100"><rect width="100" height="100" fill="#ff0000"/></svg>';
+    /** Where the red is across the PDF's page, its images side by side. @param {Blob} blob */
+    const span = async (blob) => {
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      const text = new TextDecoder('latin1').decode(bytes);
+      const images = [...text.matchAll(/\/Width (\d+) \/Height (\d+)[^>]*\/Length (\d+) >>\nstream\n/g)].map((m) => {
+        const start = /** @type {number} */ (m.index) + m[0].length;
+        return { w: Number(m[1]), h: Number(m[2]), jpeg: bytes.slice(start, start + Number(m[3])) };
+      });
+      const canvas = document.createElement('canvas');
+      canvas.width = images.reduce((sum, im) => sum + im.w, 0);
+      canvas.height = images[0].h;
+      const ctx = /** @type {CanvasRenderingContext2D} */ (canvas.getContext('2d'));
+      let x = 0;
+      for (const im of images) {
+        ctx.drawImage(await createImageBitmap(new Blob([im.jpeg], { type: 'image/jpeg' })), x, 0);
+        x += im.w;
+      }
+      const row = ctx.getImageData(0, canvas.height >> 1, canvas.width, 1).data;
+      const reds = [];
+      for (let i = 0; i < canvas.width; i++) if (row[i * 4] > 200 && row[i * 4 + 1] < 80) reds.push(i);
+      return { strips: images.length, from: reds[0], to: reds[reds.length - 1] };
+    };
+    return {
+      whole: await span(await svgToPdf(svg, { dpi: 100 })),
+      strips: await span(await svgToPdf(svg, { dpi: 100, maxPixels: 156_000 })),
+    };
+  });
+  expect(red.strips.strips).toBeGreaterThan(1);
+  expect(Math.abs(red.strips.from - red.whole.from)).toBeLessThanOrEqual(2);
+  expect(Math.abs(red.strips.to - red.whole.to)).toBeLessThanOrEqual(2);
+  expect(Math.abs(red.whole.from - 250)).toBeLessThanOrEqual(2);
   // 10.475 × 8.25 in at 100 dpi is 1048 × 825 px: three strips of at most 300,000 px, side by side.
   expect(result.images.length).toBe(3);
   expect(result.images.reduce((sum, [w]) => sum + w, 0)).toBe(1048);
