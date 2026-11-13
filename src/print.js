@@ -386,8 +386,14 @@ const inkHeight = (text, font) => (inkAbove(text, font) + inkBelow(text)) * 1.08
 // old-style figures (Georgia, Hoefler Text: 3 4 5 7 9 hang below), a J with a tail, brackets, bars.
 const LOW = /[0-9J[\]{}|$@/\\]/;
 const TALL = /[[\]{}()|$@/\\]/;
-/** How far a line's ink reaches above its baseline, in em. @param {string} line @param {import('./text.js').FontSpec} font */
-const inkAbove = (line, font) => (font.cap ?? 0.72) + Math.max(markExtent(line).above, TALL.test(line) ? 0.1 : 0);
+/**
+ * How far a line's ink reaches above its baseline, in em. (Capitals at least 0.76 em tall: the PDF
+ * is drawn with the fonts the browser has, and where a stack's first font is missing, the one it
+ * falls back to may have taller capitals, as DejaVu has against Garamond.)
+ * @param {string} line @param {import('./text.js').FontSpec} font
+ */
+const inkAbove = (line, font) =>
+  Math.max(font.cap ?? 0.72, 0.76) + Math.max(markExtent(line).above, TALL.test(line) ? 0.1 : 0);
 /** How far a line's ink reaches below its baseline, in em. @param {string} line */
 const inkBelow = (line) => Math.max(descentOf(line), LOW.test(line) ? 0.24 : 0);
 
