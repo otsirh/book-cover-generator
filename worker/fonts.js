@@ -230,32 +230,29 @@ export function fontSet(faces) {
    */
   const faceFor = (stack, weight, italic, text) => pick(familyFor(stack, text, weight, italic), weight, italic);
 
+  /** @param {string} stack @param {string} [text] @param {number} [weight] @param {boolean} [italic] */
+  const setIn = (stack, text = '', weight = 400, italic = false) => {
+    const list = familyFor(stack, text, weight, italic);
+    return { family: list[0].family, whole: !text || has(pick(list, weight, italic), text) };
+  };
+
   /** Every face, for characters no family of the list has (as resvg falls back to any font). */
   const fallbacks = [...families.values()].flat();
 
   return {
     faceFor,
     /**
-     * The name of the family a CSS font-family list sets a text in (see familyFor): render() names
-     * it on each line, so resvg draws the line in the face it was measured in.
+     * The family a CSS font-family list sets a text in (see familyFor), and whether its face has
+     * every character of it (else resvg sets it from several fonts, and needs them all): render()
+     * names the family on each line, so resvg draws the line in the face it was measured in.
      * @param {string} stack @param {string} [text] @param {number} [weight] @param {boolean} [italic]
      */
-    familyOf: (stack, text, weight = 400, italic = false) => familyFor(stack, text, weight, italic)[0].family,
+    setIn,
     /**
-     * At once, the family a list sets a text in (familyOf) and whether its face has every character
-     * of the text (whole): what render() needs of each line, found once.
-     * @param {string} stack @param {string} text @param {number} [weight] @param {boolean} [italic]
+     * The name of the family a list sets a text in (setIn's).
+     * @param {string} stack @param {string} [text] @param {number} [weight] @param {boolean} [italic]
      */
-    setIn: (stack, text, weight = 400, italic = false) => {
-      const list = familyFor(stack, text, weight, italic);
-      return { family: list[0].family, whole: !text || has(pick(list, weight, italic), text) };
-    },
-    /**
-     * Whether one family's face (at the weight and slant) has every character of the text: else
-     * resvg sets it from several fonts, and needs them all.
-     * @param {string} stack @param {string} text @param {number} [weight] @param {boolean} [italic]
-     */
-    whole: (stack, text, weight = 400, italic = false) => has(faceFor(stack, weight, italic, text), text),
+    familyOf: (stack, text = '', weight = 400, italic = false) => setIn(stack, text, weight, italic).family,
     /**
      * Width in px of `text` at `size` px in a font-family list: a setTextMeasurer measurer.
      * (Advance widths, without kerning, which only ever narrows a line.)

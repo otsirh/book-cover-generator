@@ -2619,3 +2619,18 @@ test('the gallery reads the design you bring as the app does: no object names, o
   await expect(stripes).not.toHaveAttribute('variant', /./);
   expect(errors).toEqual([]);
 });
+
+test('a link to a design this tab showed before opens that design, not the latest', async ({ page }) => {
+  await page.goto('/#title=Back&author=A&style=swiss&palette=noir&seed=s&format=paperback');
+  await selected(page, 'swiss');
+  const swiss = page.url();
+  await page.locator('.tile[data-style="bauhaus"]').click();
+  await selected(page, 'bauhaus');
+  // Away, then a link to the earlier design (as the gallery's cover of it is).
+  await page.goto('/gallery/');
+  await page.goto(swiss);
+  await selected(page, 'swiss');
+  // …a new step after the latest: Undo goes back to it.
+  await page.locator('#undo').click();
+  await selected(page, 'bauhaus');
+});

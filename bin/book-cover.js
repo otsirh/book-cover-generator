@@ -13,8 +13,8 @@ import {
   optionsForBook,
   genres,
 } from '../src/index.js';
-import { hex, slug, fontEntries } from '../src/shared.js';
-import { px, formatSize } from '../src/link.js';
+import { slug, fontEntries } from '../src/shared.js';
+import { px, formatSize, sixDigits } from '../src/link.js';
 import { answerPayload } from '../src/mcp.js';
 
 /**
@@ -234,7 +234,8 @@ function palette() {
   if (values.bg === undefined || values.ink === undefined || !accents.length) {
     throw new Error('Your own colours need --bg, --ink and at least one --accent');
   }
-  return { bg: hex(values.bg), ink: hex(values.ink), accents: accents.map(hex) };
+  // (Each as #rrggbb, as a link and the HTTP API read them: the same colours draw the same bytes.)
+  return { bg: sixDigits(values.bg), ink: sixDigits(values.ink), accents: accents.map(sixDigits) };
 }
 
 // A reader that stops early (book-cover … | head) closes the pipe: that's fine, not a crash.
@@ -452,26 +453,35 @@ function isSvgFile(file) {
   if (!statSync(file).isFile()) return false;
   const fd = openSync(file, 'r');
   try {
-    const start = Buffer.alloc(512);
+    const start = Buffer.alloc(16384);
     const read = readSync(fd, start, 0, start.length, 0);
-    // (Past a byte order mark, an XML declaration and comments, read one by one: a pattern that
-    // tried every way to split a run of comments could take forever on a file made to.)
+    // Past a byte order mark, then the XML declaration, processing instructions, comments and a
+    // DOCTYPE (as editors write them), one by one: a pattern that tried every way to split a run of
+    // comments could take forever on a file made to.
     let text = start
       .subarray(0, read)
       .toString('utf8')
       .replace(/^\uFEFF/, '')
       .trimStart();
-    if (text.startsWith('<?xml')) {
-      const end = text.indexOf('?>');
-      if (end < 0) return false;
-      text = text.slice(end + 2).trimStart();
+    for (;;) {
+      if (text.startsWith('<?')) {
+        const end = text.indexOf('?>');
+        if (end < 0) return false;
+        text = text.slice(end + 2).trimStart();
+      } else if (text.startsWith('<!--')) {
+        const end = text.indexOf('-->', 4);
+        if (end < 0) return false;
+        text = text.slice(end + 3).trimStart();
+      } else if (/^<!DOCTYPE\b/i.test(text)) {
+        // (Its internal subset, in [ ], may hold > of its own.)
+        const subset = text.indexOf('[');
+        const close = text.indexOf('>');
+        const end = subset >= 0 && subset < close ? text.indexOf(']', subset) : close;
+        const after = end < 0 ? -1 : text.indexOf('>', end);
+        if (after < 0) return false;
+        text = text.slice(after + 1).trimStart();
+      } else return /^<svg[\s>]/.test(text);
     }
-    while (text.startsWith('<!--')) {
-      const end = text.indexOf('-->', 4);
-      if (end < 0) return false;
-      text = text.slice(end + 3).trimStart();
-    }
-    return /^<svg[\s>]/.test(text);
   } finally {
     closeSync(fd);
   }

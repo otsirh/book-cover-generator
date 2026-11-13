@@ -362,6 +362,12 @@ async function drawPng(request, env, url, kind) {
   const refused = notGet(request);
   if (refused) return refused;
   const q = url.searchParams;
+  // (A query the library refuses is refused before anything costly: the limit, resvg, the fonts.)
+  try {
+    drawn(kind, q);
+  } catch (err) {
+    return refusal(err);
+  }
   if (!(await allowed(request, env.PNG_LIMIT))) return refusal(new Error(TOO_MANY), 429, { 'Retry-After': '60' });
   const asked = q.getAll('scale').at(-1);
   const given = asked === undefined || asked === '' ? null : Number(asked);
@@ -510,8 +516,12 @@ export const API_PARAMETERS = Object.freeze([
  */
 function cacheKey(request, deployment) {
   const url = new URL(request.url);
-  const read = [...url.searchParams].filter(([name]) => name !== 'v' && API_PARAMETERS.includes(name));
-  url.search = new URLSearchParams(read).toString();
+  const read = new URLSearchParams(
+    [...url.searchParams].filter(([name]) => name !== 'v' && API_PARAMETERS.includes(name)),
+  );
+  // (In any order, one design: sorted by name, the values of a repeated one in their order.)
+  read.sort();
+  url.search = read.toString();
   url.searchParams.set('v', `${version}+${deployment}`);
   return new Request(url.href, { method: 'GET' });
 }

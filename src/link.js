@@ -337,11 +337,11 @@ export function optionsFromLink(q) {
   const width = given('width') === undefined ? undefined : px('width', /** @type {string} */ (given('width')));
   const height = given('height') === undefined ? undefined : px('height', /** @type {string} */ (given('height')));
   const format = given('format');
+  // (A width or a height alone sizes the default shape, the paperback's, as the CLI does; both
+  // are a size of their own.)
   if (format !== undefined) [o.width, o.height] = formatSize(format, width, height);
-  else {
-    if (width !== undefined) o.width = width;
-    if (height !== undefined) o.height = height;
-  }
+  else if (width !== undefined && height !== undefined) [o.width, o.height] = [width, height];
+  else if (width !== undefined || height !== undefined) [o.width, o.height] = formatSize('paperback', width, height);
   const [bg, ink, accent] = [given('bg'), given('ink'), given('accent')];
   if (bg || ink || accent) {
     if (!bg || !ink || !accent) throw new RangeError('Your own colours need bg, ink and accent');

@@ -291,23 +291,10 @@ let urlTimer;
 /** The URL (or the stored steps) may be behind the design. */
 let urlDirty = false;
 
-/**
- * The last addresses this tab was at: a reload begun at one of them opens there, though the page
- * may have written a newer one before it went (a timer's write, in the moment a reload starts).
- * @type {string[]}
- */
-const recentUrls = [];
-const RECENT_URLS = 8;
-
-/**
- * Save the steps for this tab, with the addresses it may be loaded at again (reloaded, or come
- * back to): opened at one of them, the app goes on from the steps rather than from the address.
- * @param {string[]} [urls]
- */
-function saveSteps(urls = [location.hash]) {
+/** Save the steps for this tab: a reload of it, or Back to it, goes on from them (restoreSteps). */
+function saveSteps() {
   try {
-    const all = [...new Set([...recentUrls, ...urls])];
-    sessionStorage.setItem(STEPS_KEY, JSON.stringify({ steps, index: stepIndex, urls: all }));
+    sessionStorage.setItem(STEPS_KEY, JSON.stringify({ steps, index: stepIndex }));
   } catch {
     // Storage blocked or full: Undo starts afresh after a reload.
   }
@@ -315,9 +302,6 @@ function saveSteps(urls = [location.hash]) {
 
 /** Write the design to the URL and the steps to the tab's storage, now. */
 function flushUrl() {
-  // (The address it leaves is one a reload may have begun at.)
-  if (!recentUrls.includes(location.hash)) recentUrls.push(location.hash);
-  if (recentUrls.length > RECENT_URLS) recentUrls.splice(0, recentUrls.length - RECENT_URLS);
   const hash = toHash(design);
   // A write can be refused (rate-limited browsers throw) or ignored silently (Chrome): checked, so
   // the timer tries again.
@@ -348,22 +332,16 @@ function writeUrl(keystroke = false) {
   if (urlDirty && urlTimer === undefined) urlTimer = setTimeout(tickUrl, 1000);
 }
 
-// Leaving or reloading the page: a reload has its address already, which may be a keystroke or two
-// behind the design. The steps note both, so the app opened at either goes on as it was.
-// (Both pagehide and visibilitychange come as a page is left: the addresses of either are kept.)
-/** @type {Set<string>} */
-const leftAt = new Set();
+// Leaving or reloading the page: the steps are saved with the design as it is now (a reload's
+// address may be a keystroke or two behind it). (pagehide and visibilitychange both come as a page
+// is left; either saves.)
 const leaving = () => {
-  leftAt.add(location.hash);
   if (urlDirty) flushUrl();
-  leftAt.add(location.hash);
-  saveSteps([...leftAt]);
+  else saveSteps();
 };
 window.addEventListener('pagehide', leaving);
-window.addEventListener('pageshow', () => leftAt.clear());
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') leaving();
-  else leftAt.clear();
 });
 
 /** A new step for the design as it is now, after the one on show (any ahead of it are dropped). */
@@ -385,11 +363,8 @@ function typed(field) {
     typing = true;
     typingField = field;
   } else {
-    // Later keystrokes of the burst update its step, saved at once for the address the tab is at
-    // (which may be a keystroke or two behind): a reload right after typing keeps them all, without
-    // waiting on the page's last moments to save them.
+    // Later keystrokes of the burst update its step (saved with the URL, and as the page is left).
     steps[stepIndex] = { ...design };
-    saveSteps();
     writeUrl(true);
   }
   clearTimeout(typingTimer);
@@ -433,16 +408,30 @@ function redo() {
 }
 
 /**
- * The steps saved for this tab. Reloaded, or come back to, at an address they were saved with, the
- * app goes on as it was (the design included, typed after the address was last written). Opened at
- * another (a link opened in the tab), its design is a new step after the one that was on show.
+ * How this page was opened: 'reload', 'back_forward', 'navigate' (a link or an address), or '' where
+ * the browser doesn't say.
+ */
+function openedBy() {
+  try {
+    const entry = /** @type {PerformanceNavigationTiming | undefined} */ (
+      performance.getEntriesByType('navigation')[0]
+    );
+    return entry?.type ?? '';
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * The steps saved for this tab. Reloaded, the app goes on as it was: the steps, and the design as it
+ * last was (typed, maybe, after the address was last written). Come back to with Back or Forward at
+ * the design it was left at, the same. Opened any other way (a link opened in the tab), its design is
+ * a new step after the one that was on show.
  */
 function restoreSteps() {
   /** @type {Design[]} */
   let saved = [];
   let index = -1;
-  /** @type {unknown[]} */
-  let urls = [];
   try {
     const raw = JSON.parse(sessionStorage.getItem(STEPS_KEY) || 'null');
     if (Array.isArray(raw?.steps) && raw.steps.length) {
@@ -452,12 +441,13 @@ function restoreSteps() {
           complete(sanitize(d && typeof d === 'object' ? /** @type {Record<string, unknown>} */ (d) : {})),
         );
       index = Number.isInteger(raw.index) ? Math.min(Math.max(raw.index, 0), saved.length - 1) : saved.length - 1;
-      urls = Array.isArray(raw.urls) ? raw.urls : [];
     }
   } catch {
     // Unreadable or blocked: a fresh start.
   }
-  if (saved.length && location.hash.length > 1 && urls.includes(location.hash)) {
+  const how = openedBy();
+  const leftHere = saved.length > 0 && toHash(saved[index]) === toHash(design);
+  if (saved.length && (how === 'reload' || leftHere)) {
     steps = saved;
     stepIndex = index;
     Object.assign(design, saved[index]);
@@ -2056,8 +2046,8 @@ function listedBooks() {
  */
 function bookOptions(book, i, d = design, own = /** @type {HTMLInputElement} */ ($('many-palettes')).checked) {
   // (The design's look for every book; its text is the book's own: one book's subtitle, series,
-  // credit or badge isn't another's.)
-  const base = optionsFor({ ...d, title: '', author: '', subtitle: '', series: '', credit: '', badge: '' });
+  // credit, badge or language isn't another's. A list can give each its own.)
+  const base = optionsFor({ ...d, title: '', author: '', subtitle: '', series: '', credit: '', badge: '', lang: '' });
   const start = Math.max(
     0,
     palettes.findIndex((p) => p.id === d.palette),

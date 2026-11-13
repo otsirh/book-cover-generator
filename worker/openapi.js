@@ -37,8 +37,8 @@ export function openapi(base) {
     }),
     param(
       'variant',
-      'Choices the style lets you pin (/api/catalog.json lists them): name.value pairs joined by "-", such as scene.forest.',
-      { type: 'string', pattern: '^[a-z][a-z0-9]*\\.[a-z][a-z0-9]*(-[a-z][a-z0-9]*\\.[a-z][a-z0-9]*)*$' },
+      'Choices the style lets you pin (/api/catalog.json lists them): name.value pairs joined by "-", such as scene.forest, in any case.',
+      { type: 'string', examples: ['scene.forest', 'field.pale-emblem.sun'] },
     ),
     param('palette', 'A palette, by id or name in any case, or "auto" (the default: the seed picks one).', {
       type: 'string',
@@ -55,22 +55,34 @@ export function openapi(base) {
       type: 'string',
       examples: ['upper', 'normal'],
     }),
+    param('titleCase', 'The same as case, by the library’s name for it.', {
+      type: 'string',
+      examples: ['upper', 'normal'],
+    }),
     param('seed', 'Any text: the same seed draws the same cover. Default: from the title and author.'),
     param(
       'format',
       `A shape: ${Object.keys(formats).join(', ')}, or a size in px such as 1600x2560. Default: paperback.`,
       { type: 'string', examples: [...Object.keys(formats), '1600x2560'] },
     ),
-    param('width', `The width in px (${sizeLimits.min} to ${sizeLimits.max}); with a format, it scales it.`, {
-      type: 'integer',
-      minimum: sizeLimits.min,
-      maximum: sizeLimits.max,
-    }),
-    param('height', `The height in px (${sizeLimits.min} to ${sizeLimits.max}); with a format, it scales it.`, {
-      type: 'integer',
-      minimum: sizeLimits.min,
-      maximum: sizeLimits.max,
-    }),
+    param(
+      'width',
+      `The width in px (${sizeLimits.min} to ${sizeLimits.max}, rounded); alone, or with a format, it scales that shape (default paperback).`,
+      {
+        type: 'number',
+        minimum: sizeLimits.min,
+        maximum: sizeLimits.max,
+      },
+    ),
+    param(
+      'height',
+      `The height in px (${sizeLimits.min} to ${sizeLimits.max}, rounded); alone, or with a format, it scales that shape (default paperback).`,
+      {
+        type: 'number',
+        minimum: sizeLimits.min,
+        maximum: sizeLimits.max,
+      },
+    ),
     param('texture', 'Paper grain: 1 or true (on), 0 or false (off).', {
       type: 'string',
       examples: ['1', '0', 'true', 'false'],

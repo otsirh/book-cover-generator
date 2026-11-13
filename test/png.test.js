@@ -206,11 +206,11 @@ test(
     // a family whose italic has them all, so resvg draws it as measured.
     assert.equal(f.familyOf(FONTS.garamond.family, 'E = mc²', 400, false), 'EB Garamond');
     assert.notEqual(f.familyOf(FONTS.garamond.family, 'E = mc²', 400, true), 'EB Garamond');
-    assert.equal(f.whole(FONTS.garamond.family, 'E = mc²', 400, true), true);
+    assert.equal(f.setIn(FONTS.garamond.family, 'E = mc²', 400, true).whole, true);
     // ∞ and → aren't in the Noto faces: the line goes to a family that has them, and only it is loaded.
     for (const text of ['Love ∞ Forever', 'North → South']) {
       const family = f.familyOf(FONTS.serif.family, text);
-      assert.equal(f.whole(family, text), true, `${text} in ${family}`);
+      assert.equal(f.setIn(family, text).whole, true, `${text} in ${family}`);
       const cover = engine.laidOut(() =>
         createCover({ title: text, author: 'Mara Ellison', style: 'classic', seed: 's' }),
       );
@@ -220,7 +220,7 @@ test(
       ).exec(ready);
       assert.ok(line, `${text}: named`);
       assert.equal(
-        f.whole(/** @type {string} */ (line[1] ?? line[2]), text.split(' ')[1]),
+        f.setIn(/** @type {string} */ (line[1] ?? line[2]), text.split(' ')[1]).whole,
         true,
         `${text}: ${line[1] ?? line[2]}`,
       );

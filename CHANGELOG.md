@@ -34,7 +34,9 @@ All notable changes to this project are documented here. The format follows [Kee
 - The gallery reads the design you bring as the app does, with the app's own reader (the last of a repeated value; `texture=false` is off; only pins the style takes; a name like `valueOf` in the link no longer stops it).
 - A list of books may quote a field after the space typed after a comma (`Night, "A Tale, Retold"`).
 - A PNG of text with a character that draws nothing (an Arabic letter mark, a Mongolian vowel separator) is no longer refused for want of a font; `createMockup`'s `text: null` is no line, not the word "null".
-- Many covers draws each book with its own text: the design on show lends its look, but no longer its subtitle, series, credit or badge, to books that don't have their own.
+- Many covers draws each book with its own text: the design on show lends its look, but no longer its subtitle, series, credit, badge or language, to books that don't have their own.
+- A link opened in the tab to a design it showed before opens that design (as a new step), even one met a moment ago: the app resumes its steps only when the page is reloaded or come back to.
+- In the HTTP API, a `width` or a `height` alone sizes the paperback's shape, as the CLI's `--width` and `--height` do (`height=1500` is 1000 × 1500, not 600 × 1500); the same design asked for in another order is one cache entry; and the CLI writes your own colours as the API does (`--bg abc` as `#aabbcc`).
 - Text with characters that draw nothing (soft hyphens, zero-width spaces, word joiners) is measured as it's drawn, without room for them, in Node, the CLI and the HTTP API, SVG and PNG.
 - Your own colours in the HTTP API's query are read as a link writes them (`bg=000` as `#000000`), so `/api/cover.json`'s link draws the very bytes the query does; a registered style's pin named in capitals stays in the links the MCP server and `cover.json` write.
 - A kept design's snapshot that isn't of the design's size (from a file made elsewhere) is drawn again from the design, so its thumbnail and Download all show the design.

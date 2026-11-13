@@ -223,6 +223,11 @@ test('book-cover --mcp saves only an .svg, and never over a file of another kind
     );
     // (Many comments and no SVG: read one by one, at once, not by a pattern that tries every split.)
     await writeFile(join(dir, 'comments.svg'), '<!---->'.repeat(73));
+    // An editor's SVG: a generator's comment, a DOCTYPE, and a licence longer than 512 bytes.
+    await writeFile(
+      join(dir, 'drawn.svg'),
+      `<?xml version="1.0"?>\n<!-- Generator: Adobe Illustrator -->\n<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd" [<!ENTITY ns "x">]>\n<!-- ${'licence '.repeat(100)} -->\n<svg xmlns="http://www.w3.org/2000/svg"/>`,
+    );
     const child = spawn(process.execPath, [fileURLToPath(new URL('../bin/book-cover.js', import.meta.url)), '--mcp'], {
       cwd: dir,
     });
@@ -239,10 +244,11 @@ test('book-cover --mcp saves only an .svg, and never over a file of another kind
       save(2, join(dir, 'notes.svg')),
       save(3, join(dir, 'old.svg')),
       save(4, join(dir, 'comments.svg')),
+      save(5, join(dir, 'drawn.svg')),
     ];
     child.stdin.end(`${lines.map((l) => JSON.stringify(l)).join('\n')}\n`);
     await new Promise((resolve) => child.on('close', resolve));
-    const [other, notSvg, svg, comments] = out
+    const [other, notSvg, svg, comments, drawn] = out
       .trim()
       .split('\n')
       .map((l) => JSON.parse(l).result);
@@ -254,6 +260,8 @@ test('book-cover --mcp saves only an .svg, and never over a file of another kind
     assert.equal(svg.isError, undefined);
     assert.match(await readFile(join(dir, 'old.svg'), 'utf8'), /^<svg [\s\S]*Saved/);
     assert.match(comments.content[0].text, /isn't an SVG: not replaced/);
+    assert.equal(drawn.isError, undefined);
+    assert.match(await readFile(join(dir, 'drawn.svg'), 'utf8'), /^<svg [\s\S]*Saved/);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

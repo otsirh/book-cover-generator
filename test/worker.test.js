@@ -111,6 +111,12 @@ test('answers are kept at the edge, once per version', async () => {
     await worker.fetch(new Request('https://covers.example/api/cover.svg?style=nope'), env, ctx);
     await Promise.all(waiting);
     assert.equal(kept.size, 2);
+    // The same design in another order is the same answer.
+    await worker.fetch(new Request('https://covers.example/api/cover.svg?author=Z&title=Kept'), env, ctx);
+    await worker.fetch(new Request('https://covers.example/api/cover.svg?title=Kept&author=Z'), env, ctx);
+    await Promise.all(waiting);
+    assert.equal(kept.size, 3);
+    kept.delete([...kept.keys()].at(-1) ?? '');
     // A parameter the API doesn't read is the same answer, and so is a HEAD (without the body).
     const extra = await worker.fetch(
       new Request('https://covers.example/api/cover.svg?x=1&title=Kept&utm=a'),
@@ -211,7 +217,9 @@ test('the API and the app read one link alike: the last of a repeated key, CRLF,
 test('a format is a shape a width or height may scale; the library says what’s wrong with a size', () => {
   assert.deepEqual(optionsFromLink(new URLSearchParams('format=10x16&width=1600')), { width: 1600, height: 2560 });
   assert.deepEqual(optionsFromLink(new URLSearchParams('format=16x25&height=2500')), { width: 1600, height: 2500 });
-  assert.deepEqual(optionsFromLink(new URLSearchParams('width=1e3')), { width: 1000 });
+  // (A width or a height alone sizes the paperback's shape, as the CLI does.)
+  assert.deepEqual(optionsFromLink(new URLSearchParams('width=1e3')), { width: 1000, height: 1500 });
+  assert.deepEqual(optionsFromLink(new URLSearchParams('height=1500')), { width: 1000, height: 1500 });
   assert.throws(
     () => optionsFromLink(new URLSearchParams('titleCase=bold')),
     /titleCase is upper or normal, got "bold"/,
@@ -560,6 +568,14 @@ test('PNGs and MCP requests past a client’s limit are refused with 429; cached
   assert.equal(busy.status, 429);
   assert.equal(busy.headers.get('retry-after'), '60');
   assert.match(await busy.text(), /Too many requests/);
+  assert.deepEqual(png.keys, ['203.0.113.9']);
+  // A query the library refuses is refused before the limit is asked (or resvg started).
+  const bad = await worker.fetch(
+    new Request('https://covers.example/api/cover.png?title=Dune&style=nope', { headers }),
+    env,
+    ctx,
+  );
+  assert.equal(bad.status, 400);
   assert.deepEqual(png.keys, ['203.0.113.9']);
   // SVGs and descriptions are cheap: never limited.
   const svg = await worker.fetch(new Request('https://covers.example/api/cover.svg?title=Dune', { headers }), env, ctx);
