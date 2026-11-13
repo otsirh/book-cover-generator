@@ -30,8 +30,18 @@ import {
   svgToBlob,
 } from '../src/browser.js';
 import { hashString, contrast } from '../src/core.js';
-import { CUSTOM_SIZE, customColors, slug, familyName } from '../src/shared.js';
-import { LINK_FIELDS, fits, lastValues, writeLink, customPalette, variantOf, readDesign, pinsOf } from '../src/link.js';
+import { customColors, slug, familyName } from '../src/shared.js';
+import {
+  LINK_FIELDS,
+  fits,
+  lastValues,
+  writeLink,
+  customPalette,
+  variantOf,
+  readDesign,
+  pinsOf,
+  formatSize,
+} from '../src/link.js';
 import { registerServiceWorker } from './offline.js';
 
 /** @typedef {keyof typeof formats} Preset */
@@ -110,9 +120,12 @@ const pickOther = (arr, current) => pick(arr.filter((x) => x !== current));
 const isCustomSize = (format) => !Object.hasOwn(FORMATS, format);
 /** A format's cover size in px. @param {string} format @returns {readonly [number, number]} */
 function sizeOf(format) {
-  if (!isCustomSize(format)) return FORMATS[/** @type {Preset} */ (format)];
-  const m = CUSTOM_SIZE.exec(format);
-  return m ? [Number(m[1]), Number(m[2])] : FORMATS.paperback;
+  // (As links and the API read it; one they'd refuse, the paperback.)
+  try {
+    return formatSize(format, undefined, undefined);
+  } catch {
+    return FORMATS.paperback;
+  }
 }
 
 /** The five colours the editor shows: background, text and three accents (repeating the ones given). @param {string[]} colors */

@@ -1,7 +1,7 @@
 // Mockups: a cover shown as a product (a flat shot, a book, an e-reader) or on a social card,
 // for listings and cover reveals. Each is an SVG with the cover nested in it.
 
-import { n, mix, escapeXml, hashString, contrast, readable } from './core.js';
+import { n, mix, escapeXml, hashString, contrast, readable, isHex } from './core.js';
 import { FONTS, fitText, drawText, textBottom, clipGraphemes } from './text.js';
 
 /** The kinds of mockup, with the size of each (or how it follows the cover's). */
@@ -63,16 +63,18 @@ export const mockupText = (text) =>
  * @param {{ kind?: string, background?: string, text?: string }} [options]
  * @returns {{ svg: string, width: number, height: number }}
  */
-export function createMockup(cover, { kind = 'book', background, text = '' } = {}) {
+export function createMockup(cover, { kind = 'book', background: given, text = '' } = {}) {
   if (!cover || typeof cover.body !== 'string' || !(cover.width > 0) || !(cover.height > 0)) {
     throw new TypeError('createMockup: pass a cover from createCover');
   }
   if (!mockupKinds.includes(kind)) {
     throw new RangeError(`Unknown mockup "${kind}". Available: ${mockupKinds.join(', ')}`);
   }
-  if (background != null && !/^#(?:[0-9a-f]{3}){1,2}$/i.test(background)) {
-    throw new RangeError(`createMockup: background must be a hex colour, got ${JSON.stringify(background)}`);
+  // (A hex colour as the library takes one everywhere: its spaces trimmed.)
+  if (given != null && !isHex(given)) {
+    throw new RangeError(`createMockup: background must be a hex colour, got ${JSON.stringify(given)}`);
   }
+  const background = given == null ? undefined : given.trim();
   // Ids unique to this cover and kind of mockup, so several can share a page.
   const tag = `mk${hashString(cover.svg).toString(36)}-${kind}`;
   const id = (/** @type {string} */ name) => `${tag}-${name}`;

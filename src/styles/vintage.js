@@ -378,11 +378,11 @@ export const typewriter = {
         })
       : null;
     // The series, typed above the title.
+    // (Fitted untracked, as typedLine types it.)
     const series = c.series
       ? fitText(c.series, {
           font: FONTS.mono,
           upper: true,
-          letterSpacing: 0.08,
           maxWidth: maxW,
           maxHeight: S * 0.08,
           maxSize: S * 0.028,

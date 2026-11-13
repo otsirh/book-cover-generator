@@ -22,6 +22,12 @@ import {
 const oneLine = (v) => (typeof v === 'string' ? v.split(LINE_BREAK).join(' ') : null);
 /** Line breaks kept, each as "\n" (the title, typed on several lines). @param {unknown} v */
 const lines = (v) => (typeof v === 'string' ? v.split(LINE_BREAK).join('\n') : null);
+/** A format as links write it: lower case, a size as WxH (1600X2560 and 1600 × 2560 as 1600x2560). @param {string} format */
+const formatName = (format) =>
+  format
+    .trim()
+    .toLowerCase()
+    .replace(/^(\d+)\s*[x×]\s*(\d+)$/, '$1x$2');
 /** At most `max` UTF-16 units (as the app's inputs count), cut between whole characters. @param {string | null | undefined} s @param {number} max */
 const clip = (s, max) => (s == null ? undefined : clipGraphemes(s, max, { units: true }));
 /** The value if it passes `ok`, else undefined. @param {string | null | undefined} v @param {(v: string) => boolean} ok */
@@ -64,9 +70,9 @@ export const LINK = {
     return CUSTOM_PALETTE.test(lower) ? lower : idFor(t, palettes);
   },
   seed: (/** @type {unknown} */ v) => clip(oneLine(v)?.trim(), 40),
-  /** A preset, or a size of your own the library can make. @param {unknown} v */
+  /** A preset, or a size of your own the library can make, in any case (1600X2560, 1600 × 2560). @param {unknown} v */
   format: (v) =>
-    oneOf(oneLine(v)?.trim(), (f) => {
+    oneOf(typeof v === 'string' ? formatName(v) : undefined, (f) => {
       if (Object.hasOwn(formats, f)) return true;
       const size = CUSTOM_SIZE.exec(f);
       return size !== null && fits(Number(size[1]), Number(size[2]));
@@ -259,7 +265,7 @@ export function px(key, raw) {
  * @returns {[number, number]}
  */
 export function formatSize(format, width, height) {
-  const read = format.trim();
+  const read = formatName(format);
   const size = Object.hasOwn(formats, read)
     ? formats[/** @type {keyof typeof formats} */ (read)]
     : CUSTOM_SIZE.exec(read)?.slice(1).map(Number);

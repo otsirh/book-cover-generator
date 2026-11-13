@@ -3,8 +3,7 @@
 // themselves (public/fonts), so the Worker lays text out in the faces resvg then draws it in.
 // Plain JavaScript, no DOM: Node tests it with the same files.
 
-/** A character that draws nothing (Unicode's default ignorables: joiners, soft hyphens, variation selectors…). */
-const INVISIBLE = /^\p{Default_Ignorable_Code_Point}$/u;
+import { INVISIBLE } from '../src/text.js';
 
 /** The fonts in public/fonts the Worker loads: open faces the built-in stacks name. */
 export const FONT_FILES = [

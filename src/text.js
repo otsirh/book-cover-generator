@@ -138,8 +138,11 @@ function latinWidth(ch) {
   return 0.54;
 }
 
-/** Text of characters that draw nothing (Unicode's default ignorables), as browsers and resvg draw them. */
-const INVISIBLE = /^\p{Default_Ignorable_Code_Point}+$/u;
+/**
+ * Text of characters that draw nothing and take no room (Unicode's default ignorables: joiners,
+ * soft hyphens, variation selectors, marks of direction), as browsers and resvg draw them.
+ */
+export const INVISIBLE = /^\p{Default_Ignorable_Code_Point}+$/u;
 
 /** Where each measured character is in a table. */
 const CHAR_INDEX = new Map([...CHARS].map((ch, i) => [ch, i]));

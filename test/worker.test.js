@@ -333,6 +333,10 @@ test(
     assert.equal(fallback.status, 302);
     assert.equal(fallback.headers.get('location'), 'https://covers.example/og.png');
     assert.equal((await fetchPath('/api/cover.png', 'POST')).status, 405);
+    // A scale that draws the cover in a mockup as nothing is the request's fault, as for a cover.
+    const nothing = await fetchPath('/api/mockup.png?title=x&format=3000x1000&kind=card&scale=0.001');
+    assert.equal(nothing.status, 400);
+    assert.match(await nothing.text(), /as nothing/);
     // The MCP server answers a cover with its picture (a PNG at most 480 px wide), and keeps the
     // links of one in a script the PNG fonts lack.
     /** @param {string} title */
@@ -570,12 +574,11 @@ test('PNGs and MCP requests past a client’s limit are refused with 429; cached
   assert.match(await busy.text(), /Too many requests/);
   assert.deepEqual(png.keys, ['203.0.113.9']);
   // A query the library refuses is refused before the limit is asked (or resvg started).
-  const bad = await worker.fetch(
-    new Request('https://covers.example/api/cover.png?title=Dune&style=nope', { headers }),
-    env,
-    ctx,
-  );
-  assert.equal(bad.status, 400);
+  for (const query of ['title=Dune&style=nope', 'title=Dune&scale=9', 'title=Dune&kind=nope']) {
+    const path = query.includes('kind') ? '/api/mockup.png' : '/api/cover.png';
+    const bad = await worker.fetch(new Request(`https://covers.example${path}?${query}`, { headers }), env, ctx);
+    assert.equal(bad.status, 400, query);
+  }
   assert.deepEqual(png.keys, ['203.0.113.9']);
   // SVGs and descriptions are cheap: never limited.
   const svg = await worker.fetch(new Request('https://covers.example/api/cover.svg?title=Dune', { headers }), env, ctx);
@@ -685,4 +688,13 @@ test('a pin of a registered style named in capitals stays in the link, as links 
   } finally {
     unregisterStyle('camel-test');
   }
+});
+
+test('a format is read in any case, as every other link value', async () => {
+  const { LINK } = await import('../src/link.js');
+  assert.equal(LINK.format('Ebook'), 'ebook');
+  assert.equal(LINK.format('1600X2560'), '1600x2560');
+  assert.equal(LINK.format('1600 × 2560'), '1600x2560');
+  assert.deepEqual(optionsFromLink(new URLSearchParams('format=SQUARE')), { width: 600, height: 600 });
+  assert.deepEqual(optionsFromLink(new URLSearchParams('format=1600X2560')), { width: 1600, height: 2560 });
 });

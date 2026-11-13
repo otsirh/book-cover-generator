@@ -200,9 +200,12 @@ function dimensions() {
     if (values.width !== undefined || values.height !== undefined || values.format !== undefined) {
       throw new Error('--size sets the width and height: use it without --width, --height or --format');
     }
-    const m = /^\s*(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)\s*$/i.exec(values.size);
-    if (!m) throw new RangeError(`--size must look like 1600x2560, got "${values.size}"`);
-    return { width: Number(m[1]), height: Number(m[2]) };
+    // (A size of its own, read as --format and links read one.)
+    if (!/^\s*\d+\s*[x×]\s*\d+\s*$/i.test(values.size)) {
+      throw new RangeError(`--size must look like 1600x2560, got "${values.size}"`);
+    }
+    const [width, height] = formatSize(values.size, undefined, undefined);
+    return { width, height };
   }
   const width = values.width === undefined ? undefined : px('--width', values.width);
   const height = values.height === undefined ? undefined : px('--height', values.height);

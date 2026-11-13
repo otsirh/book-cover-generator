@@ -9,11 +9,11 @@
 // measured with the built-in fonts' widths (src/metrics.js), as macOS draws them, so it can break
 // a little differently from the app on another system, which measures with its own fonts.
 
-import { createCover, createMockup, version } from '../src/index.js';
+import { createCover, createMockup, mockupKinds, version } from '../src/index.js';
 import { hex, slug } from '../src/shared.js';
 import { optionsFromLink, linkOf, LINK_FIELDS } from '../src/link.js';
 import { answerPayload, catalog } from '../src/mcp.js';
-import { escapeXml } from '../src/core.js';
+import { escapeXml, isHex } from '../src/core.js';
 import { COVER_PIXELS, MOCKUP_PIXELS, SHADOWED_PIXELS, pngEngine } from './png.js';
 import { openapi } from './openapi.js';
 
@@ -362,18 +362,28 @@ async function drawPng(request, env, url, kind) {
   const refused = notGet(request);
   if (refused) return refused;
   const q = url.searchParams;
-  // (A query the library refuses is refused before anything costly: the limit, resvg, the fonts.)
-  try {
-    drawn(kind, q);
-  } catch (err) {
-    return refusal(err);
-  }
-  if (!(await allowed(request, env.PNG_LIMIT))) return refusal(new Error(TOO_MANY), 429, { 'Retry-After': '60' });
+  // A query the library refuses is refused before anything costly (the limit, resvg, the fonts):
+  // the scale, the cover's options, and the mockup's. (The cover is drawn again, laid out in the
+  // PNG fonts.)
   const asked = q.getAll('scale').at(-1);
   const given = asked === undefined || asked === '' ? null : Number(asked);
   if (given !== null && !(given > 0 && given <= 4)) {
     return refusal(new RangeError(`scale must be a number above 0, at most 4, got "${asked}"`));
   }
+  try {
+    createCover(optionsFromLink(q));
+    if (kind === 'mockup') {
+      const { kind: shape, background } = mockupOptions(q);
+      if (!mockupKinds.includes(shape))
+        throw new RangeError(`Unknown mockup "${shape}". Available: ${mockupKinds.join(', ')}`);
+      if (background !== undefined && !isHex(background)) {
+        throw new RangeError(`background must be a hex colour, got ${JSON.stringify(background)}`);
+      }
+    }
+  } catch (err) {
+    return refusal(err);
+  }
+  if (!(await allowed(request, env.PNG_LIMIT))) return refusal(new Error(TOO_MANY), 429, { 'Retry-After': '60' });
   let drawer;
   try {
     drawer = await pngEngineFor(env, url.origin);
@@ -423,10 +433,16 @@ async function drawPng(request, env, url, kind) {
         // The cover drawn first, then shown in the mockup as that picture: its own filters, under
         // the mockup's shadow, would take resvg several times the memory.
         // (At the size the mockup shows it, at most COVER_PIXELS.)
-        const picture = drawer.render(
-          cover.svg,
-          Math.min(scale * shownAt(svg, cover), 0.995 * Math.sqrt(COVER_PIXELS / (cover.width * cover.height))),
+        const pictureScale = Math.min(
+          scale * shownAt(svg, cover),
+          0.995 * Math.sqrt(COVER_PIXELS / (cover.width * cover.height)),
         );
+        if (Math.round(cover.width * pictureScale) < 1 || Math.round(cover.height * pictureScale) < 1) {
+          return refusal(
+            new RangeError(`scale ${scale} draws the cover in this mockup as nothing: ask for a larger scale`),
+          );
+        }
+        const picture = drawer.render(cover.svg, pictureScale);
         const body = `<image width="${cover.width}" height="${cover.height}" href="data:image/png;base64,${base64(picture)}"/>`;
         const flat = drawer.laidOut(() => createMockup({ ...cover, body }, mockupOptions(q)));
         bytes = drawer.render(flat.svg, scale);

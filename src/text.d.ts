@@ -222,3 +222,8 @@ export declare function textGroupAttrs(o: {
 export declare function spacingShift(anchor: 'start' | 'middle' | 'end', spacing: number): number;
 /** Visual bottom of a fit placed at `y`, including descenders. */
 export declare function textBottom(fit: TextFit, y: number): number;
+/**
+ * Text of characters that draw nothing and take no room (Unicode's default ignorables: joiners,
+ * soft hyphens, variation selectors, marks of direction), as browsers and resvg draw them.
+ */
+export declare const INVISIBLE: RegExp;
