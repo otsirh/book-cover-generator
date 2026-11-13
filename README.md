@@ -72,6 +72,7 @@ The site draws covers from a URL too, so a page can show one with nothing instal
 
 - `GET /api/cover.svg` answers with the cover as SVG.
 - `GET /api/mockup.svg` answers with a [mockup](#mockups) of it. Add `kind` (`book`, `flat`, `ereader`, `card`, `square`, `story`), `text` for the line on a card, square or story, and `background`.
+- `GET /api/cover.png` and `GET /api/mockup.png` answer with the same as PNG, for places that don't take SVG (email, chat, social posts). Add `scale` (1 to 4) for more pixels, up to 16.7 million. The server draws them with [open fonts](public/fonts/README.md) and lays the text out in their widths; they have Latin, Greek and Cyrillic letters, so a cover in another script (Chinese, Japanese, Arabic…) gets a `422`: ask for its SVG.
 
 The query takes the options' own names (`title`, `author`, `subtitle`, `series`, `credit`, `badge`, `style`, `palette`, `seed`, `genre`, `font`, `lang`, `width`, `height`) and the app's link parameters, so the part of an app link after `#` draws the same design (the server measures text with the widths of the fonts as macOS draws them, so on another system a line can break a little differently from the app's preview):
 
@@ -84,7 +85,7 @@ The query takes the options' own names (`title`, `author`, `subtitle`, `series`,
 | `palette`             | a palette id, or your own colours as `custom-0b132b-f8f9fa-ff6b6b` (background, text, accents) |
 | `bg`, `ink`, `accent` | your own colours, as hex (the `#` is optional; accents separated by commas)                    |
 
-A title breaks its line at `%0A`. Anyone may embed the answers (CORS and `Cross-Origin-Resource-Policy` allow it), and the headers `X-Cover-Style`, `X-Cover-Palette` and `X-Cover-Version` say what was drawn. The same URL always draws the same cover in a version of the library, so answers are cached for a day. Options the library rejects get a `400` with the reason as plain text.
+A title breaks its line at `%0A`. A design's link from the app (Copy link: `https://covers.otsirh.dev/?title=…`) shows that design in link previews, as a social card drawn by `/api/mockup.png`. Anyone may embed the answers (CORS and `Cross-Origin-Resource-Policy` allow it), and the headers `X-Cover-Style`, `X-Cover-Palette` and `X-Cover-Version` say what was drawn. The same URL always draws the same cover in a version of the library, so answers are cached for a day. Options the library rejects get a `400` with the reason as plain text.
 
 ## On any page: `<book-cover>`
 

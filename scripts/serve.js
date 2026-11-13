@@ -26,6 +26,8 @@ const TYPES = {
   '.webmanifest': 'application/manifest+json; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
+  '.ttf': 'font/ttf',
+  '.otf': 'font/otf',
   '.txt': 'text/plain; charset=utf-8',
   '.xml': 'application/xml; charset=utf-8',
   '.ts': 'text/plain; charset=utf-8',
@@ -93,6 +95,23 @@ for (const root of roots) {
   }
 }
 
+/**
+ * What the Worker has in production, here: the site's files (ASSETS: the roots, as served) and
+ * resvg's WebAssembly (which Node can't import, so it's read from disk).
+ * @type {import('../worker/index.js').Env}
+ */
+const workerEnv = {
+  ASSETS: {
+    async fetch(request) {
+      const file = await locate(decodeURIComponent(new URL(request.url).pathname));
+      if (!file) return new Response('Not found\n', { status: 404 });
+      const type = TYPES[/** @type {keyof typeof TYPES} */ (extname(file))] ?? 'application/octet-stream';
+      return new Response(await readFile(file), { headers: { 'Content-Type': type } });
+    },
+  },
+  RESVG_WASM: await readFile(new URL('../node_modules/@resvg/resvg-wasm/index_bg.wasm', import.meta.url)),
+};
+
 /** @param {import('node:http').IncomingMessage} req @param {import('node:http').ServerResponse} res */
 async function handle(req, res) {
   let urlPath;
@@ -105,8 +124,10 @@ async function handle(req, res) {
   // The Worker's paths (wrangler.jsonc runs it first for them), answered by the Worker's own fetch,
   // with the body as a stream: routing, limits and headers as in production (which doesn't add
   // _headers to the Worker's answers).
-  const rawPath = new URL(req.url ?? '/', 'http://localhost').pathname;
-  if (rawPath === '/mcp' || rawPath.startsWith('/api/')) {
+  const raw = new URL(req.url ?? '/', 'http://localhost');
+  const rawPath = raw.pathname;
+  // (And a design's link, /?title=…, whose page the Worker gives the design's link preview.)
+  if (rawPath === '/mcp' || rawPath.startsWith('/api/') || (rawPath === '/' && raw.searchParams.has('title'))) {
     const method = req.method ?? 'GET';
     const headers = new Headers();
     for (const [name, value] of Object.entries(req.headers)) {
@@ -120,7 +141,7 @@ async function handle(req, res) {
         // @ts-expect-error duplex is required for a streamed body, and missing from the types
         duplex: 'half',
       }),
-      {},
+      workerEnv,
       { waitUntil() {} },
     );
     res.writeHead(answer.status, Object.fromEntries(answer.headers));

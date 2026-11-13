@@ -207,6 +207,16 @@ function toHash(d) {
 }
 
 /**
+ * A link to share a design: its settings in the query (/?title=…), so the page it opens has the
+ * design's own link preview (a #fragment never reaches the server); the app moves them to the
+ * #fragment as it opens.
+ * @param {Design} d
+ */
+function shareLink(d) {
+  return new URL(`/?${writeLink(d)}`, location.href).href;
+}
+
+/**
  * The site's HTTP API URL that draws a design (see worker/index.js): its link, as a query.
  * Only the pins its style has, so a pin left from another style can't make it an error.
  * @param {Design} d
@@ -1029,7 +1039,7 @@ function buildControls() {
     flushReplace();
     try {
       // From the design itself: a history write the browser refused would leave the URL behind.
-      await copyText(new URL(toHash(design), location.href).href);
+      await copyText(shareLink(design));
       toast('Link copied: it opens this exact design');
     } catch {
       toast('Could not access the clipboard');
@@ -2370,8 +2380,14 @@ function toast(msg) {
 
 /* -------------------------------------------------------------------- boot */
 
+// A design's link as Copy link makes it (/?title=…): the design moves to the #fragment, where the
+// app keeps it (and the query goes, so the page's address is the app's again).
+const sharedLink = new URLSearchParams(location.search).has('title') && location.hash.length < 2;
+if (sharedLink) {
+  safely(() => history.replaceState(history.state, '', `${location.pathname}#${location.search.slice(1)}`));
+}
 // A shared link opens the same cover every time (see complete()); with no link, the sample stays.
-const linked = fromHash(location.hash);
+const linked = fromHash(location.hash.length > 1 ? location.hash : sharedLink ? location.search : '');
 if (Object.keys(linked).length) Object.assign(design, complete(linked));
 else {
   // With no link, the first cover is in the genre chosen last time: a starter that suits it, if any.

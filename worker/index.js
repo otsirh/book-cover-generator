@@ -11,6 +11,25 @@ import { createCover, createMockup, version } from '../src/index.js';
 import { hex } from '../src/shared.js';
 import { optionsFromLink } from '../src/link.js';
 import { answerPayload } from '../src/mcp.js';
+import { escapeXml } from '../src/core.js';
+import { MAX_PIXELS, pngEngine } from './png.js';
+
+/**
+ * The site's headers (public/_headers, /*), for the pages the Worker answers itself: the static
+ * assets' rules don't reach a Worker's answers. (A test keeps the two the same.)
+ */
+export const SITE_HEADERS = {
+  'Content-Security-Policy':
+    "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; require-trusted-types-for 'script'; trusted-types sw",
+  'Strict-Transport-Security': 'max-age=63072000; includeSubDomains; preload',
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Permissions-Policy':
+    'accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()',
+  'Cross-Origin-Opener-Policy': 'same-origin',
+  'Cross-Origin-Resource-Policy': 'same-origin',
+};
 
 /** Headers every answer has: anyone may embed it, and it's never taken for anything but what it is. */
 const COMMON = {
@@ -22,14 +41,10 @@ const COMMON = {
 };
 
 /**
- * Answer an API request (or say it isn't one: null).
+ * A CORS preflight's answer, or a refusal of any method but GET and HEAD; null for those.
  * @param {Request} request
- * @returns {Response | null}
  */
-export function api(request) {
-  const url = new URL(request.url);
-  const kind = url.pathname === '/api/cover.svg' ? 'cover' : url.pathname === '/api/mockup.svg' ? 'mockup' : null;
-  if (!kind) return null;
+function notGet(request) {
   if (request.method === 'OPTIONS') {
     return new Response(null, {
       status: 204,
@@ -47,19 +62,52 @@ export function api(request) {
       headers: { ...COMMON, Allow: 'GET, HEAD', 'Content-Type': 'text/plain; charset=utf-8' },
     });
   }
+  return null;
+}
+
+/** @param {unknown} err @param {number} [status] */
+const refusal = (err, status = 400) =>
+  new Response(`${err instanceof Error ? err.message : String(err)}\n`, {
+    status,
+    headers: { ...COMMON, 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' },
+  });
+
+/**
+ * The cover a query draws (the app's link), or its mockup, as SVG.
+ * @param {'cover' | 'mockup'} kind @param {URLSearchParams} q
+ */
+function drawn(kind, q) {
+  const cover = createCover(optionsFromLink(q));
+  if (kind === 'cover') return { cover, svg: cover.svg, width: cover.width, height: cover.height };
+  const background = q.getAll('background').at(-1);
+  const mockup = createMockup(cover, {
+    kind: /** @type {import('../src/index.js').MockupKind} */ (q.getAll('kind').at(-1) || 'book'),
+    text: q.getAll('text').at(-1) ?? '',
+    background: background ? hex(background) : undefined,
+  });
+  return { cover, svg: mockup.svg, width: mockup.width, height: mockup.height };
+}
+
+/** What every drawn answer says of the cover. @param {ReturnType<typeof createCover>} cover */
+const about = (cover) => ({
+  'X-Cover-Style': cover.style,
+  'X-Cover-Palette': cover.palette,
+  'X-Cover-Version': version,
+});
+
+/**
+ * Answer an API request for SVG (or say it isn't one: null).
+ * @param {Request} request
+ * @returns {Response | null}
+ */
+export function api(request) {
+  const url = new URL(request.url);
+  const kind = url.pathname === '/api/cover.svg' ? 'cover' : url.pathname === '/api/mockup.svg' ? 'mockup' : null;
+  if (!kind) return null;
+  const refused = notGet(request);
+  if (refused) return refused;
   try {
-    const q = url.searchParams;
-    const cover = createCover(optionsFromLink(q));
-    const svg =
-      kind === 'cover'
-        ? cover.svg
-        : createMockup(cover, {
-            kind: /** @type {import('../src/index.js').MockupKind} */ (q.getAll('kind').at(-1) || 'book'),
-            text: q.getAll('text').at(-1) ?? '',
-            background: q.getAll('background').at(-1)
-              ? hex(/** @type {string} */ (q.getAll('background').at(-1)))
-              : undefined,
-          }).svg;
+    const { cover, svg } = drawn(kind, url.searchParams);
     return new Response(request.method === 'HEAD' ? null : svg, {
       headers: {
         ...COMMON,
@@ -68,17 +116,144 @@ export function api(request) {
         'Cache-Control': 'public, max-age=86400',
         // Opened on its own, the SVG may style itself and nothing else.
         'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; img-src data:",
-        'X-Cover-Style': cover.style,
-        'X-Cover-Palette': cover.palette,
-        'X-Cover-Version': version,
+        ...about(cover),
       },
     });
   } catch (err) {
-    return new Response(`${err instanceof Error ? err.message : String(err)}\n`, {
-      status: 400,
-      headers: { ...COMMON, 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' },
-    });
+    return refusal(err);
   }
+}
+
+/**
+ * @typedef {object} Env
+ * @property {{ fetch(request: Request): Promise<Response> }} [ASSETS]  the site's files
+ * @property {{ id: string }} [CF_VERSION_METADATA]  this deployment
+ * @property {WebAssembly.Module | BufferSource} [RESVG_WASM]  resvg's WebAssembly, where it can't be imported (Node)
+ */
+
+/** The PNG engine, made once an instance needs it. @type {Promise<Awaited<ReturnType<typeof pngEngine>>> | null} */
+let engine = null;
+
+/**
+ * resvg and the fonts, ready: its WebAssembly comes with the Worker (in Node, as env.RESVG_WASM),
+ * the fonts are the site's own files (public/fonts).
+ * @param {Env} env @param {string} origin
+ */
+function pngEngineFor(env, origin) {
+  if (!engine) {
+    const made = (async () => {
+      const [resvg, wasm] = await Promise.all([
+        import('@resvg/resvg-wasm'),
+        env.RESVG_WASM ?? import('./resvg-wasm.js').then((m) => m.default),
+      ]);
+      return pngEngine(resvg, wasm, async (file) => {
+        if (!env.ASSETS) throw new Error('No site files to read the fonts from');
+        const res = await env.ASSETS.fetch(new Request(new URL(`/fonts/${file}`, origin)));
+        if (!res.ok) throw new Error(`fonts/${file}: ${res.status}`);
+        return new Uint8Array(await res.arrayBuffer());
+      });
+    })();
+    // (A failure isn't kept: the next request tries again.)
+    made.catch(() => {
+      if (engine === made) engine = null;
+    });
+    engine = made;
+  }
+  return engine;
+}
+
+/**
+ * Answer an API request for PNG (or say it isn't one: null): the cover drawn by resvg with open
+ * fonts, laid out in their widths. `scale` (1 to 4) multiplies its size. Text in a script the
+ * fonts lack (Chinese, Japanese, Arabic…) is refused (the SVG draws it), or, for a link preview
+ * (`preview`), answered with the site's own image.
+ * @param {Request} request @param {Env} env
+ * @returns {Promise<Response | null>}
+ */
+export async function png(request, env) {
+  const url = new URL(request.url);
+  const kind = url.pathname === '/api/cover.png' ? 'cover' : url.pathname === '/api/mockup.png' ? 'mockup' : null;
+  if (!kind) return null;
+  const refused = notGet(request);
+  if (refused) return refused;
+  const q = url.searchParams;
+  const asked = q.getAll('scale').at(-1);
+  const scale = asked === undefined || asked === '' ? 1 : Number(asked);
+  if (!(scale >= 1 && scale <= 4)) return refusal(new RangeError(`scale must be a number from 1 to 4, got "${asked}"`));
+  let drawer;
+  try {
+    drawer = await pngEngineFor(env, url.origin);
+  } catch (err) {
+    console.error(err);
+    return refusal(new Error('PNG covers are unavailable just now: ask for the SVG (cover.svg)'), 503);
+  }
+  try {
+    const { cover, svg, width, height } = drawer.laidOut(() => drawn(kind, q));
+    const [w, h] = [Math.round(width * scale), Math.round(height * scale)];
+    if (w * h > MAX_PIXELS) {
+      throw new RangeError(
+        `A PNG has at most ${MAX_PIXELS} pixels; ${w} × ${h} is more: ask for a smaller size or scale, or the SVG`,
+      );
+    }
+    if (!drawer.draws(svg)) {
+      if (q.has('preview')) return Response.redirect(new URL('/og.png', url).href, 302);
+      return refusal(
+        new RangeError(
+          'The PNG fonts have Latin, Greek and Cyrillic letters, not all of this text: ask for the SVG (cover.svg), which your fonts draw',
+        ),
+        422,
+      );
+    }
+    const bytes = drawer.render(svg, scale);
+    return new Response(request.method === 'HEAD' ? null : /** @type {BodyInit} */ (bytes), {
+      headers: { ...COMMON, 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400', ...about(cover) },
+    });
+  } catch (err) {
+    return refusal(err);
+  }
+}
+
+/**
+ * The app's page for a design's link (/?title=…, as Copy link makes it): with the design's own
+ * title and picture for link previews (a social card of it), which a link's #fragment can't give
+ * (it never reaches the server). The app moves the design to the #fragment as it opens.
+ * @param {Request} request @param {Env} env
+ * @returns {Promise<Response | null>}
+ */
+export async function preview(request, env) {
+  const url = new URL(request.url);
+  if (url.pathname !== '/' || !url.searchParams.has('title') || !env.ASSETS) return null;
+  if (request.method !== 'GET' && request.method !== 'HEAD') return null;
+  const page = await env.ASSETS.fetch(new Request(new URL('/', url)));
+  if (!page.ok) return page;
+  let html = await page.text();
+  let name = '';
+  try {
+    const cover = createCover(optionsFromLink(url.searchParams));
+    name = `${cover.title.replace(/\n/g, ' ')}${cover.author ? ` by ${cover.author}` : ''}`;
+  } catch {
+    // A link the library refuses: the page as it is (the app says what's wrong).
+  }
+  if (name) {
+    const image = new URL('/api/mockup.png', url);
+    image.search = url.search;
+    image.searchParams.set('kind', 'card');
+    image.searchParams.set('preview', '1');
+    /** @param {RegExp} re @param {string} value */
+    const set = (re, value) => {
+      html = html.replace(re, (_, start) => `${start}${escapeXml(value)}`);
+    };
+    set(/(<title>)[^<]*/, `${name} · Book Cover Generator`);
+    set(/(<meta property="og:title" content=")[^"]*/, name);
+    set(/(<meta property="og:url" content=")[^"]*/, url.href);
+    set(/(<meta property="og:image" content=")[^"]*/, image.href);
+    set(/(<meta property="og:image:alt" content=")[^"]*/, `The cover of ${name}`);
+  }
+  const headers = new Headers(page.headers);
+  for (const [k, v] of Object.entries(SITE_HEADERS)) if (!headers.has(k)) headers.set(k, v);
+  headers.set('Cache-Control', 'public, max-age=300');
+  headers.delete('Content-Length');
+  return new Response(request.method === 'HEAD' ? null : html, { status: 200, headers });
 }
 
 /**
@@ -175,19 +350,21 @@ export async function mcp(request) {
 export default {
   /**
    * @param {Request} request
-   * @param {{ ASSETS?: { fetch(request: Request): Promise<Response> }, CF_VERSION_METADATA?: { id: string } }} env
+   * @param {Env} env
    * @param {{ waitUntil(promise: Promise<unknown>): void }} ctx
    */
   async fetch(request, env, ctx) {
     const mcpAnswer = await mcp(request);
     if (mcpAnswer) return mcpAnswer;
+    const page = await preview(request, env);
+    if (page) return page;
     const cache = request.method === 'GET' ? /** @type {any} */ (globalThis).caches?.default : undefined;
     const key = cache ? cacheKey(request, env.CF_VERSION_METADATA?.id ?? 'dev') : null;
     if (cache && key) {
       const hit = await cache.match(key);
       if (hit) return hit;
     }
-    const answer = api(request);
+    const answer = api(request) ?? (await png(request, env));
     if (!answer) return env.ASSETS ? env.ASSETS.fetch(request) : new Response('Not found\n', { status: 404 });
     if (cache && key && answer.ok) ctx.waitUntil(cache.put(key, answer.clone()));
     return answer;

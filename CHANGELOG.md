@@ -4,6 +4,11 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+
+- **PNG from the HTTP API**: `/api/cover.png` and `/api/mockup.png` draw what the `.svg` endpoints do as PNG (with `scale` up to 4), for email, chat and social posts. The site's Worker draws them with resvg and open fonts (Noto, Liberation, EB Garamond, Roboto Condensed, Anton, TeX Gyre Adventor), laying the text out in their own widths; text in a script they lack gets a `422` (the SVG draws it).
+- **Link previews of a design**: Copy link (and Share) give a link that holds the design in its query, `https://covers.otsirh.dev/?title=…`, and a link preview of it (on X, Facebook, Slack, Discord, iMessage…) shows that design, as a social card. The app opens it as before.
+
 ## [1.11.0] - 2026-11-13
 
 Capitals in the cover's language. Covers without a language are drawn as in 1.10.0; Turkish and Azeri covers, and Big Letter for an initial with an accent on its I, change.

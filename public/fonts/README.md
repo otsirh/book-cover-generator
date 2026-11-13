@@ -1,0 +1,17 @@
+# Fonts for PNG covers
+
+The site's Worker draws PNG covers (`/api/cover.png`, `/api/mockup.png` and link previews) with these open fonts: the server has no system fonts, and these are the open faces the built-in font stacks name (`src/text.js`). The browser and the library never load them; covers drawn there use the reader's own fonts.
+
+| Stack     | Face               | Files                             | Source                                                                                                                                          | License                                    |
+| --------- | ------------------ | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| serif     | Noto Serif         | Regular, Bold, Italic, BoldItalic | [notofonts](https://github.com/notofonts/notofonts.github.io)                                                                                   | [OFL 1.1](OFL-Noto.txt)                    |
+| didone    | Noto Serif Display | Regular, Bold, Italic             | [notofonts](https://github.com/notofonts/notofonts.github.io)                                                                                   | [OFL 1.1](OFL-Noto.txt)                    |
+| humanist  | Noto Sans          | Regular, Bold, Italic, BoldItalic | [notofonts](https://github.com/notofonts/notofonts.github.io)                                                                                   | [OFL 1.1](OFL-Noto.txt)                    |
+| garamond  | EB Garamond        | Regular, Bold, Italic, BoldItalic | [Google Fonts](https://github.com/google/fonts/tree/main/ofl/ebgaramond) (static weights cut from the variable fonts with fontTools' instancer) | [OFL 1.1](OFL-EBGaramond.txt)              |
+| sans      | Liberation Sans    | Regular, Bold, Italic, BoldItalic | [Liberation 2.1.5](https://github.com/liberationfonts/liberation-fonts)                                                                         | [OFL 1.1](OFL-Liberation.txt)              |
+| mono      | Liberation Mono    | Regular, Bold                     | [Liberation 2.1.5](https://github.com/liberationfonts/liberation-fonts)                                                                         | [OFL 1.1](OFL-Liberation.txt)              |
+| condensed | Roboto Condensed   | Regular, Bold                     | [Google Fonts](https://github.com/google/fonts/tree/main/ofl/robotocondensed) (static weights cut from the variable font)                       | [OFL 1.1](OFL-RobotoCondensed.txt)         |
+| display   | Anton              | Regular                           | [Google Fonts](https://github.com/google/fonts/tree/main/ofl/anton)                                                                             | [OFL 1.1](OFL-Anton.txt)                   |
+| geometric | TeX Gyre Adventor  | regular, bold, italic, bolditalic | [GUST e-foundry](https://www.gust.org.pl/projects/e-foundry/tex-gyre/adventor)                                                                  | [GUST Font License](GUST-FONT-LICENSE.txt) |
+
+They cover Latin, Greek and Cyrillic. A cover whose text needs another script (Chinese, Japanese, Korean, Arabic, Hebrew, Thai…) is refused as PNG and drawn as SVG instead. `worker/fonts.js` lists the files the Worker loads; a test keeps that list and this folder the same.

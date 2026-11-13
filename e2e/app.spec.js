@@ -1260,7 +1260,34 @@ test('copies the SVG and a link to the design', async ({ page, context, browserN
   expect(await page.evaluate(() => navigator.clipboard.readText())).toMatch(/^<svg[\s\S]*Clipboard[\s\S]*<\/svg>$/);
   await page.locator('#copy-link').click();
   await expect(page.locator('#toast')).toContainText('Link copied');
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toMatch(/#title=Clipboard.*style=minimal.*seed=c1/);
+  // The link holds the design in its query (so a link preview can show it)…
+  const link = await page.evaluate(() => navigator.clipboard.readText());
+  expect(link).toMatch(/\/\?title=Clipboard.*style=minimal.*seed=c1/);
+  // …and opens it, with the design moved to the #fragment, where the app keeps it.
+  await page.goto(link);
+  await ready(page);
+  await expect(page).toHaveURL(/\/#title=Clipboard.*style=minimal.*seed=c1/);
+  expect(await svgOf(page, '#preview')).toContain('Clipboard');
+});
+
+test('a design’s link shows that design in link previews, a PNG the site draws', async ({ page, request }) => {
+  const query = 'title=Dune&author=Frank+Herbert&style=retro&seed=s';
+  const html = await (await request.get(`/?${query}`)).text();
+  const image = /<meta property="og:image" content="([^"]+)"/.exec(html)?.[1]?.replaceAll('&amp;', '&');
+  expect(image).toMatch(/\/api\/mockup\.png\?title=Dune&author=Frank\+Herbert&style=retro&seed=s&kind=card&preview=1$/);
+  const png = await request.get(
+    new URL(/** @type {string} */ (image)).pathname + new URL(/** @type {string} */ (image)).search,
+  );
+  expect(png.status()).toBe(200);
+  expect(png.headers()['content-type']).toBe('image/png');
+  // The PNG's header: a 1200 × 630 card.
+  const bytes = await png.body();
+  expect([bytes.readUInt32BE(16), bytes.readUInt32BE(20)]).toEqual([1200, 630]);
+  // The page itself is the app, which opens the design.
+  await page.goto(`/?${query}`);
+  await ready(page);
+  await expect(page.locator('#title')).toHaveValue('Dune');
+  expect(await svgOf(page, '#preview')).toContain('Dune');
 });
 
 test('copies an image link: the site’s HTTP API draws the same cover', async ({ page, context, browserName }) => {
