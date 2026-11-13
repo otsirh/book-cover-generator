@@ -15,25 +15,7 @@
 import { createCover } from './index.js';
 import { svgToDataUrl } from './browser.js';
 import { LINK, optionsFromLink } from './link.js';
-
-/** The attributes that draw the cover, and the link parameter each is. */
-const ATTRIBUTES = /** @type {const} */ ({
-  'cover-title': 'title',
-  author: 'author',
-  subtitle: 'subtitle',
-  series: 'series',
-  credit: 'credit',
-  badge: 'badge',
-  'cover-style': 'style',
-  genre: 'genre',
-  palette: 'palette',
-  seed: 'seed',
-  format: 'format',
-  font: 'font',
-  case: 'case',
-  variant: 'variant',
-  lang: 'lang',
-});
+import { COVER_ATTRIBUTES as ATTRIBUTES } from './shared.js';
 
 const CSS =
   ':host{display:inline-block;width:240px;vertical-align:top}:host([hidden]){display:none}' +

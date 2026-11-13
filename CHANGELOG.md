@@ -32,8 +32,9 @@ All notable changes to this project are documented here. The format follows [Kee
 - A PNG resvg stops on no longer stops the site's other PNGs: the Worker starts a new resvg for the next one (its own copy of resvg's glue, `worker/resvg-glue.js`, made by `scripts/vendor-resvg.js`).
 - A link preview's picture is the site's own image whenever the design's can't be drawn (the crawler asked too much, or resvg failed), never an error.
 - A design's link preview shows the design the app opens from it (an old link's pin its style no longer takes, a style it doesn't know, or pins with no style, which the seed's style takes), and the card's picture is drawn from the design alone, not the page's other parameters.
-- The gallery shows your design in its own shape (a square or an eBook), as each cover opens it.
-- A mockup's `kind` is read in any case, by `createMockup`, the HTTP API and the MCP server; a PNG of text in a script its fonts lack is a `422` kept at the edge, so asking again costs nothing; `createMockup` says how large it shows the cover (`coverScale`).
+- The gallery shows your design in its own shape (a square or an eBook), as each cover opens it, and your pins on the style the app opens it in (the seed's, when the link names none).
+- Many covers previews every book of a list, one whose size can't be made among them (left empty, and said on download).
+- A mockup's `kind` is read in any case, by `createMockup` (which says the kind it made, `kind`), the HTTP API and the MCP server; a PNG of text in a script its fonts lack is a `422` kept at the edge, so asking again costs nothing; `createMockup` says how large it shows the cover (`coverScale`).
 - The gallery reads the design you bring as the app does, with the app's own reader (the last of a repeated value; `texture=false` is off; only pins the style takes; a name like `valueOf` in the link no longer stops it).
 - A list of books may quote a field after the space typed after a comma (`Night, "A Tale, Retold"`).
 - A PNG of text with a character that draws nothing (an Arabic letter mark, a Mongolian vowel separator) is no longer refused for want of a font; `createMockup`'s `text: null` is no line, not the word "null".

@@ -2054,7 +2054,7 @@ function lookOf(d) {
 let manyTimer;
 /** The design the list's preview was last drawn for (title and author aside). */
 let lastManyKey = '';
-/** List covers still to draw. @type {{ img: HTMLImageElement, options: import('../src/index.js').CoverOptions }[]} */
+/** List covers still to draw: each book, and its place in the list. @type {{ img: HTMLImageElement, book: import('../src/index.js').CoverOptions, i: number }[]} */
 let manyQueue = [];
 
 /** Draw the next queued list cover (a few per frame, so a long list never stalls the page). */
@@ -2062,9 +2062,9 @@ const scheduleMany = sliced(() => {
   const item = manyQueue.shift();
   if (!item) return false;
   try {
-    item.img.src = svgToDataUrl(createCover(item.options).svg);
+    item.img.src = svgToDataUrl(createCover(bookOptions(item.book, item.i)).svg);
   } catch {
-    // A row the library refuses (an unknown style, say): shown empty, reported on download.
+    // A row the library refuses (an unknown style, a size it can't make): shown empty, reported on download.
   }
   return true;
 });
@@ -2080,7 +2080,7 @@ function renderMany() {
   $('many-preview').replaceChildren(
     ...books.slice(0, PREVIEWED).map((book, i) => {
       const img = /** @type {HTMLImageElement} */ (h('img', { alt: '' }));
-      manyQueue.push({ img, options: bookOptions(book, i) });
+      manyQueue.push({ img, book, i });
       return h('li', {}, img);
     }),
   );

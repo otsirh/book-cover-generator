@@ -90,6 +90,8 @@ export declare function createMockup(
   height: number;
   /** How many times its own size the mockup shows the cover at (the largest place it shows it). */
   coverScale: number;
+  /** The kind of mockup it is (the one asked for, as the library reads it: `'Card'` is `'card'`). */
+  kind: MockupKind;
 };
 
 /** A paper a paperback is printed on. `color` is KDP's standard colour; `premium-color` is thicker. */

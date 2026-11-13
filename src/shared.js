@@ -105,3 +105,22 @@ export function slug(title) {
   // Cut between whole characters first, so the trim also catches a separator at the cut.
   return clipGraphemes(words, 60).replace(/-+$/, '') || 'cover';
 }
+
+/** The attributes of <book-cover> that draw the cover, and the link parameter each is (src/element.js; the gallery sets them). */
+export const COVER_ATTRIBUTES = /** @type {const} */ ({
+  'cover-title': 'title',
+  author: 'author',
+  subtitle: 'subtitle',
+  series: 'series',
+  credit: 'credit',
+  badge: 'badge',
+  'cover-style': 'style',
+  genre: 'genre',
+  palette: 'palette',
+  seed: 'seed',
+  format: 'format',
+  font: 'font',
+  case: 'case',
+  variant: 'variant',
+  lang: 'lang',
+});

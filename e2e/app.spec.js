@@ -2657,3 +2657,32 @@ test('the gallery shows your design in its own shape, as each cover opens it', a
     })
     .toBe(1);
 });
+
+test('Many covers previews every book, one whose size can’t be made among them', async ({ page }) => {
+  /** @type {string[]} */
+  const errors = [];
+  page.on('pageerror', (err) => errors.push(err.message));
+  await page.goto('/#title=Base&style=minimal&seed=b');
+  await page.locator('#many summary').click();
+  await page.locator('#many-list').fill('title,height\nDune,60\nOther,\nThird,1500');
+  await expect(page.locator('#many-preview li')).toHaveCount(3);
+  // (The others drawn; the one that can't be is left empty, and said so on download.)
+  await expect(page.locator('#many-preview li img[src^="data:"]')).toHaveCount(2);
+  expect(errors).toEqual([]);
+});
+
+test('the gallery gives your pins to the style the app opens your design in, one the link leaves out too', async ({
+  page,
+}) => {
+  const { wholeDesign, readDesign, lastValues } = await import('../src/link.js');
+  const { listStyles } = await import('../src/index.js');
+  // A seed whose style (the link names none) offers a pin, and that pin.
+  const found = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'].flatMap((seed) => {
+    const style = wholeDesign(readDesign(lastValues(new URLSearchParams(`title=A&seed=${seed}`)))).style;
+    const variant = listStyles().find((s) => s.id === style)?.variants[0];
+    return variant ? [{ seed, style, pin: `${variant.name}.${variant.values.at(-1)?.value}` }] : [];
+  })[0];
+  expect(found).toBeTruthy();
+  await page.goto(`/gallery/#title=A&seed=${found.seed}&variant=${found.pin}`);
+  await expect(page.locator(`a[data-style="${found.style}"] book-cover`)).toHaveAttribute('variant', found.pin);
+});

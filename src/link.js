@@ -185,11 +185,8 @@ export function wholeDesign(read) {
  * @returns {[number, number]}
  */
 export function sizeOfFormat(format) {
-  try {
-    return formatSize(format, undefined, undefined);
-  } catch {
-    return [...formats.paperback];
-  }
+  const read = LINK.format(format);
+  return read ? formatSize(read, undefined, undefined) : [...formats.paperback];
 }
 
 /**

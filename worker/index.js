@@ -136,9 +136,18 @@ const fileTitle = (kind, q, title) => (kind === 'cover' ? title : `${title} ${mo
  */
 function drawn(kind, q) {
   const cover = createCover(optionsFromLink(q));
-  if (kind === 'cover') return { cover, svg: cover.svg, width: cover.width, height: cover.height, coverScale: 1 };
+  if (kind === 'cover') {
+    return { cover, svg: cover.svg, width: cover.width, height: cover.height, coverScale: 1, shape: null };
+  }
   const mockup = createMockup(cover, mockupOptions(q));
-  return { cover, svg: mockup.svg, width: mockup.width, height: mockup.height, coverScale: mockup.coverScale };
+  return {
+    cover,
+    svg: mockup.svg,
+    width: mockup.width,
+    height: mockup.height,
+    coverScale: mockup.coverScale,
+    shape: mockup.kind,
+  };
 }
 
 /** A mockup's options from a query: kind, text and background. @param {URLSearchParams} q */
@@ -346,7 +355,14 @@ export async function png(request, env) {
   // A link preview's picture that can't be drawn (too many asked of the crawler's address, resvg
   // unavailable or failed, a script the fonts lack) is the site's own: never an error card.
   if (!answer.ok && answer.status !== 405 && url.searchParams.has('preview')) {
-    return Response.redirect(new URL('/og.png', url).href, 302);
+    // (Kept, as the 422 is, when the design's text can't be drawn: that answer won't change.)
+    return new Response(null, {
+      status: 302,
+      headers: {
+        Location: new URL('/og.png', url).href,
+        ...(answer.status === 422 ? { 'Cache-Control': 'public, max-age=86400' } : {}),
+      },
+    });
   }
   return answer;
 }
@@ -446,10 +462,10 @@ function pngPlan(kind, q) {
   if (given !== null && !(given > 0 && given <= 4)) {
     throw new RangeError(`scale must be a number above 0, at most 4, got "${asked}"`);
   }
-  const { cover, width, height, coverScale } = drawn(kind, q);
+  const { cover, width, height, coverScale, shape } = drawn(kind, q);
   // At its size, or smaller to fit (a large cover, a story); a scale asked for that can't fit is
   // refused. (Auto a hair under the limit, as resvg rounds the size.)
-  const shadowed = kind === 'mockup' && /^(flat|ereader)$/i.test(mockupOptions(q).kind.trim());
+  const shadowed = shape === 'flat' || shape === 'ereader';
   const most = kind === 'cover' ? COVER_PIXELS : shadowed ? SHADOWED_PIXELS : MOCKUP_PIXELS;
   const fit = Math.sqrt(most / (width * height));
   const scale = given ?? (fit >= 1 ? 1 : fit * 0.995);

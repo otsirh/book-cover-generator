@@ -341,6 +341,8 @@ test(
     const fallback = await fetchPath(`/api/mockup.png?kind=card&preview=1&title=${encodeURIComponent('灯台守')}`);
     assert.equal(fallback.status, 302);
     assert.equal(fallback.headers.get('location'), 'https://covers.example/og.png');
+    // (Kept, as the 422 is: the design's text won't draw any better next time.)
+    assert.match(fallback.headers.get('cache-control') ?? '', /public/);
     assert.equal((await fetchPath('/api/cover.png', 'POST')).status, 405);
     // A scale that draws the cover in a mockup as nothing is the request's fault, as for a cover.
     const nothing = await fetchPath('/api/mockup.png?title=x&format=3000x1000&kind=card&scale=0.001');
@@ -758,4 +760,13 @@ test('a format is read in any case, as every other link value', async () => {
   assert.equal(LINK.format('1600 × 2560'), '1600x2560');
   assert.deepEqual(optionsFromLink(new URLSearchParams('format=SQUARE')), { width: 600, height: 600 });
   assert.deepEqual(optionsFromLink(new URLSearchParams('format=1600X2560')), { width: 1600, height: 2560 });
+});
+
+test('sizeOfFormat reads a format as links do: one they refuse is the paperback; a mockup says its kind', async () => {
+  const { sizeOfFormat } = await import('../src/link.js');
+  assert.deepEqual(sizeOfFormat('Ebook'), [600, 960]);
+  assert.deepEqual(sizeOfFormat('1600X2560'), [1600, 2560]);
+  for (const refused of ['10x10', '99999x99999', '100x1000', 'nope'])
+    assert.deepEqual(sizeOfFormat(refused), [600, 900], refused);
+  assert.equal(createMockup(createCover({ title: 'x' }), { kind: /** @type {any} */ ('Flat') }).kind, 'flat');
 });

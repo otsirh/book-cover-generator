@@ -61,7 +61,7 @@ export const mockupText = (text) =>
  *
  * @param {import('./index.js').Cover} cover  from createCover
  * @param {{ kind?: string, background?: string, text?: string }} [options]
- * @returns {{ svg: string, width: number, height: number, coverScale: number }}
+ * @returns {{ svg: string, width: number, height: number, coverScale: number, kind: import('./index.js').MockupKind }}
  */
 export function createMockup(cover, { kind: named = 'book', background: given, text = '' } = {}) {
   // (A kind in any case, as the library's other names.)
@@ -102,6 +102,7 @@ export function createMockup(cover, { kind: named = 'book', background: given, t
     width: Math.round(W),
     height: Math.round(H),
     coverScale: shown || 1,
+    kind: /** @type {import('./index.js').MockupKind} */ (kind),
   });
 
   if (kind === 'flat') {

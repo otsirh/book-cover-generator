@@ -3,37 +3,33 @@
 // style, left behind for another, as in the app). The header and footer links back to the app keep
 // it too, and the place they go to: "#usage&title=…" opens the design at #usage (see site/app.js).
 import { registerServiceWorker } from './offline.js';
-import { lastValues, readDesign, pinsOf, variantOf } from '../src/link.js';
+import { lastValues, readDesign, pinsOf, variantOf, wholeDesign } from '../src/link.js';
+import { COVER_ATTRIBUTES } from '../src/shared.js';
 import { listStyles } from '../src/index.js';
 
 registerServiceWorker();
 
 /** The design's link parameters each cover draws, and the attribute that is each (src/element.js). */
-const DRAWN = {
-  title: 'cover-title',
-  author: 'author',
-  subtitle: 'subtitle',
-  series: 'series',
-  credit: 'credit',
-  badge: 'badge',
-  palette: 'palette',
-  seed: 'seed',
-  font: 'font',
-  case: 'case',
-  lang: 'lang',
-  format: 'format',
-};
+const DRAWN = Object.fromEntries(
+  Object.entries(COVER_ATTRIBUTES)
+    // (Each tile has its own style, and pins only for your own style: set below.)
+    .filter(([attribute]) => attribute !== 'cover-style' && attribute !== 'variant')
+    .map(([attribute, key]) => [key, attribute]),
+);
 
 const design = new URLSearchParams(location.hash.slice(1));
 /** The design as the app reads it (src/link.js): the last of a repeated key, each by the app's rules. */
 const read = readDesign(lastValues(design));
+/** …and as a whole design, its style the one the app opens it in. */
+const whole = wholeDesign(read);
 /** Each style's variants, for the pins it can take. */
 const offered = new Map(listStyles().map((s) => [s.id, s.variants]));
 if (typeof read.title === 'string') {
   for (const link of /** @type {NodeListOf<HTMLAnchorElement>} */ (document.querySelectorAll('a[data-style]'))) {
     const q = new URLSearchParams(design);
     const style = link.dataset.style ?? '';
-    const own = style === read.style;
+    // (Your style as the app opens your design: one the link leaves out is the seed's.)
+    const own = style === whole.style;
     if (!own) q.delete('variant');
     q.set('style', style);
     link.href = `/#${q}`;
