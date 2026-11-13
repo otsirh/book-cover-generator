@@ -7,6 +7,8 @@ import { FONTS, fitText, drawText, textBottom, clipGraphemes } from './text.js';
 /** The kinds of mockup, with the size of each (or how it follows the cover's). */
 export const mockupKinds = Object.freeze(['flat', 'book', 'ereader', 'card', 'square', 'story']);
 
+/** @typedef {import('./index.js').MockupKind} MockupKind */
+
 /** The neutral backdrop of the product shots. */
 const STUDIO = '#ecebe7';
 
@@ -61,7 +63,7 @@ export const mockupText = (text) =>
  *
  * @param {import('./index.js').Cover} cover  from createCover
  * @param {{ kind?: string, background?: string, text?: string }} [options]
- * @returns {{ svg: string, width: number, height: number, coverScale: number, kind: import('./index.js').MockupKind }}
+ * @returns {{ svg: string, width: number, height: number, coverScale: number, kind: MockupKind }}
  */
 export function createMockup(cover, { kind: named = 'book', background: given, text = '' } = {}) {
   // (A kind in any case, as the library's other names.)
@@ -102,7 +104,7 @@ export function createMockup(cover, { kind: named = 'book', background: given, t
     width: Math.round(W),
     height: Math.round(H),
     coverScale: shown || 1,
-    kind: /** @type {import('./index.js').MockupKind} */ (kind),
+    kind: /** @type {MockupKind} */ (kind),
   });
 
   if (kind === 'flat') {
