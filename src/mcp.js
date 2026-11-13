@@ -278,9 +278,10 @@ function callTool(tool, args, ctx) {
       const line = typeof args.text === 'string' ? mockupText(args.text) : '';
       const mockup = createMockup(cover, { kind: /** @type {import('./index.js').MockupKind} */ (kind), text: line });
       ({ svg, width, height } = mockup);
-      const extra = new URLSearchParams({ kind, ...(line ? { text: line } : {}) });
+      // (Named as the library read it: 'Ereader' is an ereader.)
+      const extra = new URLSearchParams({ kind: mockup.kind, ...(line ? { text: line } : {}) });
       image = `${base}/api/mockup.svg?${link}&${extra}`;
-      what = `${/^[aeiou]/.test(kind) ? 'an' : 'a'} ${kind} mockup of ${what}`;
+      what = `${/^[aeiou]/.test(mockup.kind) ? 'an' : 'a'} ${mockup.kind} mockup of ${what}`;
     }
     const png = image.replace(/\.svg\?/, '.png?');
     const saved =

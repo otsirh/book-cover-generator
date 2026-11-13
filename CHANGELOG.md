@@ -27,7 +27,8 @@ All notable changes to this project are documented here. The format follows [Kee
 - The HTTP API takes one to three accents for your own colours, as a link's palette holds (four or more gave links that drew nothing), and the links `/api/cover.json` and the MCP server write keep the language a query gave (`lang=tr`), so they draw the same capitals.
 - On an iPhone or iPad, a size of your own too large for the device's canvas even at 1× exports as large as the device can draw, rather than failing.
 - A design's link from Copy link opens in its shape at once (an eBook or square no longer starts as a paperback), and leaves out pins its style doesn't have, which cost it its link preview.
-- `wrapText` no longer repeats a line when a long word's last letter is wider than the line by itself.
+- `wrapText` no longer repeats a line when a long word's last letter is wider than the line by itself; in a very narrow box, `fitText` never adds a hyphen past the edge, never makes a line of a lone space, and shortens to an ellipsis that fits.
+- The MCP server names a mockup as the library read its kind (`Ereader` is "an ereader mockup"); a mockup's background of spaces is none; the print panel offers each of your own colours once.
 - The dev server never serves a hidden file (`.git`, `node_modules`), however the URL spells its path.
 - A PNG resvg stops on no longer stops the site's other PNGs: the Worker starts a new resvg for the next one (its own copy of resvg's glue, `worker/resvg-glue.js`, made by `scripts/vendor-resvg.js`).
 - A link preview's picture is the site's own image whenever the design's can't be drawn (the crawler asked too much, or resvg failed), never an error.

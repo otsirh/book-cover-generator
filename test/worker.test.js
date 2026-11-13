@@ -184,6 +184,8 @@ test('the API reads a link as the app does, and sizes a format as the CLI does',
 });
 
 test('a mockup background without its #, and a preflight for any header', async () => {
+  // (A background of spaces is none: the mockup's own.)
+  assert.equal(/** @type {Response} */ (get('/api/mockup.svg?title=x&background=%20')).status, 200);
   const res = /** @type {Response} */ (get('/api/mockup.svg?title=x&background=ffffff'));
   assert.equal(res.status, 200);
   assert.match(await res.text(), /#ffffff/);

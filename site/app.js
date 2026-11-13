@@ -2241,7 +2241,13 @@ function paletteColour(key, colors) {
 /** The back's and the spine's colour choices: the cover's palette as swatches (the choice kept, as a place in it). */
 function printColourMenus() {
   const { colors } = current;
-  const choices = [['bg', 'Background'], ['ink', 'Ink'], ...colors.accents.map((_, i) => [`a${i}`, `Accent ${i + 1}`])];
+  // (Each accent once: a palette of your own with one accent is padded to three of the same.)
+  const accents = colors.accents.flatMap((c, i) => (colors.accents.indexOf(c) === i ? [i] : []));
+  const choices = [
+    ['bg', 'Background'],
+    ['ink', 'Ink'],
+    ...accents.map((i, k) => [`a${i}`, accents.length > 1 ? `Accent ${k + 1}` : 'Accent']),
+  ];
   for (const id of /** @type {const} */ (['print-back', 'print-spine'])) {
     const group = $(id);
     const fallback = id === 'print-back' ? 'bg' : 'ink';

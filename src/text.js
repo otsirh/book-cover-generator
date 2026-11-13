@@ -620,7 +620,16 @@ function hardWrap(tokens, maxWidth, measure) {
           }
         }
       }
-      pieces.push({ text: piece(end), space, hard });
+      const text = piece(end);
+      if (!text.trim()) {
+        // (A space in a unit joined across one, « … » say, is a break between pieces, never a line.)
+        space = true;
+        start = end;
+        continue;
+      }
+      // (A hyphen that doesn't fit after the one letter that does: the letter alone.)
+      const fitting = measure(text) > maxWidth && text.endsWith(hyphen) && hyphen ? text.slice(0, -1) : text;
+      pieces.push({ text: fitting, space, hard });
       space = false;
       hard = false;
       start = end;
@@ -1011,7 +1020,9 @@ export function fitText(text, opts) {
   lines = lines.slice(0, fitCount);
   const chars = graphemes(lines[fitCount - 1]);
   while (chars.length > 1 && measure(chars.join('') + '…') > maxWidth) chars.pop();
-  lines[fitCount - 1] = chars.join('').trimEnd() + '…';
+  const kept = `${chars.join('').trimEnd()}…`;
+  // (Not even one letter and the ellipsis fit: the ellipsis alone.)
+  lines[fitCount - 1] = measure(kept) <= maxWidth ? kept : '…';
   return finish(lines, size, true);
 }
 

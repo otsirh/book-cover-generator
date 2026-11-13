@@ -2,6 +2,7 @@
 // Browser helpers for exporting covers: copy, download, rasterise, zip, print PDF. (`setDpi` and
 // `zipFiles` also work in Node.)
 import { pdfPage } from './pdf.js';
+import { joinBytes as concat } from './shared.js';
 
 /** SVG markup to a `data:` URL usable as an <img> src. */
 export function svgToDataUrl(svg) {
@@ -171,17 +172,6 @@ function crc32(bytes) {
   let crc = 0xffffffff;
   for (let i = 0; i < bytes.length; i++) crc = crcTable[(crc ^ bytes[i]) & 0xff] ^ (crc >>> 8);
   return (crc ^ 0xffffffff) >>> 0;
-}
-
-/** @param {Uint8Array[]} parts */
-function concat(parts) {
-  const out = new Uint8Array(parts.reduce((sum, p) => sum + p.length, 0));
-  let at = 0;
-  for (const p of parts) {
-    out.set(p, at);
-    at += p.length;
-  }
-  return out;
 }
 
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];

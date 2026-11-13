@@ -397,3 +397,22 @@ test('the MCP registry entry (server.json) is this package, at its version, with
   assert.deepEqual(npm.packageArguments, [{ type: 'positional', value: '--mcp' }]);
   assert.deepEqual(server.remotes, [{ type: 'streamable-http', url: 'https://covers.otsirh.dev/mcp' }]);
 });
+
+test('create_mockup names the kind as the library read it', () => {
+  for (const [asked, made, said] of [
+    ['Ereader', 'ereader', 'an ereader mockup'],
+    [' card ', 'card', 'a card mockup'],
+    ['FLAT', 'flat', 'a flat mockup'],
+  ]) {
+    const answer = /** @type {any} */ (
+      handleMessage({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: { name: 'create_mockup', arguments: { title: 'Dune', kind: asked } },
+      })
+    ).result;
+    assert.match(answer.content[0].text, new RegExp(said));
+    assert.equal(new URL(answer.structuredContent.imageUrl).searchParams.get('kind'), made);
+  }
+});

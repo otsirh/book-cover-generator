@@ -79,3 +79,28 @@ test('characters that draw nothing take no room where text is measured without a
     );
   }
 });
+
+test('fitText in a narrow box: no hyphen past the edge, no line of a lone space, an ellipsis that fits', async () => {
+  const narrow = fitText('WWWW', { font: FONTS.display, maxWidth: 28, maxHeight: 307, maxSize: 118, maxLines: 6 });
+  for (const line of narrow.lines) assert.ok(measureText(line, narrow.size, { font: FONTS.display }) <= 28, line);
+  const spaced = fitText('東京 » \n »', {
+    font: FONTS.garamond,
+    maxWidth: 24,
+    maxSize: 98,
+    maxLines: 6,
+    letterSpacing: 0.3,
+  });
+  assert.ok(
+    spaced.lines.every((line) => line.trim()),
+    JSON.stringify(spaced.lines),
+  );
+  const cut = fitText('WWWW I —', {
+    font: FONTS.mono,
+    maxWidth: 25,
+    maxHeight: 13,
+    maxSize: 114,
+    maxLines: 3,
+    upper: true,
+  });
+  for (const line of cut.lines) assert.ok(measureText(line, cut.size, { font: FONTS.mono }) <= 25, line);
+});

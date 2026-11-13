@@ -124,3 +124,14 @@ export const COVER_ATTRIBUTES = /** @type {const} */ ({
   variant: 'variant',
   lang: 'lang',
 });
+
+/** Byte arrays joined into one. @param {readonly Uint8Array[]} parts */
+export function joinBytes(parts) {
+  const out = new Uint8Array(parts.reduce((sum, p) => sum + p.byteLength, 0));
+  let at = 0;
+  for (const p of parts) {
+    out.set(p, at);
+    at += p.byteLength;
+  }
+  return out;
+}

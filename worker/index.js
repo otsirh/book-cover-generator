@@ -10,7 +10,7 @@
 // a little differently from the app on another system, which measures with its own fonts.
 
 import { createCover, createMockup, listStyles, version } from '../src/index.js';
-import { hex, slug } from '../src/shared.js';
+import { hex, slug, joinBytes } from '../src/shared.js';
 import {
   optionsFromLink,
   linkOf,
@@ -127,8 +127,8 @@ function disposition(q, title, ext) {
   return { 'Content-Disposition': `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(name)}` };
 }
 
-/** A cover's or a mockup's file name, without its extension. @param {'cover' | 'mockup'} kind @param {URLSearchParams} q @param {string} title */
-const fileTitle = (kind, q, title) => (kind === 'cover' ? title : `${title} ${mockupOptions(q).kind}`);
+/** A cover's or a mockup's file name, without its extension: a mockup's says its kind (the one made). @param {string | null} shape @param {string} title */
+const fileTitle = (shape, title) => (shape ? `${title} ${shape}` : title);
 
 /**
  * The cover a query draws (the app's link), or its mockup, as SVG.
@@ -152,7 +152,7 @@ function drawn(kind, q) {
 
 /** A mockup's options from a query: kind, text and background. @param {URLSearchParams} q */
 function mockupOptions(q) {
-  const background = q.getAll('background').at(-1);
+  const background = q.getAll('background').at(-1)?.trim();
   return {
     kind: /** @type {import('../src/index.js').MockupKind} */ (q.getAll('kind').at(-1) || 'book'),
     text: q.getAll('text').at(-1) ?? '',
@@ -186,7 +186,7 @@ export function api(request) {
   const refused = notGet(request);
   if (refused) return refused;
   try {
-    const { cover, svg } = drawn(kind, url.searchParams);
+    const { cover, svg, shape } = drawn(kind, url.searchParams);
     return new Response(request.method === 'HEAD' ? null : svg, {
       headers: {
         ...COMMON,
@@ -196,7 +196,7 @@ export function api(request) {
         // Opened on its own, the SVG may style itself and nothing else.
         'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; img-src data:",
         ...about(cover),
-        ...disposition(url.searchParams, fileTitle(kind, url.searchParams, cover.title), 'svg'),
+        ...disposition(url.searchParams, fileTitle(shape, cover.title), 'svg'),
       },
     });
   } catch (err) {
@@ -445,7 +445,7 @@ async function drawPng(request, env, url, kind) {
       'Content-Type': 'image/png',
       'Cache-Control': 'public, max-age=86400',
       ...about(cover),
-      ...disposition(q, fileTitle(kind, q, cover.title), 'png'),
+      ...disposition(q, fileTitle(laid.shape, cover.title), 'png'),
     },
   });
 }
@@ -634,13 +634,7 @@ export async function mcp(request, env = {}, draw) {
     }
     chunks.push(value);
   }
-  const bytes = new Uint8Array(size);
-  let at = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, at);
-    at += chunk.byteLength;
-  }
-  const body = new TextDecoder().decode(bytes);
+  const body = new TextDecoder().decode(joinBytes(chunks));
   let message;
   try {
     message = JSON.parse(body);

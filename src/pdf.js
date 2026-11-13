@@ -1,5 +1,6 @@
 // A minimal PDF: one page of JPEG images, with its bleed and trim boxes, which is what a print
 // service takes as a cover file. No DOM here (./browser draws the images), so Node tests it.
+import { joinBytes } from './shared.js';
 
 /** A number as PDF writes it: at most three decimals. @param {number} v */
 const num = (v) => String(Math.round(v * 1000) / 1000);
@@ -91,11 +92,5 @@ export function pdfPage({ width, height, bleed = 0, title = '', images }) {
   for (let id = 1; id < count; id++) write(`${String(offsets[id]).padStart(10, '0')} 00000 n \n`);
   write(`trailer\n<< /Size ${count} /Root 1 0 R /Info 5 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
 
-  const out = new Uint8Array(length);
-  let at = 0;
-  for (const part of parts) {
-    out.set(part, at);
-    at += part.length;
-  }
-  return out;
+  return joinBytes(parts);
 }
