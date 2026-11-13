@@ -116,7 +116,7 @@ export function setTextMeasurer(fn) {
   widthCache.clear();
 }
 
-const NARROW = new Set("iljI.,:;!|'’`ı".split(''));
+const NARROW = new Set("iljIİ.,:;!|'’`ı".split(''));
 const SEMI = new Set('frt()[]-/"“”'.split(''));
 const WIDE = new Set('mwMW@%&'.split(''));
 // Glyphs that are about 1em wide in any font: CJK, kana, Hangul, full-width forms, emoji.

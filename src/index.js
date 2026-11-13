@@ -33,7 +33,7 @@ export { createPrintCover, spineWidth, paperTypes, trimSizes, printLimits } from
 export { parseBookList } from './books.js';
 
 /** This version of the library (artwork for a seed can change between minor versions). */
-export const version = '1.10.0';
+export const version = '1.11.0';
 
 /** The sizes a cover can have: each side `min` to `max` px, and neither more than `ratio` times the other. */
 export const sizeLimits = Object.freeze({ min: 50, max: 10000, ratio: 3 });
@@ -498,6 +498,8 @@ export function createCover(options = {}) {
         ...(titleType.font || titleType.titleCase ? ['font', titleType.fontId, titleType.titleCase ?? ''] : []),
         ...(series || credit ? ['series', series, credit] : []),
         ...(badge ? ['badge', badge] : []),
+        // (The language changes what is drawn, its capitals: Turkish İ.)
+        ...(lang ? ['lang', lang] : []),
       ]),
     ).toString(36);
   /** The variants the style chose (or was given). @type {Record<string, string>} */

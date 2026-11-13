@@ -892,7 +892,8 @@ test('titles on a tiny cover shrink to fit rather than being cut', () => {
 test('the Big Letter initial keeps its accent on the cover', () => {
   for (const seed of ['a', 'b', 'c', 'd', 'e']) {
     const { svg } = createCover({ title: 'Île', style: 'typographic', seed });
-    const m = /<text x="[\d.-]+" y="([\d.-]+)" font-family="[^"]*" font-size="([\d.]+)"[^>]*>Î</.exec(svg);
+    // (Î is narrow, as I is: the initial is a pair, ÎL.)
+    const m = /<text x="[\d.-]+" y="([\d.-]+)" font-family="[^"]*" font-size="([\d.]+)"[^>]*>ÎL</.exec(svg);
     assert.ok(m, svg.slice(0, 400));
     const [y, size] = [Number(m[1]), Number(m[2])];
     // Accents reach about 0.3 em above the cap height (≤ 0.72 em) in the fonts it uses.
@@ -1599,4 +1600,28 @@ test('capitals are the language’s: Turkish i is İ in every style, its badge a
   assert.deepEqual([...capitals].sort(), ['>İLK<', 'İLKAY', 'İSTANBUL']);
   // Without a language, capitals as before.
   assert.match(createCover({ title: 'istanbul', style: 'swiss', titleCase: 'upper', seed: 's' }).body, /ISTANBUL/);
+});
+
+test('Turkish capitals: Big Letter pairs a narrow İ, ids tell the languages apart, İ is measured narrow', async () => {
+  const { fitStack, measureText } = await import('../src/index.js');
+  // Big Letter sets two letters where the first is narrow (I, and İ).
+  const giant = (/** @type {string | undefined} */ lang) =>
+    /<text[^>]*font-size="(\d{3}(?:\.\d)?)"[^>]*>([^<]+)<\/text>/.exec(
+      createCover({ title: 'istanbul', author: 'x', style: 'typographic', seed: 's', lang }).body,
+    )?.[2];
+  assert.equal(giant(undefined), 'IS');
+  assert.equal(giant('tr'), 'İS');
+  // A cover in another language draws other capitals: its ids are its own.
+  const ids = (/** @type {string | undefined} */ lang) =>
+    /\bid="(bc[0-9a-z]+)-/.exec(
+      createCover({ title: 'istanbul', author: 'ilkay', style: 'flowfield', seed: 's', lang }).body,
+    )?.[1];
+  assert.notEqual(ids(undefined), ids('tr'));
+  // fitStack takes the language too.
+  const stack = fitStack('istanbul büyük şehir', { upper: true, lang: 'tr', maxWidth: 400, maxSize: 80 });
+  const stacked = (stack?.lines ?? []).map((line) => line.text);
+  assert.ok(stacked.includes('İSTANBUL'), stacked.join(' | '));
+  // Without width tables or a canvas (a font of your own), İ is as narrow as I.
+  const font = { name: 'Mine', family: "'My Display', sans-serif", cap: 0.7 };
+  assert.equal(measureText('İSTİKLAL', 100, { font }), measureText('ISTIKLAL', 100, { font }));
 });

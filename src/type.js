@@ -109,7 +109,7 @@ export function fitStack(text, o) {
     italic: !!o.italic,
     letterSpacing: trackingFor(text, o.letterSpacing ?? 0),
   };
-  const source = o.upper ? toUpper(text) : text;
+  const source = o.upper ? toUpper(text, o.lang || undefined) : text;
   const lines = stackLines(source);
   if (lines.length < 2 || lines.length > (o.maxLines ?? 5)) return null;
   const cap = font.cap ?? 0.72;

@@ -4,9 +4,15 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
-### Fixed
+## [1.11.0] - 2026-11-13
 
-- Capitals follow the cover's language (`lang`): a Turkish or Azeri title's i is İ in every style that sets capitals, on its badge and its mockups, as on the print cover's spine. `fitText` takes a `lang` for its `upper`.
+Capitals in the cover's language. Covers without a language are drawn as in 1.10.0; Turkish and Azeri covers, and Big Letter for an initial with an accent on its I, change.
+
+### Changed
+
+- Capitals follow the cover's language (`lang`): a Turkish or Azeri title's i is İ in every style that sets capitals, on its badge and its mockups, as on the print cover's spine. `fitText` and `fitStack` take a `lang` for their `upper`.
+- Big Letter sets two letters for an initial İ, Í, Ì, Î or Ï, as it does for I: one alone reads as a slab.
+- A cover's SVG ids include its language, so two covers that differ only in it can share a page (Japanese and Korean covers, whose language is inferred, get new ids).
 
 ## [1.10.0] - 2026-11-13
 
@@ -333,7 +339,8 @@ A redesign of the covers and the app, based on a design review.
 
 - First release: 27 styles, 20 palettes, seeded randomizer, text fitting, CLI and the web app with SVG, PNG and JPEG export.
 
-[Unreleased]: https://github.com/otsirh/book-cover-generator/compare/v1.10.0...HEAD
+[Unreleased]: https://github.com/otsirh/book-cover-generator/compare/v1.11.0...HEAD
+[1.11.0]: https://github.com/otsirh/book-cover-generator/compare/v1.10.0...v1.11.0
 [1.10.0]: https://github.com/otsirh/book-cover-generator/compare/v1.9.2...v1.10.0
 [1.9.2]: https://github.com/otsirh/book-cover-generator/compare/v1.9.1...v1.9.2
 [1.9.1]: https://github.com/otsirh/book-cover-generator/compare/v1.9.0...v1.9.1

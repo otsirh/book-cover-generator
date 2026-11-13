@@ -53,7 +53,8 @@ export const minimal = {
   },
 };
 
-// (initialChars upper-cases the title and skips punctuation, so these are all that can occur.)
+// (initialChars upper-cases the title, in its language, and skips punctuation: these are all that
+// can occur, once accents are set aside, as Turkish İ and Í Ì Î Ï are narrow too.)
 const NARROW_INITIALS = /^[I1|]$/;
 
 export const typographic = {
@@ -69,7 +70,7 @@ export const typographic = {
     const chars = initialChars(splitLead(c.title).main);
     const first = chars[0] || 'A';
     // A narrow initial (I, l, 1…) makes an unexplained slab; use two letters instead.
-    const pair = NARROW_INITIALS.test(first) && chars[1] && /\p{L}/u.test(chars[1]);
+    const pair = NARROW_INITIALS.test(first.normalize('NFD').charAt(0)) && chars[1] && /\p{L}/u.test(chars[1]);
     const letters = pair ? first + chars[1] : first;
     const font = rng.pick([FONTS.didone, FONTS.serif, FONTS.didone]);
     const mode = c.choose('letter', ['solid', 'outline', 'duo']);
