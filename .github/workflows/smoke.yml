@@ -1,0 +1,28 @@
+name: Smoke
+
+# Checks the live site every day: its pages, the HTTP API (SVG, PNG, JSON), the MCP server and a
+# design's link preview answer, from the version npm has. A failed run means the site broke, or a
+# release reached npm but wasn't deployed.
+
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Check covers.otsirh.dev
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Check the site against npm's latest version
+        run: node scripts/smoke.js --expect "$(npm view book-cover-generator version)"

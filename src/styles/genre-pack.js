@@ -346,7 +346,7 @@ export const ribbon = {
     let s = `<defs>${linearGradient(ids.bg, [
       [0, top],
       [1, bottom],
-    ])}${blurFilter(ids.soft, S * 0.012)}${shadowFilter(ids.sh, u, { blur: 5, dy: 3, opacity: 0.22 })}</defs>`;
+    ])}${blurFilter(ids.soft, S * 0.012, { width: W, height: H })}${shadowFilter(ids.sh, u, { blur: 5, dy: 3, opacity: 0.22 })}</defs>`;
     s += rect(0, 0, W, H, `url(#${ids.bg})`);
 
     const tints = [c1, mix(c1, p.paper, 0.35), mix(c1, p.paper, 0.6), mix(c1, p.night, 0.15)];

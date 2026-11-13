@@ -1,7 +1,8 @@
 {
   // Static site on Cloudflare Workers. Static assets answer every path but /api/*, /mcp and /,
-  // which the Worker (worker/index.js) answers: covers drawn from a query string (SVG and PNG), the
-  // MCP endpoint, and a design's link (/?title=…) with its own link preview (else the page as is).
+  // which the Worker (worker/index.js) answers: covers drawn from a query string (SVG and PNG) and
+  // the API's own description, the MCP endpoint, and a design's link (/?title=…) with its own link
+  // preview (else the page as is).
   // `npm run deploy` runs every check, then `wrangler deploy` (which runs `npm run build` first).
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "book-cover-generator",
@@ -17,6 +18,21 @@
     "run_worker_first": ["/api/*", "/mcp", "/"],
     "not_found_handling": "404-page",
     "html_handling": "auto-trailing-slash",
+  },
+  // How many requests a client (by address, at each Cloudflare location) may make a minute: PNGs
+  // that aren't cached yet (resvg is the costly part), and MCP requests. SVGs are never limited.
+  "ratelimits": [
+    { "name": "PNG_LIMIT", "namespace_id": "1001", "simple": { "limit": 240, "period": 60 } },
+    { "name": "MCP_LIMIT", "namespace_id": "1002", "simple": { "limit": 120, "period": 60 } },
+  ],
+  // The most CPU time one request may take: the slowest PNG takes under 2 s.
+  "limits": { "cpu_ms": 10000 },
+  // Workers Logs keep the Worker's own errors (console.error), without the query strings (a cover's
+  // title is the visitor's) and without a line for every request.
+  "observability": {
+    "enabled": true,
+    "redact_query_string": true,
+    "logs": { "invocation_logs": false },
   },
   // Serve only from the custom domain: no *.workers.dev or preview URLs.
   "workers_dev": false,

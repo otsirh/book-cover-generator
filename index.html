@@ -119,9 +119,28 @@
       <symbol id="i-star" viewBox="0 0 24 24">
         <path
           d="m12 3.6 2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8Z"
-          fill="none"
           stroke="currentColor"
           stroke-width="1.7"
+          stroke-linejoin="round"
+        />
+      </symbol>
+      <symbol id="i-share" viewBox="0 0 24 24">
+        <path
+          d="M12 15V4m0 0L8 8m4-4 4 4M7 11H6a1.5 1.5 0 0 0-1.5 1.5v6A1.5 1.5 0 0 0 6 20h12a1.5 1.5 0 0 0 1.5-1.5v-6A1.5 1.5 0 0 0 18 11h-1"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.9"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </symbol>
+      <symbol id="i-chevron" viewBox="0 0 24 24">
+        <path
+          d="m6 9.5 6 6 6-6"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
           stroke-linejoin="round"
         />
       </symbol>
@@ -150,495 +169,565 @@
         <a class="nav-wide" href="#styles">Styles</a>
         <a href="/gallery/" id="nav-gallery">Gallery</a>
         <a class="nav-wide" href="#usage">Developers</a>
+        <a class="nav-wide" href="/about/" id="nav-about">About</a>
         <a href="https://github.com/otsirh/book-cover-generator">GitHub</a>
       </nav>
     </header>
 
-    <section class="intro">
-      <h1>Type a title. Get a cover.</h1>
-      <p>39 styles · 28 palettes or your own colours · any size · free downloads</p>
-    </section>
+    <main id="main">
+      <section class="intro" aria-labelledby="intro-heading">
+        <h1 id="intro-heading">Type a title. Get a cover.</h1>
+        <p>39 styles · 28 palettes or your own colours · any size · free downloads</p>
+      </section>
+      <noscript><p class="noscript">This generator needs JavaScript to draw covers.</p></noscript>
 
-    <main class="app">
-      <div class="controls-zone">
-        <form class="controls" id="controls" autocomplete="off" aria-label="Cover settings">
-          <div class="field">
-            <!-- (The hint outside the label: it describes the field, it isn't its name.) -->
-            <label class="label" for="title">Title</label>
-            <textarea id="title" name="title" rows="2" maxlength="200" aria-describedby="title-hint"></textarea>
-            <small class="field-hint" id="title-hint">Enter starts a new line on the cover.</small>
-          </div>
-          <label class="field">
-            <span class="label">Author</span>
-            <input id="author" name="author" type="text" maxlength="120" enterkeyhint="done" />
-          </label>
-          <label class="field">
-            <span class="label">Subtitle or tagline <small>(optional)</small></span>
-            <input
-              id="subtitle"
-              name="subtitle"
-              type="text"
-              maxlength="160"
-              enterkeyhint="done"
-              placeholder="A Novel"
-            />
-          </label>
-          <details class="more-text" id="more-text">
-            <summary>Series, credit and badge</summary>
-            <label class="field">
-              <span class="label">Series <small>(above the title)</small></span>
-              <input
-                id="series"
-                name="series"
-                type="text"
-                maxlength="120"
-                enterkeyhint="done"
-                placeholder="Book Two of the Ember Cycle"
-              />
-            </label>
-            <label class="field">
-              <span class="label">Credit <small>(under the subtitle)</small></span>
-              <input
-                id="credit"
-                name="credit"
-                type="text"
-                maxlength="120"
-                enterkeyhint="done"
-                placeholder="Translated by Edith Grossman"
-              />
-            </label>
-            <label class="field">
-              <span class="label">Badge <small>(a seal in a corner)</small></span>
-              <input
-                id="badge"
-                name="badge"
-                type="text"
-                maxlength="60"
-                enterkeyhint="done"
-                placeholder="Winner of the Hugo Award"
-              />
-            </label>
-          </details>
-
-          <div class="randomize-row">
-            <button type="button" class="primary" id="randomize" aria-keyshortcuts="R">
-              <svg aria-hidden="true"><use href="#i-dice" /></svg> Randomize
-            </button>
-            <button
-              type="button"
-              class="icon-btn boxed"
-              id="undo"
-              aria-label="Undo"
-              title="Undo (Z)"
-              aria-keyshortcuts="Z"
-              aria-disabled="true"
-            >
-              <svg aria-hidden="true"><use href="#i-undo" /></svg>
-            </button>
-            <button
-              type="button"
-              class="icon-btn boxed"
-              id="redo"
-              aria-label="Redo"
-              title="Redo (Shift+Z)"
-              aria-keyshortcuts="Shift+Z"
-              aria-disabled="true"
-            >
-              <svg aria-hidden="true"><use href="#i-redo" /></svg>
-            </button>
-          </div>
-
-          <div class="field">
-            <div class="label-row">
-              <span class="label" id="style-label">Style</span>
-              <span class="tools">
-                <button
-                  type="button"
-                  class="icon-btn"
-                  id="prev-style"
-                  aria-label="Previous style"
-                  title="Previous style (←)"
-                >
-                  <svg aria-hidden="true"><use href="#i-prev" /></svg>
-                </button>
-                <button type="button" class="icon-btn" id="next-style" aria-label="Next style" title="Next style (→)">
-                  <svg aria-hidden="true"><use href="#i-next" /></svg>
-                </button>
-                <button type="button" class="icon-btn" id="dice-style" aria-label="Random style" title="Random style">
-                  <svg aria-hidden="true"><use href="#i-dice" /></svg>
-                </button>
-                <button
-                  type="button"
-                  class="icon-btn lock"
-                  id="lock-style"
-                  aria-pressed="false"
-                  aria-label="Keep this style when randomizing"
-                  title="Keep this style when randomizing"
-                >
-                  <svg aria-hidden="true"><use href="#i-lock" /></svg>
-                </button>
-              </span>
+      <div class="app">
+        <div class="controls-zone">
+          <form class="controls" id="controls" autocomplete="off" aria-label="Cover settings">
+            <div class="field">
+              <!-- (The hint outside the label: it describes the field, it isn't its name.) -->
+              <label class="label" for="title">Title</label>
+              <textarea id="title" name="title" rows="2" maxlength="200" aria-describedby="title-hint"></textarea>
+              <small class="field-hint" id="title-hint">Enter starts a new line on the cover.</small>
             </div>
-            <a class="current-style" href="#styles" id="style-name" aria-describedby="style-label"></a>
-            <div class="style-variants" id="style-variants" hidden></div>
-          </div>
+            <label class="field">
+              <span class="label">Author</span>
+              <input id="author" name="author" type="text" maxlength="120" enterkeyhint="done" />
+            </label>
+            <label class="field">
+              <span class="label">Subtitle or tagline <small>(optional)</small></span>
+              <input
+                id="subtitle"
+                name="subtitle"
+                type="text"
+                maxlength="160"
+                enterkeyhint="done"
+                placeholder="A Novel"
+              />
+            </label>
+            <details class="more-text" id="more-text">
+              <summary>Series, credit and badge</summary>
+              <label class="field">
+                <span class="label">Series <small>(above the title)</small></span>
+                <input
+                  id="series"
+                  name="series"
+                  type="text"
+                  maxlength="120"
+                  enterkeyhint="done"
+                  placeholder="Book Two of the Ember Cycle"
+                />
+              </label>
+              <label class="field">
+                <span class="label">Credit <small>(under the subtitle)</small></span>
+                <input
+                  id="credit"
+                  name="credit"
+                  type="text"
+                  maxlength="120"
+                  enterkeyhint="done"
+                  placeholder="Translated by Edith Grossman"
+                />
+              </label>
+              <label class="field">
+                <span class="label">Badge <small>(a seal in a corner)</small></span>
+                <input
+                  id="badge"
+                  name="badge"
+                  type="text"
+                  maxlength="60"
+                  enterkeyhint="done"
+                  placeholder="Winner of the Hugo Award"
+                />
+              </label>
+            </details>
 
-          <div class="field">
-            <span class="label" id="type-label">Title type</span>
-            <div class="type-row">
-              <select id="title-font" aria-label="Title font" aria-describedby="type-label">
-                <option value="">The style’s font</option>
-                <option value="serif">Serif · Georgia</option>
-                <option value="didone">Didone · Didot, Bodoni</option>
-                <option value="garamond">Old style · Garamond</option>
-                <option value="sans">Sans · Helvetica</option>
-                <option value="geometric">Geometric · Futura</option>
-                <option value="humanist">Humanist · Gill Sans</option>
-                <option value="condensed">Condensed</option>
-                <option value="display">Heavy · Impact</option>
-                <option value="mono">Typewriter · Courier</option>
-              </select>
-              <div class="chips" id="title-case" role="group" aria-label="Title case">
-                <button type="button" class="chip" data-case="" title="As the style sets it">Auto</button>
-                <button type="button" class="chip" data-case="upper" title="In capitals" aria-label="ABC: capitals">
-                  ABC
-                </button>
-                <button type="button" class="chip" data-case="normal" title="As typed" aria-label="Abc: as typed">
-                  Abc
+            <div class="field">
+              <span class="label" id="format-label">Format</span>
+              <div class="segmented fit" id="format" role="group" aria-labelledby="format-label">
+                <button type="button" data-format="paperback" title="2:3, like a 6 × 9 in paperback">Paperback</button>
+                <button type="button" data-format="ebook" title="5:8, Kindle and most eBook stores">eBook</button>
+                <button type="button" data-format="square" title="1:1, audiobooks">Square</button>
+                <button type="button" data-format="custom" title="Any size in pixels, such as a print trim size">
+                  Custom
                 </button>
               </div>
+              <div class="custom-size" id="custom-size" hidden>
+                <div class="size-inputs">
+                  <label class="mini">
+                    <span>Width</span>
+                    <input id="size-w" type="number" inputmode="numeric" min="50" max="10000" step="1" />
+                  </label>
+                  <span class="times" aria-hidden="true">×</span>
+                  <label class="mini">
+                    <span>Height</span>
+                    <input id="size-h" type="number" inputmode="numeric" min="50" max="10000" step="1" />
+                  </label>
+                  <span class="unit" aria-hidden="true">px</span>
+                </div>
+                <select id="size-preset" aria-label="Common sizes">
+                  <option value="">Common sizes…</option>
+                  <option value="1600x2560">Kindle eBook · 1600 × 2560</option>
+                  <option value="1500x2400">Print 5 × 8 in · 1500 × 2400</option>
+                  <option value="1650x2550">Print 5.5 × 8.5 in · 1650 × 2550</option>
+                  <option value="1800x2700">Print 6 × 9 in · 1800 × 2700</option>
+                  <option value="2550x3300">Print 8.5 × 11 in · 2550 × 3300</option>
+                  <option value="2400x2400">Audiobook · 2400 × 2400</option>
+                  <option value="1080x1350">Social post 4:5 · 1080 × 1350</option>
+                </select>
+                <p class="field-note" id="size-note">Print sizes are the front cover at 300 dpi, without bleed.</p>
+              </div>
+              <button type="button" class="link-btn" id="print-link" aria-controls="print">
+                Need the back and spine too?
+              </button>
             </div>
-            <p class="field-note" id="type-note" hidden>This style keeps its own lettering.</p>
-          </div>
 
-          <div class="field">
-            <div class="label-row">
-              <span class="label" id="palette-label">Palette</span>
-              <span class="tools">
-                <button
-                  type="button"
-                  class="icon-btn"
-                  id="dice-palette"
-                  aria-label="Random palette"
-                  title="Random palette ([ and ] step through)"
-                >
-                  <svg aria-hidden="true"><use href="#i-dice" /></svg>
-                </button>
-                <button
-                  type="button"
-                  class="icon-btn lock"
-                  id="lock-palette"
-                  aria-pressed="false"
-                  aria-label="Keep this palette when randomizing"
-                  title="Keep this palette when randomizing"
-                >
-                  <svg aria-hidden="true"><use href="#i-lock" /></svg>
-                </button>
-              </span>
-            </div>
-            <div class="swatches" id="swatches" role="group" aria-labelledby="palette-label"></div>
-            <p class="swatch-name" id="palette-name" aria-hidden="true"></p>
-            <div class="custom-colors" id="custom-colors" role="group" aria-label="Your colours" hidden>
-              <label class="color"><input type="color" id="color-bg" /><span>Background</span></label>
-              <label class="color"><input type="color" id="color-ink" /><span>Text</span></label>
-              <label class="color"><input type="color" id="color-a1" /><span>Accent 1</span></label>
-              <label class="color"><input type="color" id="color-a2" /><span>Accent 2</span></label>
-              <label class="color"><input type="color" id="color-a3" /><span>Accent 3</span></label>
-              <p class="field-note" id="contrast-note"></p>
-            </div>
-          </div>
-
-          <div class="field">
-            <label class="label" for="seed">Variation <small>(same variation, same artwork)</small></label>
-            <div class="row">
-              <input
-                id="seed"
-                name="seed"
-                type="text"
-                maxlength="40"
-                spellcheck="false"
-                autocapitalize="off"
-                placeholder="from the title"
-              />
+            <div class="randomize-row">
+              <button type="button" class="primary" id="randomize" aria-keyshortcuts="R">
+                <svg aria-hidden="true"><use href="#i-dice" /></svg> Randomize
+              </button>
               <button
                 type="button"
                 class="icon-btn boxed"
-                id="dice-seed"
-                aria-label="New variation"
-                title="New variation"
+                id="undo"
+                aria-label="Undo"
+                title="Undo (Z)"
+                aria-keyshortcuts="Z"
+                aria-disabled="true"
               >
-                <svg aria-hidden="true"><use href="#i-dice" /></svg>
+                <svg aria-hidden="true"><use href="#i-undo" /></svg>
+              </button>
+              <button
+                type="button"
+                class="icon-btn boxed"
+                id="redo"
+                aria-label="Redo"
+                title="Redo (Shift+Z)"
+                aria-keyshortcuts="Shift+Z"
+                aria-disabled="true"
+              >
+                <svg aria-hidden="true"><use href="#i-redo" /></svg>
               </button>
             </div>
-          </div>
 
-          <div class="field">
-            <span class="label" id="format-label">Format</span>
-            <div class="segmented fit" id="format" role="group" aria-labelledby="format-label">
-              <button type="button" data-format="paperback" title="2:3, like a 6 × 9 in paperback">Paperback</button>
-              <button type="button" data-format="ebook" title="5:8, Kindle and most eBook stores">eBook</button>
-              <button type="button" data-format="square" title="1:1, audiobooks">Square</button>
-              <button type="button" data-format="custom" title="Any size in pixels, such as a print trim size">
-                Custom
-              </button>
-            </div>
-            <div class="custom-size" id="custom-size" hidden>
-              <div class="size-inputs">
-                <label class="mini">
-                  <span>Width</span>
-                  <input id="size-w" type="number" inputmode="numeric" min="50" max="10000" step="1" />
-                </label>
-                <span class="times" aria-hidden="true">×</span>
-                <label class="mini">
-                  <span>Height</span>
-                  <input id="size-h" type="number" inputmode="numeric" min="50" max="10000" step="1" />
-                </label>
-                <span class="unit" aria-hidden="true">px</span>
+            <div class="field">
+              <div class="label-row">
+                <span class="label" id="style-label">Style</span>
+                <span class="tools">
+                  <button
+                    type="button"
+                    class="icon-btn"
+                    id="prev-style"
+                    aria-label="Previous style"
+                    title="Previous style (←)"
+                  >
+                    <svg aria-hidden="true"><use href="#i-prev" /></svg>
+                  </button>
+                  <button type="button" class="icon-btn" id="next-style" aria-label="Next style" title="Next style (→)">
+                    <svg aria-hidden="true"><use href="#i-next" /></svg>
+                  </button>
+                  <button type="button" class="icon-btn" id="dice-style" aria-label="Random style" title="Random style">
+                    <svg aria-hidden="true"><use href="#i-dice" /></svg>
+                  </button>
+                  <button
+                    type="button"
+                    class="icon-btn lock"
+                    id="lock-style"
+                    aria-pressed="false"
+                    aria-label="Keep this style when randomizing"
+                    title="Keep this style when randomizing"
+                  >
+                    <svg aria-hidden="true"><use href="#i-lock" /></svg>
+                  </button>
+                </span>
               </div>
-              <select id="size-preset" aria-label="Common sizes">
-                <option value="">Common sizes…</option>
-                <option value="1600x2560">Kindle eBook · 1600 × 2560</option>
-                <option value="1500x2400">Print 5 × 8 in · 1500 × 2400</option>
-                <option value="1650x2550">Print 5.5 × 8.5 in · 1650 × 2550</option>
-                <option value="1800x2700">Print 6 × 9 in · 1800 × 2700</option>
-                <option value="2550x3300">Print 8.5 × 11 in · 2550 × 3300</option>
-                <option value="2400x2400">Audiobook · 2400 × 2400</option>
-                <option value="1080x1350">Social post 4:5 · 1080 × 1350</option>
-              </select>
-              <p class="field-note" id="size-note">Print sizes are the front cover at 300 dpi, without bleed.</p>
+              <a class="current-style" href="#styles" id="style-name" aria-describedby="style-label"></a>
+              <div class="style-variants" id="style-variants" hidden></div>
             </div>
-          </div>
 
-          <label class="switch">
-            <input type="checkbox" id="texture" role="switch" />
-            <span class="switch-track" aria-hidden="true"></span>
-            <span>Paper texture</span>
-          </label>
+            <div class="field">
+              <span class="label" id="type-label">Title font and case</span>
+              <div class="type-row">
+                <select id="title-font" aria-label="Title font">
+                  <option value="">The style’s font</option>
+                  <option value="serif">Serif · Georgia</option>
+                  <option value="didone">Didone · Didot, Bodoni</option>
+                  <option value="garamond">Old style · Garamond</option>
+                  <option value="sans">Sans · Helvetica</option>
+                  <option value="geometric">Geometric · Futura</option>
+                  <option value="humanist">Humanist · Gill Sans</option>
+                  <option value="condensed">Condensed</option>
+                  <option value="display">Heavy · Impact</option>
+                  <option value="mono">Typewriter · Courier</option>
+                </select>
+                <div class="chips" id="title-case" role="group" aria-label="Title case">
+                  <button type="button" class="chip" data-case="" title="As the style sets it">Auto</button>
+                  <button type="button" class="chip" data-case="upper" title="In capitals" aria-label="ABC: capitals">
+                    ABC
+                  </button>
+                  <button type="button" class="chip" data-case="normal" title="As typed" aria-label="Abc: as typed">
+                    Abc
+                  </button>
+                </div>
+              </div>
+              <p class="field-note" id="type-note" hidden>This style keeps its own lettering.</p>
+            </div>
 
-          <p class="hint" id="shortcut-hint">
-            <span class="hint-keys">
-              <kbd>R</kbd> randomize · <kbd>←</kbd><kbd>→</kbd> style · <kbd>[</kbd><kbd>]</kbd> palette ·
-              <kbd>Z</kbd> undo
-            </span>
-            <button type="button" class="hint-toggle" id="shortcuts-toggle">Turn off shortcuts</button>
-          </p>
-        </form>
-      </div>
+            <div class="field">
+              <div class="label-row">
+                <span class="label" id="palette-label">Palette</span>
+                <span class="tools">
+                  <button
+                    type="button"
+                    class="icon-btn"
+                    id="dice-palette"
+                    aria-label="Random palette"
+                    title="Random palette ([ and ] step through)"
+                  >
+                    <svg aria-hidden="true"><use href="#i-dice" /></svg>
+                  </button>
+                  <button
+                    type="button"
+                    class="icon-btn lock"
+                    id="lock-palette"
+                    aria-pressed="false"
+                    aria-label="Keep this palette when randomizing"
+                    title="Keep this palette when randomizing"
+                  >
+                    <svg aria-hidden="true"><use href="#i-lock" /></svg>
+                  </button>
+                </span>
+              </div>
+              <div class="swatches" id="swatches" role="group" aria-labelledby="palette-label"></div>
+              <p class="swatch-name" id="palette-name" aria-hidden="true"></p>
+              <div class="custom-colors" id="custom-colors" role="group" aria-label="Your colours" hidden>
+                <label class="color"><input type="color" id="color-bg" /><span>Background</span></label>
+                <label class="color"><input type="color" id="color-ink" /><span>Text</span></label>
+                <label class="color"><input type="color" id="color-a1" /><span>Accent 1</span></label>
+                <label class="color"><input type="color" id="color-a2" /><span>Accent 2</span></label>
+                <label class="color"><input type="color" id="color-a3" /><span>Accent 3</span></label>
+                <p class="field-note" id="contrast-note"></p>
+              </div>
+            </div>
 
-      <div class="stage-zone">
-        <section class="stage" aria-labelledby="preview-heading">
-          <h2 id="preview-heading" class="visually-hidden">Preview</h2>
-          <div class="preview-wrap">
-            <button
-              type="button"
-              class="thumb-toggle"
-              id="thumb-toggle"
-              aria-pressed="false"
-              title="See the cover as small as stores list it: is the title still clear?"
-            >
-              Store size
-            </button>
-            <figure class="book" id="book">
-              <img id="preview" alt="Cover preview" width="600" height="900" />
-              <img id="preview-prev" class="prev" alt="" aria-hidden="true" width="600" height="900" />
-            </figure>
-          </div>
-          <p class="meta" id="meta"></p>
-          <div class="variations-row">
-            <span class="variations-label" id="variations-label">Variations</span>
-            <div class="variations" id="variations" role="group" aria-labelledby="variations-label"></div>
-          </div>
-          <p class="visually-hidden" id="announce" aria-live="polite"></p>
+            <div class="field">
+              <label class="label" for="seed">Variation <small>(same variation, same artwork)</small></label>
+              <div class="row">
+                <input
+                  id="seed"
+                  name="seed"
+                  type="text"
+                  maxlength="40"
+                  spellcheck="false"
+                  autocapitalize="off"
+                  placeholder="from the title"
+                />
+                <button
+                  type="button"
+                  class="icon-btn boxed"
+                  id="dice-seed"
+                  aria-label="New variation"
+                  title="New variation"
+                >
+                  <svg aria-hidden="true"><use href="#i-dice" /></svg>
+                </button>
+              </div>
+            </div>
 
-          <div class="export">
-            <button type="button" class="primary download" id="dl-png">
-              <svg aria-hidden="true"><use href="#i-download" /></svg>
-              <span>Download PNG <small id="png-size"></small></span>
-            </button>
-            <div class="secondary" role="group" aria-label="More export options">
-              <button type="button" id="dl-jpeg" aria-label="Download JPEG">JPEG</button>
-              <button type="button" id="dl-webp" aria-label="Download WebP">WebP</button>
-              <button type="button" id="dl-svg" aria-label="Download SVG">SVG</button>
-              <button type="button" id="copy-image" hidden>Copy image</button>
-              <button type="button" id="copy-svg">Copy SVG</button>
-              <button type="button" id="copy-link">Copy link</button>
-              <button type="button" id="copy-image-link">Copy image link</button>
-              <button type="button" id="share" hidden>Share</button>
-              <button type="button" id="keep" aria-label="Keep this design">
+            <label class="switch">
+              <input type="checkbox" id="texture" role="switch" />
+              <span class="switch-track" aria-hidden="true"></span>
+              <span>Paper texture</span>
+            </label>
+
+            <p class="hint" id="shortcut-hint">
+              <span class="hint-keys">
+                <kbd>R</kbd> randomize · <kbd>←</kbd><kbd>→</kbd> style · <kbd>[</kbd><kbd>]</kbd> palette ·
+                <kbd>Z</kbd> undo · <kbd>K</kbd> keep
+              </span>
+              <button type="button" class="hint-toggle" id="shortcuts-toggle">Turn off shortcuts</button>
+            </p>
+          </form>
+        </div>
+
+        <div class="stage-zone">
+          <section class="stage" aria-labelledby="preview-heading">
+            <h2 id="preview-heading" class="visually-hidden">Preview</h2>
+            <div class="preview-wrap">
+              <button
+                type="button"
+                class="frame-toggle keep-toggle"
+                id="keep"
+                aria-pressed="false"
+                aria-label="Keep this design"
+                title="Keep this design (K)"
+                aria-keyshortcuts="K"
+              >
                 <svg aria-hidden="true"><use href="#i-star" /></svg> Keep
               </button>
-            </div>
-            <div class="size">
-              <span class="label" id="scale-label">Size</span>
-              <div class="segmented compact" id="scale" role="group" aria-labelledby="scale-label">
-                <button type="button" data-scale="1">1×</button>
-                <button type="button" data-scale="2">2×</button>
-                <button type="button" data-scale="3">3×</button>
-                <button type="button" data-scale="4">4×</button>
-              </div>
-            </div>
-            <p class="size-hint" id="size-hint"></p>
-            <div class="mockup">
-              <img id="mockup-preview" class="mockup-preview" alt="" />
-              <div class="mockup-controls">
-                <label class="label" for="mockup-kind">Mockup</label>
-                <select id="mockup-kind">
-                  <option value="book">3D book</option>
-                  <option value="flat">Flat, with a shadow</option>
-                  <option value="ereader">E-reader</option>
-                  <option value="card">Link preview · 1200 × 630</option>
-                  <option value="square">Square post · 1080 × 1080</option>
-                  <option value="story">Story · 1080 × 1920</option>
-                </select>
-                <input id="mockup-text" type="text" maxlength="80" placeholder="A line for the card: Out now" hidden />
-                <button type="button" id="dl-mockup">Download mockup</button>
-              </div>
-            </div>
-          </div>
-        </section>
-      </div>
-
-      <div class="stage-tools">
-        <section class="kept" id="kept" aria-labelledby="kept-heading">
-          <div class="kept-head">
-            <h2 id="kept-heading">Kept designs</h2>
-            <div class="kept-tools">
-              <button type="button" class="kept-tool" id="kept-all">Download all</button>
-              <button type="button" class="kept-tool" id="kept-export">Export</button>
-              <button type="button" class="kept-tool" id="kept-import">Import</button>
-              <input type="file" id="kept-file" accept=".json,application/json" hidden />
-            </div>
-          </div>
-          <p class="kept-empty" id="kept-empty">
-            None yet. <strong>Keep</strong> saves a design here, in this browser; Export saves them to a file.
-          </p>
-          <ul class="kept-list" id="kept-list"></ul>
-        </section>
-
-        <section class="many" aria-labelledby="many-heading">
-          <details id="many">
-            <summary><h2 id="many-heading">Many covers</h2></summary>
-            <p class="many-help" id="many-help">
-              One book per line, as <code>Title | Author | Subtitle</code>, or paste a CSV with a title column. Each
-              gets this design: with a fixed variation, a series gets one look.
-            </p>
-            <textarea
-              id="many-list"
-              rows="5"
-              aria-describedby="many-help"
-              aria-label="Books, one per line"
-              placeholder="The Lighthouse Keeper | Mara Ellison&#10;Salt and Static | J. R. Okafor"
-            ></textarea>
-            <label class="switch">
-              <input type="checkbox" id="many-palettes" role="switch" />
-              <span class="switch-track" aria-hidden="true"></span>
-              <span>A different palette for each</span>
-            </label>
-            <div class="many-row">
-              <select id="many-format" aria-label="File type">
-                <option value="png">PNG</option>
-                <option value="svg">SVG</option>
-              </select>
-              <button type="button" class="kept-tool" id="many-download">Download all as ZIP</button>
-              <span class="many-count" id="many-count" role="status"></span>
-            </div>
-            <ul class="kept-list" id="many-preview"></ul>
-          </details>
-        </section>
-
-        <section class="many print" aria-labelledby="print-heading">
-          <details id="print">
-            <summary><h2 id="print-heading">Paperback for print</h2></summary>
-            <p class="many-help" id="print-help">
-              The whole cover of a printed paperback: the back, the spine and this front, sized from the trim and the
-              page count as Amazon KDP asks, as the PDF to upload (300 dpi, with bleed).
-            </p>
-            <div class="print-row">
-              <label
-                ><span class="label">Trim (in)</span
-                ><select id="print-trim"></select
-              ></label>
-              <label
-                ><span class="label">Pages</span
-                ><input
-                  id="print-pages"
-                  type="number"
-                  inputmode="numeric"
-                  min="24"
-                  max="828"
-                  step="1"
-                  value="300"
-                  aria-describedby="print-size"
-              /></label>
-              <label
-                ><span class="label">Paper</span
-                ><select id="print-paper">
-                  <option value="white">White</option>
-                  <option value="cream">Cream</option>
-                  <option value="color">Colour</option>
-                  <option value="premium-color">Premium colour</option>
-                </select></label
+              <button
+                type="button"
+                class="frame-toggle thumb-toggle"
+                id="thumb-toggle"
+                aria-pressed="false"
+                title="See the cover as small as stores list it: is the title still clear?"
               >
+                Store size
+              </button>
+              <!-- (On phones, beside the pinned preview: the form's own buttons are far below it.) -->
+              <button type="button" class="flank flank-prev" id="m-prev-style" tabindex="-1" aria-hidden="true">
+                <svg aria-hidden="true"><use href="#i-prev" /></svg>
+              </button>
+              <figure class="book" id="book">
+                <img id="preview" alt="Cover preview" width="600" height="900" />
+                <img id="preview-prev" class="prev" alt="" aria-hidden="true" width="600" height="900" />
+              </figure>
+              <button type="button" class="flank flank-next" id="m-next-style" tabindex="-1" aria-hidden="true">
+                <svg aria-hidden="true"><use href="#i-next" /></svg>
+              </button>
             </div>
-            <label class="print-field"
-              ><span class="label">Headline</span
-              ><input
-                id="print-hook"
-                type="text"
-                maxlength="200"
-                placeholder="Some lights are kept burning for a reason."
-            /></label>
-            <label class="print-field"
-              ><span class="label">Back cover</span
-              ><textarea
-                id="print-blurb"
-                rows="5"
-                maxlength="3000"
-                placeholder="What the book is about. A blank line starts a new paragraph."
-              ></textarea>
-            </label>
-            <label class="print-field"
-              ><span class="label">Imprint</span
-              ><input id="print-imprint" type="text" maxlength="80" placeholder="Your imprint or website"
-            /></label>
-            <div class="print-row">
-              <label
-                ><span class="label">Back</span
-                ><select id="print-back"></select
-              ></label>
-              <label
-                ><span class="label">Spine</span
-                ><select id="print-spine"></select
-              ></label>
+            <p class="meta" id="meta"></p>
+            <div class="variations-row">
+              <span class="variations-label" id="variations-label">Variations</span>
+              <div class="variations" id="variations" role="group" aria-labelledby="variations-label"></div>
             </div>
-            <img
-              id="print-preview"
-              class="print-preview"
-              alt="The whole paperback cover: the back, the spine and the front, with the trim, the folds and the barcode's box dashed"
-            />
-            <p class="many-count" id="print-size" role="status"></p>
-            <div class="many-row">
-              <button type="button" class="kept-tool" id="print-pdf">Download print PDF</button>
-              <button type="button" class="kept-tool" id="print-svg">SVG</button>
-            </div>
-          </details>
-        </section>
-      </div>
+            <p class="visually-hidden" id="announce" aria-live="polite"></p>
 
-      <aside class="rail" id="styles" aria-labelledby="rail-heading">
-        <div class="rail-head">
-          <h2 id="rail-heading">Styles</h2>
-          <p id="rail-note"></p>
-          <label class="rail-genre">
-            <span>Genre</span>
-            <select id="genre">
-              <option value="">All genres</option>
-            </select>
-          </label>
-          <nav class="rail-groups" id="rail-groups" aria-label="Style families"></nav>
+            <div class="export">
+              <button type="button" class="primary download" id="download">
+                <svg aria-hidden="true"><use href="#i-download" /></svg>
+                <span class="download-text"
+                  ><span>Download <span id="download-kind">PNG</span></span> <small id="png-size"></small
+                ></span>
+              </button>
+              <div class="export-row" role="group" aria-labelledby="also-label">
+                <span class="export-label" id="also-label">Also as</span>
+                <div class="secondary">
+                  <button type="button" id="dl-png" aria-label="Download PNG" hidden>PNG</button>
+                  <button type="button" id="dl-jpeg" aria-label="Download JPEG">JPEG</button>
+                  <button type="button" id="dl-webp" aria-label="Download WebP">WebP</button>
+                  <button type="button" id="dl-svg" aria-label="Download SVG">SVG</button>
+                </div>
+              </div>
+              <div class="export-row" role="group" aria-labelledby="copy-label">
+                <span class="export-label" id="copy-label">Copy</span>
+                <div class="secondary">
+                  <button type="button" id="copy-image" aria-label="Copy image" hidden>Image</button>
+                  <button type="button" id="copy-svg" aria-label="Copy SVG">SVG</button>
+                  <button
+                    type="button"
+                    id="copy-link"
+                    aria-label="Copy link"
+                    title="A link that opens this design here"
+                  >
+                    Link
+                  </button>
+                  <button
+                    type="button"
+                    id="copy-image-link"
+                    aria-label="Copy embed link"
+                    title="A link to the image itself, for an image on any web page"
+                  >
+                    Embed link
+                  </button>
+                </div>
+              </div>
+              <button type="button" class="share" id="share" hidden>
+                <svg aria-hidden="true"><use href="#i-share" /></svg> Share
+              </button>
+              <div class="size">
+                <span class="label" id="scale-label">Size</span>
+                <div class="segmented compact" id="scale" role="group" aria-labelledby="scale-label">
+                  <button type="button" data-scale="1">1×</button>
+                  <button type="button" data-scale="2">2×</button>
+                  <button type="button" data-scale="3">3×</button>
+                  <button type="button" data-scale="4">4×</button>
+                </div>
+              </div>
+              <p class="size-hint" id="size-hint"></p>
+              <div class="mockup">
+                <img id="mockup-preview" class="mockup-preview" alt="" />
+                <div class="mockup-controls">
+                  <label class="label" for="mockup-kind">Mockup</label>
+                  <select id="mockup-kind">
+                    <option value="book">3D book</option>
+                    <option value="flat">Flat, with a shadow</option>
+                    <option value="ereader">E-reader</option>
+                    <option value="card">Link preview · 1200 × 630</option>
+                    <option value="square">Square post · 1080 × 1080</option>
+                    <option value="story">Story · 1080 × 1920</option>
+                  </select>
+                  <input
+                    id="mockup-text"
+                    type="text"
+                    maxlength="80"
+                    placeholder="A line for the card: Out now"
+                    hidden
+                  />
+                  <button type="button" id="dl-mockup">Download mockup</button>
+                </div>
+              </div>
+            </div>
+          </section>
         </div>
-        <div class="rail-body" id="rail"></div>
-      </aside>
+
+        <div class="stage-tools">
+          <section class="kept" id="kept" aria-labelledby="kept-heading">
+            <div class="kept-head">
+              <h2 id="kept-heading">Kept designs</h2>
+              <div class="kept-tools">
+                <button type="button" class="kept-tool" id="kept-all">Download all</button>
+                <button type="button" class="kept-tool" id="kept-export">Export</button>
+                <button type="button" class="kept-tool" id="kept-import">Import</button>
+                <input type="file" id="kept-file" accept=".json,application/json" hidden />
+              </div>
+            </div>
+            <p class="kept-empty" id="kept-empty">
+              None yet. <strong>Keep</strong>, the star on the preview, saves a design here, in this browser; Export
+              saves them to a file.
+            </p>
+            <ul class="kept-list" id="kept-list"></ul>
+          </section>
+
+          <section class="many" aria-labelledby="many-heading">
+            <details id="many">
+              <summary>
+                <h2 id="many-heading">Many covers</h2>
+                <span class="panel-desc">This design for a whole list of books, in one ZIP.</span>
+                <svg class="chevron" aria-hidden="true"><use href="#i-chevron" /></svg>
+              </summary>
+              <p class="many-help" id="many-help">
+                One book per line, as <code>Title | Author | Subtitle</code>, or paste a CSV with a title column. Each
+                gets this design: with a fixed variation, a series gets one look.
+              </p>
+              <textarea
+                id="many-list"
+                rows="5"
+                aria-describedby="many-help"
+                aria-label="Books, one per line"
+                placeholder="The Lighthouse Keeper | Mara Ellison&#10;Salt and Static | J. R. Okafor"
+              ></textarea>
+              <label class="switch">
+                <input type="checkbox" id="many-palettes" role="switch" />
+                <span class="switch-track" aria-hidden="true"></span>
+                <span>A different palette for each</span>
+              </label>
+              <div class="many-row">
+                <select id="many-format" aria-label="File type">
+                  <option value="png">PNG</option>
+                  <option value="svg">SVG</option>
+                </select>
+                <button type="button" class="panel-btn" id="many-download">Download all as ZIP</button>
+                <span class="many-count" id="many-count" role="status"></span>
+              </div>
+              <div class="many-failed" id="many-failed" hidden>
+                <p id="many-failed-heading">Left out of the last ZIP:</p>
+                <ul id="many-failed-list" aria-labelledby="many-failed-heading"></ul>
+              </div>
+              <ul class="kept-list" id="many-preview"></ul>
+            </details>
+          </section>
+
+          <section class="many print" aria-labelledby="print-heading">
+            <details id="print">
+              <summary>
+                <h2 id="print-heading">Paperback for print</h2>
+                <span class="panel-desc">The back, the spine and this front, as the PDF KDP takes.</span>
+                <svg class="chevron" aria-hidden="true"><use href="#i-chevron" /></svg>
+              </summary>
+              <p class="many-help" id="print-help">
+                The whole cover of a printed paperback: the back, the spine and this front, sized from the trim and the
+                page count as Amazon KDP asks, as the PDF to upload (300 dpi, with bleed).
+              </p>
+              <div class="print-row">
+                <label
+                  ><span class="label">Trim (in)</span
+                  ><select id="print-trim"></select
+                ></label>
+                <label
+                  ><span class="label">Pages</span
+                  ><input
+                    id="print-pages"
+                    type="number"
+                    inputmode="numeric"
+                    min="24"
+                    max="828"
+                    step="1"
+                    value="300"
+                    aria-describedby="print-size"
+                /></label>
+                <label
+                  ><span class="label">Paper</span
+                  ><select id="print-paper">
+                    <option value="white">White</option>
+                    <option value="cream">Cream</option>
+                    <option value="color">Colour</option>
+                    <option value="premium-color">Premium colour</option>
+                  </select></label
+                >
+              </div>
+              <label class="print-field"
+                ><span class="label">Headline</span
+                ><input
+                  id="print-hook"
+                  type="text"
+                  maxlength="200"
+                  placeholder="Some lights are kept burning for a reason."
+              /></label>
+              <label class="print-field"
+                ><span class="label">Back cover</span
+                ><textarea
+                  id="print-blurb"
+                  rows="5"
+                  maxlength="3000"
+                  placeholder="What the book is about. A blank line starts a new paragraph."
+                ></textarea>
+              </label>
+              <label class="print-field"
+                ><span class="label">Imprint</span
+                ><input id="print-imprint" type="text" maxlength="80" placeholder="Your imprint or website"
+              /></label>
+              <div class="print-colours">
+                <div class="print-colour">
+                  <span class="label" id="print-back-label">Back colour</span>
+                  <div class="colour-choices" id="print-back" role="group" aria-labelledby="print-back-label"></div>
+                </div>
+                <div class="print-colour">
+                  <span class="label" id="print-spine-label">Spine colour</span>
+                  <div class="colour-choices" id="print-spine" role="group" aria-labelledby="print-spine-label"></div>
+                </div>
+              </div>
+              <img
+                id="print-preview"
+                class="print-preview"
+                alt="The whole paperback cover: the back, the spine and the front, with the trim, the folds and the barcode's box dashed"
+              />
+              <p class="many-count" id="print-size" role="status"></p>
+              <div class="many-row">
+                <button type="button" class="panel-btn" id="print-pdf">Download print PDF</button>
+                <button type="button" class="panel-btn quiet" id="print-svg" aria-label="Download print SVG">
+                  SVG
+                </button>
+              </div>
+            </details>
+          </section>
+        </div>
+
+        <aside class="rail" id="styles" aria-labelledby="rail-heading">
+          <div class="rail-head">
+            <h2 id="rail-heading">Styles</h2>
+            <p id="rail-note"></p>
+            <label class="rail-genre">
+              <span>Genre</span>
+              <select id="genre">
+                <option value="">All genres</option>
+              </select>
+            </label>
+            <nav class="rail-groups" id="rail-groups" aria-label="Style families"></nav>
+          </div>
+          <div class="rail-body" id="rail"></div>
+        </aside>
+      </div>
     </main>
 
     <section class="usage" id="usage" aria-labelledby="usage-heading">
@@ -654,12 +743,12 @@
           <h3>An image link</h3>
           <pre tabindex="0"><code>&lt;img alt="Dune"
   src="https://covers.otsirh.dev/api/cover.svg?title=Dune&amp;author=Frank+Herbert"&gt;</code></pre>
-          <p class="code-note">Any design's link works too: <b>Copy image link</b> above gives it.</p>
+          <p class="code-note">Any design's link works too: <b>Copy embed link</b> above gives it.</p>
         </div>
         <div>
           <h3>An element for any page</h3>
           <pre tabindex="0"><code>&lt;script type="module"
-  src="https://covers.otsirh.dev/src/element.js"&gt;&lt;/script&gt;
+  src="https://covers.otsirh.dev/element.js"&gt;&lt;/script&gt;
 
 &lt;book-cover cover-title="Dune" author="Frank Herbert"
   cover-style="retro"&gt;&lt;/book-cover&gt;</code></pre>
@@ -694,21 +783,31 @@ const { svg } = createCover({
 
     <footer class="site-footer">
       <p>
-        MIT licensed · <a href="https://github.com/otsirh/book-cover-generator">Source on GitHub</a> ·
+        <a href="/about/">Using your covers</a> · MIT licensed ·
+        <a href="https://github.com/otsirh/book-cover-generator">Source on GitHub</a> ·
         <a href="https://github.com/otsirh/book-cover-generator/blob/main/CHANGELOG.md">Changelog</a>
       </p>
     </footer>
 
     <div class="mobile-bar" aria-hidden="true">
+      <button type="button" class="icon-btn boxed" id="m-undo" tabindex="-1" aria-disabled="true">
+        <svg aria-hidden="true"><use href="#i-undo" /></svg>
+      </button>
       <button type="button" class="primary" id="m-randomize" tabindex="-1">
         <svg aria-hidden="true"><use href="#i-dice" /></svg> Randomize
       </button>
+      <button type="button" class="icon-btn boxed keep-toggle" id="m-keep" tabindex="-1" aria-pressed="false">
+        <svg aria-hidden="true"><use href="#i-star" /></svg>
+      </button>
       <button type="button" class="primary download" id="m-download" tabindex="-1">
-        <svg aria-hidden="true"><use href="#i-download" /></svg> PNG
+        <svg aria-hidden="true"><use href="#i-download" /></svg> <span id="m-download-kind">PNG</span>
       </button>
     </div>
 
-    <noscript><p class="noscript">This generator needs JavaScript to draw covers.</p></noscript>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <div class="toast error" id="alert">
+      <span id="alert-text" role="alert"></span>
+      <button type="button" class="toast-close" id="alert-close" aria-label="Dismiss">×</button>
+    </div>
   </body>
 </html>

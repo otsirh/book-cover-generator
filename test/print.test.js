@@ -89,7 +89,7 @@ test('every style makes a well-formed print cover, its text where it may be', ()
     for (const [trim, pages, paper] of /** @type {const} */ ([
       ['6x9', 320, 'cream'],
       ['5x8', 120, 'white'],
-      ['8.5x11', 600, 'premium-color'],
+      ['8.5x11', 590, 'premium-color'],
     ])) {
       const label = `${style} ${trim} ${pages} ${paper}`;
       const print = createPrintCover(
@@ -364,4 +364,32 @@ test('the barcode box, the colours and the guides', () => {
     color: [72, 600],
     'premium-color': [24, 828],
   });
+});
+
+test('KDP’s trims, and the largest of them take fewer pages (and not every paper)', () => {
+  assert.equal(Object.keys(trimSizes).length, 16);
+  for (const [name, [w, h]] of Object.entries(trimSizes)) {
+    assert.equal(name, `${w}x${h}`);
+    assert.ok(
+      w >= printLimits.width[0] &&
+        w <= printLimits.width[1] &&
+        h >= printLimits.height[0] &&
+        h <= printLimits.height[1],
+      name,
+    );
+  }
+  const big = { title: 'Big', seed: 's' };
+  assert.ok(createPrintCover(big, { trim: '8.5x11', pages: 590 }));
+  assert.throws(
+    () => createPrintCover(big, { trim: '8.5x11', pages: 591 }),
+    /8\.5 × 11 in book on white paper has at most 590 pages/,
+  );
+  assert.throws(() => createPrintCover(big, { trim: [8.5, 8.5], pages: 560, paper: 'cream' }), /at most 550/);
+  assert.throws(
+    () => createPrintCover(big, { trim: '8.27x11.69', pages: 100, paper: 'color' }),
+    /color paper isn't printed at 8\.27 × 11\.69 in/,
+  );
+  // A trim of its own keeps the paper's own limits.
+  assert.ok(createPrintCover(big, { trim: [8.4, 11], pages: 800 }));
+  assert.ok(createPrintCover(big, { trim: '6x9', pages: 828 }));
 });

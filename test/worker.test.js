@@ -97,7 +97,8 @@ test('answers are kept at the edge, once per version', async () => {
     );
     // A link from another version is the same answer; another deployment draws anew.
     const again = await worker.fetch(new Request('https://covers.example/api/cover.svg?title=Kept&v=1.6.0'), env, ctx);
-    assert.equal(await again.text(), await first.text());
+    const drawn = await first.text();
+    assert.equal(await again.text(), drawn);
     await worker.fetch(
       new Request('https://covers.example/api/cover.svg?title=Kept'),
       { CF_VERSION_METADATA: { id: 'd2' } },
@@ -109,6 +110,27 @@ test('answers are kept at the edge, once per version', async () => {
     await worker.fetch(new Request('https://covers.example/api/cover.svg?style=nope'), env, ctx);
     await Promise.all(waiting);
     assert.equal(kept.size, 2);
+    // A parameter the API doesn't read is the same answer, and so is a HEAD (without the body).
+    const extra = await worker.fetch(
+      new Request('https://covers.example/api/cover.svg?x=1&title=Kept&utm=a'),
+      env,
+      ctx,
+    );
+    assert.equal(await extra.text(), drawn);
+    const head = await worker.fetch(
+      new Request('https://covers.example/api/cover.svg?title=Kept', { method: 'HEAD' }),
+      env,
+      ctx,
+    );
+    assert.equal(head.status, 200);
+    assert.equal(head.headers.get('content-type'), 'image/svg+xml; charset=utf-8');
+    assert.equal(await head.text(), '');
+    await Promise.all(waiting);
+    assert.equal(kept.size, 2);
+    // A HEAD of what isn't kept yet is drawn and kept for the GET.
+    await worker.fetch(new Request('https://covers.example/api/cover.json?title=Head', { method: 'HEAD' }), env, ctx);
+    await Promise.all(waiting);
+    assert.equal(kept.size, 3);
   } finally {
     delete (/** @type {any} */ (globalThis).caches);
   }
@@ -224,7 +246,7 @@ const siteEnv = async () => {
         const path = new URL(request.url).pathname;
         const file = path === '/' ? 'index.html' : path.startsWith('/fonts/') ? `public${path}` : null;
         if (!file) return new Response('Not found', { status: 404 });
-        return new Response(await readFile(new URL(`../${file}`, import.meta.url)));
+        return new Response(await readFile(new URL(`../${file}`, import.meta.url)), { headers: { ETag: '"page"' } });
       },
     },
     // (Only the PNG tests need it.)
@@ -255,6 +277,8 @@ test(
     assert.equal(cover.headers.get('access-control-allow-origin'), '*');
     assert.deepEqual(await size(cover), [600, 900]);
     assert.deepEqual(await size(await fetchPath('/api/cover.png?title=Dune&scale=1.2&format=square')), [720, 720]);
+    // A cover that fits is drawn at its size, to the pixel.
+    assert.deepEqual(await size(await fetchPath('/api/cover.png?title=Dune&width=600&height=1000')), [600, 1000]);
     assert.deepEqual(await size(await fetchPath('/api/mockup.png?title=Dune&kind=card')), [1200, 630]);
     // A story at its full size: a mockup shows the cover as a picture drawn first, so it costs little.
     assert.deepEqual(await size(await fetchPath('/api/mockup.png?title=Dune&kind=story')), [1080, 1920]);
@@ -300,6 +324,35 @@ test(
     assert.equal(fallback.status, 302);
     assert.equal(fallback.headers.get('location'), 'https://covers.example/og.png');
     assert.equal((await fetchPath('/api/cover.png', 'POST')).status, 405);
+    // The MCP server answers a cover with its picture (a PNG at most 480 px wide), and keeps the
+    // links of one in a script the PNG fonts lack.
+    /** @param {string} title */
+    const call = async (title) => {
+      const res = await worker.fetch(
+        new Request('https://covers.example/mcp', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'tools/call',
+            params: { name: 'create_mockup', arguments: { title, kind: 'story', text: 'Out now' } },
+          }),
+        }),
+        env,
+        ctx,
+      );
+      return (await res.json()).result;
+    };
+    const drawn = await call('Dune');
+    const picture = drawn.content.find((/** @type {{ type: string }} */ c) => c.type === 'image');
+    assert.equal(picture.mimeType, 'image/png');
+    const view = new DataView(Uint8Array.from(atob(picture.data), (c) => c.charCodeAt(0)).buffer);
+    assert.deepEqual([view.getUint32(16), view.getUint32(20)], [480, 853]);
+    assert.match(drawn.structuredContent.pngUrl, /^https:\/\/covers\.example\/api\/mockup\.png\?/);
+    const unwritten = await call('灯台守');
+    assert.equal(unwritten.isError, undefined);
+    assert.equal(unwritten.content.filter((/** @type {{ type: string }} */ c) => c.type === 'image').length, 0);
   },
 );
 
@@ -324,6 +377,8 @@ test('a design’s link (/?title=…) gets its own link preview; the site’s he
     /<meta property="og:image" content="https:\/\/covers\.example\/api\/mockup\.png\?title=Dune&amp;author=Frank\+Herbert&amp;style=retro&amp;seed=s&amp;kind=card&amp;preview=1"/,
   );
   assert.match(html, /<meta property="og:image:alt" content="The cover of Dune by Frank Herbert"/);
+  // The page's validators don't describe the page rewritten.
+  assert.equal(res.headers.get('etag'), null);
   // The page's security headers, which the static files' rules don't give a Worker's answer.
   assert.match(res.headers.get('content-security-policy') ?? '', /require-trusted-types-for 'script'/);
   assert.equal(res.headers.get('x-frame-options'), 'DENY');
@@ -355,4 +410,146 @@ test('the Worker’s pages have the site’s headers: SITE_HEADERS is public/_he
       ),
   );
   assert.deepEqual(SITE_HEADERS, rule);
+});
+
+test('the API describes itself: what a query draws, the catalog, and OpenAPI', async () => {
+  const { info } = await import('../worker/index.js');
+  /** @param {string} path @param {string} [method] */
+  const ask = async (path, method = 'GET') => {
+    const res = /** @type {Response} */ (info(new Request(`https://covers.example${path}`, { method })));
+    const json = method !== 'HEAD' && res.headers.get('content-type')?.startsWith('application/json');
+    return { res, body: json ? await res.json() : await res.text() };
+  };
+  assert.equal(info(new Request('https://covers.example/api/nope.json')), null);
+  // What a random style and palette came to, and the link that keeps them.
+  const { res, body } = await ask('/api/cover.json?title=Dune&author=Frank+Herbert&style=random&seed=s');
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('content-type'), 'application/json; charset=utf-8');
+  assert.equal(res.headers.get('access-control-allow-origin'), '*');
+  const cover = createCover({ title: 'Dune', author: 'Frank Herbert', seed: 's' });
+  assert.equal(body.style, cover.style);
+  assert.equal(body.palette, cover.palette);
+  assert.deepEqual(body.colors, cover.colors);
+  assert.equal(body.seed, 's');
+  assert.deepEqual([body.width, body.height], [600, 900]);
+  const link = new URLSearchParams(body.link);
+  assert.equal(link.get('style'), cover.style);
+  assert.equal(link.get('palette'), cover.palette);
+  assert.equal(createCover(optionsFromLink(link)).svg, cover.svg);
+  assert.equal(body.urls.svg, `https://covers.example/api/cover.svg?${body.link}`);
+  assert.equal(body.urls.edit, `https://covers.example/#${body.link}`);
+  assert.equal(body.version, version);
+  // A seed from the title stays one.
+  assert.equal((await ask('/api/cover.json?title=Dune')).body.seed, null);
+  assert.equal((await ask('/api/cover.json?style=nope')).res.status, 400);
+  assert.equal((await ask('/api/cover.json?title=x', 'HEAD')).body, '');
+
+  const catalog = (await ask('/api/catalog.json')).body;
+  const { listStyles, palettes, genres, mockupKinds } = await import('../src/index.js');
+  assert.deepEqual(
+    catalog.styles.map((/** @type {{ id: string }} */ s) => s.id),
+    listStyles().map((s) => s.id),
+  );
+  assert.equal(catalog.palettes.length, palettes.length);
+  assert.equal(catalog.genres.length, genres.length);
+  assert.deepEqual(catalog.mockups, [...mockupKinds]);
+  assert.equal(catalog.version, version);
+
+  const spec = (await ask('/api/openapi.json')).body;
+  assert.equal(spec.openapi, '3.1.0');
+  assert.equal(spec.info.version, version);
+  assert.deepEqual(spec.servers, [{ url: 'https://covers.example' }]);
+  for (const path of ['/api/cover.svg', '/api/cover.png', '/api/mockup.svg', '/api/mockup.png', '/api/cover.json'])
+    assert.ok(
+      spec.paths[path].get.parameters.some((/** @type {{ name: string }} */ p) => p.name === 'title'),
+      path,
+    );
+  const kind = spec.paths['/api/mockup.svg'].get.parameters.find(
+    (/** @type {{ name: string }} */ p) => p.name === 'kind',
+  );
+  assert.deepEqual(kind.schema.enum, [...mockupKinds]);
+  // Every parameter it names is one the API reads (it refuses none of them as unknown).
+  assert.equal((await ask('/api/openapi.json', 'POST')).res.status, 405);
+});
+
+test('download names the file after the title, or as asked', async () => {
+  const plain = /** @type {Response} */ (get('/api/cover.svg?title=Dune'));
+  assert.equal(plain.headers.get('content-disposition'), null);
+  const named = /** @type {Response} */ (get('/api/cover.svg?title=The+Café+Days&download=1'));
+  assert.equal(
+    named.headers.get('content-disposition'),
+    `attachment; filename="the-cafe-days.svg"; filename*=UTF-8''the-cafe-days.svg`,
+  );
+  const asked = /** @type {Response} */ (get('/api/mockup.svg?title=Dune&kind=card&download=My+Card'));
+  assert.equal(
+    asked.headers.get('content-disposition'),
+    `attachment; filename="my-card.svg"; filename*=UTF-8''my-card.svg`,
+  );
+  const mockup = /** @type {Response} */ (get('/api/mockup.svg?title=Dune&kind=card&download'));
+  assert.match(mockup.headers.get('content-disposition') ?? '', /filename="dune-card\.svg"/);
+  const japanese = /** @type {Response} */ (get(`/api/cover.svg?title=${encodeURIComponent('灯台守')}&download=1`));
+  assert.equal(
+    japanese.headers.get('content-disposition'),
+    `attachment; filename="___.svg"; filename*=UTF-8''${encodeURIComponent('灯台守.svg')}`,
+  );
+});
+
+test('PNGs and MCP requests past a client’s limit are refused with 429; cached answers aren’t counted', async () => {
+  /** A limiter that allows `n` requests in all, recording the keys asked about. @param {number} n */
+  const limiter = (n) => ({
+    /** @type {string[]} */ keys: [],
+    /** @param {{ key: string }} o */
+    async limit({ key }) {
+      this.keys.push(key);
+      return { success: this.keys.length <= n };
+    },
+  });
+  const png = limiter(0);
+  const mcpLimit = limiter(0);
+  const env = { PNG_LIMIT: png, MCP_LIMIT: mcpLimit };
+  const ctx = { waitUntil() {} };
+  const headers = { 'cf-connecting-ip': '203.0.113.9' };
+  const busy = await worker.fetch(
+    new Request('https://covers.example/api/cover.png?title=Dune', { headers }),
+    env,
+    ctx,
+  );
+  assert.equal(busy.status, 429);
+  assert.equal(busy.headers.get('retry-after'), '60');
+  assert.match(await busy.text(), /Too many requests/);
+  assert.deepEqual(png.keys, ['203.0.113.9']);
+  // SVGs and descriptions are cheap: never limited.
+  const svg = await worker.fetch(new Request('https://covers.example/api/cover.svg?title=Dune', { headers }), env, ctx);
+  assert.equal(svg.status, 200);
+  assert.equal(png.keys.length, 1);
+  const post = new Request('https://covers.example/mcp', {
+    method: 'POST',
+    headers: { ...headers, 'content-type': 'application/json' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping' }),
+  });
+  const refused = await worker.fetch(post, env, ctx);
+  assert.equal(refused.status, 429);
+  assert.equal(refused.headers.get('retry-after'), '60');
+  assert.equal((await refused.json()).error.code, -32000);
+  // Within the limit, the answer.
+  const open = await worker.fetch(
+    new Request('https://covers.example/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping' }),
+    }),
+    { MCP_LIMIT: limiter(1) },
+    ctx,
+  );
+  assert.equal(open.status, 200);
+});
+
+test('the cache key keeps every parameter the API reads (OpenAPI’s, at least)', async () => {
+  const { API_PARAMETERS } = await import('../worker/index.js');
+  const { openapi } = await import('../worker/openapi.js');
+  const spec = openapi('https://covers.example');
+  for (const [path, item] of Object.entries(spec.paths)) {
+    for (const p of /** @type {any} */ (item).get?.parameters ?? [])
+      assert.ok(API_PARAMETERS.includes(p.name), `${path} ${p.name}`);
+  }
 });

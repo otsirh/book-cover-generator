@@ -5,6 +5,10 @@
   --text: #1d1b18;
   --muted: #6d675e;
   --line: #e4ddd1;
+  /* The edge of a field, chip or switch: 3:1 on the panel, so the control shows where it is. */
+  --control-line: #948d81;
+  /* A hairline round every cover, so a dark cover on a dark page (or a white one on white) keeps its edge. */
+  --hairline: color-mix(in srgb, var(--text) 16%, transparent);
   --accent: #c2410c;
   --accent-ink: #ffffff;
   --focus: #2563eb;
@@ -37,6 +41,7 @@
     --text: #f1ede6;
     --muted: #a39d93;
     --line: #34302b;
+    --control-line: #6f6a63;
     --accent: #f97316;
     --accent-ink: #1a0f06;
     --focus: #60a5fa;
@@ -120,11 +125,20 @@ svg {
   top: 12px;
 }
 
+/* Without JavaScript: a note in place of an interface that can't work. */
 .noscript {
-  max-width: 1440px;
+  width: min(100% - 48px, 1392px);
   margin: 0 auto 24px;
-  padding: 0 24px;
-  color: var(--muted);
+  padding: 14px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-weight: 600;
+}
+
+html:not(.js) .app-page .app,
+html:not(.js) .app-page .mobile-bar {
+  display: none;
 }
 
 kbd {
@@ -181,20 +195,35 @@ kbd {
   color: var(--text);
 }
 
+.site-header nav a[aria-current='page'] {
+  color: var(--text);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 6px;
+  text-decoration-color: var(--accent);
+}
+
+/* The heading and the line under it side by side where they fit: the generator starts high. */
 .intro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 18px;
+  row-gap: 4px;
   max-width: 1440px;
   margin: 0 auto;
-  padding: 18px 24px 22px;
+  padding: 10px 24px 18px;
 }
 
 .intro h1 {
   margin: 0;
-  font: 600 clamp(28px, 4vw, 44px) / 1.08 var(--display);
+  font: 600 clamp(28px, 3.2vw, 40px) / 1.08 var(--display);
   letter-spacing: -0.015em;
 }
 
 .intro p {
-  margin: 8px 0 0;
+  margin: 0;
   color: var(--muted);
 }
 
@@ -281,7 +310,7 @@ textarea {
   height: 40px;
   padding: 0 12px;
   background: var(--surface-2);
-  border: 1px solid var(--line);
+  border: 1px solid var(--control-line);
   border-radius: 9px;
 }
 
@@ -298,15 +327,16 @@ textarea {
   color: var(--muted);
 }
 
+/* Focus: the border turns blue, and the ring everything else has shows round it. */
 input[type='text']:focus,
 textarea:focus {
   border-color: var(--focus);
-  outline: none;
 }
 
-input::placeholder {
+input::placeholder,
+textarea::placeholder {
   color: var(--muted);
-  opacity: 0.8;
+  opacity: 1;
 }
 
 #title {
@@ -321,6 +351,7 @@ input::placeholder {
 
 .icon-btn {
   display: grid;
+  flex: none;
   place-items: center;
   width: 30px;
   height: 30px;
@@ -348,7 +379,7 @@ input::placeholder {
 .icon-btn.boxed {
   width: 40px;
   height: 40px;
-  border-color: var(--line);
+  border-color: var(--control-line);
   background: var(--surface-2);
 }
 
@@ -368,11 +399,15 @@ input::placeholder {
   align-items: center;
   height: 40px;
   padding: 0 12px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--control-line);
   border-radius: 9px;
   background: var(--surface-2);
   font-weight: 600;
   text-decoration: none;
+}
+
+.current-style:hover {
+  border-color: var(--text);
 }
 
 .current-style::after {
@@ -433,7 +468,7 @@ input::placeholder {
 .chip {
   min-height: 26px;
   padding: 2px 9px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--control-line);
   border-radius: 999px;
   background: var(--surface-2);
   color: var(--text);
@@ -442,17 +477,19 @@ input::placeholder {
 }
 
 .chip:hover {
-  border-color: var(--muted);
+  border-color: var(--text);
 }
 
+/* The font menu on a line of its own (its names need the width), the case chips under it. */
 .type-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
 
 .type-row select {
-  flex: 1;
+  flex: 1 1 100%;
 }
 
 .type-row .chips {
@@ -487,7 +524,8 @@ input::placeholder {
   gap: 2px;
   height: 32px;
   padding: 0;
-  border: 1px solid rgb(0 0 0 / 0.14);
+  /* (Strong enough to edge a dark swatch on a dark panel, and a pale one on a white panel.) */
+  border: 1px solid color-mix(in srgb, var(--text) 30%, transparent);
   border-radius: 7px;
   transition: transform 0.12s ease;
 }
@@ -512,10 +550,18 @@ input::placeholder {
 }
 
 .swatch.auto {
+  background: conic-gradient(from 40deg, #f2b705, #d62828, #7b5ea7, #1d4e89, #2a9d8f, #f2b705);
+}
+
+/* Auto and Custom are named on a solid label, readable on any colours behind it. */
+.sw-label {
+  padding: 1px 3px;
+  border-radius: 4px;
+  background: rgb(255 255 255 / 0.92);
+  color: #1d1b18;
   font-size: 9.5px;
   font-weight: 700;
-  color: #1d1b18;
-  background: conic-gradient(from 40deg, #f2b705, #d62828, #7b5ea7, #1d4e89, #2a9d8f, #f2b705);
+  line-height: 1.25;
 }
 
 .swatch[aria-pressed='true'] {
@@ -550,14 +596,26 @@ input::placeholder {
   color: var(--muted);
 }
 
-/* The Custom swatch: your colours once you have some, a colour wheel before. */
+/* The Custom swatch, two wide for its name: your colours once you have some, dashed before. */
+.swatch.custom {
+  grid-column: span 2;
+  flex-direction: row;
+  gap: 5px;
+}
+
 .swatch.custom:not(.has-colors) {
-  font-size: 9.5px;
-  font-weight: 700;
-  color: var(--text);
   background: var(--surface-2);
   border-style: dashed;
   border-color: var(--muted);
+}
+
+.swatch.custom:not(.has-colors) .sw-dots {
+  display: none;
+}
+
+.swatch.custom:not(.has-colors) .sw-label {
+  background: none;
+  color: var(--text);
 }
 
 /* Background and text side by side, the three accents below them. */
@@ -588,7 +646,7 @@ input::placeholder {
   height: 32px;
   padding: 2px;
   background: var(--surface-2);
-  border: 1px solid var(--line);
+  border: 1px solid var(--control-line);
   border-radius: 7px;
   cursor: pointer;
 }
@@ -608,6 +666,25 @@ input::placeholder {
 
 .field-note.warn {
   color: var(--text);
+}
+
+/* Under Format: to the panel for the paperback's back and spine. */
+.link-btn {
+  align-self: start;
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-size: 13px;
+  text-decoration: underline;
+  text-decoration-color: var(--muted);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.link-btn:hover {
+  text-decoration-color: currentColor;
 }
 
 .custom-size {
@@ -648,7 +725,7 @@ select {
   font-size: 14px;
   color: var(--text);
   background: var(--surface-2);
-  border: 1px solid var(--line);
+  border: 1px solid var(--control-line);
   border-radius: 9px;
   font-variant-numeric: tabular-nums;
 }
@@ -656,7 +733,6 @@ select {
 input[type='number']:focus,
 select:focus {
   border-color: var(--focus);
-  outline: none;
 }
 
 input[type='number'][aria-invalid='true'] {
@@ -669,7 +745,7 @@ input[type='number'][aria-invalid='true'] {
   padding: 3px;
   gap: 3px;
   background: var(--surface-2);
-  border: 1px solid var(--line);
+  border: 1px solid var(--control-line);
   border-radius: 10px;
 }
 
@@ -690,6 +766,11 @@ input[type='number'][aria-invalid='true'] {
   border: 0;
   border-radius: 7px;
   color: var(--muted);
+}
+
+.segmented button:hover:not([aria-pressed='true'], [aria-disabled='true']) {
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 7%, transparent);
 }
 
 .segmented button[aria-disabled='true'] {
@@ -721,10 +802,12 @@ input[type='number'][aria-invalid='true'] {
 
 .switch-track {
   position: relative;
+  flex: none;
   width: 36px;
   height: 21px;
   border-radius: 999px;
-  background: var(--line);
+  /* (Off: a track that shows against the panel, not a white knob alone.) */
+  background: var(--control-line);
   transition: background 0.15s;
 }
 
@@ -862,7 +945,8 @@ input[type='number'][aria-invalid='true'] {
   display: flex;
   justify-content: center;
   width: 100%;
-  padding: 28px 16px;
+  /* (Room at the top for the toggles on its corners.) */
+  padding: 44px 16px 24px;
   border-radius: var(--radius);
   background: radial-gradient(ellipse at 50% 35%, rgb(255 255 255 / 0.6), transparent 65%), var(--surface-2);
   border: 1px solid var(--line);
@@ -874,24 +958,39 @@ input[type='number'][aria-invalid='true'] {
   }
 }
 
-/* Store size: the cover as small as a store's listing shows it. */
 .preview-wrap {
   position: relative;
 }
 
-.thumb-toggle {
+/* On the frame's top corners: Keep (a star) and Store size. */
+.frame-toggle {
   position: absolute;
   top: 8px;
-  right: 8px;
   z-index: 1;
-  min-height: 24px;
-  padding: 2px 10px;
-  border: 1px solid var(--line);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 2px 11px;
+  border: 1px solid var(--control-line);
   border-radius: 999px;
   background: var(--surface);
   color: var(--text);
-  font-size: 12px;
+  font-size: 12.5px;
   cursor: pointer;
+}
+
+.frame-toggle:hover {
+  border-color: var(--text);
+}
+
+.thumb-toggle {
+  right: 8px;
+}
+
+.keep-toggle.frame-toggle {
+  left: 8px;
+  padding-left: 8px;
 }
 
 .thumb-toggle[aria-pressed='true'] {
@@ -900,21 +999,33 @@ input[type='number'][aria-invalid='true'] {
   color: var(--bg);
 }
 
-.book.store-size {
-  width: auto;
-  min-width: 0;
-  height: 120px;
+.keep-toggle svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+}
+
+/* Kept: the star filled. */
+.keep-toggle[aria-pressed='true'] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.keep-toggle[aria-pressed='true'] svg {
+  fill: currentColor;
 }
 
 .book {
   position: relative;
   margin: 0;
-  width: min(100%, 520px, calc((100vh - 340px) * var(--cover-w) / var(--cover-h)));
+  /* (Room under it, in the window, for the caption, the variations and the download button.) */
+  width: min(100%, 520px, calc((100vh - 410px) * var(--cover-w) / var(--cover-h)));
   min-width: 220px;
   aspect-ratio: var(--cover-w) / var(--cover-h);
   border-radius: 3px 6px 6px 3px;
   overflow: hidden;
   box-shadow:
+    0 0 0 1px var(--hairline),
     0 2px 4px rgb(0 0 0 / 0.12),
     0 18px 40px -8px rgb(0 0 0 / 0.35),
     0 40px 80px -24px rgb(0 0 0 / 0.25);
@@ -922,15 +1033,43 @@ input[type='number'][aria-invalid='true'] {
 }
 
 @media (hover: hover) {
-  .book:hover {
+  .book:not(.store-size):hover {
     transform: perspective(1400px) rotateY(-4deg);
   }
+}
+
+/* Store size: the cover as small as a store's listing shows it, in the same frame (so nothing
+   under it moves). */
+.book.store-size {
+  display: grid;
+  place-items: center;
+  overflow: visible;
+  box-shadow: none;
+}
+
+.book.store-size::after,
+.book.store-size .prev {
+  display: none;
+}
+
+.book.store-size #preview {
+  width: auto;
+  height: 120px;
+  border-radius: 1px 2px 2px 1px;
+  box-shadow:
+    0 0 0 1px var(--hairline),
+    0 4px 10px -4px rgb(0 0 0 / 0.4);
 }
 
 .book img {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+/* Previous and next style beside the pinned preview: phones only. */
+.flank {
+  display: none;
 }
 
 .book .prev {
@@ -996,7 +1135,7 @@ input[type='number'][aria-invalid='true'] {
 
 .variation {
   padding: 0;
-  border: 1px solid var(--line);
+  border: 1px solid var(--hairline);
   border-radius: 3px;
   overflow: hidden;
   background: var(--surface-2);
@@ -1055,6 +1194,23 @@ input[type='number'][aria-invalid='true'] {
   font-weight: 400;
 }
 
+/* The other files, and what can be copied: a small label before each group. */
+.export-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 10px;
+}
+
+.export-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
 .secondary {
   display: flex;
   flex-wrap: wrap;
@@ -1062,7 +1218,8 @@ input[type='number'][aria-invalid='true'] {
   gap: 6px;
 }
 
-.secondary button {
+.secondary button,
+.export .share {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1075,17 +1232,20 @@ input[type='number'][aria-invalid='true'] {
   font-weight: 500;
 }
 
-.secondary button svg {
+.secondary button svg,
+.export .share svg {
   width: 16px;
   height: 16px;
 }
 
-.secondary button:hover:not(:disabled, [aria-disabled='true']) {
+.secondary button:hover:not(:disabled, [aria-disabled='true']),
+.export .share:hover {
   border-color: var(--muted);
 }
 
 .secondary button:disabled,
-.secondary button[aria-busy='true'] {
+.secondary button[aria-busy='true'],
+.export .share[aria-busy='true'] {
   cursor: progress;
   opacity: 0.6;
 }
@@ -1108,11 +1268,11 @@ input[type='number'][aria-invalid='true'] {
   text-align: center;
 }
 
-/* Mockups: a small preview, the kind, and a download. */
+/* Mockups: the preview as wide as the box (a link card's line can be read), the kind, a download. */
 .mockup {
   display: flex;
-  align-items: center;
-  gap: 14px;
+  flex-direction: column;
+  gap: 10px;
   width: 100%;
   padding: 10px;
   border: 1px solid var(--line);
@@ -1121,15 +1281,19 @@ input[type='number'][aria-invalid='true'] {
 }
 
 .mockup-preview {
-  flex: 0 0 auto;
-  width: 96px;
-  height: 96px;
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 240px;
   object-fit: contain;
+}
+
+.mockup-preview:not([src]) {
+  display: none;
 }
 
 .mockup-controls {
   display: flex;
-  flex: 1;
   flex-direction: column;
   gap: 6px;
   min-width: 0;
@@ -1137,13 +1301,17 @@ input[type='number'][aria-invalid='true'] {
 
 .mockup-controls button {
   align-self: start;
-  height: 34px;
+  height: 36px;
   padding: 0 13px;
   background: var(--surface-2);
   border: 1px solid var(--line);
   border-radius: 9px;
   font-size: 14px;
   font-weight: 500;
+}
+
+.mockup-controls button:hover {
+  border-color: var(--muted);
 }
 
 .mockup-controls button[aria-busy='true'] {
@@ -1166,18 +1334,97 @@ input[type='number'][aria-invalid='true'] {
   gap: 10px;
 }
 
+/* Each panel's heading a card to open: its name, what it makes, and a chevron. */
 .many summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  list-style: none;
   cursor: pointer;
 }
 
+.many summary::-webkit-details-marker {
+  display: none;
+}
+
+.many summary:hover {
+  border-color: var(--muted);
+}
+
 .many summary h2 {
-  display: inline;
   margin: 0;
+  font: 600 16px/1.3 var(--display);
+  color: var(--text);
+}
+
+.panel-desc {
+  grid-column: 1;
   font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   color: var(--muted);
+}
+
+.many .chevron {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  width: 20px;
+  height: 20px;
+  color: var(--muted);
+  transition: transform 0.2s;
+}
+
+.many details[open] .chevron {
+  transform: rotate(180deg);
+}
+
+/* A panel's buttons: as tall as the other buttons, not little pills. */
+.panel-btn {
+  height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--control-line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.panel-btn:hover {
+  border-color: var(--text);
+}
+
+.panel-btn.quiet {
+  font-weight: 500;
+}
+
+.panel-btn[aria-busy='true'] {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+/* The books the last ZIP left out, and why. */
+.many-failed {
+  padding: 10px 12px;
+  border: 1px solid var(--control-line);
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.many-failed p {
+  margin: 0 0 4px;
+  font-weight: 600;
+}
+
+.many-failed ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
 }
 
 .many details[open] > * + * {
@@ -1192,6 +1439,7 @@ input[type='number'][aria-invalid='true'] {
 
 .many-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
@@ -1218,6 +1466,59 @@ input[type='number'][aria-invalid='true'] {
   flex-direction: column;
   gap: 4px;
   min-width: 0;
+}
+
+/* The back's and the spine's colours: the cover's palette, as swatches to press. */
+.print-colours {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: 10px 16px;
+}
+
+.print-colour {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.colour-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.colour-choice {
+  width: 34px;
+  height: 34px;
+  padding: 3px;
+  border: 1px solid var(--control-line);
+  border-radius: 9px;
+  background: var(--surface);
+}
+
+.colour-chip {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px var(--hairline);
+}
+
+.colour-choice:hover {
+  border-color: var(--text);
+}
+
+.colour-choice[aria-pressed='true'] {
+  border-color: var(--text);
+  outline: 2px solid var(--text);
+  outline-offset: 1px;
+}
+
+.colour-choice[aria-pressed='true']:focus-visible {
+  outline-color: var(--focus);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 2px var(--text);
 }
 
 .print-preview {
@@ -1257,6 +1558,10 @@ input[type='number'][aria-invalid='true'] {
   cursor: pointer;
 }
 
+.kept-tool:hover {
+  border-color: var(--muted);
+}
+
 .kept-tool[aria-busy='true'] {
   cursor: progress;
   opacity: 0.6;
@@ -1294,8 +1599,20 @@ input[type='number'][aria-invalid='true'] {
   grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
   gap: 10px;
   margin: 0;
-  padding: 0;
+  /* (Room above for the remove buttons, which stand out over the covers' corners.) */
+  padding: 8px 0 0;
   list-style: none;
+}
+
+/* Many covers' previews: thumbnails, however large the covers are. */
+.kept-list li > img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 2px 4px 4px 2px;
+  box-shadow:
+    0 0 0 1px var(--hairline),
+    0 4px 10px -4px rgb(0 0 0 / 0.4);
 }
 
 .kept-list li {
@@ -1310,7 +1627,9 @@ input[type='number'][aria-invalid='true'] {
   border-radius: 2px 4px 4px 2px;
   overflow: hidden;
   background: none;
-  box-shadow: 0 4px 10px -4px rgb(0 0 0 / 0.4);
+  box-shadow:
+    0 0 0 1px var(--hairline),
+    0 4px 10px -4px rgb(0 0 0 / 0.4);
 }
 
 .kept-open img {
@@ -1325,11 +1644,15 @@ input[type='number'][aria-invalid='true'] {
   width: 24px;
   height: 24px;
   padding: 0;
-  border: 1px solid var(--line);
+  border: 1px solid var(--control-line);
   border-radius: 50%;
   background: var(--surface);
   font-size: 14px;
   line-height: 1;
+}
+
+.kept-remove:hover {
+  border-color: var(--text);
 }
 
 /* -------------------------------------------------------------------- rail */
@@ -1445,6 +1768,7 @@ input[type='number'][aria-invalid='true'] {
   overflow: hidden;
   background: var(--line);
   box-shadow:
+    0 0 0 1px var(--hairline),
     0 1px 2px rgb(0 0 0 / 0.1),
     0 8px 18px -6px rgb(0 0 0 / 0.3);
   transition:
@@ -1461,6 +1785,7 @@ input[type='number'][aria-invalid='true'] {
 .tile:hover .tile-img {
   transform: translateY(-3px);
   box-shadow:
+    0 0 0 1px var(--hairline),
     0 2px 4px rgb(0 0 0 / 0.1),
     0 16px 28px -8px rgb(0 0 0 / 0.35);
 }
@@ -1488,6 +1813,44 @@ input[type='number'][aria-invalid='true'] {
     center / 13px no-repeat;
 }
 
+/* ------------------------------------------------------------------- about */
+
+.about {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 24px 24px 40px;
+}
+
+.about h1 {
+  margin: 0;
+  font: 600 34px/1.15 var(--display);
+}
+
+.about-item {
+  margin-top: 28px;
+  scroll-margin-top: 16px;
+}
+
+.about-item h2 {
+  margin: 0 0 8px;
+  font: 600 21px/1.3 var(--display);
+}
+
+.about-item p,
+.about-item li {
+  margin: 0 0 10px;
+  line-height: 1.6;
+}
+
+.about-item ol {
+  margin: 0;
+  padding-left: 1.4em;
+}
+
+.about-item a {
+  color: var(--accent);
+}
+
 /* ----------------------------------------------------------------- gallery */
 
 .gallery {
@@ -1501,6 +1864,45 @@ input[type='number'][aria-invalid='true'] {
   font: 600 34px/1.15 var(--display);
 }
 
+/* Under the gallery's heading: make a cover, or jump to a family. */
+.gallery-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin: -8px 0 8px;
+}
+
+.gallery-actions .primary {
+  text-decoration: none;
+}
+
+.gallery-families {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.gallery-families a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 2px 12px;
+  border: 1px solid var(--control-line);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 13.5px;
+  text-decoration: none;
+}
+
+.gallery-families a:hover {
+  border-color: var(--text);
+}
+
+.gallery-group {
+  scroll-margin-top: 12px;
+}
+
 .gallery-group h2 {
   margin: 28px 0 14px;
   font: 600 22px/1.2 var(--display);
@@ -1508,9 +1910,9 @@ input[type='number'][aria-invalid='true'] {
 
 .gallery-grid {
   display: grid;
-  /* (Two to a row on a phone.) */
-  grid-template-columns: repeat(auto-fill, minmax(min(46%, 180px), 1fr));
-  gap: 22px 16px;
+  /* (Two to a row on a phone; five on a laptop, so a family's last row is seldom one alone.) */
+  grid-template-columns: repeat(auto-fill, minmax(min(46%, 230px), 1fr));
+  gap: 26px 20px;
 }
 
 .gallery-item {
@@ -1526,7 +1928,9 @@ input[type='number'][aria-invalid='true'] {
   width: 100%;
   border-radius: 4px;
   overflow: hidden;
-  box-shadow: 0 10px 24px -14px rgb(0 0 0 / 0.5);
+  box-shadow:
+    0 0 0 1px var(--hairline),
+    0 10px 24px -14px rgb(0 0 0 / 0.5);
   aspect-ratio: 2 / 3;
   background: var(--surface-2);
   transition: transform 0.15s ease;
@@ -1653,14 +2057,84 @@ pre {
 .toast.show {
   opacity: 1;
   transform: translate(-50%, 0);
+  /* (Hovered, it stays: a message is kept on show while the pointer is over it.) */
+  pointer-events: auto;
 }
 
-/* Wider screens: at the top, clear of the export buttons (which can sit at the bottom edge). */
-@media (min-width: 760px) {
+/* An action in a toast, such as Undo. */
+.toast-action {
+  margin-left: 6px;
+  padding: 2px 4px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Something that went wrong: its own colours, and a button to dismiss it. */
+.toast.error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px 8px 16px;
+  border: 2px solid #b91c1c;
+  border-radius: 12px;
+  background: #fef2f2;
+  color: #7f1d1d;
+}
+
+.toast-close {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.toast-close:hover {
+  background: rgb(127 29 29 / 0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+  .toast.error {
+    border-color: #f87171;
+    background: #2a1414;
+    color: #fecaca;
+  }
+
+  .toast-close:hover {
+    background: rgb(254 202 202 / 0.12);
+  }
+}
+
+/* Tablets: at the top, clear of the export buttons (which can sit at the bottom edge). */
+@media (min-width: 760px) and (max-width: 1279px) {
   .toast {
     top: 20px;
     bottom: auto;
     transform: translate(-50%, -20px);
+  }
+}
+
+/* Laptops: the export buttons are beside the cover, from the top: the toast is at the bottom left,
+   under the controls' column. */
+@media (min-width: 1280px) {
+  .toast {
+    left: max(24px, (100vw - 1440px) / 2 + 24px);
+    max-width: 300px;
+    border-radius: 14px;
+    transform: translateY(20px);
+  }
+
+  .toast.show {
+    transform: none;
   }
 }
 
@@ -1699,7 +2173,6 @@ pre {
 
 /* -------------------------------------------------------------- responsive */
 
-/* Tablets and small laptops: two columns, the style rail below. */
 /* Wider screens: the preview stays in view while the controls (or the page) scroll. */
 @media (min-width: 760px) {
   .stage {
@@ -1708,7 +2181,101 @@ pre {
   }
 }
 
-@media (max-width: 1199px) {
+/* Laptops and wider: the downloads in a column beside the cover, so every export is in view with
+   it, and the whole stage fits the window (and so stays in view as the controls scroll). */
+@media (min-width: 1280px) {
+  .stage {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 260px;
+    grid-template-rows: auto auto 1fr;
+    align-items: start;
+    gap: 14px 20px;
+  }
+
+  .preview-wrap,
+  .meta,
+  .variations-row {
+    grid-column: 1;
+  }
+
+  .meta,
+  .variations-row {
+    justify-self: center;
+  }
+
+  .export {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+    justify-items: stretch;
+    width: 100%;
+  }
+
+  .book {
+    /* (Only the caption and the variations under it now.) */
+    width: min(100%, 520px, calc((100vh - 200px) * var(--cover-w) / var(--cover-h)));
+  }
+
+  .export-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .export .secondary {
+    justify-content: flex-start;
+  }
+
+  .secondary button,
+  .export .share {
+    height: 34px;
+    padding: 0 11px;
+    font-size: 13.5px;
+  }
+
+  .export .share {
+    justify-self: start;
+  }
+
+  /* The size under the label, in this narrow column. */
+  .export .download-text {
+    display: flex;
+    flex-direction: column;
+    align-items: start;
+    line-height: 1.25;
+  }
+
+  .export .download small {
+    margin: 0;
+    font-size: 12.5px;
+  }
+
+  .mockup-preview {
+    max-height: 130px;
+  }
+
+  .size {
+    justify-content: space-between;
+  }
+
+  .size .segmented {
+    flex: 1;
+    width: auto;
+  }
+
+  .size-hint {
+    text-align: left;
+  }
+}
+
+/* Small laptops: three columns still, a little narrower. */
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .app {
+    grid-template-columns: 290px minmax(0, 1fr) 280px;
+    gap: 20px;
+  }
+}
+
+/* Tablets: two columns, the style rail below. */
+@media (max-width: 1023px) {
   .app {
     grid-template-columns: 290px minmax(0, 1fr);
   }
@@ -1741,13 +2308,33 @@ pre {
     padding: 14px 16px 4px;
   }
 
+  /* (On one line, where it fits beside the links: the generator starts higher.) */
+  .brand {
+    font-size: 16px;
+  }
+
+  @media (min-width: 360px) {
+    .brand {
+      white-space: nowrap;
+    }
+  }
+
   /* (Only Gallery and GitHub: the header fits a 320px screen.) */
   .site-header nav .nav-wide {
     display: none;
   }
 
   .intro {
-    padding: 8px 16px 14px;
+    padding: 6px 16px 12px;
+  }
+
+  /* (The heading alone: the first screen has room for the title field.) */
+  .intro p {
+    display: none;
+  }
+
+  .noscript {
+    width: calc(100% - 32px);
   }
 
   .app {
@@ -1779,20 +2366,50 @@ pre {
     background: var(--surface-2);
   }
 
+  /* (Narrower than the frame by the buttons on either side.) */
   .book {
-    width: auto;
+    width: min(100% - 104px, 36vh * var(--cover-w) / var(--cover-h));
     min-width: 0;
-    height: 36vh;
+  }
+
+  .flank {
+    position: absolute;
+    top: 50%;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 1px solid var(--control-line);
+    border-radius: 50%;
+    background: var(--surface);
+    color: var(--text);
+    transform: translateY(-50%);
+  }
+
+  .flank svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .flank-prev {
+    left: 10px;
+  }
+
+  .flank-next {
+    right: 10px;
+  }
+
+  /* The form first, right under the preview: the title field is on the first screen. */
+  .controls {
+    order: 2;
+    position: static;
   }
 
   .meta,
   .variations-row {
-    order: 2;
-  }
-
-  .controls {
     order: 3;
-    position: static;
   }
 
   .export {
@@ -1827,6 +2444,16 @@ pre {
     scroll-snap-align: start;
   }
 
+  /* 16px text in fields: smaller, and iOS Safari zooms the page in when one is focused. */
+  input[type='text'],
+  input[type='number'],
+  textarea,
+  select,
+  #seed,
+  .rail-genre select {
+    font-size: 16px;
+  }
+
   .mobile-bar {
     position: fixed;
     left: 0;
@@ -1834,20 +2461,34 @@ pre {
     bottom: 0;
     z-index: 10;
     display: flex;
-    gap: 10px;
+    gap: 8px;
     padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
     background: var(--surface);
     border-top: 1px solid var(--line);
     box-shadow: 0 -6px 20px rgb(0 0 0 / 0.08);
   }
 
+  .mobile-bar .icon-btn {
+    width: 44px;
+    height: 44px;
+  }
+
   .mobile-bar .primary {
     flex: 1;
+    min-width: 0;
+    padding: 0 12px;
   }
 
   .mobile-bar .download {
+    flex: none;
+    width: auto;
     height: 44px;
     font-size: 15px;
+  }
+
+  .mobile-bar .keep-toggle svg {
+    width: 20px;
+    height: 20px;
   }
 
   .toast {
@@ -1856,6 +2497,68 @@ pre {
 
   .usage {
     padding: 24px 16px;
+  }
+}
+
+/* Touch screens: controls a finger can hit (40px or more), with room between them. */
+@media (pointer: coarse) {
+  .icon-btn {
+    width: 40px;
+    height: 40px;
+  }
+
+  .tools {
+    gap: 4px;
+  }
+
+  .chip {
+    min-height: 40px;
+    padding: 2px 14px;
+  }
+
+  .kept-tool,
+  .rail-jump {
+    min-height: 40px;
+    padding: 2px 14px;
+  }
+
+  .frame-toggle {
+    min-height: 36px;
+  }
+
+  .segmented button {
+    padding: 11px 4px;
+  }
+
+  .hint-toggle,
+  .link-btn {
+    min-height: 40px;
+  }
+
+  .swatch {
+    height: 40px;
+  }
+
+  .colour-choice {
+    width: 40px;
+    height: 40px;
+  }
+
+  .secondary button,
+  .export .share {
+    height: 40px;
+  }
+
+  .kept-list {
+    gap: 16px;
+    padding-top: 12px;
+  }
+
+  /* (A 40px target round the small button.) */
+  .kept-remove::before {
+    content: '';
+    position: absolute;
+    inset: -8px;
   }
 }
 

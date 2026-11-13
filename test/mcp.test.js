@@ -212,6 +212,56 @@ test('book-cover --mcp: a message a line, and a cover saved to a file', async ()
   }
 });
 
+test('book-cover --mcp saves only an .svg, and never over a file of another kind', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'book-cover-mcp-'));
+  try {
+    const { writeFile } = await import('node:fs/promises');
+    await writeFile(join(dir, 'notes.svg'), 'export PATH=/usr/bin\n');
+    await writeFile(join(dir, 'old.svg'), '<?xml version="1.0"?>\n<svg xmlns="http://www.w3.org/2000/svg"/>');
+    const child = spawn(process.execPath, [fileURLToPath(new URL('../bin/book-cover.js', import.meta.url)), '--mcp'], {
+      cwd: dir,
+    });
+    let out = '';
+    child.stdout.on('data', (d) => (out += d));
+    const save = (/** @type {number} */ id, /** @type {string} */ output) => ({
+      jsonrpc: '2.0',
+      id,
+      method: 'tools/call',
+      params: { name: 'create_cover', arguments: { title: 'Saved', output } },
+    });
+    const lines = [save(1, join(dir, '.zshrc')), save(2, join(dir, 'notes.svg')), save(3, join(dir, 'old.svg'))];
+    child.stdin.end(`${lines.map((l) => JSON.stringify(l)).join('\n')}\n`);
+    await new Promise((resolve) => child.on('close', resolve));
+    const [other, notSvg, svg] = out
+      .trim()
+      .split('\n')
+      .map((l) => JSON.parse(l).result);
+    assert.equal(other.isError, true);
+    assert.match(other.content[0].text, /must name an \.svg file/);
+    assert.equal(notSvg.isError, true);
+    assert.match(notSvg.content[0].text, /isn't an SVG: not replaced/);
+    assert.equal(await readFile(join(dir, 'notes.svg'), 'utf8'), 'export PATH=/usr/bin\n');
+    assert.equal(svg.isError, undefined);
+    assert.match(await readFile(join(dir, 'old.svg'), 'utf8'), /^<svg [\s\S]*Saved/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('a mockup’s link holds its line as the mockup draws it', () => {
+  const answer = handleMessage({
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'tools/call',
+    params: {
+      name: 'create_mockup',
+      arguments: { title: 'Dune', kind: 'card', text: `Out   now ${'x'.repeat(5000)}` },
+    },
+  });
+  const line = new URL(/** @type {any} */ (answer).result.structuredContent.imageUrl).searchParams.get('text');
+  assert.equal(line, `Out now ${'x'.repeat(72)}`);
+});
+
 test('the Worker answers MCP at /mcp', async () => {
   /** @param {string} method @param {unknown} [body] */
   const post = (method, body) =>
@@ -314,4 +364,17 @@ test('the Worker reads at most 1 MB of a body, even one that doesn’t say its l
   );
   assert.equal(res.status, 413);
   assert.ok(sent < 40, `read ${sent} chunks`);
+});
+
+test('the MCP registry entry (server.json) is this package, at its version, with this server', async () => {
+  const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+  const server = JSON.parse(await readFile(new URL('../server.json', import.meta.url), 'utf8'));
+  // (The registry checks the package's mcpName is the entry's name.)
+  assert.equal(server.name, pkg.mcpName);
+  assert.equal(server.version, pkg.version);
+  assert.ok(server.description.length <= 100, 'the registry takes 100 characters');
+  const [npm] = server.packages;
+  assert.deepEqual([npm.identifier, npm.version], [pkg.name, pkg.version]);
+  assert.deepEqual(npm.packageArguments, [{ type: 'positional', value: '--mcp' }]);
+  assert.deepEqual(server.remotes, [{ type: 'streamable-http', url: 'https://covers.otsirh.dev/mcp' }]);
 });

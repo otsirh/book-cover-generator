@@ -124,8 +124,6 @@ export async function pngEngine(resvg, wasm, fontFile) {
   const buffers = await Promise.all(FONT_FILES.map(fontFile));
   const faces = buffers.map(readFont);
   const fonts = fontSet(faces);
-  /** Why resvg can't be used again, once it has failed. @type {Error | null} */
-  let broken = null;
   return {
     fonts,
     /**
@@ -148,44 +146,43 @@ export async function pngEngine(resvg, wasm, fontFile) {
      * @returns {Uint8Array}
      */
     render(svg, scale = 1) {
-      if (broken) throw broken;
       const { svg: ready, whole } = prepared(svg, fonts);
       // Only the families it names (prepare names one on each line, which has every letter of it),
       // and the serif resvg falls back to: the fonts are copied into resvg's memory for each
       // drawing. (All of them where no one family has a line's letters.)
       const named = new Set([GENERIC.serif, ...[...ready.matchAll(/\sfont-family="([^"]*)"/g)].map((m) => m[1])]);
       const fontBuffers = whole ? buffers.filter((_, i) => named.has(faces[i].family)) : buffers;
-      const r = new resvg.Resvg(ready, {
-        fitTo: { mode: 'zoom', value: scale },
-        font: {
-          fontBuffers,
-          loadSystemFonts: false,
-          defaultFontFamily: GENERIC.serif,
-          serifFamily: GENERIC.serif,
-          sansSerifFamily: GENERIC['sans-serif'],
-          monospaceFamily: GENERIC.monospace,
-        },
-      });
+      /** @type {any} */
+      let r;
+      /** @type {any} */
       let image;
+      let trapped = false;
       try {
+        r = new resvg.Resvg(ready, {
+          fitTo: { mode: 'zoom', value: scale },
+          font: {
+            fontBuffers,
+            loadSystemFonts: false,
+            defaultFontFamily: GENERIC.serif,
+            serifFamily: GENERIC.serif,
+            sansSerifFamily: GENERIC['sans-serif'],
+            monospaceFamily: GENERIC.monospace,
+          },
+        });
         image = r.render();
         return image.asPng();
       } catch (err) {
-        // resvg stopped (a WebAssembly trap): what it held isn't safe to free or to use again, so
-        // this engine draws no more; the next request makes a new one. (An error it reports, such
-        // as a size of nothing, leaves it sound.)
-        if (err instanceof WebAssembly.RuntimeError) broken = err;
+        // resvg stopped (a WebAssembly trap): what it held isn't safe to free, and stays taken (its
+        // memory never shrinks; the runtime replaces an instance that runs out). An error it
+        // reports, such as a size of nothing, leaves it sound.
+        trapped = err instanceof WebAssembly.RuntimeError;
         throw err;
       } finally {
-        if (!broken) {
+        if (!trapped) {
           image?.free?.();
-          r.free?.();
+          r?.free?.();
         }
       }
-    },
-    /** Whether resvg failed (the Worker then makes a new engine). */
-    get broken() {
-      return Boolean(broken);
     },
   };
 }

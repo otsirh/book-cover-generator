@@ -2,9 +2,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
-import { FONT_FILES, fontSet, readFont } from '../worker/fonts.js';
-import { pngEngine, drawnText, prepare } from '../worker/png.js';
-import { createCover, createMockup, styles, FONTS, measureText } from '../src/index.js';
+import { FONT_FILES, GENERIC, fontSet, readFont } from '../worker/fonts.js';
+import { pngEngine, drawnText, prepare, COVER_PIXELS } from '../worker/png.js';
+import { createCover, createMockup, styles, palettes, FONTS, measureText } from '../src/index.js';
+import { contrast } from '../src/core.js';
 import { textBoxes, extentOf } from './svg-text.js';
 
 const file = (/** @type {string} */ path) => new Uint8Array(readFileSync(new URL(`../${path}`, import.meta.url)));
@@ -149,25 +150,38 @@ test('prepare: a lone filled shape’s opacity is its fill’s; others keep thei
   assert.match(ready, /<g opacity="0.2">/);
 });
 
-test('an engine whose resvg stopped draws no more (the Worker makes a new one)', async () => {
+test('a drawing that traps resvg isn’t freed (that would trap again), and the engine draws on', async () => {
   // A stand-in resvg whose drawing traps, as resvg 2.6 did on some designs.
+  let frees = 0;
+  let draws = 0;
   const trapping = {
     initWasm: async () => {},
     Resvg: class {
+      constructor(/** @type {string} */ svg) {
+        if (svg.includes('early')) throw new WebAssembly.RuntimeError('unreachable');
+      }
       render() {
-        throw new WebAssembly.RuntimeError('unreachable');
+        draws++;
+        if (draws === 1) throw new WebAssembly.RuntimeError('unreachable');
+        return { asPng: () => new Uint8Array([1]), free: () => frees++ };
       }
       free() {
-        throw new Error('recursive use of an object detected');
+        frees++;
       }
     },
   };
   const fonts = FONT_FILES.slice(0, 1);
-  const broken = await pngEngine(trapping, new Uint8Array(), async () => file(`public/fonts/${fonts[0]}`));
-  assert.equal(broken.broken, false);
-  assert.throws(() => broken.render('<svg xmlns="http://www.w3.org/2000/svg"/>'), /unreachable/);
-  assert.equal(broken.broken, true);
-  assert.throws(() => broken.render('<svg xmlns="http://www.w3.org/2000/svg"/>'), /unreachable/);
+  const drawer = await pngEngine(trapping, new Uint8Array(), async () => file(`public/fonts/${fonts[0]}`));
+  assert.throws(() => drawer.render('<svg xmlns="http://www.w3.org/2000/svg"/>'), /unreachable/);
+  assert.equal(frees, 0);
+  // (A trap as it starts, too.)
+  assert.throws(
+    () => drawer.render('<svg xmlns="http://www.w3.org/2000/svg"><title>early</title></svg>'),
+    /unreachable/,
+  );
+  assert.equal(frees, 0);
+  assert.deepEqual(drawer.render('<svg xmlns="http://www.w3.org/2000/svg"/>'), new Uint8Array([1]));
+  assert.equal(frees, 2);
 });
 
 test(
@@ -200,3 +214,118 @@ test(
     }
   },
 );
+
+test('the blurred styles draw at the pixel cap in a fraction of a Worker’s memory', { skip }, async () => {
+  // A resvg of its own (the module loaded afresh starts its own WebAssembly), its memory caught as
+  // it starts. The memory only grows, so its size after the drawings is the most they needed.
+  /** @type {WebAssembly.Memory | undefined} */
+  let memory;
+  const instantiate = WebAssembly.instantiate;
+  WebAssembly.instantiate = async (...args) => {
+    const made = await instantiate(...args);
+    memory = (made.instance ?? made).exports.memory;
+    return made;
+  };
+  let own;
+  try {
+    const fresh = await import(new URL('../node_modules/@resvg/resvg-wasm/index.mjs?memory', import.meta.url).href);
+    own = await pngEngine(fresh, file('node_modules/@resvg/resvg-wasm/index_bg.wasm'), async (name) =>
+      file(`public/fonts/${name}`),
+    );
+  } finally {
+    WebAssembly.instantiate = instantiate;
+  }
+  assert.ok(memory, 'resvg’s memory');
+  // Their blurs' regions are the cover and 3σ around it (27 MiB in all): 220% of each blurred
+  // group, which already spans the cover, took these drawings to 103 MiB of the Worker's 128 MB.
+  const side = Math.floor(Math.sqrt(COVER_PIXELS));
+  for (const style of ['aurora', 'thriller', 'ribbon']) {
+    for (const [width, height] of [
+      [600, 900],
+      [side, side],
+    ]) {
+      for (const seed of ['s', 'c']) {
+        const cover = own.laidOut(() =>
+          createCover({ title: 'The Lighthouse Keeper', author: 'Mara Ellison', style, seed, width, height }),
+        );
+        own.render(cover.svg);
+      }
+    }
+  }
+  const mib = memory.buffer.byteLength / 2 ** 20;
+  assert.ok(mib <= 48, `resvg took ${mib.toFixed(0)} MiB`);
+});
+
+test('Aurora sets its text at 3:1 or more against the pixels around it, over every palette', { skip }, () => {
+  // Each line of text, drawn as the Worker draws it, against the pixels just outside its letters:
+  // the blurred fields where they overlap, the grain and the text's own shadow. (Each field alone
+  // keeping 3:1 against the ink left a fifth of a line's outline under it on 2 covers in 5.)
+  const buffers = FONT_FILES.map((f) => file(`public/fonts/${f}`));
+  const families = buffers.map((b) => readFont(b).family);
+  /** The SVG's pixels (RGBA) as resvg draws it. @param {string} svg */
+  const draw = (svg) => {
+    const ready = prepare(svg, engine.fonts);
+    const named = new Set([GENERIC.serif, ...[...ready.matchAll(/\sfont-family="([^"]*)"/g)].map((m) => m[1])]);
+    const r = new /** @type {typeof import('@resvg/resvg-wasm')} */ (resvg).Resvg(ready, {
+      font: {
+        fontBuffers: buffers.filter((_, i) => named.has(families[i])),
+        loadSystemFonts: false,
+        defaultFontFamily: GENERIC.serif,
+      },
+    });
+    const image = r.render();
+    const out = { width: image.width, pixels: image.pixels.slice() };
+    image.free();
+    r.free();
+    return out;
+  };
+  const seeds = ['a', 'b', 'c', 'd', 'e', 'f'];
+  palettes.forEach((p, k) => {
+    const seed = seeds[k % seeds.length];
+    const { svg } = engine.laidOut(() =>
+      createCover({ title: 'The Lighthouse Keeper', author: 'Mara Ellison', style: 'aurora', palette: p.id, seed }),
+    );
+    const cover = draw(svg).pixels;
+    const open = svg.slice(0, svg.indexOf('>') + 1);
+    for (const [, attrs, lines] of svg.matchAll(/<g ([^>]*)>((?:<text\b[^>]*>[^<]*<\/text>)+)<\/g>/g)) {
+      const ink = /\sfill="(#[0-9a-f]{6})"/.exec(attrs)?.[1] ?? '';
+      const plain = attrs.replace(/\s(?:filter|fill|opacity)="[^"]*"/g, '');
+      for (const [line, text] of lines.matchAll(/<text\b[^>]*>([^<]*)<\/text>/g)) {
+        // The line alone, white on black: where its letters are.
+        const { width, pixels } = draw(
+          `${open}<rect width="100%" height="100%"/><g ${plain} fill="#fff">${line}</g></svg>`,
+        );
+        const height = pixels.length / 4 / width;
+        const on = (/** @type {number} */ x, /** @type {number} */ y) => pixels[(y * width + x) * 4] > 0;
+        let [x0, y0, x1, y1] = [width, height, 0, 0];
+        for (let i = 0; i < pixels.length; i += 4) {
+          if (!pixels[i]) continue;
+          const x = (i / 4) % width;
+          const y = Math.floor(i / 4 / width);
+          [x0, y0, x1, y1] = [Math.min(x0, x), Math.min(y0, y), Math.max(x1, x), Math.max(y1, y)];
+        }
+        // Its outline: the pixels with none of a letter that touch one.
+        let ring = 0;
+        let under = 0;
+        for (let y = Math.max(1, y0 - 1); y <= Math.min(height - 2, y1 + 1); y++) {
+          for (let x = Math.max(1, x0 - 1); x <= Math.min(width - 2, x1 + 1); x++) {
+            if (on(x, y)) continue;
+            let touches = false;
+            for (let dy = -1; dy <= 1 && !touches; dy++)
+              for (let dx = -1; dx <= 1; dx++) touches ||= on(x + dx, y + dy);
+            if (!touches) continue;
+            ring++;
+            const i = (y * width + x) * 4;
+            const seen = `#${[cover[i], cover[i + 1], cover[i + 2]].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+            if (contrast(seen, ink) < 3) under++;
+          }
+        }
+        assert.ok(ring > 0, `${p.id} ${seed}: "${text}" is drawn`);
+        assert.ok(
+          under / ring < 0.2,
+          `${p.id} ${seed}: ${Math.round((under / ring) * 100)}% of "${text}"'s outline is under 3:1`,
+        );
+      }
+    }
+  });
+});

@@ -1,0 +1,36 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.otsirh/book-cover-generator",
+  "title": "Book Cover Generator",
+  "description": "Book covers from a title and an author: 39 styles, 28 palettes, mockups, SVG and PNG.",
+  "websiteUrl": "https://covers.otsirh.dev/",
+  "repository": {
+    "url": "https://github.com/otsirh/book-cover-generator",
+    "source": "github"
+  },
+  "version": "1.12.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "book-cover-generator",
+      "version": "1.12.0",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "--mcp"
+        }
+      ]
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://covers.otsirh.dev/mcp"
+    }
+  ]
+}

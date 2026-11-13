@@ -176,3 +176,8 @@ test('colours as a link writes them: six hex digits, or as given for the reader 
   for (const odd of ['#1a2b3c4', 'red', '#12345']) assert.equal(sixDigits(odd), odd);
   assert.equal(customPalette(['#000', '#FFF', '#f00']), 'custom-000000-ffffff-ff0000');
 });
+
+test('only the list’s own column names are read, not an object’s (constructor, __proto__)', () => {
+  assert.deepEqual(parseBookList('title,constructor,__proto__,toString\nDune,x,y,z\n'), [{ title: 'Dune' }]);
+  assert.deepEqual(parseBookList('{"title":"Dune","constructor":"x","__proto__":{"a":1}}\n'), [{ title: 'Dune' }]);
+});

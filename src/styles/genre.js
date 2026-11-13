@@ -41,7 +41,7 @@ export const thriller = {
     const g = grain(c, { opacity: dark ? 0.16 : 0.12, light: dark });
 
     // A blurred, tinted "photograph": dark shapes, light streaks, vignette and grain.
-    let s = `<defs>${blurFilter(ids.blur, S * 0.06)}${radialGradient(
+    let s = `<defs>${blurFilter(ids.blur, S * 0.06, { width: W, height: H })}${radialGradient(
       ids.vig,
       [
         [0.4, '#000000', 0],
@@ -416,7 +416,40 @@ export const blueprint = {
     // Wide covers put the drawing on the left and a full-height title block on the right; others
     // have the drawing above a title block along the bottom.
     const wide = W / H > 1.4;
-    const blockH = wide ? H - m * 1.6 : Math.max(H * 0.24, S * 0.3);
+    const base = wide ? H - m * 1.6 : Math.max(H * 0.24, S * 0.3);
+    const bw = wide ? W * 0.5 - m * 0.8 : W - m * 1.6;
+    const labelSize = S * 0.018;
+    const labelRow = base * 0.18;
+    // The title block: the TITLE field, and under it a row for the author, the scale and the sheet.
+    const row = base * 0.32;
+    /** @param {number} titleH the TITLE field's height */
+    const titleOptions = (titleH) => ({
+      font: FONTS.condensed,
+      weight: 700,
+      upper: true,
+      letterSpacing: 0.04,
+      series: /** @type {false} */ (false),
+      maxWidth: bw - m * 0.8,
+      maxHeight: titleH - labelRow - m * 0.45,
+      maxSize: S * (wide ? 0.16 : 0.11),
+      lineHeight: 1.0,
+      maxLines: wide ? 4 : 3,
+      subtitleFont: FONTS.mono,
+      subtitleItalic: false,
+    });
+    // A subtitle or a long title doesn't shrink the title to fit: on a tall cover the TITLE field
+    // grows into the drawing's room until the title is 8% of the short side and keeps 70% of its
+    // size without the subtitle (the block of a wide cover is already the cover's height).
+    const alone = c.subtitle && !wide ? titleBlock(c, { ...titleOptions(base - row), subtitle: false }).smallest : 0;
+    const { block: t, value: titleH } = wide
+      ? { block: titleBlock(c, titleOptions(base - row)), value: base - row }
+      : fitTitleWith(
+          c,
+          [0, 0.15, 0.3, 0.45].map((k) => base * (0.68 + k)),
+          titleOptions,
+          Math.max(0.08, (alone * 0.7) / S),
+        );
+    const blockH = titleH + row;
     const blockTop = wide ? m * 0.8 : H - m * 0.8 - blockH;
     // The drawing, its centre lines and the dimension callout below it all fit beside or above the block.
     const cx = wide ? W * 0.25 : W / 2;
@@ -500,12 +533,10 @@ export const blueprint = {
     // Engineering title block.
     const bx = wide ? W * 0.5 : m * 0.8;
     const by = blockTop;
-    const bw = wide ? W * 0.5 - m * 0.8 : W - m * 1.6;
-    const labelSize = S * 0.018;
-    const labelRow = blockH * 0.18;
+    const rowTop = by + titleH;
     s += rect(bx, by, bw, blockH, bg, `stroke="${ink}" stroke-width="${n(2 * u)}"`);
-    s += line(bx, by + blockH * 0.68, bx + bw, by + blockH * 0.68, ink, u);
-    s += line(bx + bw * 0.68, by + blockH * 0.68, bx + bw * 0.68, by + blockH, ink, u);
+    s += line(bx, rowTop, bx + bw, rowTop, ink, u);
+    s += line(bx + bw * 0.68, rowTop, bx + bw * 0.68, by + blockH, ink, u);
     const label = (/** @type {string} */ text, /** @type {number} */ x, /** @type {number} */ y) =>
       `<text x="${n(x)}" y="${n(y)}" ${textGroupAttrs({ font: FONTS.mono, size: labelSize, fill: ink, opacity: 0.7 })}>${escapeXml(text)}</text>`;
     if (c.series) {
@@ -524,34 +555,20 @@ export const blueprint = {
         opacity: 0.7,
       });
     } else s += label('TITLE', bx + m * 0.4, by + labelRow * 0.7);
-    s += label('AUTHOR', bx + m * 0.4, by + blockH * 0.68 + labelRow * 0.7);
-    s += label(`SCALE 1:${rng.pick([2, 5, 10, 20])}`, bx + bw * 0.68 + m * 0.3, by + blockH * 0.68 + labelRow * 0.7);
+    s += label('AUTHOR', bx + m * 0.4, rowTop + labelRow * 0.7);
+    s += label(`SCALE 1:${rng.pick([2, 5, 10, 20])}`, bx + bw * 0.68 + m * 0.3, rowTop + labelRow * 0.7);
     s += label('SHEET 1 OF 1', bx + bw * 0.68 + m * 0.3, by + blockH - m * 0.35);
-    const t = titleBlock(c, {
-      font: FONTS.condensed,
-      weight: 700,
-      upper: true,
-      letterSpacing: 0.04,
-      series: false,
-      maxWidth: bw - m * 0.8,
-      maxHeight: blockH * 0.68 - labelRow - m * 0.45,
-      maxSize: S * (wide ? 0.16 : 0.11),
-      lineHeight: 1.0,
-      maxLines: wide ? 4 : 3,
-      subtitleFont: FONTS.mono,
-      subtitleItalic: false,
-    });
     s += t.draw({ x: bx + m * 0.4, y: by + labelRow + m * 0.15, fill: ink });
     const a = authorFit(c, {
       font: FONTS.mono,
       weight: 700,
       letterSpacing: 0.04,
       maxWidth: bw * 0.68 - m * 0.8,
-      maxHeight: blockH * 0.32 - labelRow - m * 0.2,
+      maxHeight: row - labelRow - m * 0.2,
       maxSize: S * 0.036,
       maxLines: 1,
     });
-    s += drawText(a, { x: bx + m * 0.4, y: by + blockH * 0.68 + labelRow + m * 0.1, fill: ink });
+    s += drawText(a, { x: bx + m * 0.4, y: rowTop + labelRow + m * 0.1, fill: ink });
     return s;
   },
 };

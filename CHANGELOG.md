@@ -4,6 +4,53 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+
+- **The HTTP API describes itself**: `/api/cover.json` says what a query draws (the style, palette, colours, seed, size and pins it came to, its link with every choice written out, and its SVG, PNG, edit and share URLs), `/api/catalog.json` lists every style, palette, genre, font, format and mockup, and `/api/openapi.json` describes the API as OpenAPI 3.1.
+- **The MCP server shows what it drew**: the hosted server (`/mcp`) answers `create_cover` and `create_mockup` with the picture (a PNG up to 480 px wide), so the assistant can see the cover and your client can show it; every server adds a link to the PNG (`pngUrl`).
+- **All of KDP's paperback trims**: `trimSizes` (and the app's print panel) has the sixteen, from 5 × 8 to 8.5 × 11 with 5.06 × 7.81, 6.69 × 9.61, 7.44 × 9.69, 7.5 × 9.25, 8 × 10, 8.25 × 6, 8.25 × 8.25, 8.5 × 8.5 and A4 (8.27 × 11.69); `createPrintCover` holds the largest to the fewer pages KDP prints at them (8.5 × 11 at most 590 on white paper), and says when a paper isn't offered at a size.
+- **An about page** (`/about/`, "Using your covers" in the footer): you may use the covers you make for anything, books you sell included, with no credit needed; what stays private; which fonts covers use and why a cover looks different elsewhere; and how to upload ebook and paperback covers to Amazon KDP.
+- **One file for `<book-cover>`**: `https://covers.otsirh.dev/element.js` is the element and the library as one minified module (48 KB compressed), for pages that would rather load one file than the two dozen of `/src/element.js`.
+- **The MCP registry**: the server is listed in the official MCP registry as `io.github.otsirh/book-cover-generator` (npm and the hosted `/mcp`), published by each release.
+- `download=1` on any image of the HTTP API answers it as a file named after the title (`download=my-cover` names it).
+- **Keep is a star on the preview**: it shows whether the design on show is kept, keeps it (or press K), and pressed again removes it. Removing a kept design, here or in the tray, offers Undo.
+- Undo and Redo with Ctrl or Cmd+Z too (Shift for Redo, or Ctrl+Y), outside text fields, and with single-key shortcuts off. On a phone, Undo and Keep are in the bar along the bottom, and the previous and next style beside the pinned preview.
+
+### Fixed
+
+- Link previews of a design show its picture on X and other sites whose crawlers honour `robots.txt`, which kept them from the image.
+- A PNG cover that fits is drawn at its size, to the pixel (600 × 1000 came as 597 × 995), and a PNG mockup shows the cover as sharp as it's shown (a story's cover was drawn smaller and enlarged).
+- The HTTP API answers a HEAD from the cache, as its GET, and a parameter it doesn't read (`&utm_source=…`) no longer draws a cover again.
+- `parseBookList` reads only its own column names: a `constructor` or `__proto__` column is ignored like any other unknown one.
+- `create_mockup`'s image link holds its line as the mockup draws it (at most 80 characters).
+- Aurora's title and author keep 3:1 against what is drawn behind them: each colour field kept it alone, but blurred fields add up where they overlap (two covers in five had a fifth of a line's outline under 3:1, down to 1.7:1). Where they would, a soft field of the background goes under that text, only as strong as it needs.
+- Blueprint no longer shrinks its title to make room for a subtitle (from 54 to 29 px on a 600 × 900 cover): on tall and square covers the title block grows into the drawing's room instead, and for a long title too.
+- Aurora, Thriller and Ribbon blur only the cover and the blur's reach around it, so their PNGs take a third of the memory they did (Aurora's up to 32 MiB of resvg's, from 98) and draw faster. `svgUtils.blurFilter(id, std, { width, height })` gives a filter that region.
+- Many covers' previews were drawn at full size, wider than the panel: the page grew sideways (892 px wide on a 390 px phone). They are thumbnails now.
+- Store size keeps the preview's frame, so the buttons under it no longer jump.
+- Dark covers, swatches and thumbnails keep an edge on the dark page, and white ones on white: a hairline goes round every cover.
+- The title font menu shows its names whole (the field is now "Title font and case").
+- Fields show the 2px focus ring everything else has. Fields, chips, the switches and the texture switch's track have edges of 3:1; placeholders and the Auto swatch's name are readable (4.5:1). The page heading is in the main landmark. Without JavaScript, a note at the top takes the place of controls that can't work.
+- The Variation dice is as wide as its neighbours; the format and size switches, the tray's buttons, Store size and the style's name react to the pointer; the Custom swatch says "Custom".
+
+### Security
+
+- The MCP server run locally (`book-cover --mcp`) saves a cover (`output`) only as an `.svg` file, and never over a file that isn't an SVG, so an assistant talked into a path can't replace other files.
+- Releases: the job that publishes to npm runs none of the repository's code; it publishes the package the checks passed, which is the one the GitHub release signs. JSR is checked and published with a pinned Deno instead of a package fetched at run time.
+
+### Changed
+
+- The site's PNGs not yet cached are limited to 240 a minute for each client, and MCP requests to 120 (`429` with `Retry-After`); SVGs aren't limited. The README says how to run your own copy. The site's Worker keeps its errors in Workers Logs, without query strings, and a daily check of the live site (pages, API, MCP, link previews and the version) runs in CI and after every deploy.
+- **Back leaves the site**: changes no longer add browser history entries (nine changes took ten Back presses to leave). Undo and Redo keep their steps in the page, and through a reload; the URL still holds the design, and links work as before.
+- **Laptops**: from 1280 px the downloads are a column beside the cover, so every export is in view with it, and the whole preview stays in view as the controls scroll. From 1024 px the styles are beside the preview (they were 800 px below it), and Browse scrolls the styles, not the page.
+- The exports are in groups, "Also as" and "Copy"; Copy image link is Copy embed link. For an eBook the main download is a JPEG, the file KDP takes.
+- Format comes right after the text, with a link to the paperback's back and spine. Many covers and Paperback for print open from cards that say what they make, with full-size buttons; the print panel's Back colour and Spine colour are swatches; and a book Many covers can't make is listed in the panel, with why.
+- On phones the title field is on the first screen: the form comes right under the pinned preview, and the line under the heading is gone. Fields have 16px text, so iOS doesn't zoom in, and on touch screens buttons, chips and swatches are 40px.
+- A first visit opens a sample book in a style and palette that suit it, as on the README's sheet, and its title is selected, so typing replaces it.
+- Messages stay four seconds or more (longer ones longer) and while the pointer is on them. Errors look different, are read out at once and stay until dismissed.
+- The mockup preview is as wide as its panel, so a link card's line can be read.
+- Gallery: each style shows a book of its own, and coming from the app every cover shows yours, as the click opens it. Links to each family and a Make a cover button are at the top; a laptop shows five covers to a row; the header marks the page you're on. The styles' Genre family is called Themed here and in the app, apart from the Genre menu.
+
 ## [1.12.0] - 2026-11-13
 
 PNG covers from the site, and link previews of a design. Covers are drawn as in 1.11.0.

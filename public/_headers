@@ -10,8 +10,14 @@
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Resource-Policy: same-origin
 
-# The library can be imported straight from the site by other origins.
+# The library can be imported straight from the site by other origins, as modules or as the
+# one-file <book-cover> (/element.js).
 /src/*
+  ! Cross-Origin-Resource-Policy
+  Cross-Origin-Resource-Policy: cross-origin
+  Access-Control-Allow-Origin: *
+
+/element.js
   ! Cross-Origin-Resource-Policy
   Cross-Origin-Resource-Policy: cross-origin
   Access-Control-Allow-Origin: *

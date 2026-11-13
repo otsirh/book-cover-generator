@@ -1,6 +1,8 @@
-// Runs before first paint (loaded as a blocking classic script): apply the cover
-// format from a shared link so the preview has the right shape from the start.
+// Runs before first paint (loaded as a blocking classic script): mark the page as scripted, and apply
+// the cover format from a shared link so the preview has the right shape from the start.
 (() => {
+  // The interface works: the stylesheet shows it (without JavaScript, a note says why it can't).
+  document.documentElement.classList.add('js');
   // (The last of a repeated key, trimmed, as the app reads links: src/link.js.)
   const format = (new URLSearchParams(location.hash.slice(1)).getAll('format').at(-1) ?? '').trim();
   const root = document.documentElement;

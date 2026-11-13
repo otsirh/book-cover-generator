@@ -1,6 +1,8 @@
 User-agent: *
 Allow: /
 Disallow: /api/
+# (A design's link preview shows its card: crawlers that honour this file may fetch it.)
+Allow: /api/mockup.png
 Disallow: /mcp
 
 Sitemap: https://covers.otsirh.dev/sitemap.xml

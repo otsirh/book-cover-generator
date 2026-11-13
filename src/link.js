@@ -137,6 +137,39 @@ export function writeLink(design) {
 }
 
 /**
+ * The link of the cover drawn, written as the app writes its links from the options it was drawn
+ * with (not the tool's arguments), with what the seed chose written out: the app and the API draw
+ * that cover. (The MCP server's links and the HTTP API's cover.json.)
+ * @param {import('./index.js').CoverOptions} options @param {ReturnType<typeof import('./index.js').createCover>} cover
+ */
+export function linkOf(options, cover) {
+  /** @type {Record<string, string>} */
+  const pinned = {};
+  for (const name of Object.keys(options.variants ?? {}).map((n) => n.toLowerCase())) {
+    if (Object.hasOwn(cover.variants, name)) pinned[name] = cover.variants[name];
+  }
+  const own = options.palette && typeof options.palette === 'object' ? options.palette : null;
+  const preset = Object.entries(formats).find(([, [w, h]]) => w === cover.width && h === cover.height);
+  return writeLink({
+    title: cover.title,
+    author: cover.author,
+    subtitle: options.subtitle ?? '',
+    series: options.series ?? '',
+    credit: options.credit ?? '',
+    badge: options.badge ?? '',
+    style: cover.style,
+    variant: variantOf(pinned),
+    font: options.font ?? '',
+    case: options.titleCase ?? '',
+    palette: own ? customPalette([own.bg, own.ink, ...(own.accents ?? [])]) : cover.palette,
+    // (A seed from the title stays one: the app reads an empty seed so.)
+    seed: options.seed != null ? cover.seed : '',
+    format: preset ? preset[0] : `${cover.width}x${cover.height}`,
+    texture: options.texture === true,
+  });
+}
+
+/**
  * Your own colours (background, text, one to three accents) as a link's palette: each as six hex
  * digits (#abc is #aabbcc; an alpha is dropped).
  * @param {readonly string[]} colors

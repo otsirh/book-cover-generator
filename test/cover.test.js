@@ -271,6 +271,12 @@ test('svgUtils helpers handle every documented input', async () => {
   const g = svgUtils.radialGradient('g', [[0, '#000']], { fx: 0.3 });
   assert.match(g, /fx="0.3"/);
   assert.doesNotMatch(g, /undefined|fy=/);
+  // A blur's region: room around the shape, or the cover and 3σ around it.
+  assert.match(svgUtils.blurFilter('b', 10), /<filter id="b" x="-60%" y="-60%" width="220%" height="220%">/);
+  assert.match(
+    svgUtils.blurFilter('b', 10, { width: 600, height: 900 }),
+    /<filter id="b" filterUnits="userSpaceOnUse" x="-30" y="-30" width="660" height="960"><feGaussianBlur stdDeviation="10"\/>/,
+  );
 });
 
 test('custom palettes reject non-hex colours and trim whitespace', () => {
@@ -408,6 +414,55 @@ test('Blueprint keeps its dimension callout clear of the title block', () => {
       for (const m of svg.matchAll(/<text x="([\d.]+)" y="([\d.]+)"[^>]*>(?:Ø )?\d+<\/text>/g)) {
         if (wide) assert.ok(Number(m[1]) < width * 0.5, `${width}x${height} ${seed}: callout at x ${m[1]}`);
         else assert.ok(Number(m[2]) < blockTop, `${width}x${height} ${seed}: callout at ${m[2]}, block at ${blockTop}`);
+      }
+    }
+  }
+});
+
+test('Blueprint makes room for a subtitle in its title block, not at the title’s cost', () => {
+  const condensed = textLib.FONTS.condensed.family;
+  for (const [width, height] of [
+    [600, 900],
+    [600, 600],
+    [600, 1000],
+    [700, 600],
+    [900, 600],
+  ]) {
+    for (const title of ['The Lighthouse Keeper', 'Dune', 'Midnight Garden', 'The Long Way Home Tonight']) {
+      for (const seed of ['a', 'b', 's']) {
+        const titleSize = (/** @type {string | undefined} */ subtitle) => {
+          const { svg } = createCover({
+            title,
+            author: 'Mara Ellison',
+            subtitle,
+            style: 'blueprint',
+            width,
+            height,
+            seed,
+          });
+          // A taller block takes its room from the drawing: the callout stays clear of it (above
+          // it, or on a wide cover to its left).
+          const [, bx, by] = /<rect x="([\d.]+)" y="([\d.]+)"[^>]*stroke-width/.exec(svg) ?? [];
+          const wide = width / height > 1.4;
+          for (const [, x, y] of svg.matchAll(/<text x="([\d.]+)" y="([\d.]+)"[^>]*>(?:Ø )?\d+<\/text>/g)) {
+            assert.ok(
+              wide ? Number(x) < Number(bx) : Number(y) < Number(by),
+              `${width}x${height} ${seed}: callout at ${x}, ${y}, block at ${bx}, ${by}`,
+            );
+          }
+          // The title is the largest text in the condensed face (its lead line is smaller).
+          return Math.max(
+            ...textBoxes(svg)
+              .filter((b) => unescapeXml(b.family ?? '') === condensed)
+              .map((b) => b.size),
+          );
+        };
+        const alone = titleSize(undefined);
+        const withSubtitle = titleSize('A Novel');
+        assert.ok(
+          withSubtitle >= alone * 0.7,
+          `${width}x${height} ${seed} "${title}": ${alone.toFixed(1)} px alone, ${withSubtitle.toFixed(1)} px with a subtitle`,
+        );
       }
     }
   }

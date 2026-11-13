@@ -114,7 +114,7 @@ test('a shared square link has the right shape', async ({ page }) => {
   expect(Math.abs(w - hgt)).toBeLessThanOrEqual(1);
 });
 
-test('editing the URL updates the design', async ({ page }) => {
+test('editing the URL updates the design, as a step Undo takes back', async ({ page }) => {
   await page.goto('/#style=swiss&seed=one');
   await selected(page, 'swiss');
   await page.evaluate(() => {
@@ -122,9 +122,12 @@ test('editing the URL updates the design', async ({ page }) => {
   });
   await selected(page, 'orbit');
   await expect(page.locator('#seed')).toHaveValue('two');
+  await page.locator('#undo').click();
+  await selected(page, 'swiss');
+  await expect(page.locator('#seed')).toHaveValue('one');
 });
 
-test('undo, redo and the browser back button step through designs', async ({ page }) => {
+test('undo and redo step through designs: buttons, Z, and Control or Command with Z', async ({ page }) => {
   await page.goto('/#style=minimal&seed=s1&palette=auto');
   await expect(page.locator('#undo')).toBeDisabled();
   await page.locator('.tile[data-style="retro"]').click();
@@ -143,8 +146,41 @@ test('undo, redo and the browser back button step through designs', async ({ pag
   await expect(page.locator('#meta')).toContainText('Mint');
   await page.locator('body').press('KeyZ');
   await expect(page.locator('#meta')).not.toContainText('Mint');
-  await page.goBack();
+  // As in other apps, with Control or Command; these work with single-key shortcuts off, too.
+  await page.locator('#shortcuts-toggle').click();
+  await page.locator('body').press('Control+KeyZ');
   await selected(page, 'minimal');
+  await page.locator('body').press('Meta+Shift+KeyZ');
+  await selected(page, 'retro');
+  await page.locator('body').press('Control+KeyY');
+  await expect(page.locator('#meta')).toContainText('Mint');
+  // In a text field they undo the typing, as the browser does, not the design.
+  // (Ours would leave a step to redo; the field's own undo is typing, a new step.)
+  await page.locator('#title').fill('Typed');
+  await page.locator('#title').press('Control+KeyZ');
+  await expect(page.locator('#redo')).toBeDisabled();
+});
+
+test('Back leaves the app, however many changes were made', async ({ page }) => {
+  await page.goto('about:blank');
+  await page.goto('/#title=T&style=minimal&seed=b');
+  const entries = await page.evaluate(() => history.length);
+  for (const style of ['swiss', 'bauhaus', 'retro']) {
+    await page.locator(`.tile[data-style="${style}"]`).click();
+    await selected(page, style);
+  }
+  await page.locator('#title').fill('Typed');
+  await expect(page).toHaveURL(/title=Typed&.*style=retro/);
+  // Each change rewrites the app's one entry: there are no more to go back through.
+  expect(await page.evaluate(() => history.length)).toBe(entries);
+  await page.goBack();
+  expect(page.url()).toBe('about:blank');
+  // Forward comes back to the design as it was left, with its steps.
+  await page.goForward();
+  await expect(page.locator('#title')).toHaveValue('Typed');
+  await page.locator('#undo').click();
+  await expect(page.locator('#title')).toHaveValue('T');
+  await selected(page, 'retro');
 });
 
 test('undo reverts the subtitle and the texture too', async ({ page }) => {
@@ -161,14 +197,18 @@ test('undo reverts the subtitle and the texture too', async ({ page }) => {
   await expect(page.locator('#subtitle')).toHaveValue('');
 });
 
-test('history survives a reload, and redo never leaves the app', async ({ page }) => {
+test('the steps survive a reload, and redo never leaves the app', async ({ page }) => {
   await page.goto('/#style=minimal&seed=r');
   await page.locator('.tile[data-style="swiss"]').click();
   await page.locator('.tile[data-style="bauhaus"]').click();
+  await selected(page, 'bauhaus');
   await page.reload();
   await selected(page, 'bauhaus');
   await expect(page.locator('#undo')).toBeEnabled();
   await page.locator('#undo').click();
+  await selected(page, 'swiss');
+  await expect(page.locator('#redo')).toBeEnabled();
+  await page.reload();
   await selected(page, 'swiss');
   await expect(page.locator('#redo')).toBeEnabled();
   await page.locator('#redo').click();
@@ -178,6 +218,20 @@ test('history survives a reload, and redo never leaves the app', async ({ page }
   await page.locator('body').press('KeyY');
   await selected(page, 'bauhaus');
   expect(new URL(page.url()).pathname).toBe('/');
+});
+
+test('a link opened in the tab is a new step after the design you had', async ({ page }) => {
+  await page.goto('/#title=Mine&style=minimal&seed=m');
+  await page.locator('.tile[data-style="swiss"]').click();
+  await selected(page, 'swiss');
+  // Another link, loaded in this tab (as pasting it in the address bar does).
+  await page.goto('/?title=Theirs&author=A&style=retro&palette=synth&seed=x&format=paperback');
+  await selected(page, 'retro');
+  await page.locator('#undo').click();
+  await selected(page, 'swiss');
+  await expect(page.locator('#title')).toHaveValue('Mine');
+  await page.locator('#undo').click();
+  await selected(page, 'minimal');
 });
 
 test('typing in another field starts a new undo step', async ({ page }) => {
@@ -329,7 +383,7 @@ test('arrow keys scroll a focused code sample instead of changing the style', as
   await expect(page.locator('#style-name')).toHaveText('Minimal');
 });
 
-test('a fragment that is not a design keeps the design, and Undo skips its entry', async ({ page }) => {
+test('a fragment that is not a design keeps the design, and adds no step', async ({ page }) => {
   await page.goto('/#title=T&subtitle=A+Novel&style=minimal&seed=s&texture=1');
   await page.locator('.tile[data-style="swiss"]').click();
   await selected(page, 'swiss');
@@ -342,7 +396,6 @@ test('a fragment that is not a design keeps the design, and Undo skips its entry
   await page.locator('.tile[data-style="bauhaus"]').click();
   await page.locator('#undo').click();
   await selected(page, 'swiss');
-  // The entry left by #usage shows the same design, so this one press goes back to Minimal.
   await page.locator('#undo').click();
   await selected(page, 'minimal');
   await page.locator('#redo').click();
@@ -369,88 +422,6 @@ test('loading the same URL again (Enter in the address bar) adds no Undo step', 
   expect(new URL(page.url()).pathname).toBe('/');
   await selected(page, 'minimal');
   await expect(page.locator('#undo')).toBeDisabled();
-});
-
-test('Undo onto an entry whose write was refused shows that entry, not a mix', async ({ page }) => {
-  await page.goto('/#title=T&style=minimal&palette=parchment&seed=w');
-  await page.locator('.tile[data-style="swiss"]').click();
-  await selected(page, 'swiss');
-  await page.evaluate(() => {
-    const real = history.replaceState.bind(history);
-    let refuse = true;
-    history.replaceState = (...args) => {
-      if (refuse) {
-        refuse = false;
-        throw new DOMException('Too many calls', 'SecurityError');
-      }
-      return real(...args);
-    };
-    location.hash = 'style=orbit&seed=w2';
-  });
-  await selected(page, 'orbit');
-  await page.locator('[data-palette="mint"]').click();
-  await expect(page.locator('[data-palette="mint"]')).toHaveAttribute('aria-pressed', 'true');
-  await page.waitForTimeout(1200);
-  await page.locator('#undo').click();
-  await selected(page, 'orbit');
-  // The palette change is undone too.
-  await expect(page.locator('[data-palette="parchment"]')).toHaveAttribute('aria-pressed', 'true');
-});
-
-test('a step the browser ignored does not steer a later navigation', async ({ page }) => {
-  await page.goto('/#title=T&style=minimal&seed=g');
-  await page.locator('.tile[data-style="swiss"]').click();
-  await page.locator('.tile[data-style="bauhaus"]').click();
-  await selected(page, 'bauhaus');
-  await page.locator('#undo').click();
-  await selected(page, 'swiss');
-  await page.locator('#undo').click();
-  await selected(page, 'minimal');
-  await expect(page.locator('#redo')).toBeEnabled();
-  // The browser drops the next history.go.
-  await page.evaluate(() => {
-    const real = history.go.bind(history);
-    let drop = true;
-    history.go = (delta) => {
-      if (drop) {
-        drop = false;
-        return;
-      }
-      real(delta);
-    };
-  });
-  await page.locator('#redo').click();
-  await page.waitForTimeout(1200);
-  await page.evaluate(() => {
-    location.hash = 'style=orbit&seed=g2';
-  });
-  await selected(page, 'orbit');
-  // A new entry: nothing is ahead of it.
-  await expect(page.locator('#redo')).toBeDisabled();
-  await page.locator('#undo').click();
-  await selected(page, 'minimal');
-});
-
-test('coming back with Forward makes the app entries ahead reachable again', async ({ page }) => {
-  await page.goto('about:blank');
-  await page.goto('/#title=T&style=minimal&seed=f');
-  for (const style of ['swiss', 'bauhaus']) {
-    await page.locator(`.tile[data-style="${style}"]`).click();
-    await selected(page, style);
-  }
-  await page.locator('#undo').click();
-  await page.locator('#undo').click();
-  await selected(page, 'minimal');
-  await page.goBack();
-  await page.goForward();
-  await selected(page, 'minimal');
-  await page.goForward();
-  await selected(page, 'swiss');
-  await page.locator('#undo').click();
-  await selected(page, 'minimal');
-  await expect(page.locator('#redo')).toBeEnabled();
-  await page.locator('#redo').click();
-  await selected(page, 'swiss');
 });
 
 test('a long typing session slows its history writes, inside browser rate limits', async ({ page }) => {
@@ -489,112 +460,24 @@ test('a long typing session slows its history writes, inside browser rate limits
   expect(total).toBeLessThan(70);
 });
 
-test('a history write the browser ignores silently is retried', async ({ page }) => {
+test('a URL write the browser refuses or ignores is tried again', async ({ page }) => {
   await page.goto('/#title=T&style=minimal&seed=q');
-  // Chrome may drop pushState and replaceState without throwing when rate-limited.
-  await page.evaluate(() => {
-    const push = history.pushState.bind(history);
-    const replace = history.replaceState.bind(history);
-    let dropPush = true;
-    let dropReplace = true;
-    history.pushState = (...args) => {
-      if (dropPush) dropPush = false;
-      else push(...args);
-    };
-    history.replaceState = (...args) => {
-      if (dropReplace) dropReplace = false;
-      else replace(...args);
-    };
-  });
-  await page.locator('.tile[data-style="swiss"]').click();
-  await selected(page, 'swiss');
-  await expect(page).toHaveURL(/style=swiss/, { timeout: 3000 });
-});
-
-test("the toolbar's Back onto an entry whose write was refused finds its place", async ({ page }) => {
-  await page.goto('/#title=T&style=minimal&seed=b');
-  await page.locator('.tile[data-style="swiss"]').click();
-  await selected(page, 'swiss');
-  await page.evaluate(() => {
-    const real = history.replaceState.bind(history);
-    let refuse = true;
-    history.replaceState = (...args) => {
-      if (refuse) {
+  // Rate-limited browsers throw (Safari), or drop the write without a word (Chrome).
+  for (const how of ['throw', 'drop']) {
+    await page.evaluate((mode) => {
+      const real = history.replaceState.bind(history);
+      let refuse = true;
+      history.replaceState = (...args) => {
+        if (!refuse) return real(...args);
         refuse = false;
-        throw new DOMException('Too many calls', 'SecurityError');
-      }
-      return real(...args);
-    };
-    location.hash = 'style=orbit&seed=b2';
-  });
-  await selected(page, 'orbit');
-  await page.locator('.tile[data-style="bauhaus"]').click();
-  await selected(page, 'bauhaus');
-  await page.waitForTimeout(1500);
-  await page.goBack();
-  await selected(page, 'orbit');
-  await expect(page.locator('#redo')).toBeEnabled();
-  await page.locator('#redo').click();
-  await selected(page, 'bauhaus');
-});
-
-test("presses queued for a dropped step don't undo the toolbar's Back", async ({ page }) => {
-  await page.goto('/#title=T&style=minimal&seed=d');
-  for (const style of ['swiss', 'bauhaus']) {
+        if (mode === 'throw') throw new DOMException('Too many calls', 'SecurityError');
+      };
+    }, how);
+    const style = how === 'throw' ? 'swiss' : 'bauhaus';
     await page.locator(`.tile[data-style="${style}"]`).click();
     await selected(page, style);
+    await expect(page, how).toHaveURL(new RegExp(`style=${style}`), { timeout: 3000 });
   }
-  await page.locator('#undo').click();
-  await selected(page, 'swiss');
-  // The browser drops the next history.go; a second Redo is pressed while it is "in flight".
-  await page.evaluate(() => {
-    const real = history.go.bind(history);
-    let drop = true;
-    history.go = (delta) => {
-      if (drop) drop = false;
-      else real(delta);
-    };
-  });
-  // Both presses from the page, back to back: a click from the test waits for the page to hold
-  // still, which on a slow runner can take longer than the second a step is expected for.
-  await page.evaluate(() => {
-    const redo = /** @type {HTMLButtonElement} */ (document.getElementById('redo'));
-    redo.click();
-    redo.click();
-  });
-  await page.waitForTimeout(1200);
-  await page.goBack();
-  await selected(page, 'minimal');
-  await page.waitForTimeout(500);
-  await selected(page, 'minimal');
-});
-
-test('a write refused for an edited URL is not retried onto a later entry', async ({ page }) => {
-  await page.goto('/#title=T&style=minimal&seed=w');
-  await page.locator('.tile[data-style="swiss"]').click();
-  await selected(page, 'swiss');
-  await page.evaluate(() => {
-    const real = history.replaceState.bind(history);
-    let refuse = true;
-    history.replaceState = (...args) => {
-      if (refuse) {
-        refuse = false;
-        throw new DOMException('Too many calls', 'SecurityError');
-      }
-      return real(...args);
-    };
-    location.hash = 'style=orbit&seed=w2';
-  });
-  await selected(page, 'orbit');
-  // Within the retry's second: a click adds the next entry.
-  await page.locator('.tile[data-style="bauhaus"]').click();
-  await selected(page, 'bauhaus');
-  await page.waitForTimeout(1500);
-  await page.locator('#undo').click();
-  await selected(page, 'orbit');
-  await expect(page.locator('#redo')).toBeEnabled();
-  await page.locator('#redo').click();
-  await selected(page, 'bauhaus');
 });
 
 test('a change made before an Undo lands comes after the Undo, not before it', async ({ page }) => {
@@ -614,18 +497,6 @@ test('a change made before an Undo lands comes after the Undo, not before it', a
   await expect(page.locator('#redo')).toBeDisabled();
   await page.locator('#undo').click();
   await selected(page, 'typographic');
-});
-
-test('a change made behind an Undo the browser drops is still applied', async ({ page }) => {
-  await page.goto('/#title=T&style=minimal&seed=q');
-  await page.locator('.tile[data-style="swiss"]').click();
-  await selected(page, 'swiss');
-  await page.evaluate(() => {
-    history.go = () => {};
-  });
-  await page.locator('#undo').click();
-  await page.locator('.tile[data-style="bauhaus"]').click();
-  await selected(page, 'bauhaus');
 });
 
 test('a quick double Undo steps twice and never leaves the app', async ({ page }) => {
@@ -712,13 +583,14 @@ test('the rail renders a few tiles ahead of its scroll position', async ({ page 
   });
 });
 
-test('the Variation field follows Back even while it has focus', async ({ page }) => {
+test('the Variation field follows an edited URL even while it has focus', async ({ page }) => {
   await page.goto('/#title=T&style=minimal&seed=xyz');
   const seed = page.locator('#seed');
   await seed.fill('abc');
   await expect(page).toHaveURL(/seed=abc/);
-  await page.goBack();
-  await expect(page).toHaveURL(/seed=xyz/);
+  await page.evaluate(() => {
+    location.hash = 'seed=xyz';
+  });
   await expect(seed).toBeFocused();
   await expect(seed).toHaveValue('xyz');
   // A trailing space while typing stays in the field.
@@ -726,35 +598,16 @@ test('the Variation field follows Back even while it has focus', async ({ page }
   await expect(seed).toHaveValue('xyz ');
 });
 
-test("the browser's back shortcuts and mouse button save the last keystrokes first", async ({ page }) => {
+test('the last keystrokes are in the URL when the page is left or reloaded', async ({ page }) => {
   await page.goto('/#title=Before&style=minimal&seed=t');
   const title = page.locator('#title');
-  /** @type {[string, () => Promise<void>][]} */
-  const triggers = [
-    [
-      'Alt+←',
-      () =>
-        title.evaluate((el) =>
-          el.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', altKey: true, bubbles: true })),
-        ),
-    ],
-    [
-      'mouse back',
-      () =>
-        page.evaluate(() => document.body.dispatchEvent(new PointerEvent('pointerdown', { button: 3, bubbles: true }))),
-    ],
-  ];
-  for (const [name, trigger] of triggers) {
-    await title.fill('');
-    await title.pressSequentially(name === 'Alt+←' ? 'Hello' : 'World');
-    await trigger();
-    await page.goBack();
-    await page.goForward();
-    await expect(title, name).toHaveValue(name === 'Alt+←' ? 'Hello' : 'World');
-  }
+  await title.fill('');
+  await title.pressSequentially('Hello there', { delay: 5 });
+  await page.reload();
+  await expect(title).toHaveValue('Hello there');
 });
 
-test('coming back from another page and reloading never enables a stale Redo', async ({ page }) => {
+test('coming back from another page and reloading keeps Undo and Redo', async ({ page }) => {
   await page.goto('/#style=minimal&seed=m');
   await page.locator('.tile[data-style="swiss"]').click();
   await page.locator('.tile[data-style="bauhaus"]').click();
@@ -766,7 +619,10 @@ test('coming back from another page and reloading never enables a stale Redo', a
   await selected(page, 'minimal');
   await page.reload();
   await selected(page, 'minimal');
-  await expect(page.locator('#redo')).toBeDisabled();
+  await expect(page.locator('#undo')).toBeDisabled();
+  await page.locator('#redo').click();
+  await selected(page, 'swiss');
+  expect(new URL(page.url()).pathname).toBe('/');
 });
 
 test('a link pasted into an open tab opens exactly that design', async ({ page }) => {
@@ -787,30 +643,6 @@ test('a link pasted into an open tab opens exactly that design', async ({ page }
   expect(await svgOf(page, '#preview')).not.toContain('texture-dark');
 });
 
-test('an entry whose history write was refused gets its index once the browser allows it', async ({ page }) => {
-  await page.goto('/#title=T&style=minimal&seed=w');
-  await page.locator('.tile[data-style="swiss"]').click();
-  await selected(page, 'swiss');
-  // Refuse the next write, as a rate-limited browser would.
-  await page.evaluate(() => {
-    const real = history.replaceState.bind(history);
-    let refuse = true;
-    history.replaceState = (...args) => {
-      if (refuse) {
-        refuse = false;
-        throw new DOMException('Too many calls', 'SecurityError');
-      }
-      return real(...args);
-    };
-  });
-  await page.evaluate(() => {
-    location.hash = 'style=orbit&seed=w2';
-  });
-  await selected(page, 'orbit');
-  await expect.poll(() => page.evaluate(() => history.state?.i), { timeout: 3000 }).toBe(2);
-  await expect(page).toHaveURL(/title=T&.*style=orbit/);
-});
-
 test('Undo after a hand-edited URL never steps off the app', async ({ page }) => {
   await page.goto('about:blank');
   await page.goto('/#title=T&style=minimal&seed=e');
@@ -822,15 +654,13 @@ test('Undo after a hand-edited URL never steps off the app', async ({ page }) =>
   await selected(page, 'bauhaus');
   await page.locator('#undo').click();
   await selected(page, 'swiss');
-  // Editing the URL now drops retro and bauhaus: the app's history is minimal, swiss, orbit.
+  // Editing the URL now drops retro and bauhaus: the steps are minimal, swiss, orbit.
   await page.evaluate(() => {
     location.hash = 'style=orbit&seed=e2';
   });
   await selected(page, 'orbit');
-  for (let i = 0; i < 6; i++) {
-    await page.locator('body').press('KeyZ');
-    await page.waitForTimeout(150);
-  }
+  await expect(page.locator('#redo')).toBeDisabled();
+  for (let i = 0; i < 6; i++) await page.locator('body').press('KeyZ');
   expect(new URL(page.url()).pathname).toBe('/');
   await selected(page, 'minimal');
   await expect(page.locator('#undo')).toBeDisabled();
@@ -839,7 +669,7 @@ test('Undo after a hand-edited URL never steps off the app', async ({ page }) =>
 test('a download keeps keyboard focus on its button', async ({ page }) => {
   await page.goto('/#title=Focus&style=topographic&seed=f');
   await page.locator('[data-scale="4"]').click();
-  const button = page.locator('#dl-png');
+  const button = page.locator('#download');
   await button.focus();
   const [download] = await Promise.all([page.waitForEvent('download'), page.keyboard.press('Enter')]);
   expect(download.suggestedFilename()).toBe('focus-topographic.png');
@@ -1088,7 +918,11 @@ test('the tools under the preview: never covered by it while it stays in view, a
   await page.goto('/#title=Tools&style=artdeco&seed=t');
   await ready(page);
   // Keep a few designs: the tools grow, and the preview still stays in view beside the controls.
-  for (let i = 0; i < 3; i++) await page.locator('#keep').click();
+  for (let i = 0; i < 3; i++) {
+    await page.locator('#keep').click();
+    await page.locator('#dice-seed').click();
+  }
+  await expect(page.locator('#kept-list li')).toHaveCount(3);
   for (const y of [0, 400, 800, 2000]) {
     await page.evaluate((top) => window.scrollTo(0, top), y);
     const [stage, tools] = await Promise.all([
@@ -1101,7 +935,7 @@ test('the tools under the preview: never covered by it while it stays in view, a
   await page.locator('#print summary').click();
   await expect(page.locator('#print')).toHaveAttribute('open', '');
   // On a tablet the styles come below, full width: the controls, kept in view, never lie over them.
-  await page.setViewportSize({ width: 1024, height: 768 });
+  await page.setViewportSize({ width: 900, height: 768 });
   await page.evaluate(() =>
     window.scrollTo(0, (document.querySelector('.rail')?.getBoundingClientRect().top ?? 0) + window.scrollY + 100),
   );
@@ -1149,15 +983,48 @@ test('keyboard focus: kept on a variant chip when the style changes, and clear o
   }
 });
 
-test('the toast shows at the top on wide screens, clear of the export buttons', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
+test('the toast never covers the export buttons, and stays while the pointer is over it', async ({ page }) => {
+  // Beside the cover (at the top, so the toast is at the bottom), and under it (the toast at the top).
+  for (const [width, height] of [
+    [1440, 900],
+    [1280, 720],
+    [1024, 768],
+  ]) {
+    await page.setViewportSize({ width, height });
+    await page.goto('/#title=Toast&style=minimal&seed=t');
+    await ready(page);
+    for (const y of [0, 600]) {
+      await page.evaluate((top) => window.scrollTo(0, top), y);
+      await page.locator('#dice-seed').click();
+      await page.locator('#keep').click();
+      const toast = page.locator('#toast');
+      await expect(toast).toHaveClass(/show/);
+      const box = await toast.boundingBox();
+      const exports = await page.locator('.export').boundingBox();
+      const apart =
+        box &&
+        exports &&
+        (box.y + box.height <= exports.y ||
+          box.y >= exports.y + exports.height ||
+          box.x + box.width <= exports.x ||
+          box.x >= exports.x + exports.width);
+      expect(apart, `${width} × ${height}, scrolled to ${y}`).toBe(true);
+    }
+  }
+  // Long enough to read, and longer while the pointer rests on it.
+  await page.clock.install();
   await page.goto('/#title=Toast&style=minimal&seed=t');
+  await ready(page);
   await page.locator('#keep').click();
   const toast = page.locator('#toast');
+  await page.clock.runFor(3000);
   await expect(toast).toHaveClass(/show/);
-  const box = await toast.boundingBox();
-  const exports = await page.locator('.export').boundingBox();
-  expect(box && exports && box.y + box.height <= exports.y).toBe(true);
+  await toast.hover();
+  await page.clock.runFor(10_000);
+  await expect(toast).toHaveClass(/show/);
+  await page.mouse.move(0, 0);
+  await page.clock.runFor(4000);
+  await expect(toast).not.toHaveClass(/show/);
 });
 
 test('kept designs are saved, restored and removed', async ({ page }) => {
@@ -1212,7 +1079,7 @@ test('downloads SVG, PNG and JPEG at the chosen size', async ({ page }) => {
   expect(s.name).toBe('export-test-aurora.svg');
   expect(s.data.toString('utf8')).toMatch(/^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" width="600" height="900"/);
 
-  const png = await grab('#dl-png');
+  const png = await grab('#download');
   expect(png.name).toBe('export-test-aurora.png');
   expect(png.data.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
   expect(pngSize(png.data)).toEqual([1200, 1800]);
@@ -1299,7 +1166,7 @@ test('copies an image link: the site’s HTTP API draws the same cover', async (
   );
   await ready(page);
   await page.locator('#copy-image-link').click();
-  await expect(page.locator('#toast')).toContainText('Image link copied');
+  await expect(page.locator('#toast')).toContainText('Embed link copied');
   const link = await page.evaluate(() => navigator.clipboard.readText());
   expect(link).toMatch(/\/api\/cover\.svg\?title=Glass%0ACity&/);
   expect(link).not.toContain('scene.forest');
@@ -1411,7 +1278,11 @@ test('a custom size: presets, typing, and an export size of its own', async ({ p
   await page.locator('#size-w').fill('10');
   await page.locator('#size-w').blur();
   await expect(page.locator('#size-w')).toHaveValue('1800');
-  await expect(page.locator('#toast')).toContainText('50 to 10,000 px');
+  // (Something gone wrong: an alert, there until dismissed.)
+  await expect(page.locator('#alert')).toHaveClass(/show/);
+  await expect(page.locator('#alert-text')).toContainText('50 to 10,000 px');
+  await page.locator('#alert-close').click();
+  await expect(page.locator('#alert')).not.toHaveClass(/show/);
   // Scales past 10,000 px are off.
   await expect(page.locator('[data-scale="4"]')).toHaveAttribute('aria-disabled', 'true');
   // (Dispatched: Playwright won't click a button marked disabled.)
@@ -1451,7 +1322,7 @@ test('downloads WebP, and PNG and JPEG files say 300 dpi', async ({ page, browse
     const [download] = await Promise.all([page.waitForEvent('download'), page.locator(button).click()]);
     return { name: download.suggestedFilename(), data: await readFile(/** @type {string} */ (await download.path())) };
   };
-  const png = await grab('#dl-png');
+  const png = await grab('#download');
   // A pHYs chunk right after the header: 11811 pixels per metre.
   expect(png.data.toString('latin1', 37, 41)).toBe('pHYs');
   expect(png.data.readUInt32BE(41)).toBe(11811);
@@ -1511,13 +1382,14 @@ test('kept designs export to a file and import back', async ({ page }) => {
   await page
     .locator('#kept-file')
     .setInputFiles({ name: 'x.json', mimeType: 'application/json', buffer: Buffer.from('not json') });
-  await expect(page.locator('#toast')).toContainText('no kept designs');
+  await expect(page.locator('#alert-text')).toContainText('no kept designs');
   // Nor is a list of things that aren't designs "kept already".
-  await page.locator('#toast').evaluate((el) => el.classList.remove('show'));
+  await page.locator('#alert-close').click();
   await page
     .locator('#kept-file')
     .setInputFiles({ name: 'y.json', mimeType: 'application/json', buffer: Buffer.from('[{"foo":1}]') });
-  await expect(page.locator('#toast')).toContainText('That file has no kept designs in it');
+  await expect(page.locator('#alert')).toHaveClass(/show/);
+  await expect(page.locator('#alert-text')).toContainText('That file has no kept designs in it');
 });
 
 test('a kept design shows the cover as it was kept, and says when this version draws it differently', async ({
@@ -1536,7 +1408,10 @@ test('a kept design shows the cover as it was kept, and says when this version d
   await page.locator('.kept-open').click();
   await selected(page, 'minimal');
   await expect(page.locator('#toast')).toContainText('draws it a little differently');
-  // Kept again: the tray shows the drawing kept now, not the old one.
+  // It is kept (the star says so): removed and kept again, the tray shows the drawing kept now.
+  await expect(page.locator('#keep')).toHaveAttribute('aria-pressed', 'true');
+  await page.locator('#keep').click();
+  await expect(page.locator('#kept-list li')).toHaveCount(0);
   await page.locator('#keep').click();
   await expect.poll(() => svgOf(page, '.kept-open img')).not.toBe(snapshot);
   expect(await svgOf(page, '.kept-open img')).toBe(await svgOf(page, '#preview'));
@@ -1583,13 +1458,19 @@ test('Store size shows the cover as small as a store lists it', async ({ page })
   await page.goto('/#title=Small&style=bigtype&seed=t');
   await ready(page);
   const toggle = page.locator('#thumb-toggle');
+  const height = (/** @type {string} */ id) =>
+    page.locator(id).evaluate((el) => /** @type {HTMLElement} */ (el).offsetHeight);
+  const frame = await height('#book');
+  const download = await page.locator('#download').boundingBox();
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-pressed', 'true');
-  const height = () => page.locator('#book').evaluate((el) => /** @type {HTMLElement} */ (el).offsetHeight);
-  expect(await height()).toBe(120);
+  expect(await height('#preview')).toBe(120);
+  // The frame keeps its size, so nothing under it moves.
+  expect(await height('#book')).toBe(frame);
+  expect(await page.locator('#download').boundingBox()).toEqual(download);
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-pressed', 'false');
-  expect(await height()).toBeGreaterThan(200);
+  expect(await height('#preview')).toBe(frame);
 });
 
 test('when storage is full, the oldest kept designs give up their SVG first, and Keep says so', async ({ page }) => {
@@ -1771,16 +1652,18 @@ test('many covers: a list in, a preview, and a ZIP of one design for every book'
     b.toString(),
   );
   expect(varied.filter((svg) => svg.includes('#e4f1ea'))).toHaveLength(1);
-  // A book that can't be made is left out and reported; the rest are saved.
+  // A book that can't be made is left out and reported, in the panel; the rest are saved.
+  await expect(page.locator('#many-failed')).toBeHidden();
   await page.locator('#many-list').fill('title,style\nGood,swiss\nBad,nope');
   await expect(page.locator('#many-count')).toHaveText('2 books');
   const [partial] = await Promise.all([page.waitForEvent('download'), page.locator('#many-download').click()]);
   expect([...unzip(await readFile(/** @type {string} */ (await partial.path()))).keys()]).toEqual(['1-good.svg']);
   await expect(page.locator('#toast')).toContainText('1 couldn’t be made');
-  // None: no file, and the toast says so.
+  await expect(page.locator('#many-failed-list li')).toHaveText([/^2\. Bad: .*nope/]);
+  // None: no file, and an alert says so.
   await page.locator('#many-list').fill('title,style\nBad,nope');
   await page.locator('#many-download').click();
-  await expect(page.locator('#toast')).toContainText('None of the books could be made');
+  await expect(page.locator('#alert-text')).toContainText('None of the books could be made');
 });
 
 test('a paperback for print: the whole cover, sized from the trim and pages, as a PDF', async ({ page }) => {
@@ -1796,7 +1679,11 @@ test('a paperback for print: the whole cover, sized from the trim and pages, as 
     .locator('#print-blurb')
     .fill('When the lamp goes dark, Ada rows out.\n\nWhat she finds will change everything.');
   await page.locator('#print-imprint').fill('Harbour Press');
-  await page.locator('#print-back').selectOption('ink');
+  // The back's colour: a swatch of the cover's palette.
+  await expect(page.locator('#print-back [data-key="bg"]')).toHaveAttribute('aria-pressed', 'true');
+  await page.locator('#print-back [data-key="ink"]').click();
+  await expect(page.locator('#print-back [data-key="ink"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#print-back [data-key="bg"]')).toHaveAttribute('aria-pressed', 'false');
   // 2 × 5.5 + 240 × 0.0025 + 2 × 0.125 = 11.85 wide; 8.5 + 0.25 = 8.75 high.
   await expect(page.locator('#print-size')).toHaveText('Whole cover 11.85 × 8.75 in, spine 0.6 in');
   const preview = await svgSoon(page, '#print-preview');
@@ -1836,7 +1723,7 @@ test('a paperback for print: the whole cover, sized from the trim and pages, as 
   await expect(page.locator('#print-blurb')).toHaveValue(
     'When the lamp goes dark, Ada rows out.\n\nWhat she finds will change everything.',
   );
-  await expect(page.locator('#print-back')).toHaveValue('ink');
+  await expect(page.locator('#print-back [data-key="ink"]')).toHaveAttribute('aria-pressed', 'true');
 });
 
 test('the spine keeps 1/16 in clear of the ink of accents and tails, in this browser’s fonts', async ({ page }) => {
@@ -2119,6 +2006,179 @@ test('<book-cover> draws a cover on a page from its attributes', async ({ page }
   expect(result.src).toBeNull();
 });
 
+test('Many covers previews thumbnails, and the page never grows wider than the window', async ({ page }) => {
+  // (A custom size draws every cover at 1800 × 2700: still thumbnails.)
+  for (const [width, format] of [
+    [1440, 'paperback'],
+    [1024, '1800x2700'],
+    [390, '1800x2700'],
+  ]) {
+    await page.setViewportSize({ width: Number(width), height: 900 });
+    await page.goto('about:blank');
+    await page.goto(`/#title=T&style=minimal&seed=m&format=${format}`);
+    await page.locator('#many summary').click();
+    await page.locator('#many-list').fill('Dune | Frank Herbert\nFish | Ana\nThird\nFourth | X');
+    await expect(page.locator('#many-preview img')).toHaveCount(4);
+    await expect(page.locator('#many-preview li:nth-child(4) img')).toHaveAttribute('src', /^data:image\/svg\+xml/);
+    const [list, thumb] = await Promise.all([
+      page.locator('#many-preview').boundingBox(),
+      page.locator('#many-preview li:nth-child(4) img').boundingBox(),
+    ]);
+    expect(thumb && list && thumb.x + thumb.width <= list.x + list.width + 0.5, `${width}`).toBe(true);
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(overflow, `${width}`).toBeLessThanOrEqual(0);
+  }
+});
+
+test('K and the star keep the design; pressed again, it is removed, with an Undo', async ({ page }) => {
+  await page.goto('/#title=Starred&style=minimal&seed=k');
+  await ready(page);
+  const star = page.locator('#keep');
+  await expect(star).toHaveAttribute('aria-pressed', 'false');
+  await page.locator('body').press('KeyK');
+  await expect(page.locator('#kept-list li')).toHaveCount(1);
+  await expect(star).toHaveAttribute('aria-pressed', 'true');
+  // Another design is not kept; back to this one, it is.
+  await page.locator('.tile[data-style="swiss"]').click();
+  await expect(star).toHaveAttribute('aria-pressed', 'false');
+  await page.locator('#undo').click();
+  await expect(star).toHaveAttribute('aria-pressed', 'true');
+  await star.click();
+  await expect(page.locator('#kept-list li')).toHaveCount(0);
+  await expect(star).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.locator('#toast')).toContainText('Removed');
+  await page.locator('#toast button', { hasText: 'Undo' }).click();
+  await expect(page.locator('#kept-list li')).toHaveCount(1);
+  await expect(star).toHaveAttribute('aria-pressed', 'true');
+  // The tray's remove button offers it back too.
+  await page.locator('.kept-remove').click();
+  await expect(page.locator('#kept-list li')).toHaveCount(0);
+  await page.locator('#toast button', { hasText: 'Undo' }).click();
+  await expect(page.locator('#kept-list li')).toHaveCount(1);
+  // With single-key shortcuts off, K is a letter like any other.
+  await page.locator('#shortcuts-toggle').click();
+  await page.locator('body').press('KeyK');
+  await expect(page.locator('#kept-list li')).toHaveCount(1);
+});
+
+test('the main download is JPEG for an eBook, which KDP takes, and PNG otherwise', async ({ page }) => {
+  await page.goto('/#title=Kindle&style=minimal&seed=e&format=ebook');
+  await expect(page.locator('#download')).toContainText('Download JPEG');
+  await expect(page.locator('#dl-jpeg')).toBeHidden();
+  await expect(page.locator('#dl-png')).toBeVisible();
+  const [download] = await Promise.all([page.waitForEvent('download'), page.locator('#download').click()]);
+  expect(download.suggestedFilename()).toBe('kindle-minimal.jpg');
+  await page.locator('[data-format="paperback"]').click();
+  await expect(page.locator('#download')).toContainText('Download PNG');
+  await expect(page.locator('#dl-png')).toBeHidden();
+  await expect(page.locator('#dl-jpeg')).toBeVisible();
+});
+
+test('Browse brings the style into view in the rail, without scrolling the page away', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/#title=Browse&style=memphis&seed=b');
+  await ready(page);
+  await page.locator('#style-name').click();
+  const tile = page.locator('.tile[data-style="memphis"]');
+  await expect(tile).toBeFocused();
+  await expect(tile).toBeInViewport({ ratio: 1 });
+  // The page moves only as far as the rail, longer than the window here, needs to show it.
+  expect(await page.evaluate(() => window.scrollY)).toBeLessThan(150);
+  await expect(page.locator('#preview')).toBeInViewport({ ratio: 0.9 });
+  // A style at the top of the rail: the page doesn't move at all.
+  await page.evaluate(() => {
+    location.hash = 'title=Browse&style=swiss&seed=b';
+  });
+  await selected(page, 'swiss');
+  await page.evaluate(() => window.scrollTo(0, 0));
+  // (Clicked from the page: Playwright's own click would scroll to it first.)
+  await page.evaluate(() => document.getElementById('style-name')?.click());
+  await expect(page.locator('.tile[data-style="swiss"]')).toBeInViewport({ ratio: 1 });
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+});
+
+test('on a laptop the cover, every export and the variations are in view together', async ({ page }) => {
+  for (const [width, height] of [
+    [1440, 900],
+    [1280, 720],
+    [1920, 1080],
+  ]) {
+    await page.setViewportSize({ width, height });
+    await page.goto('/#title=In+View&style=artdeco&seed=v');
+    await ready(page);
+    await expect(page.locator('#download'), `${width}`).toBeInViewport({ ratio: 1 });
+    await expect(page.locator('#dl-svg'), `${width}`).toBeInViewport({ ratio: 1 });
+    // Scrolled through the controls, the whole stage stays in view.
+    await page.evaluate(() => window.scrollTo(0, 400));
+    for (const id of ['#book', '#download', '#copy-link', '#variations']) {
+      await expect(page.locator(id), `${width}: ${id}`).toBeInViewport({ ratio: 1 });
+    }
+  }
+});
+
+test('Format comes right after the text, with a way to the back and spine', async ({ page }) => {
+  await page.goto('/#title=Paper&style=minimal&seed=p');
+  const top = async (/** @type {string} */ selector) => (await page.locator(selector).boundingBox())?.y ?? NaN;
+  expect(await top('#format')).toBeLessThan(await top('#randomize'));
+  expect(await top('#format')).toBeGreaterThan(await top('#subtitle'));
+  await page.locator('#print-link').click();
+  await expect(page.locator('#print')).toHaveAttribute('open', '');
+  await expect(page.locator('#print summary')).toBeFocused();
+  await expect(page.locator('#print-preview')).toHaveAttribute('src', /^data:image\/svg\+xml/);
+  // An eBook has no back to print.
+  await page.locator('[data-format="ebook"]').click();
+  await expect(page.locator('#print-link')).toBeHidden();
+});
+
+test('a first visit opens a sample book in a style and palette that suit it, its title ready to replace', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await ready(page);
+  const title = await page.locator('#title').inputValue();
+  const style = await page.locator('.tile[aria-pressed="true"]').getAttribute('data-style');
+  // (Some of the pairs; the README's sheet has them all.)
+  /** @type {Record<string, string>} */
+  const pairs = {
+    'The Lighthouse Keeper': 'artdeco',
+    'Signal Lost': 'thriller',
+    'Neon Tide': 'bigtype',
+    'Hollow Season': 'silhouette',
+    'Midnight Arithmetic': 'blueprint',
+  };
+  if (pairs[title]) expect(style).toBe(pairs[title]);
+  // A palette picked for it, not left to chance.
+  await expect(page.locator('[data-palette="auto"]')).toHaveAttribute('aria-pressed', 'false');
+  // The first focus selects the sample title, so typing replaces it.
+  await page.locator('#title').click();
+  await page.keyboard.type('Mine');
+  await expect(page.locator('#title')).toHaveValue('Mine');
+  // Not on a link's own title.
+  await page.goto('about:blank');
+  await page.goto('/#title=Linked&style=minimal&seed=l');
+  await page.locator('#title').click();
+  await page.keyboard.press('End');
+  await page.keyboard.type('!');
+  await expect(page.locator('#title')).toHaveValue('Linked!');
+});
+
+test('errors look different, are announced at once and stay until dismissed', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('/#title=E&style=minimal&seed=e&format=1600x2560');
+  await page.locator('#size-w').fill('5');
+  await page.locator('#size-w').blur();
+  const alert = page.locator('#alert');
+  await expect(alert).toHaveClass(/show/);
+  await expect(page.getByRole('alert')).toContainText('Sizes go from 50');
+  await page.clock.runFor(30_000);
+  await expect(alert).toHaveClass(/show/);
+  await page.keyboard.press('Escape');
+  await expect(alert).not.toHaveClass(/show/);
+  await expect(page.locator('#alert-close')).toBeHidden();
+});
+
 test('the gallery draws every style, and a click opens the generator in it', async ({ page }) => {
   // (Without its slash, sent to it with the query, as production does.)
   await page.goto('/gallery?from=test');
@@ -2133,6 +2193,12 @@ test('the gallery draws every style, and a click opens the generator in it', asy
   for (let i = 0; i < 39; i += 4) await covers.nth(i).scrollIntoViewIfNeeded();
   await covers.last().scrollIntoViewIfNeeded();
   await expect.poll(drawn).toBe(39);
+  // Each style with a book of its own (not seven titles shared by all).
+  const titles = await covers.evaluateAll((els) => els.map((el) => el.getAttribute('cover-title')));
+  expect(new Set(titles).size).toBe(39);
+  // The families, named as in the app, with links to each.
+  await expect(page.locator('.gallery-group h2')).toContainText(['Typographic', 'Themed']);
+  await expect(page.locator('.gallery-families a')).toHaveCount(6);
   await page.locator('a', { has: page.locator('book-cover[cover-style="crest"]') }).click();
   await selected(page, 'crest');
   await expect(page.locator('#title')).toHaveValue('Kingdom of Ash');
@@ -2162,6 +2228,13 @@ test('your design goes to the gallery and comes back in the style you pick', asy
   }
   await page.locator('#nav-gallery').click();
   await expect(page).toHaveURL(/\/gallery\/#title=My\+Own\+Book&/);
+  // Every cover shows your book, as the link under it opens it.
+  await expect(page.locator('book-cover[cover-style="crest"]')).toHaveAttribute('cover-title', 'My Own Book');
+  await expect(page.locator('book-cover[cover-style="crest"]')).toHaveAttribute('palette', 'mint');
+  await expect(page.locator('a[data-app]', { hasText: 'Make a cover' })).toHaveAttribute(
+    'href',
+    /^\/#title=My\+Own\+Book&/,
+  );
   // Your pins stay with your own style, and are left behind for another, as in the app.
   await expect(page.locator('a[data-style="minimal"]')).toHaveAttribute('href', /style=minimal&variant=align\.start/);
   await expect(page.locator('a[data-style="crest"]')).not.toHaveAttribute('href', /variant=/);
@@ -2393,6 +2466,35 @@ test('fits a phone screen, keeps the preview pinned and shows the action bar @mo
   await expect(page.locator('#seed')).not.toHaveValue('m');
 });
 
+test('on a phone the title field is on the first screen, with style arrows and Undo by the cover @mobile', async ({
+  page,
+}) => {
+  await page.goto('/#title=Phone&style=bigtype&seed=m');
+  await ready(page);
+  // Above the bar along the bottom.
+  const [field, bar] = await Promise.all([
+    page.locator('#title').boundingBox(),
+    page.locator('.mobile-bar').boundingBox(),
+  ]);
+  expect(field && bar && field.y + field.height <= bar.y).toBe(true);
+  await page.locator('#m-next-style').click();
+  await expect(page.locator('#style-name')).not.toHaveText('Big Type');
+  await page.locator('#m-undo').click();
+  await expect(page.locator('#style-name')).toHaveText('Big Type');
+  await page.locator('#m-prev-style').click();
+  await expect(page.locator('#style-name')).not.toHaveText('Big Type');
+  await page.locator('#m-keep').click();
+  await expect(page.locator('#m-keep')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#kept-list li')).toHaveCount(1);
+  // 16px text in fields, so iOS Safari doesn't zoom in on focus.
+  for (const id of ['#title', '#author', '#seed', '#title-font']) {
+    expect(
+      await page.locator(id).evaluate((el) => parseFloat(getComputedStyle(el).fontSize)),
+      id,
+    ).toBeGreaterThanOrEqual(16);
+  }
+});
+
 test('the phone download button shows that it is busy @mobile', async ({ page }) => {
   await page.goto('/#title=Busy&style=minimal&seed=b');
   await expect(page.locator('#m-download')).toBeVisible();
@@ -2434,4 +2536,22 @@ test('long values in a shared link are clipped and never overflow @mobile', asyn
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   expect(overflow).toBeLessThanOrEqual(0);
+});
+
+test('/element.js, the one-file <book-cover>, draws a cover on a page of its own', async ({ page }) => {
+  // (The about page loads no part of the library: the bundle brings all of it.)
+  await page.goto('/about/');
+  await expect(page.getByRole('heading', { level: 1, name: 'Using your covers' })).toBeVisible();
+  const drawn = await page.evaluate(async () => {
+    await import('/element.js');
+    const el = document.createElement('book-cover');
+    el.setAttribute('cover-title', 'Dune');
+    el.setAttribute('cover-style', 'retro');
+    const cover = new Promise((resolve) =>
+      el.addEventListener('cover', (e) => resolve(/** @type {CustomEvent} */ (e).detail.style), { once: true }),
+    );
+    document.body.append(el);
+    return cover;
+  });
+  expect(drawn).toBe('retro');
 });

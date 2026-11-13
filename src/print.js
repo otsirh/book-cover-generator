@@ -28,15 +28,37 @@ const PT = PX / 72;
 /** How thick a page is, in inches, on each paper (KDP's figures). */
 export const paperTypes = Object.freeze({ white: 0.002252, cream: 0.0025, color: 0.002252, 'premium-color': 0.002347 });
 
-/** Common paperback trim sizes (width × height, in inches), by name. */
+/** Amazon KDP's paperback trim sizes (width × height, in inches), by name. */
 export const trimSizes = Object.freeze({
   '5x8': Object.freeze([5, 8]),
+  '5.06x7.81': Object.freeze([5.06, 7.81]),
   '5.25x8': Object.freeze([5.25, 8]),
   '5.5x8.5': Object.freeze([5.5, 8.5]),
   '6x9': Object.freeze([6, 9]),
   '6.14x9.21': Object.freeze([6.14, 9.21]),
+  '6.69x9.61': Object.freeze([6.69, 9.61]),
   '7x10': Object.freeze([7, 10]),
+  '7.44x9.69': Object.freeze([7.44, 9.69]),
+  '7.5x9.25': Object.freeze([7.5, 9.25]),
+  '8x10': Object.freeze([8, 10]),
+  '8.25x6': Object.freeze([8.25, 6]),
+  '8.25x8.25': Object.freeze([8.25, 8.25]),
+  '8.27x11.69': Object.freeze([8.27, 11.69]),
+  '8.5x8.5': Object.freeze([8.5, 8.5]),
   '8.5x11': Object.freeze([8.5, 11]),
+});
+
+/**
+ * The most pages KDP prints at the trims that take fewer than `printLimits.pages` (the widest and
+ * the A4), on each paper; null where the paper isn't offered at that size.
+ * @type {Readonly<Record<string, Readonly<Record<keyof typeof paperTypes, number | null>>>>}
+ */
+const FEWER_PAGES = Object.freeze({
+  '8.25x6': Object.freeze({ white: 800, cream: 750, color: 600, 'premium-color': 800 }),
+  '8.25x8.25': Object.freeze({ white: 800, cream: 750, color: 600, 'premium-color': 800 }),
+  '8.27x11.69': Object.freeze({ white: 780, cream: 730, color: null, 'premium-color': 590 }),
+  '8.5x8.5': Object.freeze({ white: 590, cream: 550, color: 600, 'premium-color': 590 }),
+  '8.5x11': Object.freeze({ white: 590, cream: 550, color: 600, 'premium-color': 590 }),
 });
 
 /** What a paperback can be (KDP): its trim, in inches, and its page count on each paper. */
@@ -149,6 +171,12 @@ export function createPrintCover(coverOptions = {}, print = /** @type {any} */ (
   const [tw, th] = trimOf(print.trim ?? '6x9');
   const paper = paperOf(print.paper ?? 'white');
   const pages = checkPages(print.pages, paper);
+  // (Some of the largest trims take fewer pages, or not every paper.)
+  const fewer = FEWER_PAGES[`${tw}x${th}`]?.[paper];
+  if (fewer === null) throw new RangeError(`${paper} paper isn't printed at ${tw} × ${th} in`);
+  if (fewer !== undefined && pages > fewer) {
+    throw new RangeError(`A ${tw} × ${th} in book on ${paper} paper has at most ${fewer} pages, got ${pages}`);
+  }
   const thickness = print.pageThickness == null ? paperTypes[paper] : positive(print.pageThickness, 'pageThickness');
   const bleed = print.bleed == null ? 0.125 : print.bleed === 0 ? 0 : positive(print.bleed, 'bleed');
   if (bleed > 0.5) throw new RangeError(`bleed must be at most 0.5 in, got ${bleed}`);

@@ -4,7 +4,7 @@ name: Release
 # release from the CHANGELOG. npm trusts this workflow to publish (trusted publishing, set in the
 # package's settings on npmjs.com), so no npm token is stored anywhere.
 #
-# Run it by hand for a dry run: the checks, and what the package would hold. Run it on a released
+# Run it by hand for a dry run: the checks, and what npm would be given. Run it on a released
 # tag, naming it, to bring that GitHub release up to date (notes, and the package with its signed
 # provenance).
 
@@ -21,18 +21,24 @@ on:
 permissions:
   contents: read
 
+env:
+  # The MCP registry's publisher (github.com/modelcontextprotocol/registry), and its archive's hash.
+  MCP_PUBLISHER_VERSION: v1.8.9
+  MCP_PUBLISHER_SHA256: 4d527ca8f1ced0394c962dc925c2a4a4addef441cbefd62501c875e9481823a8
+
 concurrency:
   group: release
   cancel-in-progress: false
 
 jobs:
-  npm:
-    name: Publish to npm
+  # Everything that runs the repository's code (its dev tools, tests and the JSR check) runs here,
+  # in a job that can't publish anything; it hands on the package it packed.
+  verify:
+    name: Check and pack
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
-      id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -40,7 +46,6 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
-          registry-url: https://registry.npmjs.org
       - name: The tag names the package's version, and the CHANGELOG has its section
         if: github.event_name == 'push'
         run: |
@@ -48,6 +53,50 @@ jobs:
           [ "$version" = "$GITHUB_REF_NAME" ] || { echo "::error::Tag $GITHUB_REF_NAME, package $version"; exit 1; }
           # (Checked before publishing: a version on npm can't be taken back.)
           grep -q "^## \[${GITHUB_REF_NAME#v}\]" CHANGELOG.md || { echo "::error::No CHANGELOG section for ${GITHUB_REF_NAME#v}"; exit 1; }
+      - run: npm ci
+      - run: npm run check
+      # JSR takes the package too (checked before npm publishes: a version on npm is for good). The
+      # Deno that jsr@0.14.3 runs, with the flags it adds for an npm package.
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: v2.6.7
+      - name: JSR would take it
+        run: deno publish --dry-run $JSR_FLAGS
+        env:
+          JSR_FLAGS: --unstable-bare-node-builtins --unstable-sloppy-imports --unstable-byonm --no-check
+          DENO_DISABLE_PEDANTIC_NODE_WARNINGS: 'true'
+      - name: The MCP registry's publisher (pinned, checked)
+        run: |
+          curl -fsSLo mcp-publisher.tar.gz "https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/mcp-publisher_linux_amd64.tar.gz"
+          echo "${MCP_PUBLISHER_SHA256}  mcp-publisher.tar.gz" | sha256sum -c -
+          tar xzf mcp-publisher.tar.gz mcp-publisher
+          rm mcp-publisher.tar.gz
+      - name: The MCP registry takes server.json
+        run: ./mcp-publisher validate server.json && rm mcp-publisher
+      - name: The package
+        run: npm pack
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: package
+          path: book-cover-generator-*.tgz
+          retention-days: 7
+          if-no-files-found: error
+
+  # Publishes the package the checks passed, byte for byte, running none of the repository's code.
+  # npm trusts this workflow (trusted publishing), so no npm token is kept anywhere.
+  npm:
+    name: Publish to npm
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
       - name: npm can publish with trusted publishing (11.5.1 or later)
         run: |
           node -e '
@@ -55,17 +104,16 @@ jobs:
             const ok = major > 11 || (major === 11 && (minor > 5 || (minor === 5 && patch >= 1)));
             if (!ok) { console.error(`::error::npm ${process.argv[1]} is too old for trusted publishing`); process.exit(1); }
           ' "$(npm --version)"
-      - run: npm ci
-      - run: npm run check
-      # JSR takes the package too (checked before npm publishes: a version on npm is for good).
-      - run: npx --yes jsr@0.14.3 publish --dry-run
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: package
       # Only a pushed tag publishes: a run started by hand is a dry run, even on a tag.
       - name: Publish
         if: github.event_name == 'push'
-        run: npm publish
+        run: npm publish ./book-cover-generator-*.tgz
       - name: What would be published
         if: github.event_name != 'push'
-        run: npm pack --dry-run
+        run: npm publish --dry-run ./book-cover-generator-*.tgz
 
   # JSR (jsr.io/@otsirh/book-cover-generator), for Deno: npm's version, published with the
   # repository's identity (the package on jsr.io is linked to it). On when the repository variable
@@ -83,10 +131,38 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
-          node-version-file: .nvmrc
-      - run: npx --yes jsr@0.14.3 publish
+          deno-version: v2.6.7
+      - run: deno publish $JSR_FLAGS
+        env:
+          JSR_FLAGS: --unstable-bare-node-builtins --unstable-sloppy-imports --unstable-byonm --no-check
+          DENO_DISABLE_PEDANTIC_NODE_WARNINGS: 'true'
+
+  # The official MCP registry (registry.modelcontextprotocol.io): server.json, as
+  # io.github.otsirh/book-cover-generator, which GitHub's identity for this repository proves; the
+  # registry checks npm's package names it (mcpName).
+  mcp-registry:
+    name: Publish to the MCP registry
+    needs: npm
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: The MCP registry's publisher (pinned, checked)
+        run: |
+          curl -fsSLo mcp-publisher.tar.gz "https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/mcp-publisher_linux_amd64.tar.gz"
+          echo "${MCP_PUBLISHER_SHA256}  mcp-publisher.tar.gz" | sha256sum -c -
+          tar xzf mcp-publisher.tar.gz mcp-publisher
+          rm mcp-publisher.tar.gz
+      - run: ./mcp-publisher login github-oidc
+      - run: ./mcp-publisher publish server.json
 
   github:
     name: GitHub release
@@ -111,9 +187,6 @@ jobs:
         with:
           ref: ${{ env.TAG }}
           persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: .nvmrc
       - name: Release notes from the CHANGELOG
         run: |
           awk -v v="${TAG#v}" '
@@ -122,10 +195,12 @@ jobs:
             on { print }
           ' CHANGELOG.md > notes.md
           [ -s notes.md ] || { echo "::error::No CHANGELOG section for ${TAG#v}"; exit 1; }
-      # The package as published, and its build provenance signed with Sigstore (verify with
-      # `gh attestation verify book-cover-generator-X.Y.Z.tgz --repo otsirh/book-cover-generator`).
-      - name: The package
-        run: npm pack
+      # The package as published (the one the checks passed), and its build provenance signed with
+      # Sigstore (verify with `gh attestation verify book-cover-generator-X.Y.Z.tgz --repo
+      # otsirh/book-cover-generator`).
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: package
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         id: attest
         with:

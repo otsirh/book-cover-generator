@@ -90,9 +90,27 @@ export declare function createMockup(
 export type PaperType = 'white' | 'cream' | 'color' | 'premium-color';
 /** How thick a page is, in inches, on each paper (Amazon KDP's figures). */
 export declare const paperTypes: Readonly<Record<PaperType, number>>;
-/** Common paperback trim sizes, width × height in inches, by name (`'6x9'`…). */
+/** Amazon KDP's paperback trim sizes, width × height in inches, by name (`'6x9'`…). */
 export declare const trimSizes: Readonly<
-  Record<'5x8' | '5.25x8' | '5.5x8.5' | '6x9' | '6.14x9.21' | '7x10' | '8.5x11', readonly [number, number]>
+  Record<
+    | '5x8'
+    | '5.06x7.81'
+    | '5.25x8'
+    | '5.5x8.5'
+    | '6x9'
+    | '6.14x9.21'
+    | '6.69x9.61'
+    | '7x10'
+    | '7.44x9.69'
+    | '7.5x9.25'
+    | '8x10'
+    | '8.25x6'
+    | '8.25x8.25'
+    | '8.27x11.69'
+    | '8.5x8.5'
+    | '8.5x11',
+    readonly [number, number]
+  >
 >;
 /** What a paperback can be (Amazon KDP's limits). */
 export declare const printLimits: Readonly<{
@@ -102,7 +120,8 @@ export declare const printLimits: Readonly<{
   height: readonly [number, number];
   /**
    * Page count on each paper, least and most (cream is thicker; standard colour takes 72 to 600).
-   * Some large trims (8.5 in wide) take fewer pages: KDP's upload checks those.
+   * The largest trims take fewer (8.5 × 11 and 8.5 × 8.5 at most 590 on white paper; 8.25 × 6,
+   * 8.25 × 8.25 and 8.27 × 11.69 a little fewer), which `createPrintCover` checks.
    */
   pages: Readonly<Record<PaperType, readonly [number, number]>>;
   /** A book with fewer pages has no text on its spine. */

@@ -3,6 +3,7 @@
 import { cpSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { PAGES } from './gallery.js';
+import { BUNDLES, bundle } from './bundle.js';
 
 const SITE = ['index.html', 'site', 'src'];
 
@@ -18,6 +19,10 @@ cpSync('public', 'dist', { recursive: true, filter });
 for (const [path, make] of Object.entries(PAGES)) {
   mkdirSync(`dist${path}`, { recursive: true });
   writeFileSync(`dist${path}index.html`, make());
+}
+// One-file builds for pages that embed the library (/element.js).
+for (const path of /** @type {(keyof typeof BUNDLES)[]} */ (Object.keys(BUNDLES))) {
+  writeFileSync(`dist${path}`, await bundle(path));
 }
 
 /** Every file under a folder of dist/, as a site path. @param {string} dir */

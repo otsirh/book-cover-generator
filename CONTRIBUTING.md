@@ -38,6 +38,6 @@ The unit tests render every style with every palette at many sizes and shapes, c
 
 ## Releasing and deploying
 
-To release, set the new version in `package.json`, `jsr.json` and `version` in `src/index.js` (a unit test checks they match), date the `[Unreleased]` section of `CHANGELOG.md`, commit, tag the commit `vX.Y.Z` and push both. The tag runs the Release workflow (`.github/workflows/release.yml`): it checks the tag matches the version, runs the checks, publishes to npm with provenance (npm trusts the workflow, so no token is kept anywhere) and makes the GitHub release from the CHANGELOG section.
+To release, set the new version in `package.json`, `jsr.json`, `server.json` (twice: the MCP registry's entry) and `version` in `src/index.js` (unit tests check they match), date the `[Unreleased]` section of `CHANGELOG.md`, commit, tag the commit `vX.Y.Z` and push both. The tag runs the Release workflow (`.github/workflows/release.yml`): it checks the tag matches the version, runs the checks, publishes to npm with provenance (npm trusts the workflow, so no token is kept anywhere), then to JSR and the MCP registry (both trust the repository's GitHub identity), and makes the GitHub release from the CHANGELOG section.
 
 Maintainers deploy with `npm run deploy`. It runs every check and the browser tests, then publishes `dist/` to Cloudflare with `wrangler`. The build gives the service worker (`public/sw.js`) a new release name whenever a file it keeps changes, so open apps pick up the new version.

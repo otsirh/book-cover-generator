@@ -58,3 +58,60 @@ test('the page preloads every module of the library', async () => {
     .filter((f) => f !== 'src/mcp.js' && f !== 'src/element.js');
   for (const file of modules) assert.ok(html.includes(`rel="modulepreload" href="${file}"`), `${file} isn't preloaded`);
 });
+
+test('robots.txt lets crawlers fetch a design’s link preview image, and nothing else of the API', async () => {
+  const rules = readFileSync(new URL('../public/robots.txt', import.meta.url), 'utf8')
+    .split('\n')
+    .map((line) => /^(Allow|Disallow):\s*(\S+)/.exec(line.trim()))
+    .filter((m) => m !== null)
+    .map((m) => ({ allow: m[1] === 'Allow', path: m[2] }));
+  /** As crawlers read it: the longest rule that matches wins. @param {string} path */
+  const allowed = (path) => {
+    const hits = rules.filter((r) => path.startsWith(r.path)).sort((a, b) => b.path.length - a.path.length);
+    return hits[0]?.allow ?? true;
+  };
+  // The image preview() puts in a design's page (worker/index.js).
+  const { preview } = await import('../worker/index.js');
+  const page = await preview(new Request('https://covers.otsirh.dev/?title=Dune'), {
+    ASSETS: { fetch: async () => new Response('<meta property="og:image" content="">') },
+  });
+  const image = /og:image" content="([^"]+)"/.exec(await /** @type {Response} */ (page).text())?.[1] ?? '';
+  const imagePath = new URL(image.replaceAll('&amp;', '&')).pathname;
+  assert.equal(imagePath, '/api/mockup.png');
+  assert.equal(allowed(imagePath), true);
+  for (const path of ['/api/cover.svg', '/api/cover.png', '/api/catalog.json', '/mcp'])
+    assert.equal(allowed(path), false, path);
+  assert.equal(allowed('/gallery/'), true);
+});
+
+test('boot.js reads a custom size by the library’s rules (sizeLimits, CUSTOM_SIZE)', async () => {
+  const { sizeLimits } = await import('../src/index.js');
+  const { CUSTOM_SIZE } = await import('../src/shared.js');
+  const boot = readFileSync(new URL('../site/boot.js', import.meta.url), 'utf8');
+  assert.ok(boot.includes(CUSTOM_SIZE.source), 'the size pattern is src/shared.js’s');
+  assert.ok(
+    boot.includes(
+      `Math.min(w, h) >= ${sizeLimits.min} && Math.max(w, h) <= ${sizeLimits.max} && w <= h * ${sizeLimits.ratio} && h <= w * ${sizeLimits.ratio}`,
+    ),
+    'the size limits are sizeLimits',
+  );
+});
+
+test('the app’s title font menu offers every font of FONTS, in order', async () => {
+  const { FONTS } = await import('../src/text.js');
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const menu = /<select id="title-font"[\s\S]*?<\/select>/.exec(html)?.[0] ?? '';
+  const values = [...menu.matchAll(/<option value="([^"]*)"/g)].map((m) => m[1]);
+  assert.deepEqual(values, ['', ...Object.keys(FONTS)]);
+});
+
+test('the about page answers what people ask, in the site’s chrome, and the sitemap lists every page', () => {
+  const about = PAGES['/about/']();
+  for (const id of ['use', 'privacy', 'fonts', 'links', 'ebook', 'paperback'])
+    assert.match(about, new RegExp(`id="${id}"`));
+  assert.match(about, /<a [^>]*aria-current="page"[^>]*>About<\/a>/);
+  assert.match(about, /<link rel="canonical" href="https:\/\/covers\.otsirh\.dev\/about\/"/);
+  const sitemap = readFileSync(new URL('../public/sitemap.xml', import.meta.url), 'utf8');
+  for (const path of ['/', ...Object.keys(PAGES)])
+    assert.ok(sitemap.includes(`<loc>https://covers.otsirh.dev${path}</loc>`), path);
+});

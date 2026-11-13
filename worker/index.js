@@ -1,5 +1,7 @@
-// The site's Worker: an HTTP API that draws covers, at /api/cover.svg and /api/mockup.svg, and the
-// MCP endpoint at /mcp. Everything else is the static site (wrangler.jsonc sends only those here).
+// The site's Worker: an HTTP API that draws covers (/api/cover.svg and .png, /api/mockup.svg and
+// .png) and describes them (/api/cover.json, /api/catalog.json, /api/openapi.json), the MCP
+// endpoint at /mcp, and a design's link (/?title=…) with its own link preview. Everything else is
+// the static site (wrangler.jsonc sends only those here).
 //
 //   <img src="https://covers.otsirh.dev/api/cover.svg?title=Dune&author=Frank+Herbert">
 //
@@ -9,10 +11,12 @@
 
 import { createCover, createMockup, version } from '../src/index.js';
 import { hex } from '../src/shared.js';
-import { optionsFromLink } from '../src/link.js';
-import { answerPayload } from '../src/mcp.js';
+import { optionsFromLink, linkOf, LINK_FIELDS } from '../src/link.js';
+import { answerPayload, catalog } from '../src/mcp.js';
 import { escapeXml } from '../src/core.js';
+import { slug } from '../src/shared.js';
 import { COVER_PIXELS, MOCKUP_PIXELS, SHADOWED_PIXELS, pngEngine } from './png.js';
+import { openapi } from './openapi.js';
 
 /**
  * The site's headers (public/_headers, /*), for the pages the Worker answers itself: the static
@@ -65,12 +69,49 @@ function notGet(request) {
   return null;
 }
 
-/** @param {unknown} err @param {number} [status] */
-const refusal = (err, status = 400) =>
+/** @param {unknown} err @param {number} [status] @param {Record<string, string>} [extra] headers */
+const refusal = (err, status = 400, extra = {}) =>
   new Response(`${err instanceof Error ? err.message : String(err)}\n`, {
     status,
-    headers: { ...COMMON, 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' },
+    headers: { ...COMMON, 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store', ...extra },
   });
+
+/**
+ * @typedef {{ limit(options: { key: string }): Promise<{ success: boolean }> }} RateLimit
+ * A Workers rate limiter (wrangler.jsonc `ratelimits`): so many requests a minute for each key.
+ */
+
+/**
+ * Whether this client may make another request of `limiter` this minute. Keyed by the client's
+ * address; without a limiter (Node, tests, a copy of the Worker without one), always.
+ * @param {Request} request @param {RateLimit | undefined} limiter
+ */
+async function allowed(request, limiter) {
+  if (!limiter) return true;
+  const { success } = await limiter.limit({ key: request.headers.get('cf-connecting-ip') ?? 'unknown' });
+  return success;
+}
+
+/** What a client that asked too much is told, and when to ask again. */
+const TOO_MANY = 'Too many requests: wait a minute, or draw covers in your own code with the library';
+
+/**
+ * The header that makes an answer a download (`download` in the query), named after the title,
+ * or as `download=` names it; none without it.
+ * @param {URLSearchParams} q @param {string} title @param {string} ext
+ * @returns {Record<string, string>}
+ */
+function disposition(q, title, ext) {
+  if (!q.has('download')) return {};
+  const asked = q.getAll('download').at(-1)?.trim() ?? '';
+  const name = `${slug(asked && !/^(1|true)$/i.test(asked) ? asked : title)}.${ext}`;
+  // (A name in ASCII for older clients, and the name itself, encoded, for the rest.)
+  const ascii = name.replace(/[^\x20-\x7e]/g, '_');
+  return { 'Content-Disposition': `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(name)}` };
+}
+
+/** A cover's or a mockup's file name, without its extension. @param {'cover' | 'mockup'} kind @param {URLSearchParams} q @param {string} title */
+const fileTitle = (kind, q, title) => (kind === 'cover' ? title : `${title} ${mockupOptions(q).kind}`);
 
 /**
  * The cover a query draws (the app's link), or its mockup, as SVG.
@@ -129,6 +170,73 @@ export function api(request) {
         // Opened on its own, the SVG may style itself and nothing else.
         'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; img-src data:",
         ...about(cover),
+        ...disposition(url.searchParams, fileTitle(kind, url.searchParams, cover.title), 'svg'),
+      },
+    });
+  } catch (err) {
+    return refusal(err);
+  }
+}
+
+/**
+ * What a query draws, described: the cover's text, style, palette and colours, seed, size and
+ * pins, its link with every choice written out (so a random style or palette stays the one it
+ * came to), and where to get it.
+ * @param {URLSearchParams} q @param {string} base the site
+ */
+function described(q, base) {
+  const options = optionsFromLink(q);
+  const cover = createCover(options);
+  const link = linkOf(options, cover);
+  return {
+    title: cover.title,
+    author: cover.author,
+    style: cover.style,
+    palette: cover.palette,
+    colors: cover.colors,
+    // (Null when it comes from the title: the same title gives the same cover.)
+    seed: options.seed != null ? cover.seed : null,
+    width: cover.width,
+    height: cover.height,
+    lang: cover.lang ?? null,
+    variants: cover.variants,
+    link: link.toString(),
+    urls: {
+      svg: `${base}/api/cover.svg?${link}`,
+      png: `${base}/api/cover.png?${link}`,
+      edit: `${base}/#${link}`,
+      share: `${base}/?${link}`,
+    },
+    version,
+  };
+}
+
+/**
+ * Answer a request for the API's own description (or say it isn't one: null): what a query draws
+ * (/api/cover.json), what covers can be made of (/api/catalog.json), and the API as OpenAPI
+ * (/api/openapi.json).
+ * @param {Request} request
+ * @returns {Response | null}
+ */
+export function info(request) {
+  const url = new URL(request.url);
+  const make = {
+    '/api/cover.json': () => described(url.searchParams, url.origin),
+    '/api/catalog.json': () => catalog(),
+    '/api/openapi.json': () => openapi(url.origin),
+  }[url.pathname];
+  if (!make) return null;
+  const refused = notGet(request);
+  if (refused) return refused;
+  try {
+    const body = `${JSON.stringify(make(), null, 2)}\n`;
+    return new Response(request.method === 'HEAD' ? null : body, {
+      headers: {
+        ...COMMON,
+        'Content-Type': 'application/json; charset=utf-8',
+        // (The catalog and the description change with a release; a cover's, with its query.)
+        'Cache-Control': url.pathname === '/api/cover.json' ? 'public, max-age=86400' : 'public, max-age=3600',
+        'X-Cover-Version': version,
       },
     });
   } catch (err) {
@@ -141,6 +249,8 @@ export function api(request) {
  * @property {{ fetch(request: Request): Promise<Response> }} [ASSETS]  the site's files
  * @property {{ id: string }} [CF_VERSION_METADATA]  this deployment
  * @property {WebAssembly.Module | BufferSource} [RESVG_WASM]  resvg's WebAssembly, where it can't be imported (Node)
+ * @property {RateLimit} [PNG_LIMIT]  how many PNGs a client may have drawn a minute (cached ones are free)
+ * @property {RateLimit} [MCP_LIMIT]  how many MCP requests a client may make a minute
  */
 
 /** The PNG engine, made once an instance needs it. @type {Promise<Awaited<ReturnType<typeof pngEngine>>> | null} */
@@ -175,6 +285,19 @@ function pngEngineFor(env, origin) {
 }
 
 /**
+ * How many times its own size a mockup shows the cover at (the largest place it nests it).
+ * @param {string} mockup the mockup's SVG @param {{ width: number, height: number }} cover
+ */
+function shownAt(mockup, cover) {
+  const nests = mockup.matchAll(
+    new RegExp(`<svg [^>]*\\bwidth="([\\d.]+)" height="([\\d.]+)" viewBox="0 0 ${cover.width} ${cover.height}"`, 'g'),
+  );
+  let most = 0;
+  for (const [, w, h] of nests) most = Math.max(most, Number(w) / cover.width, Number(h) / cover.height);
+  return most || 1;
+}
+
+/**
  * Answer an API request for PNG (or say it isn't one: null): the cover drawn by resvg with open
  * fonts, laid out in their widths. `scale` (1 to 4) multiplies its size. Text in a script the
  * fonts lack (Chinese, Japanese, Arabic…) is refused (the SVG draws it), or, for a link preview
@@ -189,6 +312,7 @@ export async function png(request, env) {
   const refused = notGet(request);
   if (refused) return refused;
   const q = url.searchParams;
+  if (!(await allowed(request, env.PNG_LIMIT))) return refusal(new Error(TOO_MANY), 429, { 'Retry-After': '60' });
   const asked = q.getAll('scale').at(-1);
   const given = asked === undefined || asked === '' ? null : Number(asked);
   if (given !== null && !(given > 0 && given <= 4)) {
@@ -208,7 +332,7 @@ export async function png(request, env) {
     const shadowed = /^(flat|ereader)$/.test(mockupOptions(q).kind);
     const most = kind === 'cover' ? COVER_PIXELS : shadowed ? SHADOWED_PIXELS : MOCKUP_PIXELS;
     const fit = Math.sqrt(most / (width * height));
-    const scale = given ?? Math.min(1, fit * 0.995);
+    const scale = given ?? (fit >= 1 ? 1 : fit * 0.995);
     const [w, h] = [Math.ceil(width * scale), Math.ceil(height * scale)];
     if (w * h > most) {
       throw new RangeError(
@@ -233,24 +357,31 @@ export async function png(request, env) {
       else {
         // The cover drawn first, then shown in the mockup as that picture: its own filters, under
         // the mockup's shadow, would take resvg several times the memory.
-        // (At the mockup's scale, as a mockup shows the cover at its own size or smaller; at most
-        // COVER_PIXELS.)
+        // (At the size the mockup shows it, at most COVER_PIXELS.)
         const picture = drawer.render(
           cover.svg,
-          Math.min(scale, 0.995 * Math.sqrt(COVER_PIXELS / (cover.width * cover.height))),
+          Math.min(scale * shownAt(svg, cover), 0.995 * Math.sqrt(COVER_PIXELS / (cover.width * cover.height))),
         );
         const body = `<image width="${cover.width}" height="${cover.height}" href="data:image/png;base64,${base64(picture)}"/>`;
         const flat = drawer.laidOut(() => createMockup({ ...cover, body }, mockupOptions(q)));
         bytes = drawer.render(flat.svg, scale);
       }
     } catch (err) {
-      // resvg failed: our fault, not the request's. If it trapped, the next request gets a new engine.
-      console.error(err);
-      if (drawer.broken && engine && (await engine) === drawer) engine = null;
-      return refusal(new Error('The PNG could not be drawn: ask for the SVG (cover.svg)'), 500);
+      // resvg failed: our fault, not the request's. (What was drawn, without the visitor's text.)
+      console.error(`PNG ${kind} in ${cover.style}, ${width} × ${height} at ${scale}:`, err);
+      // (Kept at the edge for an hour, so the same design isn't drawn again and again meanwhile.)
+      return refusal(new Error('The PNG could not be drawn: ask for the SVG (cover.svg)'), 500, {
+        'Cache-Control': 'public, max-age=3600',
+      });
     }
     return new Response(request.method === 'HEAD' ? null : /** @type {BodyInit} */ (bytes), {
-      headers: { ...COMMON, 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400', ...about(cover) },
+      headers: {
+        ...COMMON,
+        'Content-Type': 'image/png',
+        'Cache-Control': 'public, max-age=86400',
+        ...about(cover),
+        ...disposition(q, fileTitle(kind, q, cover.title), 'png'),
+      },
     });
   } catch (err) {
     return refusal(err);
@@ -296,18 +427,32 @@ export async function preview(request, env) {
   const headers = new Headers(page.headers);
   for (const [k, v] of Object.entries(SITE_HEADERS)) if (!headers.has(k)) headers.set(k, v);
   headers.set('Cache-Control', 'public, max-age=300');
-  headers.delete('Content-Length');
+  // (The page's own length, tag and cache state don't describe the page rewritten.)
+  for (const header of ['Content-Length', 'ETag', 'Last-Modified', 'CF-Cache-Status']) headers.delete(header);
   return new Response(request.method === 'HEAD' ? null : html, { status: 200, headers });
 }
 
 /**
- * Where an answer is kept at the edge. The `v` an app link names is ignored (the API draws with
- * the code deployed), so the key names this deployment instead: every deploy draws anew, even
- * one between releases.
+ * The query parameters the API reads (every other is ignored): a design's (the app's link and the
+ * library's option names), a mockup's, a PNG's, and a download's name.
+ */
+export const API_PARAMETERS = Object.freeze([
+  ...Object.keys(LINK_FIELDS),
+  ...['genre', 'lang', 'width', 'height', 'titleCase', 'bg', 'ink', 'accent'],
+  ...['kind', 'text', 'background', 'scale', 'preview', 'download'],
+]);
+
+/**
+ * Where an answer is kept at the edge: its path and the parameters the API reads, so a parameter
+ * it ignores (`&x=1`) doesn't draw it again. The `v` an app link names is ignored too (the API
+ * draws with the code deployed), so the key names this deployment instead: every deploy draws
+ * anew, even one between releases. A HEAD is answered from the GET's.
  * @param {Request} request @param {string} deployment
  */
 function cacheKey(request, deployment) {
   const url = new URL(request.url);
+  const read = [...url.searchParams].filter(([name]) => name !== 'v' && API_PARAMETERS.includes(name));
+  url.search = new URLSearchParams(read).toString();
   url.searchParams.set('v', `${version}+${deployment}`);
   return new Request(url.href, { method: 'GET' });
 }
@@ -325,11 +470,11 @@ const MCP_HEADERS = {
 /**
  * The MCP endpoint at /mcp (Streamable HTTP, without sessions or streams): POST a JSON-RPC message
  * (or a batch), get the answer as JSON; a notification gets 202. Covers it draws link to this
- * site. Null for any other path.
- * @param {Request} request
+ * site, and come with their picture when `draw` can fetch the API's PNGs. Null for any other path.
+ * @param {Request} request @param {Env} [env] @param {(url: URL) => Promise<Response>} [draw]
  * @returns {Promise<Response | null>}
  */
-export async function mcp(request) {
+export async function mcp(request, env = {}, draw) {
   const url = new URL(request.url);
   if (url.pathname !== '/mcp') return null;
   if (request.method === 'OPTIONS') {
@@ -356,6 +501,11 @@ export async function mcp(request) {
       status: 405,
       headers: { ...MCP_HEADERS, Allow: 'POST, OPTIONS', 'Content-Type': 'text/plain; charset=utf-8' },
     });
+  }
+  if (!(await allowed(request, env.MCP_LIMIT))) {
+    const busy = json(429, { jsonrpc: '2.0', id: null, error: { code: -32000, message: TOO_MANY } });
+    busy.headers.set('Retry-After', '60');
+    return busy;
   }
   // At most 1 MB: refused up front when it says so, else as soon as it reads past it (a chunked
   // body says nothing), so a huge body is never held whole.
@@ -387,30 +537,82 @@ export async function mcp(request) {
   } catch {
     return json(400, { jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } });
   }
-  const answer = answerPayload(message, { base: url.origin });
-  return answer === null ? new Response(null, { status: 202, headers: MCP_HEADERS }) : jsonText(200, answer);
+  const answer = answerPayload(message, { base: url.origin, pictures: Boolean(draw) });
+  if (answer === null) return new Response(null, { status: 202, headers: MCP_HEADERS });
+  return jsonText(200, draw ? await withPictures(answer, url.origin, draw) : answer);
 }
 
-export default {
-  /**
-   * @param {Request} request
-   * @param {Env} env
-   * @param {{ waitUntil(promise: Promise<unknown>): void }} ctx
-   */
-  async fetch(request, env, ctx) {
-    const mcpAnswer = await mcp(request);
-    if (mcpAnswer) return mcpAnswer;
-    const page = await preview(request, env);
-    if (page) return page;
-    const cache = request.method === 'GET' ? /** @type {any} */ (globalThis).caches?.default : undefined;
-    const key = cache ? cacheKey(request, env.CF_VERSION_METADATA?.id ?? 'dev') : null;
-    if (cache && key) {
-      const hit = await cache.match(key);
-      if (hit) return hit;
-    }
-    const answer = api(request) ?? (await png(request, env));
-    if (!answer) return env.ASSETS ? env.ASSETS.fetch(request) : new Response('Not found\n', { status: 404 });
-    if (cache && key && answer.ok) ctx.waitUntil(cache.put(key, answer.clone()));
-    return answer;
-  },
-};
+/** The most pictures one MCP answer holds (a batch can draw twenty covers). */
+const MCP_PICTURES = 4;
+/** How wide a picture in an MCP answer is at most, in px: enough to judge it, small to send. */
+const MCP_PICTURE_WIDTH = 480;
+
+/**
+ * An MCP answer (JSON) with the picture added to each cover or mockup it drew (the first few), as
+ * an image the assistant can see and the client can show: the PNG the HTTP API draws, at most
+ * MCP_PICTURE_WIDTH wide. A cover whose PNG can't be drawn (a script the fonts lack) keeps its links.
+ * @param {string} answer @param {string} origin
+ * @param {(url: URL) => Promise<Response>} draw  fetches a PNG of the API
+ */
+async function withPictures(answer, origin, draw) {
+  const parsed = JSON.parse(answer);
+  let added = 0;
+  for (const message of Array.isArray(parsed) ? parsed : [parsed]) {
+    const result = message?.result;
+    const found = result?.structuredContent;
+    if (added >= MCP_PICTURES || result?.isError || typeof found?.pngUrl !== 'string') continue;
+    const url = new URL(found.pngUrl);
+    if (url.origin !== origin) continue;
+    url.searchParams.set('scale', String(Math.min(1, MCP_PICTURE_WIDTH / found.width)));
+    const res = await draw(url);
+    if (!res.ok || res.headers.get('Content-Type') !== 'image/png') continue;
+    result.content.push({
+      type: 'image',
+      data: base64(new Uint8Array(await res.arrayBuffer())),
+      mimeType: 'image/png',
+    });
+    added++;
+  }
+  return JSON.stringify(parsed);
+}
+
+/**
+ * Answer a request the Worker runs first for (wrangler.jsonc): the MCP endpoint, a design's link,
+ * the API (from the edge's cache when it can), and the site's files for anything else.
+ * @param {Request} request
+ * @param {Env} env
+ * @param {{ waitUntil(promise: Promise<unknown>): void }} ctx
+ * @returns {Promise<Response>}
+ */
+async function handle(request, env, ctx) {
+  // (A cover's picture is the API's PNG, fetched as this client: cached, and within its limit. The
+  // PNG fonts are the site's files: without them, no pictures.)
+  const ip = request.headers.get('cf-connecting-ip');
+  /** @param {URL} url */
+  const fetchPng = (url) => handle(new Request(url, { headers: ip ? { 'cf-connecting-ip': ip } : {} }), env, ctx);
+  const draw = env.ASSETS ? fetchPng : undefined;
+  const mcpAnswer = await mcp(request, env, draw);
+  if (mcpAnswer) return mcpAnswer;
+  const page = await preview(request, env);
+  if (page) return page;
+  // A HEAD is answered as its GET (from the cache, or drawn and kept), without the body.
+  const head = request.method === 'HEAD';
+  const asked = head ? new Request(request.url, { method: 'GET', headers: request.headers }) : request;
+  /** @param {Response} res */
+  const told = (res) => (head ? new Response(null, res) : res);
+  const cache = asked.method === 'GET' ? /** @type {any} */ (globalThis).caches?.default : undefined;
+  const key = cache ? cacheKey(asked, env.CF_VERSION_METADATA?.id ?? 'dev') : null;
+  if (cache && key) {
+    const hit = await cache.match(key);
+    if (hit) return told(hit);
+  }
+  const made = api(asked) ?? info(asked) ?? (await png(asked, env));
+  if (!made) return env.ASSETS ? env.ASSETS.fetch(request) : new Response('Not found\n', { status: 404 });
+  // (What it says may be kept: drawings, and a PNG resvg failed on, for a while.)
+  if (cache && key && /\bpublic\b/.test(made.headers.get('Cache-Control') ?? '')) {
+    ctx.waitUntil(cache.put(key, made.clone()));
+  }
+  return told(made);
+}
+
+export default { fetch: handle };

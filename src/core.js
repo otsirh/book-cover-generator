@@ -249,9 +249,20 @@ export function shadowFilter(id, u, { blur = 4, dy = 2, opacity = 0.35 } = {}) {
   );
 }
 
-/** Gaussian blur filter with a generous filter region. */
-export function blurFilter(id, std) {
-  return `<filter id="${id}" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="${n(std)}"/></filter>`;
+/**
+ * Gaussian blur filter. Its region is 220% of the blurred shape's box, or, given the cover's
+ * `canvas`, the cover and 3σ around it (all that shows of a blur), in user space: a blurred group
+ * that already spans the cover and more needs no more, and a renderer's memory grows with the region.
+ */
+export function blurFilter(id, std, canvas) {
+  if (!canvas) {
+    return `<filter id="${id}" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="${n(std)}"/></filter>`;
+  }
+  const pad = std * 3;
+  return (
+    `<filter id="${id}" filterUnits="userSpaceOnUse" x="${n(-pad)}" y="${n(-pad)}" width="${n(canvas.width + pad * 2)}" height="${n(canvas.height + pad * 2)}">` +
+    `<feGaussianBlur stdDeviation="${n(std)}"/></filter>`
+  );
 }
 
 /**

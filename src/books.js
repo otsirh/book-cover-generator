@@ -79,7 +79,9 @@ function optionsFrom(named) {
   /** @type {Record<string, unknown>} */
   const out = {};
   for (const [key, raw] of Object.entries(named)) {
-    const option = COLUMNS[/** @type {keyof typeof COLUMNS} */ (key.trim().toLowerCase())];
+    const column = key.trim().toLowerCase();
+    // (Only its own names: not `constructor` or `__proto__`.)
+    const option = Object.hasOwn(COLUMNS, column) ? COLUMNS[/** @type {keyof typeof COLUMNS} */ (column)] : undefined;
     if (!option || raw == null) continue;
     if (option === 'texture') {
       const v = String(raw).trim().toLowerCase();

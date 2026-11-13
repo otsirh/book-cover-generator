@@ -66,36 +66,30 @@ const STYLES = listStyles();
 const STYLE_IDS = STYLES.map((s) => s.id);
 /** @type {Set<string>} */
 const PALETTE_IDS = new Set(['auto', ...palettes.map((p) => p.id)]);
-// First-time visitors start on one of the strongest styles with a sample title.
+/**
+ * First-time visitors start on a sample book in a style, palette and variation that suit it (the
+ * README's sheet, scripts/preview.js, pairs them the same way).
+ * @type {{ title: string, author: string, style: string, palette: string, seed: string }[]}
+ */
 const STARTERS = [
-  'artdeco',
-  'bigtype',
-  'thriller',
-  'botanical',
-  'swiss',
-  'landscape',
-  'retro',
-  'bauhaus',
-  'aurora',
-  'papercut',
-];
-const SAMPLES = [
-  ['The Lighthouse Keeper', 'Mara Ellison'],
-  ['Salt and Static', 'J. R. Okafor'],
-  ['A Map of Quiet Places', 'Lena Hart'],
-  ['Neon Tide', 'Kai Moreno'],
-  ['The Glass Orchard', 'Theo Vance'],
-  ['Small Gods of Winter', 'Ines Calder'],
-  ['Signal Lost', 'R. M. Price'],
-  ['Midnight Arithmetic', 'Ada Lindqvist'],
-  ['The Last Cartographer', 'Elias Brandt'],
-  ['Under Paper Skies', 'Noor Haddad'],
+  { title: 'The Lighthouse Keeper', author: 'Mara Ellison', style: 'artdeco', palette: 'midnight', seed: 's1' },
+  { title: 'Signal Lost', author: 'R. M. Price', style: 'thriller', palette: 'thriller', seed: 's9' },
+  { title: 'The Glass Orchard', author: 'Theo Vance', style: 'botanical', palette: 'sage', seed: 's6' },
+  { title: 'Neon Tide', author: 'Kai Moreno', style: 'bigtype', palette: 'riso', seed: 's2' },
+  { title: 'Small Gods of Winter', author: 'Ines Calder', style: 'constellation', palette: 'deepsea', seed: 's4' },
+  { title: 'Bright Machines', author: 'Yuki Tanaka', style: 'bauhaus', palette: 'bauhaus', seed: 's5' },
+  { title: 'Salt and Static', author: 'J. R. Okafor', style: 'swiss', palette: 'mint', seed: 's7' },
+  { title: 'Hollow Season', author: 'Sam Whitlock', style: 'silhouette', palette: 'dusk', seed: 's8' },
+  { title: 'The Last Cartographer', author: 'Elias Brandt', style: 'engraved', palette: 'oxblood', seed: 's12' },
+  { title: 'Under Paper Skies', author: 'Noor Haddad', style: 'papercut', palette: 'pastel', seed: 's10' },
+  { title: 'Midnight Arithmetic', author: 'Ada Lindqvist', style: 'blueprint', palette: 'cobalt', seed: 's11' },
+  { title: 'A Map of Quiet Places', author: 'Lena Hart', style: 'retro', palette: 'synth', seed: 's3' },
 ];
 const KEEP_KEY = 'book-cover-generator:kept';
 const SHORTCUTS_KEY = 'book-cover-generator:shortcuts';
 const GENRE_KEY = 'book-cover-generator:genre';
 /** @type {Record<string, string>} */
-const LETTER_CODES = { KeyR: 'r', KeyZ: 'z', KeyY: 'y' };
+const LETTER_CODES = { KeyR: 'r', KeyZ: 'z', KeyY: 'y', KeyK: 'k' };
 const MAX_KEPT = 100;
 /** A kept cover's SVG is stored with it up to this length (the largest styles are about 100 KB). */
 const MAX_SNAPSHOT = 400_000;
@@ -141,21 +135,16 @@ function h(tag, props = {}, ...children) {
   return node;
 }
 
-const [sampleTitle, sampleAuthor] = pick(SAMPLES);
 /** @type {Design} */
 const design = {
-  title: sampleTitle,
-  author: sampleAuthor,
+  ...pick(STARTERS),
   subtitle: '',
   series: '',
   credit: '',
   badge: '',
-  style: pick(STARTERS),
   variant: '',
   font: '',
   case: '',
-  palette: 'auto',
-  seed: randomSeed(),
   format: 'paperback',
   texture: false,
 };
@@ -242,62 +231,35 @@ function noteVersion(hash) {
   }
 }
 
-// Every discrete change is a history entry, so Undo/Redo and the browser's
-// Back/Forward step through designs. A burst of typing is one entry. The
-// position survives a reload: the entry's index is in history.state, and the
-// newest index in sessionStorage.
-const MAX_KEY = 'book-cover-generator:history-max';
-let historyIndex = 0;
-let historyMax = 0;
+// Undo and Redo step through this tab's designs within the page. The browser's history keeps a
+// single entry for the app, whose URL holds the design as it is now: Back leaves the site, and a
+// reload or a copied address opens the same design. A burst of typing is one step. The steps
+// survive a reload (in sessionStorage, which is the tab's own).
+const STEPS_KEY = 'book-cover-generator:steps';
+/** The most steps kept: the oldest go first. */
+const MAX_STEPS = 100;
+/** The designs Undo and Redo step through, oldest first. @type {Design[]} */
+let steps = [];
+/** The step on show. */
+let stepIndex = 0;
 
-/** Fields links may leave out, with the values of a design that does (as entries of ours without them have). */
-const OPTIONAL = /** @type {Partial<Design>} */ (
-  Object.fromEntries(KEYS.filter((key) => FIELDS[key].optional).map((key) => [key, FIELDS[key].empty]))
-);
 /** The keys every link names; one that names them all is a whole design. */
 const WHOLE_KEYS = KEYS.filter((key) => !FIELDS[key].optional);
 
-function saveHistoryMax() {
-  try {
-    sessionStorage.setItem(MAX_KEY, String(historyMax));
-  } catch {
-    // Storage blocked: Redo after a reload just starts fresh.
-  }
-}
 let typing = false;
 /** The field of the current typing burst: typing in another field starts a new step. */
 let typingField = '';
-/**
- * The Undo (-1) or Redo (1) in flight until its popstate arrives: the index it left and when.
- * A popstate is that step only if it lands on `from + dir`; anything else is the browser's own.
- * @type {{ from: number, dir: number, at: number } | null}
- */
-let pending = null;
-/**
- * Undo/Redo presses (-1, 1) and changes made while a step was in flight, applied in order once it
- * lands: a change made then would otherwise be pushed after the entry the step is leaving.
- * @type {(number | { patch: Partial<Design>, kind: 'discrete' | 'typing' })[]}
- */
-let queued = [];
-/** @type {ReturnType<typeof setTimeout> | undefined} */
-let drainTimer;
-/** A step still expected (its popstate can be dropped by the browser: then, after a second, not). */
-const inFlight = () => pending !== null && performance.now() - pending.at < 1000;
-/** Forget queued Undo/Redo presses (not changes): they were for a step that never came. */
-const dropSteps = () => {
-  queued = queued.filter((item) => typeof item !== 'number');
-};
 /** @type {ReturnType<typeof setTimeout> | undefined} */
 let typingTimer;
-/** @type {ReturnType<typeof setTimeout> | undefined} */
-let replaceTimer;
-/** Keystrokes not yet written to the typing burst's entry. */
-let replaceDirty = false;
+
+/** Times of recent history writes. Safari allows about 100 in 30 s; typing slows down well before. */
+/** @type {number[]} */
+const recentWrites = [];
 const REPLACE_MS = 300;
 
 /**
  * Write to the history, ignoring the SecurityError browsers throw when pages
- * update history too often (the design still updates; only that step is lost).
+ * update history too often (the design still updates; only that write is lost).
  * @param {() => void} write
  */
 function safely(write) {
@@ -314,128 +276,93 @@ function safely(write) {
   }
 }
 
-/** Times of recent history writes. Safari allows about 100 in 30 s; typing slows down well before. */
-/** @type {number[]} */
-const recentWrites = [];
-
-/** How long a typing burst waits between history writes: longer once many were made recently. */
+/** How long to wait between writes to the URL: longer once many were made recently. */
 function replaceInterval() {
   const now = performance.now();
   return recentWrites.filter((time) => now - time <= 30_000).length > 40 ? 2000 : REPLACE_MS;
 }
 
-/** @type {ReturnType<typeof setTimeout> | undefined} */
-let stampTimer;
-/** Counts entry changes (pushes and traversals), so a delayed write can tell it is stale. */
-let entryGen = 0;
-/**
- * Each entry this tab made, by index: its URL fragment and design. For an entry whose state
- * the browser refused to store, this is how a later visit to it is recognised and shown.
- * @type {Map<number, { hash: string, design: Design }>}
- */
-const known = new Map();
-
-/** Forget entries past the last one (the browser dropped them). */
-function forgetAhead() {
-  for (const index of known.keys()) if (index > historyMax) known.delete(index);
-}
-
-/** The index of an entry this tab made with this URL fragment, nearest the current one. @param {string} hash */
-function knownIndex(hash) {
-  /** @type {number | null} */
-  let found = null;
-  for (const [index, entry] of known) {
-    if (entry.hash === hash && (found === null || Math.abs(index - historyIndex) < Math.abs(found - historyIndex))) {
-      found = index;
-    }
-  }
-  return found;
-}
-
 /** Whether the URL holds this fragment (compared as parameters, whatever the encoding). @param {string} hash */
 const urlHolds = (hash) =>
   new URLSearchParams(location.hash.slice(1)).toString() === new URLSearchParams(hash.slice(1)).toString();
-/** The URL fragment of the current entry, as last written or visited. */
-let entryHash = '';
+
+/** @type {ReturnType<typeof setTimeout> | undefined} */
+let urlTimer;
+/** The URL (or the stored steps) may be behind the design. */
+let urlDirty = false;
+
 /**
- * Write the design and the index into the current entry. A write the browser refuses
- * (rate-limited) is retried, so an entry is not left without its index, which would make
- * a later visit to it look like a new entry.
+ * Save the steps for this tab, with the addresses it may be loaded at again (reloaded, or come
+ * back to): opened at one of them, the app goes on from the steps rather than from the address.
+ * @param {string[]} [urls]
  */
-function stamp(gen = entryGen) {
-  clearTimeout(stampTimer);
-  stampTimer = undefined;
-  // Another entry is current now (a click or Back since): this write was for the old one.
-  if (gen !== entryGen) return;
-  known.set(historyIndex, { hash: location.hash, design: { ...design } });
+function saveSteps(urls = [location.hash]) {
+  try {
+    sessionStorage.setItem(STEPS_KEY, JSON.stringify({ steps, index: stepIndex, urls }));
+  } catch {
+    // Storage blocked or full: Undo starts afresh after a reload.
+  }
+}
+
+/** Write the design to the URL and the steps to the tab's storage, now. */
+function flushUrl() {
   const hash = toHash(design);
-  // A write can fail silently (Chrome ignores some when rate-limited): check both the state and the URL.
-  if (
-    !safely(() => history.replaceState({ i: historyIndex }, '', hash)) ||
-    history.state?.i !== historyIndex ||
-    !urlHolds(hash)
-  ) {
-    stampTimer = setTimeout(() => stamp(gen), 1000);
+  // A write can be refused (rate-limited browsers throw) or ignored silently (Chrome): checked, so
+  // the timer tries again.
+  urlDirty = !urlHolds(hash) && !(safely(() => history.replaceState(null, '', hash)) && urlHolds(hash));
+  saveSteps();
+}
+
+/** Make the write that is waiting, then wait a while before the next one. */
+function tickUrl() {
+  urlTimer = undefined;
+  if (!urlDirty) return;
+  flushUrl();
+  urlTimer = setTimeout(tickUrl, urlDirty ? 1000 : replaceInterval());
+}
+
+/**
+ * Keep the URL up with the design: at once for a new step, and while typing at most every
+ * REPLACE_MS (less often after many writes: browsers rate-limit them).
+ * @param {boolean} [keystroke] a keystroke within a typing burst
+ */
+function writeUrl(keystroke = false) {
+  urlDirty = true;
+  if (keystroke) {
+    if (urlTimer === undefined) tickUrl();
     return;
   }
-  entryHash = location.hash;
-  known.set(historyIndex, { hash: entryHash, design: { ...design } });
+  flushUrl();
+  if (urlDirty && urlTimer === undefined) urlTimer = setTimeout(tickUrl, 1000);
 }
 
-/** Write the current design into the current entry. */
-function writeReplace() {
-  replaceDirty = false;
-  stamp();
-}
+// Leaving or reloading the page: a reload has its address already, which may be a keystroke or two
+// behind the design. The steps note both, so the app opened at either goes on as it was.
+// (Both pagehide and visibilitychange come as a page is left: the addresses of either are kept.)
+/** @type {Set<string>} */
+const leftAt = new Set();
+const leaving = () => {
+  leftAt.add(location.hash);
+  if (urlDirty) flushUrl();
+  leftAt.add(location.hash);
+  saveSteps([...leftAt]);
+};
+window.addEventListener('pagehide', leaving);
+window.addEventListener('pageshow', () => leftAt.clear());
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') leaving();
+  else leftAt.clear();
+});
 
-/** Save keystrokes not yet in the current entry, now. */
-function flushReplace() {
-  clearTimeout(replaceTimer);
-  replaceTimer = undefined;
-  if (replaceDirty) writeReplace();
-}
-
-/**
- * Keystrokes within a typing burst update the burst's entry: at once, then at most
- * every REPLACE_MS, or less often after many writes (browsers rate-limit history writes). The entry is never more than
- * that behind, even if the toolbar's Back button (which can't be intercepted) leaves it.
- */
-function scheduleReplace() {
-  replaceDirty = true;
-  if (replaceTimer !== undefined) return;
-  writeReplace();
-  const tick = () => {
-    replaceTimer = undefined;
-    if (replaceDirty) {
-      writeReplace();
-      replaceTimer = setTimeout(tick, replaceInterval());
-    }
-  };
-  replaceTimer = setTimeout(tick, replaceInterval());
-}
-
-/** A new history step for the current design. Callers save pending keystrokes first (update()). */
+/** A new step for the design as it is now, after the one on show (any ahead of it are dropped). */
 function commit() {
   // A discrete change ends any typing burst, so later keystrokes get their own step.
   typing = false;
   clearTimeout(typingTimer);
-  // Chrome may ignore a pushState without throwing when a page writes history too fast:
-  // only count the entry if it is really there.
-  const pushed =
-    safely(() => history.pushState({ i: historyIndex + 1 }, '', toHash(design))) &&
-    history.state?.i === historyIndex + 1;
-  if (pushed) {
-    entryGen += 1;
-    entryHash = location.hash;
-    known.set(historyIndex + 1, { hash: entryHash, design: { ...design } });
-    historyIndex += 1;
-    historyMax = historyIndex;
-    forgetAhead();
-    saveHistoryMax();
-  } else {
-    // Rate-limited: update the current entry instead (which may also be refused).
-    writeReplace();
-  }
+  steps.splice(stepIndex + 1, Infinity, { ...design });
+  if (steps.length > MAX_STEPS) steps.splice(0, steps.length - MAX_STEPS);
+  stepIndex = steps.length - 1;
+  writeUrl();
   syncHistoryButtons();
 }
 
@@ -445,7 +372,11 @@ function typed(field) {
     commit();
     typing = true;
     typingField = field;
-  } else scheduleReplace();
+  } else {
+    // Later keystrokes of the burst update its step.
+    steps[stepIndex] = { ...design };
+    writeUrl(true);
+  }
   clearTimeout(typingTimer);
   typingTimer = setTimeout(() => {
     typing = false;
@@ -454,175 +385,108 @@ function typed(field) {
 
 function syncHistoryButtons() {
   // aria-disabled rather than disabled: a focused button that becomes disabled drops keyboard
-  // focus to the page. (Pressing it does nothing then: step() checks the index.)
-  $('undo').setAttribute('aria-disabled', String(historyIndex <= 0));
-  $('redo').setAttribute('aria-disabled', String(historyIndex >= historyMax));
+  // focus to the page. (Pressing it does nothing then: step() checks.)
+  for (const id of ['undo', 'm-undo']) $(id).setAttribute('aria-disabled', String(stepIndex <= 0));
+  $('redo').setAttribute('aria-disabled', String(stepIndex >= steps.length - 1));
 }
 
-// The browser's own Back and Forward leave the entry before popstate fires, too
-// late to save a typing burst's last keystrokes into it. Save them on the
-// shortcuts and mouse buttons that navigate, and when the page is hidden.
-document.addEventListener(
-  'keydown',
-  (e) => {
-    const nav =
-      e.key === 'BrowserBack' ||
-      e.key === 'BrowserForward' ||
-      ((e.altKey || e.metaKey) && ['ArrowLeft', 'ArrowRight', '[', ']'].includes(e.key));
-    if (nav) flushReplace();
-  },
-  { capture: true },
-);
-window.addEventListener(
-  'pointerdown',
-  (e) => {
-    if (e.button === 3 || e.button === 4) flushReplace();
-  },
-  { capture: true },
-);
-window.addEventListener('pagehide', flushReplace);
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') flushReplace();
-});
-
-window.addEventListener('popstate', (e) => {
-  arrive(e);
-  // What came in while a step was in flight.
-  drain();
-});
-
-/** @param {PopStateEvent} e */
-function arrive(e) {
-  // The entry being left can no longer be written: what it missed is lost.
-  clearTimeout(replaceTimer);
-  replaceTimer = undefined;
-  replaceDirty = false;
-  clearTimeout(stampTimer);
-  stampTimer = undefined;
-  entryGen += 1;
+/**
+ * Undo (-1) or Redo (1): to the nearest step that shows another design, so every press changes
+ * something (a burst of typing can end where it began).
+ * @param {number} dir
+ */
+function step(dir) {
   typing = false;
-  const arrived = pending;
-  pending = null;
-  const ours = Boolean(e.state) && typeof e.state.i === 'number';
-  /** Which way our Undo or Redo moved, if this popstate is that step; 0 for the browser's own. */
-  let dir = 0;
-  if (ours) {
-    if (arrived && e.state.i === arrived.from + arrived.dir) dir = arrived.dir;
-    historyIndex = e.state.i;
-    entryHash = location.hash;
-    // An entry of ours that is reachable again (toolbar Forward after the max was lowered).
-    if (historyIndex > historyMax) {
-      historyMax = historyIndex;
-      saveHistoryMax();
-    }
-  }
-  const linked = ours ? null : fromHash(location.hash);
-  /** The design of an entry whose state was never stored, if this tab made it. @type {Design | null} */
-  let remembered = null;
-  if (!ours) {
-    const seen = knownIndex(location.hash);
-    if (arrived && performance.now() - arrived.at < 1000) {
-      // Undo or Redo landed on an entry whose index was never written (the browser refused).
-      dir = arrived.dir;
-      historyIndex = arrived.from + arrived.dir;
-      remembered = known.get(historyIndex)?.design ?? null;
-    } else if (location.hash === entryHash) {
-      // The same URL again (Enter in the address bar): the browser replaced this entry.
-    } else if (seen !== null) {
-      // The toolbar's Back or Forward onto such an entry: recognised by its URL.
-      historyIndex = seen;
-      remembered = known.get(seen)?.design ?? null;
-    } else {
-      // A new entry (an edited URL, a pasted link, or a fragment like #usage): the browser put
-      // it right after the one we were on and dropped any ahead of it.
-      historyIndex += 1;
-      historyMax = historyIndex;
-      forgetAhead();
-      saveHistoryMax();
-    }
-  }
-  // Presses queued for an Undo or Redo don't carry over to the browser's own navigation.
-  if (!dir) dropSteps();
-  if (linked && !remembered && !Object.keys(linked).length) {
-    // A fragment that isn't a design (say #usage, typed to jump to the docs): keep the design.
-    stamp();
-    syncHistoryButtons();
-    return;
-  }
-  // Undo and Redo pass over entries that show the same design, so every press changes something.
-  if (ours && dir && toHash({ ...design, ...OPTIONAL, ...fromHash(location.hash) }) === toHash(design)) {
-    if (dir < 0 ? historyIndex > 0 : historyIndex < historyMax) {
-      go(dir);
-      return;
-    }
-  }
-  // The app's own entries hold whole designs (older ones leave out empty optional keys); an
-  // edited URL changes just the keys it names, and a pasted link names them all. A link from
-  // before 1.2.0 names every key but the optional ones, which it left out when empty or off.
-  if (!linked) Object.assign(design, OPTIONAL, fromHash(location.hash));
-  else if (remembered) Object.assign(design, remembered);
-  else {
-    // (Judged by the keys the URL names: an unknown value is dropped, but the link is still whole,
-    // and opens as it would in a new tab.)
-    const named = new URLSearchParams(location.hash.slice(1));
-    const whole = WHOLE_KEYS.every((key) => named.has(key));
-    Object.assign(design, whole ? complete(linked) : linked);
-    if (whole) noteVersion(location.hash);
-  }
-  // Rewrite an edited URL so it always holds the whole design (for Copy link).
-  if (!ours) stamp();
+  clearTimeout(typingTimer);
+  const now = toHash(design);
+  let i = stepIndex + dir;
+  while (i >= 0 && i < steps.length && toHash(steps[i]) === now) i += dir;
+  if (i < 0 || i >= steps.length) return;
+  stepIndex = i;
+  Object.assign(design, steps[i]);
+  writeUrl();
   render({ fade: true, announce: true });
   syncHistoryButtons();
 }
 
+function undo() {
+  step(-1);
+}
+
+function redo() {
+  step(1);
+}
+
 /**
- * Apply a change and re-render (after any Undo or Redo still in flight).
- * @param {Partial<Design>} patch
+ * The steps saved for this tab. Reloaded, or come back to, at an address they were saved with, the
+ * app goes on as it was (the design included, typed after the address was last written). Opened at
+ * another (a link opened in the tab), its design is a new step after the one that was on show.
+ */
+function restoreSteps() {
+  /** @type {Design[]} */
+  let saved = [];
+  let index = -1;
+  /** @type {unknown[]} */
+  let urls = [];
+  try {
+    const raw = JSON.parse(sessionStorage.getItem(STEPS_KEY) || 'null');
+    if (Array.isArray(raw?.steps) && raw.steps.length) {
+      saved = raw.steps
+        .slice(0, MAX_STEPS)
+        .map((/** @type {unknown} */ d) =>
+          complete(sanitize(d && typeof d === 'object' ? /** @type {Record<string, unknown>} */ (d) : {})),
+        );
+      index = Number.isInteger(raw.index) ? Math.min(Math.max(raw.index, 0), saved.length - 1) : saved.length - 1;
+      urls = Array.isArray(raw.urls) ? raw.urls : [];
+    }
+  } catch {
+    // Unreadable or blocked: a fresh start.
+  }
+  if (saved.length && location.hash.length > 1 && urls.includes(location.hash)) {
+    steps = saved;
+    stepIndex = index;
+    Object.assign(design, saved[index]);
+    return;
+  }
+  steps = saved.slice(0, index + 1);
+  if (!steps.length || toHash(steps[steps.length - 1]) !== toHash(design)) steps.push({ ...design });
+  if (steps.length > MAX_STEPS) steps.splice(0, steps.length - MAX_STEPS);
+  stepIndex = steps.length - 1;
+}
+
+// The address changed within the page: an edited URL, a link pasted into the tab, a #place, or Back
+// and Forward between those. What it names is a change like any other, and can be undone.
+window.addEventListener('popstate', () => {
+  // (Read first: the URL is rewritten as the design changes.)
+  const hash = location.hash;
+  const linked = fromHash(hash);
+  if (Object.keys(linked).length) {
+    // An edited URL changes just the keys it names; a pasted link names them all (and opens as it
+    // would in a new tab). A link from before 1.2.0 names every key but the optional ones.
+    // (Judged by the keys the URL names: an unknown value is dropped, but the link is still whole.)
+    const named = new URLSearchParams(hash.slice(1));
+    const whole = WHOLE_KEYS.every((key) => named.has(key));
+    update(whole ? complete(linked) : linked);
+    if (whole) noteVersion(hash);
+  }
+  // The URL holds the whole design again (a fragment that isn't one, such as #usage, keeps it).
+  writeUrl();
+});
+
+/**
+ * Apply a change and re-render.
+ * @param {Partial<Design>} change
  * @param {'discrete' | 'typing'} [kind]
  */
-function update(patch, kind = 'discrete') {
-  queued.push({ patch, kind });
-  drain();
-}
-
-/** Apply queued presses and changes in order, until a step has to wait for its popstate. */
-function drain() {
-  clearTimeout(drainTimer);
-  while (queued.length && !inFlight()) {
-    const next = /** @type {(typeof queued)[number]} */ (queued.shift());
-    if (typeof next === 'number') go(next);
-    else apply(next.patch, next.kind);
-  }
-  // A step whose popstate never comes stops holding changes back after a second (and the presses
-  // queued behind it are dropped with it).
-  if (queued.length && pending) {
-    drainTimer = setTimeout(
-      () => {
-        dropSteps();
-        drain();
-      },
-      Math.ceil(pending.at + 1000 - performance.now()) + 1,
-    );
-  }
-}
-
-/**
- * @param {Partial<Design>} change
- * @param {'discrete' | 'typing'} kind
- */
-function apply(change, kind) {
+function update(change, kind = 'discrete') {
   // Pinned choices belong to a style: another style starts with none.
   const restyled = change.style !== undefined && change.style !== design.style && !('variant' in change);
   const patch = restyled ? { ...change, variant: '' } : change;
   const changed = Object.entries(patch).some(([key, value]) => design[/** @type {keyof Design} */ (key)] !== value);
   if (!changed) return;
   const field = kind === 'typing' ? Object.keys(patch).join() : '';
-  // A discrete change, or typing in another field, is a new step: first save the burst's last
-  // keystrokes to its own entry.
-  if (kind === 'discrete' || !typing || field !== typingField) {
-    flushReplace();
-    typing = false;
-  }
+  // A discrete change, or typing in another field, is a new step.
+  if (kind === 'discrete' || field !== typingField) typing = false;
   Object.assign(design, patch);
   if (kind === 'typing') typed(field);
   else commit();
@@ -705,6 +569,7 @@ function render({ fade = false, announce = false } = {}) {
     manyTimer = setTimeout(renderMany, typing ? 250 : 0);
   }
   syncControls();
+  syncKeep();
   markRail();
   linkGallery();
   // The print panel follows the design, when it's open.
@@ -880,7 +745,7 @@ function buildControls() {
     h(
       'button',
       { type: 'button', className: 'swatch auto', title: 'Auto: picked from the variation', 'data-palette': 'auto' },
-      'Auto',
+      h('span', { className: 'sw-label' }, 'Auto'),
     ),
   );
   for (const p of palettes) {
@@ -905,10 +770,10 @@ function buildControls() {
         type: 'button',
         className: 'swatch custom',
         title: 'Custom: your own colours',
-        'aria-label': 'Your own colours',
+        'aria-label': 'Custom colours',
         'data-palette': 'custom',
       },
-      h('span', { className: 'sw-aa' }, 'Aa'),
+      h('span', { className: 'sw-label' }, 'Custom'),
       h('span', { className: 'sw-dots' }, h('i'), h('i'), h('i')),
     ),
   );
@@ -953,7 +818,7 @@ function buildControls() {
       if (fits(w, hgt)) return;
       syncSize(true);
       const { min, max, ratio } = sizeLimits;
-      toast(`Sizes go from ${min} to ${max.toLocaleString('en')} px, at most ${ratio} times as tall as wide`);
+      fail(`Sizes go from ${min} to ${max.toLocaleString('en')} px, at most ${ratio} times as tall as wide`);
     });
   }
   $('size-preset').addEventListener('change', (e) => {
@@ -1007,7 +872,22 @@ function buildControls() {
   $('randomize').addEventListener('click', randomizeAll);
   $('m-randomize').addEventListener('click', randomizeAll);
   $('undo').addEventListener('click', undo);
+  $('m-undo').addEventListener('click', undo);
   $('redo').addEventListener('click', redo);
+  $('m-prev-style').addEventListener('click', () => stepStyle(-1));
+  $('m-next-style').addEventListener('click', () => stepStyle(1));
+  // The sample title a first-time visitor sees is selected on first focus, so typing replaces it.
+  const titleField = /** @type {HTMLTextAreaElement} */ ($('title'));
+  titleField.addEventListener(
+    'focus',
+    () => {
+      if (!sampleTitle || titleField.value !== sampleTitle) return;
+      titleField.select();
+      // (A click would put the caret where it lands, after focus: not this once.)
+      titleField.addEventListener('mouseup', (e) => e.preventDefault(), { once: true });
+    },
+    { once: true },
+  );
 
   const copyImageButton = /** @type {HTMLButtonElement} */ ($('copy-image'));
   copyImageButton.hidden = !canCopyImage();
@@ -1020,7 +900,7 @@ function buildControls() {
         toast(`Image copied · ${w * scale} × ${hgt * scale} px`);
       } catch (err) {
         console.warn(err);
-        toast('Could not copy the image. Try Download PNG.');
+        fail('Could not copy the image. Try Download PNG.');
       }
     }),
   );
@@ -1032,34 +912,35 @@ function buildControls() {
       await copyText(current.svg);
       toast('SVG copied to the clipboard');
     } catch {
-      toast('Could not access the clipboard');
+      fail('Could not access the clipboard');
     }
   });
   $('copy-link').addEventListener('click', async () => {
-    flushReplace();
     try {
       // From the design itself: a history write the browser refused would leave the URL behind.
       await copyText(shareLink(design));
       toast('Link copied: it opens this exact design');
     } catch {
-      toast('Could not access the clipboard');
+      fail('Could not access the clipboard');
     }
   });
   $('copy-image-link').addEventListener('click', async () => {
-    flushReplace();
     try {
       await copyText(imageLink(design));
-      toast('Image link copied: it draws this design as an SVG, on any page');
+      toast('Embed link copied: it draws this design as an SVG, on any page');
     } catch {
-      toast('Could not access the clipboard');
+      fail('Could not access the clipboard');
     }
   });
   for (const format of /** @type {const} */ (['svg', 'png', 'jpeg', 'webp'])) {
     const button = /** @type {HTMLButtonElement} */ ($(`dl-${format}`));
     button.addEventListener('click', () => exportAs(format, button));
   }
-  const mobileDownload = /** @type {HTMLButtonElement} */ ($('m-download'));
-  mobileDownload.addEventListener('click', () => exportAs('png', mobileDownload));
+  // The main download: PNG, or JPEG for an eBook (which KDP takes, and PNG not).
+  for (const id of ['download', 'm-download']) {
+    const button = /** @type {HTMLButtonElement} */ ($(id));
+    button.addEventListener('click', () => exportAs(mainFormat(design.format), button));
+  }
   const mockupKind = /** @type {HTMLSelectElement} */ ($('mockup-kind'));
   const mockupText = /** @type {HTMLInputElement} */ ($('mockup-text'));
   mockupKind.addEventListener('change', renderMockup);
@@ -1085,7 +966,7 @@ function buildControls() {
         toast(`Saved the mockup · ${pw} × ${ph} px`);
       } catch (err) {
         console.error(err);
-        toast('Export failed. Try again.');
+        fail('Export failed. Try again.');
       }
     }),
   );
@@ -1095,7 +976,16 @@ function buildControls() {
     const on = $('book').classList.toggle('store-size');
     $('thumb-toggle').setAttribute('aria-pressed', String(on));
   });
-  $('keep').addEventListener('click', keepDesign);
+  $('keep').addEventListener('click', toggleKeep);
+  $('m-keep').addEventListener('click', toggleKeep);
+  // Under Format: the paperback's back and spine are in their own panel, below.
+  $('print-link').addEventListener('click', () => {
+    const panel = /** @type {HTMLDetailsElement} */ ($('print'));
+    panel.open = true;
+    const summary = /** @type {HTMLElement} */ (panel.querySelector('summary'));
+    summary.scrollIntoView({ behavior: reducedMotion.matches ? 'auto' : 'smooth', block: 'start' });
+    summary.focus({ preventScroll: true });
+  });
   $('kept-all').addEventListener('click', downloadKept);
   $('kept-export').addEventListener('click', exportKept);
   $('kept-import').addEventListener('click', () => $('kept-file').click());
@@ -1118,8 +1008,9 @@ function buildControls() {
     e.preventDefault();
     const behavior = reducedMotion.matches ? 'auto' : 'smooth';
     if (a.id === 'style-name') {
-      tiles.get(design.style)?.button.scrollIntoView({ behavior, block: 'center' });
-      tiles.get(design.style)?.button.focus({ preventScroll: true });
+      const tile = tiles.get(design.style)?.button;
+      if (tile) showTile(tile, behavior);
+      tile?.focus({ preventScroll: true });
     } else if (a.hash === '#controls') $('title').focus();
     else {
       target.scrollIntoView({ behavior });
@@ -1134,14 +1025,18 @@ function buildControls() {
   const syncShortcuts = () => {
     toggle.textContent = ui.shortcuts ? 'Turn off shortcuts' : 'Turn on shortcuts';
     $('shortcut-hint').classList.toggle('off', !ui.shortcuts);
-    for (const [id, keys] of [
-      ['randomize', 'R'],
-      ['undo', 'Z'],
-      ['redo', 'Shift+Z'],
+    // (Control and Command with Z work either way: they aren't single keys.)
+    for (const [id, keys, always] of [
+      ['randomize', 'R', ''],
+      ['undo', 'Z', 'Control+Z Meta+Z'],
+      ['redo', 'Shift+Z', 'Control+Shift+Z Meta+Shift+Z'],
+      ['keep', 'K', ''],
     ]) {
-      if (ui.shortcuts) $(id).setAttribute('aria-keyshortcuts', keys);
+      const list = ui.shortcuts ? `${keys} ${always}`.trim() : always;
+      if (list) $(id).setAttribute('aria-keyshortcuts', list);
       else $(id).removeAttribute('aria-keyshortcuts');
     }
+    $('keep').title = ui.shortcuts ? 'Keep this design (K)' : 'Keep this design';
   };
   try {
     ui.shortcuts = localStorage.getItem(SHORTCUTS_KEY) !== 'off';
@@ -1162,10 +1057,11 @@ function buildControls() {
   });
 
   document.addEventListener('keydown', (e) => {
-    if (!ui.shortcuts || e.metaKey || e.repeat) return;
+    if (e.repeat) return;
     // The target can be the document itself (events dispatched by scripts or extensions).
     const target = e.target instanceof Element ? e.target : null;
-    // Text fields keep their keys; the texture switch (a checkbox) has no use for them.
+    // Text fields keep their keys (Control or Command with Z undoes typing there); the texture
+    // switch (a checkbox) has no use for them.
     const field = target?.closest('input, textarea, select, [contenteditable]');
     if (field && !(field instanceof HTMLInputElement && (field.type === 'checkbox' || field.type === 'radio'))) return;
     // Match the character printed on the key (QWERTZ, AZERTY, Dvorak…); on
@@ -1173,12 +1069,21 @@ function buildControls() {
     // (Not for Latin letters like à or ı, nor dead keys: those are characters of their own.)
     const nonLatin = /^\p{L}$/u.test(e.key) && !/\p{Script=Latin}/u.test(e.key);
     const letter = /^[a-z]$/i.test(e.key) ? e.key.toLowerCase() : nonLatin ? (LETTER_CODES[e.code] ?? '') : '';
+    // Undo and Redo as everywhere else: Control or Command with Z (and Shift), or Control with Y.
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && (letter === 'z' || (letter === 'y' && !e.metaKey))) {
+      if (letter === 'y' || e.shiftKey) redo();
+      else undo();
+      e.preventDefault();
+      return;
+    }
+    if (!ui.shortcuts || e.metaKey) return;
     const plain = !e.ctrlKey && !e.altKey;
     if (plain && letter === 'r') randomizeAll();
     else if (plain && letter === 'z') {
       if (e.shiftKey) redo();
       else undo();
     } else if (plain && letter === 'y') redo();
+    else if (plain && letter === 'k' && !e.shiftKey) toggleKeep();
     // (Not in the code samples: they are focusable so arrow keys can scroll them.)
     else if (plain && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !target?.closest('pre'))
       stepStyle(e.key === 'ArrowLeft' ? -1 : 1);
@@ -1190,37 +1095,30 @@ function buildControls() {
 }
 
 /**
- * Move one entry through this app's own history, never past its first or last entry
- * (so never back or forward to another site).
- * @param {number} dir -1 or 1
+ * Bring a style's tile into view. Where the rail scrolls on its own (beside the preview), only the
+ * rail scrolls, so the cover stays where it is; elsewhere the page scrolls to it.
+ * @param {HTMLElement} tile @param {ScrollBehavior} behavior
  */
-function go(dir) {
-  if (dir < 0 ? historyIndex > 0 : historyIndex < historyMax) {
-    pending = { from: historyIndex, dir, at: performance.now() };
-    history.go(dir);
-  } else pending = null;
-}
-
-/**
- * Undo or Redo. The index only moves when popstate arrives, so a press made before
- * then waits its turn rather than check a stale index (a double-click on Undo
- * could otherwise step off the first entry). Pending keystrokes are saved first.
- * @param {number} dir -1 or 1
- */
-function step(dir) {
-  flushReplace();
-  // (A step whose popstate never came, after a second, no longer holds presses back.)
-  if (!inFlight()) dropSteps();
-  queued.push(dir);
-  drain();
-}
-
-function undo() {
-  step(-1);
-}
-
-function redo() {
-  step(1);
+function showTile(tile, behavior) {
+  const rail = $('styles');
+  const box = rail.getBoundingClientRect();
+  // (A rail out of sight, scrolled past to the docs, say: the page goes to it.)
+  if (getComputedStyle(rail).overflowY !== 'auto' || box.bottom < 0 || box.top > innerHeight) {
+    tile.scrollIntoView({ behavior, block: 'center' });
+    return;
+  }
+  // Centred in the part of the rail on screen, below its pinned header.
+  const head = /** @type {HTMLElement} */ (rail.querySelector('.rail-head')).getBoundingClientRect();
+  const [top, bottom] = [Math.max(head.bottom, 0), Math.min(box.bottom, innerHeight)];
+  const r = tile.getBoundingClientRect();
+  const most = rail.scrollHeight - rail.clientHeight;
+  const to = Math.min(most, Math.max(0, rail.scrollTop + r.top + r.height / 2 - (top + bottom) / 2));
+  const at = r.top - (to - rail.scrollTop);
+  rail.scrollTo({ top: to, behavior });
+  // The rail can run past the window's edge (at the top of the page): then the page moves, as little
+  // as it must for the whole tile to show.
+  const below = at + r.height + 8 - innerHeight;
+  if (below > 0) window.scrollBy({ top: below, behavior });
 }
 
 /** @param {number} dir */
@@ -1351,7 +1249,28 @@ function syncControls() {
   const ph = hgt * scale;
   $('png-size').textContent = `${pw} × ${ph} px`;
   $('size-hint').textContent = sizeHint(design.format, pw, ph);
+  // The main download is the file the format is for; the other formats are under it.
+  const main = mainFormat(design.format);
+  const kind = main === 'jpeg' ? 'JPEG' : 'PNG';
+  if ($('download-kind').textContent !== kind) {
+    $('download-kind').textContent = kind;
+    $('m-download-kind').textContent = kind;
+  }
+  $('dl-png').hidden = main === 'png';
+  $('dl-jpeg').hidden = main === 'jpeg';
+  // A paperback (or a size of its own) may want its back and spine too; an eBook or audiobook not.
+  $('print-link').hidden = design.format === 'ebook' || design.format === 'square';
   syncPaletteName();
+}
+
+/**
+ * The format the main download makes: JPEG for a Kindle cover (KDP takes JPEG, not PNG), else PNG.
+ * @param {string} format
+ * @returns {'png' | 'jpeg'}
+ */
+function mainFormat(format) {
+  const [w, hgt] = sizeOf(format);
+  return format === 'ebook' || (isCustomSize(format) && w * 2560 === hgt * 1600) ? 'jpeg' : 'png';
 }
 
 /** The style the variant buttons were built for. */
@@ -1470,6 +1389,13 @@ let railOrder = /** @type {string[]} */ ([]);
 // observer's margin, so look ahead by position in the rail instead.
 const LOOKAHEAD = 6;
 
+/**
+ * A family of styles as the page names it: the library's Genre family (its styles drawn for one
+ * genre each) is "Themed" here, where Genre is the menu that filters the styles.
+ * @param {string} group
+ */
+const familyName = (group) => (group === 'Genre' ? 'Themed' : group);
+
 function buildRail() {
   const observer = new IntersectionObserver(
     (entries) => {
@@ -1498,10 +1424,10 @@ function buildRail() {
     if (!grid) {
       grid = h('div', { className: 'rail-grid' });
       groups.set(s.group, grid);
-      const section = h('section', { className: 'rail-group' }, h('h3', {}, s.group), grid);
+      const section = h('section', { className: 'rail-group' }, h('h3', {}, familyName(s.group)), grid);
       rail.append(section);
       // A jump link per family in the rail's header: 39 styles are a long scroll.
-      const jump = h('button', { type: 'button', className: 'rail-jump' }, s.group);
+      const jump = h('button', { type: 'button', className: 'rail-jump' }, familyName(s.group));
       jump.addEventListener('click', () => {
         // Clear of the rail's pinned header, however tall it has grown (on narrower screens, where
         // it isn't pinned, the stylesheet's margin applies).
@@ -1717,13 +1643,32 @@ const lostNote = (lost) =>
     ? ` Storage is full, so the ${lost === 1 ? 'oldest is' : `${lost} oldest are`} now kept as settings only.`
     : '';
 
+/** The designs kept, by link, as the tray last showed them. @type {Set<string>} */
+let keptHashes = new Set();
+
+/** The Keep stars say whether the design on show is kept. */
+function syncKeep() {
+  const kept = String(keptHashes.has(toHash(design)));
+  for (const id of ['keep', 'm-keep'])
+    if ($(id).getAttribute('aria-pressed') !== kept) $(id).setAttribute('aria-pressed', kept);
+}
+
+/** Keep the design on show, or, when it is kept already, remove it (with an Undo). */
+function toggleKeep() {
+  const hash = toHash(design);
+  const list = loadKept();
+  const i = list.findIndex((k) => toHash(k.design) === hash);
+  if (i < 0) keepDesign();
+  else removeKept(list[i], i);
+}
+
 function keepDesign() {
   const hash = toHash(design);
   const list = loadKept().filter((k) => toHash(k.design) !== hash);
   list.unshift({ design: { ...design }, svg: current.svg.length <= MAX_SNAPSHOT ? current.svg : '' });
   const lost = saveKept(list.slice(0, MAX_KEPT));
   if (lost < 0) {
-    toast('Could not save here (private browsing?)');
+    fail('Could not save here (private browsing?)');
     return;
   }
   renderKept();
@@ -1731,6 +1676,28 @@ function keepDesign() {
     (list.length > MAX_KEPT ? `Kept. The oldest of ${MAX_KEPT} made room.` : 'Kept. It’s under the preview.') +
       lostNote(lost),
   );
+}
+
+/**
+ * Remove a kept design, offering to put it back where it was.
+ * @param {Kept} k @param {number} at its place in the tray
+ */
+function removeKept(k, at) {
+  const hash = toHash(k.design);
+  // (By its link: another tab may have changed the list since it was drawn.)
+  saveKept(loadKept().filter((other) => toHash(other.design) !== hash));
+  renderKept();
+  toast('Removed from kept designs.', {
+    action: 'Undo',
+    run: () => {
+      const list = loadKept();
+      if (list.some((other) => toHash(other.design) === hash)) return;
+      list.splice(Math.min(at, list.length), 0, k);
+      if (saveKept(list.slice(0, MAX_KEPT)) < 0) fail('Could not save here (private browsing?)');
+      else toast('Put back.');
+      renderKept();
+    },
+  });
 }
 
 /** Kept thumbnails by design, so Keep and Remove only draw the one that changed. */
@@ -1746,12 +1713,13 @@ function renderKept(list = loadKept()) {
   const thumbKeys = list.map((k, i) => `${hashes[i]}|${k.svg ? hashString(k.svg) : ''}`);
   for (const key of keptThumbs.keys()) if (!thumbKeys.includes(key)) keptThumbs.delete(key);
   keptQueue = [];
+  keptHashes = new Set(hashes);
+  syncKeep();
   $('kept-empty').hidden = list.length > 0;
   for (const id of ['kept-all', 'kept-export']) $(id).hidden = list.length === 0;
   $('kept-list').replaceChildren(
     ...list.map((k, i) => {
       const d = k.design;
-      const hash = hashes[i];
       const img = /** @type {HTMLImageElement} */ (h('img', { alt: '' }));
       const thumb = keptThumbs.get(thumbKeys[i]);
       if (thumb) img.src = thumb;
@@ -1780,9 +1748,7 @@ function renderKept(list = loadKept()) {
         '×',
       );
       remove.addEventListener('click', () => {
-        // Remove this exact design (another tab may have changed the list since it was drawn).
-        saveKept(loadKept().filter((other) => toHash(other.design) !== hash));
-        renderKept();
+        removeKept(k, i);
         // The button is gone: move focus to the next design's (or the last one's), or to Keep.
         const buttons = $('kept-list').querySelectorAll('.kept-remove');
         const next = /** @type {HTMLElement | undefined} */ (buttons[Math.min(i, buttons.length - 1)]);
@@ -1836,7 +1802,7 @@ async function downloadKept() {
       toast(`Saved ${files.length} PNG${files.length === 1 ? '' : 's'} in kept-covers.zip`);
     } catch (err) {
       console.error(err);
-      toast('Export failed. Try one at a time.');
+      fail('Export failed. Try one at a time.');
     } finally {
       button.textContent = 'Download all';
     }
@@ -1866,7 +1832,7 @@ async function importKept(file) {
       ? /** @type {unknown[]} */ (/** @type {{ designs: unknown[] }} */ (data).designs)
       : null;
   if (!items) {
-    toast('That file has no kept designs in it');
+    fail('That file has no kept designs in it');
     return;
   }
   const list = loadKept();
@@ -1893,18 +1859,17 @@ async function importKept(file) {
   const room = Math.max(0, MAX_KEPT - list.length);
   const taken = added.slice(0, room);
   if (!designs) {
-    toast('That file has no kept designs in it');
+    fail('That file has no kept designs in it');
     return;
   }
   if (!taken.length) {
-    toast(
-      added.length ? `The tray is full: it holds ${MAX_KEPT} designs` : 'Nothing new: those designs are kept already',
-    );
+    if (added.length) fail(`The tray is full: it holds ${MAX_KEPT} designs`);
+    else toast('Nothing new: those designs are kept already');
     return;
   }
   const lost = saveKept([...taken, ...list]);
   if (lost < 0) {
-    toast('Could not save here (private browsing?)');
+    fail('Could not save here (private browsing?)');
     return;
   }
   renderKept();
@@ -1964,7 +1929,7 @@ async function exportAs(format, button) {
       toast(`Saved ${ext === 'jpg' ? 'JPEG' : ext.toUpperCase()} · ${w * scale} × ${hgt * scale} px${fallback}`);
     } catch (err) {
       console.error(err);
-      toast('Export failed. Try SVG instead.');
+      fail('Export failed. Try SVG instead.');
     }
   });
 }
@@ -2003,7 +1968,7 @@ async function shareCover() {
     if (why === 'NotAllowedError') toast('Ready: tap Share again');
     else {
       console.error(err);
-      toast('Could not share. Try Download PNG.');
+      fail('Could not share. Try Download PNG.');
     }
   }
 }
@@ -2111,7 +2076,7 @@ function buildMany() {
 async function downloadMany() {
   const { books, error } = listedBooks();
   if (!books.length) {
-    toast(error || 'Add a book per line first');
+    fail(error || 'Add a book per line first');
     return;
   }
   // Taken now: changing the design while the ZIP is made doesn't change the books still to draw.
@@ -2143,22 +2108,25 @@ async function downloadMany() {
           files.push({ name: uniqueName(base, extensionOf(blob) ?? 'png', taken), data: blob });
         }
       } catch (err) {
-        failed.push(`${i + 1}: ${err instanceof Error ? err.message : String(err)}`);
+        const title = oneLine(String(book.title ?? '')) || 'Untitled';
+        failed.push(`${i + 1}. ${title}: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
-    if (failed.length) console.warn('Books left out:', failed);
+    // The books left out, and why, in the panel.
+    $('many-failed').hidden = !failed.length;
+    $('many-failed-list').replaceChildren(...failed.map((why) => h('li', {}, why)));
     if (!files.length) {
-      toast('None of the books could be made (see the console)');
+      fail('None of the books could be made: the panel says why.');
       return;
     }
     downloadBlob(await zipFiles(files), 'covers.zip');
     toast(
       `Saved ${files.length} cover${files.length === 1 ? '' : 's'} in covers.zip` +
-        (failed.length ? `; ${failed.length} couldn’t be made (see the console)` : ''),
+        (failed.length ? `; ${failed.length} couldn’t be made (listed in the panel)` : ''),
     );
   } catch (err) {
     console.error(err);
-    toast('Export failed. Try SVG, or fewer books.');
+    fail('Export failed. Try SVG, or fewer books.');
   } finally {
     button.textContent = 'Download all as ZIP';
   }
@@ -2231,8 +2199,8 @@ function printSettings() {
     hook: field('print-hook').value,
     blurb: field('print-blurb').value,
     imprint: field('print-imprint').value,
-    back: field('print-back').value,
-    spine: field('print-spine').value,
+    back: $('print-back').dataset.value ?? PRINT_DEFAULTS.back,
+    spine: $('print-spine').dataset.value ?? PRINT_DEFAULTS.spine,
   };
 }
 
@@ -2243,21 +2211,40 @@ function paletteColour(key, colors) {
   return colors.accents[Number(key.slice(1))] ?? colors.ink;
 }
 
-/** The colour menus, from the cover's palette (the choice kept, as a place in it). */
+/** The back's and the spine's colour choices: the cover's palette as swatches (the choice kept, as a place in it). */
 function printColourMenus() {
   const { colors } = current;
   const choices = [['bg', 'Background'], ['ink', 'Ink'], ...colors.accents.map((_, i) => [`a${i}`, `Accent ${i + 1}`])];
-  for (const id of ['print-back', 'print-spine']) {
-    const menu = /** @type {HTMLSelectElement} */ ($(id));
-    const chosen = menu.value || (id === 'print-back' ? savedPrint().back : savedPrint().spine);
+  for (const id of /** @type {const} */ (['print-back', 'print-spine'])) {
+    const group = $(id);
+    const fallback = id === 'print-back' ? 'bg' : 'ink';
+    const chosen = group.dataset.value ?? (id === 'print-back' ? savedPrint().back : savedPrint().spine);
+    group.dataset.value = choices.some(([key]) => key === chosen) ? chosen : fallback;
     const labels = choices.map(([key, name]) => `${key}:${name}:${paletteColour(key, colors)}`).join('|');
-    if (menu.dataset.labels !== labels) {
-      menu.dataset.labels = labels;
-      menu.replaceChildren(
-        ...choices.map(([key, name]) => h('option', { value: key }, `${name} · ${paletteColour(key, colors)}`)),
+    if (group.dataset.labels !== labels) {
+      group.dataset.labels = labels;
+      group.replaceChildren(
+        ...choices.map(([key, name]) => {
+          const colour = paletteColour(key, colors);
+          const button = h(
+            'button',
+            {
+              type: 'button',
+              className: 'colour-choice',
+              'data-key': key,
+              title: `${name} · ${colour}`,
+              'aria-label': name,
+            },
+            h('span', { className: 'colour-chip' }),
+          );
+          /** @type {HTMLElement} */ (button.firstChild).style.background = colour;
+          return button;
+        }),
       );
     }
-    menu.value = choices.some(([key]) => key === chosen) ? chosen : id === 'print-back' ? 'bg' : 'ink';
+    for (const b of group.querySelectorAll('button')) {
+      b.setAttribute('aria-pressed', String(b.getAttribute('data-key') === group.dataset.value));
+    }
   }
 }
 
@@ -2329,11 +2316,22 @@ function buildPrint() {
     clearTimeout(printTimer);
     printTimer = setTimeout(renderPrint, 250);
   };
-  for (const key of PRINT_FIELDS)
+  for (const key of PRINT_FIELDS) {
+    if (key === 'back' || key === 'spine') continue;
     field(`print-${key}`).addEventListener(
       key === 'blurb' || key === 'hook' || key === 'imprint' || key === 'pages' ? 'input' : 'change',
       later,
     );
+  }
+  for (const id of ['print-back', 'print-spine']) {
+    $(id).addEventListener('click', (e) => {
+      const b = /** @type {HTMLElement} */ (e.target).closest('button[data-key]');
+      if (!(b instanceof HTMLElement) || !b.dataset.key) return;
+      $(id).dataset.value = b.dataset.key;
+      // (Drawn at once: the swatch pressed shows it is chosen.)
+      renderPrint();
+    });
+  }
   $('print').addEventListener('toggle', renderPrint);
   const pdf = /** @type {HTMLButtonElement} */ ($('print-pdf'));
   pdf.addEventListener('click', () =>
@@ -2351,7 +2349,7 @@ function buildPrint() {
         );
       } catch (err) {
         console.error(err);
-        toast(err instanceof RangeError ? err.message : 'The PDF could not be made. Try the SVG.');
+        fail(err instanceof RangeError ? err.message : 'The PDF could not be made. Try the SVG.');
       } finally {
         pdf.textContent = 'Download print PDF';
       }
@@ -2362,20 +2360,83 @@ function buildPrint() {
       const print = printCoverOf({ ...design }, printSettings(), false);
       downloadBlob(svgToBlob(print.svg), `${slug(design.title)}-paperback-${printSettings().trim}.svg`);
     } catch (err) {
-      toast(err instanceof Error ? err.message : String(err));
+      fail(err instanceof Error ? err.message : String(err));
     }
   });
 }
 
 /** @type {ReturnType<typeof setTimeout> | undefined} */
 let toastTimer;
-/** @param {string} msg */
-function toast(msg) {
-  const el = $('toast');
-  el.textContent = msg;
-  el.classList.add('show');
+/** How long the toast on show stays, from when it is shown or the pointer leaves it. */
+let toastFor = 0;
+
+/** A live region's text; if it holds this text already, changed anyway (a trailing no-break space) so it is read again. @param {HTMLElement} el @param {string} msg */
+function say(el, msg) {
+  el.textContent = el.textContent === msg ? `${msg}\u00A0` : msg;
+}
+
+function hideToast() {
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+  const el = $('toast');
+  el.classList.remove('show');
+  // (Its button goes with it, so nothing unseen takes keyboard focus.)
+  el.querySelector('button')?.remove();
+}
+
+function hideAlert() {
+  $('alert').classList.remove('show');
+  $('alert-close').hidden = true;
+}
+
+/**
+ * A message that comes and goes: on show long enough to read it (four seconds at least, longer for
+ * a long one), and for as long as the pointer is over it or focus is in it. An action, such as
+ * Undo, gets a button.
+ * @param {string} msg @param {{ action?: string, run?: () => void }} [opts]
+ */
+function toast(msg, { action, run } = {}) {
+  hideAlert();
+  hideToast();
+  const el = $('toast');
+  say(el, msg);
+  if (action && run) {
+    const button = h('button', { type: 'button', className: 'toast-action' }, action);
+    button.addEventListener('click', () => {
+      hideToast();
+      run();
+    });
+    el.append(' ', button);
+  }
+  el.classList.add('show');
+  toastFor = Math.max(4000, 1500 + msg.split(/\s+/).length * 300) + (action ? 3000 : 0);
+  toastTimer = setTimeout(hideToast, toastFor);
+}
+
+/** Something that went wrong: it looks different, is announced at once, and stays until dismissed. @param {string} msg */
+function fail(msg) {
+  hideToast();
+  say($('alert-text'), msg);
+  $('alert-close').hidden = false;
+  $('alert').classList.add('show');
+}
+
+function buildToasts() {
+  const el = $('toast');
+  const hold = () => clearTimeout(toastTimer);
+  const resume = () => {
+    clearTimeout(toastTimer);
+    if (el.classList.contains('show') && !el.matches(':hover, :focus-within')) {
+      toastTimer = setTimeout(hideToast, Math.min(toastFor, 3000));
+    }
+  };
+  el.addEventListener('pointerenter', hold);
+  el.addEventListener('focusin', hold);
+  el.addEventListener('pointerleave', resume);
+  el.addEventListener('focusout', resume);
+  $('alert-close').addEventListener('click', hideAlert);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && $('alert').classList.contains('show')) hideAlert();
+  });
 }
 
 /* -------------------------------------------------------------------- boot */
@@ -2390,12 +2451,16 @@ if (sharedLink) {
 const linked = fromHash(location.hash.length > 1 ? location.hash : sharedLink ? location.search : '');
 if (Object.keys(linked).length) Object.assign(design, complete(linked));
 else {
-  // With no link, the first cover is in the genre chosen last time: a starter that suits it, if any.
+  // With no link, the first cover is in the genre chosen last time: a starter that suits it, if any
+  // (else the sample in a style of the genre, in a palette and variation picked for it).
   const genre = ui.genre;
   const suits = genre ? STYLES.filter((s) => s.genres.includes(genre)).map((s) => s.id) : [];
-  const starters = STARTERS.filter((id) => suits.includes(id));
-  if (suits.length) design.style = pick(starters.length ? starters : suits);
+  const starters = STARTERS.filter((starter) => suits.includes(starter.style));
+  if (starters.length) Object.assign(design, pick(starters));
+  else if (suits.length) Object.assign(design, { style: pick(suits), palette: 'auto', seed: randomSeed() });
 }
+/** The sample title shown to a first-time visitor: selected when first focused, so typing replaces it. */
+const sampleTitle = Object.keys(linked).length ? '' : design.title;
 const linkedHash = location.hash;
 // A fragment can name a place on the page: alone (#usage, from a header link opened in a new tab),
 // or before a design (#usage&title=…, from the gallery's header). The URL is about to hold just the
@@ -2409,37 +2474,13 @@ if (place && !place.includes('=')) {
     // A malformed fragment: nothing to scroll to.
   }
 }
-if (typeof history.state?.i === 'number') {
-  // Back on an entry of ours. After a reload the later entries are still there; after
-  // coming back from another site they may have been replaced by it, so Redo starts
-  // fresh rather than risk navigating away.
-  historyIndex = history.state.i;
-  historyMax = historyIndex;
-  const nav = /** @type {PerformanceNavigationTiming | undefined} */ (performance.getEntriesByType('navigation')[0]);
-  if (nav?.type === 'reload') {
-    try {
-      historyMax = Math.max(historyIndex, Number(sessionStorage.getItem(MAX_KEY)) || 0);
-    } catch {
-      // Storage blocked.
-    }
-  }
-}
-// Store the max settled on, so a later reload can't bring back a stale, larger one.
-saveHistoryMax();
-// Restored from the back/forward cache after visiting another page: same reasoning.
-window.addEventListener('pageshow', (e) => {
-  if (!e.persisted) return;
-  historyMax = historyIndex;
-  saveHistoryMax();
-  syncHistoryButtons();
-});
-// History entries are designs, not places on the page: Undo and Back must not scroll the page
-// to where it was when that design was made.
+restoreSteps();
+// Nothing in the page is a place the browser should scroll back to.
 history.scrollRestoration = 'manual';
-stamp();
-entryHash = location.hash;
+writeUrl();
 registerServiceWorker();
 keepFocusInView();
+buildToasts();
 buildControls();
 buildRail();
 buildVariations();

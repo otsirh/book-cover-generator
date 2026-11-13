@@ -38,6 +38,13 @@ const shadow = (id, blur, dy, opacity) =>
   `<feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
 
 /**
+ * A mockup's line as it draws it: on one line, at most 80 characters (cut between whole
+ * characters: an emoji or accented letter is never split).
+ * @param {unknown} text
+ */
+export const mockupText = (text) => clipGraphemes(String(text).replace(/\s+/g, ' ').trim(), 80).trim();
+
+/**
  * The cover as a product or a social card.
  *
  * - `flat`: the cover on a backdrop with a soft shadow.
@@ -65,8 +72,7 @@ export function createMockup(cover, { kind = 'book', background, text = '' } = {
   const id = (/** @type {string} */ name) => `${tag}-${name}`;
   const nested = { width: cover.width, height: cover.height, body: ownIds(cover.body, tag) };
   const { width: CW, height: CH, colors } = cover;
-  // (Cut between whole characters: an emoji or accented letter is never split.)
-  const words = clipGraphemes(String(text).replace(/\s+/g, ' ').trim(), 80).trim();
+  const words = mockupText(text);
   const label = escapeXml(`${cover.title.replace(/\n/g, ' ')}${cover.author ? ` by ${cover.author}` : ''}`);
 
   // (The cover's language too, so Chinese characters keep that language's forms.)

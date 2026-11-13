@@ -2,9 +2,20 @@
 // over stdio, and the site's Worker over HTTP at /mcp. This module only answers messages; the
 // transports are theirs. (Not part of the library's API.)
 
-import { createCover, createMockup, listStyles, palettes, genres, formats, mockupKinds, version } from './index.js';
-import { optionsFromLink, writeLink, customPalette, variantOf, sixDigits } from './link.js';
-import { idFor } from './shared.js';
+import {
+  createCover,
+  createMockup,
+  listStyles,
+  palettes,
+  genres,
+  formats,
+  mockupKinds,
+  sizeLimits,
+  version,
+} from './index.js';
+import { optionsFromLink, linkOf, sixDigits } from './link.js';
+import { mockupText } from './mockups.js';
+import { idFor, fontEntries } from './shared.js';
 
 /** The site that draws covers from links, and edits them. */
 export const SITE = 'https://covers.otsirh.dev';
@@ -19,9 +30,10 @@ const INSTRUCTIONS =
   'on a social card.';
 
 /**
- * @typedef {{ base?: string, writeFile?: (path: string, data: string) => string }} Context
+ * @typedef {{ base?: string, writeFile?: (path: string, data: string) => string, pictures?: boolean }} Context
  * `base`: the site links point to; `writeFile`: where a local server can save a file (it answers
- * the path written), else undefined.
+ * the path written), else undefined; `pictures`: the server adds the picture to a cover's answer
+ * (the site's, which draws PNGs).
  */
 
 /** @param {Context} ctx */
@@ -66,8 +78,9 @@ function designProperties(ctx) {
     },
     font: {
       type: 'string',
-      description:
-        "The title's font instead of the style's: serif, didone, garamond, sans, geometric, humanist, condensed, display or mono.",
+      description: `The title's font instead of the style's: ${fontEntries()
+        .map((f) => f.id)
+        .join(', ')}.`,
     },
     case: { type: 'string', enum: ['upper', 'normal'], description: 'The title in capitals, or as typed.' },
     texture: { type: 'boolean', description: 'A fine film grain.' },
@@ -78,7 +91,12 @@ function designProperties(ctx) {
     },
     svg: { type: 'boolean', description: 'Also answer with the SVG markup (large).' },
   };
-  if (ctx.writeFile) properties.output = { type: 'string', description: 'An absolute path to save the SVG to.' };
+  if (ctx.writeFile) {
+    properties.output = {
+      type: 'string',
+      description: 'An absolute path of an .svg file to save the SVG to (a new file, or an SVG it replaces).',
+    };
+  }
   return properties;
 }
 
@@ -89,16 +107,14 @@ function tools(ctx) {
     {
       name: 'create_cover',
       title: 'Create a book cover',
-      description:
-        'Draw a book cover. Answers with links to the image and to edit it in the app, and the style, palette and seed it used.',
+      description: `Draw a book cover. Answers with ${ctx.pictures ? 'the picture, ' : ''}links to the image (SVG and PNG) and to edit it in the app, and the style, palette and seed it used.`,
       inputSchema: { type: 'object', properties: design, required: ['title'] },
       annotations: { readOnlyHint: !ctx.writeFile, openWorldHint: false },
     },
     {
       name: 'create_mockup',
       title: 'Create a mockup of a cover',
-      description:
-        'Draw a cover as a product shot (a 3D book, flat, on an e-reader) or on a social card with a line of text.',
+      description: `Draw a cover as a product shot (a 3D book, flat, on an e-reader) or on a social card with a line of text.${ctx.pictures ? ' Answers with the picture and its links.' : ''}`,
       inputSchema: {
         type: 'object',
         properties: {
@@ -176,36 +192,35 @@ function queryFrom(args) {
 }
 
 /**
- * The link of the cover drawn, written as the app writes its links from the options it was drawn
- * with (not the tool's arguments), with what the seed chose written out: the app and the API draw
- * that cover.
- * @param {import('./index.js').CoverOptions} options @param {ReturnType<typeof createCover>} cover
+ * What covers can be made of: the styles (with their genres and the pins they take), palettes,
+ * genres, fonts, formats, sizes and mockups, as list_styles, list_palettes and the HTTP API's
+ * /api/catalog.json give them. (Styles and palettes registered in this process are included.)
  */
-function linkOf(options, cover) {
-  /** @type {Record<string, string>} */
-  const pinned = {};
-  for (const name of Object.keys(options.variants ?? {}).map((n) => n.toLowerCase())) {
-    if (Object.hasOwn(cover.variants, name)) pinned[name] = cover.variants[name];
-  }
-  const own = options.palette && typeof options.palette === 'object' ? options.palette : null;
-  const preset = Object.entries(formats).find(([, [w, h]]) => w === cover.width && h === cover.height);
-  return writeLink({
-    title: cover.title,
-    author: cover.author,
-    subtitle: options.subtitle ?? '',
-    series: options.series ?? '',
-    credit: options.credit ?? '',
-    badge: options.badge ?? '',
-    style: cover.style,
-    variant: variantOf(pinned),
-    font: options.font ?? '',
-    case: options.titleCase ?? '',
-    palette: own ? customPalette([own.bg, own.ink, ...(own.accents ?? [])]) : cover.palette,
-    // (A seed from the title stays one: the app reads an empty seed so.)
-    seed: options.seed != null ? cover.seed : '',
-    format: preset ? preset[0] : `${cover.width}x${cover.height}`,
-    texture: options.texture === true,
-  });
+export function catalog() {
+  return {
+    version,
+    styles: listStyles().map(({ id, name, group, description, genres: suits, variants }) => ({
+      id,
+      name,
+      group,
+      description,
+      genres: suits,
+      variants: variants.map((v) => ({ name: v.name, values: v.values.map((x) => x.value) })),
+    })),
+    palettes: palettes.map(({ id, name, bg, ink, accents, dark }) => ({
+      id,
+      name,
+      bg,
+      ink,
+      accents: [...accents],
+      dark: !!dark,
+    })),
+    genres: genres.map(({ id, name }) => ({ id, name })),
+    fonts: fontEntries(),
+    formats: Object.fromEntries(Object.entries(formats).map(([id, size]) => [id, [...size]])),
+    sizeLimits: { ...sizeLimits },
+    mockups: [...mockupKinds],
+  };
 }
 
 /** Text for a tool's answer. @param {string} body */
@@ -223,42 +238,22 @@ function callTool(tool, args, ctx) {
       const genreId = genre ? idFor(genre, genres) : null;
       if (genre && !genreId)
         throw new RangeError(`Unknown genre "${genre}". Available: ${genres.map((g) => g.id).join(', ')}`);
-      const styles = listStyles().filter((s) => !genreId || s.genres.includes(genreId));
+      const styles = catalog().styles.filter((s) => !genreId || s.genres.includes(genreId));
       const lines = styles.map((s) => {
-        const pins = s.variants.map((v) => `${v.name}: ${v.values.map((x) => x.value).join(', ')}`).join('; ');
+        const pins = s.variants.map((v) => `${v.name}: ${v.values.join(', ')}`).join('; ');
         return `- ${s.id} (${s.name}, ${s.group}): ${s.description} Genres: ${s.genres.join(', ') || 'none'}.${pins ? ` Pins: ${pins}.` : ''}`;
       });
-      return {
-        content: [text(`${styles.length} styles:\n${lines.join('\n')}`)],
-        structuredContent: {
-          styles: styles.map(({ id, name, group, description, genres: suits, variants }) => ({
-            id,
-            name,
-            group,
-            description,
-            genres: suits,
-            variants: variants.map((v) => ({ name: v.name, values: v.values.map((x) => x.value) })),
-          })),
-        },
-      };
+      return { content: [text(`${styles.length} styles:\n${lines.join('\n')}`)], structuredContent: { styles } };
     }
     if (tool === 'list_palettes') {
-      const lines = palettes.map(
+      const listed = catalog().palettes;
+      const lines = listed.map(
         (p) =>
           `- ${p.id} (${p.name}, ${p.dark ? 'dark' : 'light'}): ${p.bg} background, ${p.ink} text, ${p.accents.join(' ')}`,
       );
       return {
-        content: [text(`${palettes.length} palettes:\n${lines.join('\n')}`)],
-        structuredContent: {
-          palettes: palettes.map(({ id, name, bg, ink, accents, dark }) => ({
-            id,
-            name,
-            bg,
-            ink,
-            accents,
-            dark: !!dark,
-          })),
-        },
+        content: [text(`${listed.length} palettes:\n${lines.join('\n')}`)],
+        structuredContent: { palettes: listed },
       };
     }
     if (tool !== 'create_cover' && tool !== 'create_mockup') return null;
@@ -273,13 +268,15 @@ function callTool(tool, args, ctx) {
     let what = `"${cover.title.replace(/\n/g, ' ')}"${cover.author ? ` by ${cover.author}` : ''}`;
     if (tool === 'create_mockup') {
       const kind = typeof args.kind === 'string' && args.kind ? args.kind : 'book';
-      const line = typeof args.text === 'string' ? args.text : '';
+      // (As the mockup draws it, so its link is no longer than its picture's line.)
+      const line = typeof args.text === 'string' ? mockupText(args.text) : '';
       const mockup = createMockup(cover, { kind: /** @type {import('./index.js').MockupKind} */ (kind), text: line });
       ({ svg, width, height } = mockup);
       const extra = new URLSearchParams({ kind, ...(line ? { text: line } : {}) });
       image = `${base}/api/mockup.svg?${link}&${extra}`;
       what = `${/^[aeiou]/.test(kind) ? 'an' : 'a'} ${kind} mockup of ${what}`;
     }
+    const png = image.replace(/\.svg\?/, '.png?');
     const saved =
       typeof args.output === 'string' && args.output && ctx.writeFile ? ctx.writeFile(args.output, svg) : null;
     const styleName = listStyles().find((s) => s.id === cover.style)?.name ?? cover.style;
@@ -288,7 +285,7 @@ function callTool(tool, args, ctx) {
     const content = [
       text(
         `Drew ${what} in the ${styleName} style (${cover.style}), palette ${paletteName}, ${seed} (${width} × ${height} px).\n` +
-          `Image (SVG): ${image}\nEdit, or download as PNG or JPEG: ${edit}` +
+          `Image (SVG): ${image}\nPNG: ${png}\nEdit, or download in other sizes: ${edit}` +
           (saved ? `\nSaved to ${saved}` : ''),
       ),
     ];
@@ -305,6 +302,8 @@ function callTool(tool, args, ctx) {
         height,
         variants: cover.variants,
         imageUrl: image,
+        // (Drawn with open fonts that have Latin, Greek and Cyrillic letters: other scripts, the SVG.)
+        pngUrl: png,
         editUrl: edit,
         ...(saved ? { file: saved } : {}),
       },

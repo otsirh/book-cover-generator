@@ -13,6 +13,7 @@ import { extname, join, resolve, sep } from 'node:path';
 import { Readable } from 'node:stream';
 import worker from '../worker/index.js';
 import { PAGES } from './gallery.js';
+import { BUNDLES, bundle } from './bundle.js';
 
 const [portArg, ...rootArgs] = process.argv.slice(2);
 const port = Number(portArg ?? 4173);
@@ -166,9 +167,14 @@ async function handle(req, res) {
   // A page the build writes, made here when the roots haven't it (the source tree).
   /** @type {string | null} */
   let generated = null;
+  let generatedType = TYPES['.html'];
   const page = PAGES[/** @type {keyof typeof PAGES} */ (urlPath)];
   if (!file && page) generated = page();
-  else if (!file) {
+  else if (!file && Object.hasOwn(BUNDLES, urlPath)) {
+    // (A bundle the build writes: built here from the source as it is now.)
+    generated = await bundle(/** @type {keyof typeof BUNDLES} */ (urlPath));
+    generatedType = TYPES['.js'];
+  } else if (!file) {
     status = 404;
     file = await locate('/404.html');
   }
@@ -187,7 +193,7 @@ async function handle(req, res) {
   res.setHeader('Cache-Control', res.getHeader('Cache-Control') ?? 'no-cache');
 
   if (generated !== null) {
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.writeHead(200, { 'Content-Type': generatedType });
     res.end(req.method === 'HEAD' ? undefined : generated);
     return;
   }

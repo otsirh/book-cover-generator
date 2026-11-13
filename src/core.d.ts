@@ -143,9 +143,11 @@ export declare function shadowFilter(
 ): string;
 /**
  * A Gaussian-blur `<filter>` with this id and standard deviation `std` (px), with room around the
- * shape for the blur.
+ * shape for the blur. Given the cover's `canvas` size, the filter's region is the cover and 3 × `std`
+ * around it instead (in user space): for a blurred group that spans the cover, which then costs a
+ * renderer less memory than room around the group's own box.
  */
-export declare function blurFilter(id: string, std: number): string;
+export declare function blurFilter(id: string, std: number, canvas?: { width: number; height: number }): string;
 
 /** `[offset 0–1, colour, opacity?]` */
 export type GradientStop = readonly [offset: number, color: string, opacity?: number];

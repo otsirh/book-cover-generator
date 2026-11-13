@@ -16,9 +16,9 @@ import {
   shadowFilter,
   contrast,
 } from '../core.js';
-import { FONTS, drawText } from '../text.js';
+import { FONTS, drawText, textBottom } from '../text.js';
 import { titleBlock, authorFit } from '../type.js';
-import { strongAccents, fitTitleWith, tintText } from './util.js';
+import { strongAccents, fitTitleWith, tintText, TEXT_CONTRAST } from './util.js';
 
 /** @typedef {import('../index.js').StyleContext} Ctx */
 
@@ -685,9 +685,11 @@ export const aurora = {
     const blur = c.id('blur');
     const sh = c.id('sh');
     const g = grain(c, { opacity: p.dark ? 0.16 : 0.14, light: p.dark });
-    let s = `<defs>${blurFilter(blur, S * 0.11)}${shadowFilter(sh, u, { blur: 8, dy: 2, opacity: p.dark ? 0.5 : 0.15 })}${g.defs}</defs>`;
+    const spread = S * 0.11;
+    let s = `<defs>${blurFilter(blur, spread, { width: W, height: H })}${shadowFilter(sh, u, { blur: 8, dy: 2, opacity: p.dark ? 0.5 : 0.15 })}${g.defs}</defs>`;
     s += rect(0, 0, W, H, p.bg);
-    let blobs = '';
+    /** @type {{ x: number, y: number, r: number, col: string, op: number }[]} */
+    const fields = [];
     const cols = rng.shuffle([...p.accents, rng.pick(p.accents), p.dark ? p.bg : p.ink]);
     const count = rng.int(4, 6);
     for (let i = 0; i < count; i++) {
@@ -695,15 +697,8 @@ export const aurora = {
       let op = col === p.ink ? 0.35 : +rng.float(0.7, 1).toFixed(2);
       // The title and author sit on the blobs: fade any blob that would leave the ink under 3:1.
       while (op > 0.1 && contrast(mix(p.bg, col, op), p.ink) < 3) op = +(op - 0.05).toFixed(2);
-      blobs += circle(
-        rng.float(-0.1, 1.1) * W,
-        rng.float(-0.05, 1.05) * H,
-        S * rng.float(0.28, 0.5),
-        col,
-        `opacity="${op.toFixed(2)}"`,
-      );
+      fields.push({ x: rng.float(-0.1, 1.1) * W, y: rng.float(-0.05, 1.05) * H, r: S * rng.float(0.28, 0.5), col, op });
     }
-    s += `<g filter="url(#${blur})">${blobs}</g>${g.layer}`;
 
     const layout = c.choose('layout', ['bottom', 'center', 'top']);
     const font = rng.pick([FONTS.sans, FONTS.serif, FONTS.didone]);
@@ -717,18 +712,61 @@ export const aurora = {
       weight: font === FONTS.sans ? 300 : 400,
       stack: font === FONTS.sans && rng.bool(0.5),
     };
-    const shadow = `filter="url(#${sh})"`;
-    if (layout === 'center') {
-      const t = titleBlock(c, { ...tOpts, maxHeight: H * 0.5 });
-      s += t.draw({ x: W / 2, y: (H - t.height) / 2 - H * 0.03, anchor: 'middle', fill: p.ink, attrs: shadow });
-      s += drawText(a, { x: W / 2, y: H - m * 1.3 - a.height, anchor: 'middle', fill: p.ink, attrs: shadow });
-    } else {
-      const t = titleBlock(c, { ...tOpts, maxHeight: H * 0.46 });
-      const tY = layout === 'bottom' ? H - m * 1.4 - t.height : m * 1.4;
-      const aY = layout === 'bottom' ? m * 1.3 : H - m * 1.3 - a.height;
-      s += t.draw({ x: m, y: tY, fill: p.ink, attrs: shadow });
-      s += drawText(a, { x: m, y: aY, fill: p.ink, attrs: shadow });
+    const center = layout === 'center';
+    const t = titleBlock(c, { ...tOpts, maxHeight: H * (center ? 0.5 : 0.46) });
+    const tY = center ? (H - t.height) / 2 - H * 0.03 : layout === 'bottom' ? H - m * 1.4 - t.height : m * 1.4;
+    const aY = layout === 'bottom' ? m * 1.3 : H - m * 1.3 - a.height;
+    const left = (/** @type {number} */ width) => (center ? (W - width) / 2 : m);
+
+    // Each blob alone keeps the ink at 3:1, but blurred blobs overlap and add up. Where their mix
+    // behind the title or the author would leave the ink under 3:1, a soft field of the background
+    // goes under that text too, inside the blur, as faint as will do.
+    /** The share of a blurred edge's colour `z` blurs (standard deviations) inside it: the normal curve's integral, near enough. @param {number} z */
+    const inside = (z) => 1 / (1 + Math.exp(-1.702 * z));
+    /** The blobs' colour at (x, y), over the background. @param {number} x @param {number} y */
+    const under = (x, y) =>
+      fields.reduce((col, f) => mix(col, f.col, f.op * inside((f.r - Math.hypot(x - f.x, y - f.y)) / spread)), p.bg);
+    // The grain, and under dark ink the text's shadow, take the colour toward the ink: allow a tenth.
+    const grit = (/** @type {string} */ col) => mix(col, p.dark ? '#ffffff' : '#000000', 0.1);
+    let scrims = '';
+    for (const [x, y, w, h] of [
+      [left(t.width), tY, t.width, t.height],
+      [left(a.width), aY, a.width, textBottom(a, 0)],
+    ]) {
+      if (!w) continue;
+      // The field: the text's box and a blur around it. What it adds at each point of the text,
+      // and what is there without it.
+      const [x0, y0, x1, y1] = [x - spread, y - spread, x + w + spread, y + h + spread];
+      const nx = Math.max(1, Math.ceil(w / (spread / 2)));
+      const ny = Math.max(1, Math.ceil(h / (spread / 2)));
+      /** @type {[string, number][]} */
+      const points = [];
+      for (let i = 0; i <= nx; i++) {
+        for (let j = 0; j <= ny; j++) {
+          const px = x + (w * i) / nx;
+          const py = y + (h * j) / ny;
+          const reach =
+            (inside((x1 - px) / spread) - inside((x0 - px) / spread)) *
+            (inside((y1 - py) / spread) - inside((y0 - py) / spread));
+          points.push([under(px, py), reach]);
+        }
+      }
+      let k = 0;
+      const short = () =>
+        points.some(([col, reach]) => contrast(grit(mix(col, p.bg, k * reach)), p.ink) < TEXT_CONTRAST);
+      while (k < 1 && short()) k = +(k + 0.1).toFixed(1);
+      if (k) scrims += rect(x0, y0, x1 - x0, y1 - y0, p.bg, `opacity="${k}"`);
     }
+    const blobs = fields.map((f) => circle(f.x, f.y, f.r, f.col, `opacity="${f.op.toFixed(2)}"`)).join('');
+    s += `<g filter="url(#${blur})">${blobs}${scrims}</g>${g.layer}`;
+    const at = {
+      x: center ? W / 2 : m,
+      anchor: /** @type {'middle' | 'start'} */ (center ? 'middle' : 'start'),
+      fill: p.ink,
+      attrs: `filter="url(#${sh})"`,
+    };
+    s += t.draw({ ...at, y: tY });
+    s += drawText(a, { ...at, y: aY });
     return s;
   },
 };

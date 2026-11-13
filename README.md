@@ -42,7 +42,7 @@ On [covers.otsirh.dev](https://covers.otsirh.dev) you type a title and author (p
 - **a variation**, the seed behind the artwork: the strip under the preview shows six others to click;
 - **a format**: paperback, eBook, square, or **Custom** for any size in pixels, typed in or picked from common sizes (Kindle, print trim sizes at 300 dpi, audiobook, social posts).
 
-**Store size** shrinks the preview to the size a store lists covers at, to check the title still reads. **Randomize** reshuffles everything, except what you've locked. Undo and redo step back and forth through your designs, and so do the browser's Back and Forward buttons. **Copy link** shares the exact design, because the URL holds every setting, and **Copy image link** gives the [HTTP API](#http-api) URL that draws it, to put in any page. The export panel tells you which size suits Kindle, print or audiobook covers.
+**Store size** shrinks the preview to the size a store lists covers at, to check the title still reads. **Randomize** reshuffles everything, except what you've locked. Undo and redo (Z, or Ctrl/Cmd+Z) step back and forth through your designs, and survive a reload; the browser's Back button leaves the site. **Copy link** shares the exact design, because the URL holds every setting, and **Copy embed link** gives the [HTTP API](#http-api) URL that draws it, to put in any page. The main download is a PNG (a JPEG for an eBook, as KDP takes), and the export panel tells you which size suits Kindle, print or audiobook covers.
 
 **Mockup** shows and downloads the cover as a 3D book, a flat shot, on an e-reader, or on a social card (a 1200 × 630 link preview, a square post or a story, with a line such as "Out now").
 
@@ -50,7 +50,7 @@ On [covers.otsirh.dev](https://covers.otsirh.dev) you type a title and author (p
 
 **Paperback for print** makes the whole cover of a printed paperback from the design: the back with your headline, back cover text and imprint (and the barcode's box left clear), the spine with the title and author, and the front. Choose the trim size, the page count and the paper, and it sizes everything as Amazon KDP asks: an eighth of an inch of bleed, a spine as wide as the pages are thick (and blank under 80 pages, as KDP requires), the front's art carried into the bleed. **Download print PDF** saves the file to upload: one page at 300 dpi, its trim marked. The back and spine take any colour of the palette; the settings stay in your browser for next time.
 
-**Keep** saves a design to a tray under the preview, together with the cover as it was drawn, so a later version of the app can't change it. **Download all** saves every kept design as a PNG in one ZIP file. **Export** saves the kept designs to a file, and **Import** adds them in another browser.
+**Keep**, the star on the preview (or K), saves a design to a tray under the preview, together with the cover as it was drawn, so a later version of the app can't change it. **Download all** saves every kept design as a PNG in one ZIP file. **Export** saves the kept designs to a file, and **Import** adds them in another browser.
 
 The app works offline once it has loaded.
 
@@ -73,6 +73,8 @@ The site draws covers from a URL too, so a page can show one with nothing instal
 
 - `GET /api/cover.svg` answers with the cover as SVG.
 - `GET /api/mockup.svg` answers with a [mockup](#mockups) of it. Add `kind` (`book`, `flat`, `ereader`, `card`, `square`, `story`), `text` for the line on a card, square or story, and `background`.
+- `GET /api/cover.json` says what a query draws: the style, palette, colours, seed, size and pins it came to (so a random style or palette can be kept), its link with every choice written out, and its SVG, PNG, edit and share URLs.
+- `GET /api/catalog.json` lists every style (with its genres and the choices it lets you pin), palette, genre, font, format and mockup; `GET /api/openapi.json` describes the API as [OpenAPI 3.1](https://covers.otsirh.dev/api/openapi.json).
 - `GET /api/cover.png` and `GET /api/mockup.png` answer with the same as PNG, for places that don't take SVG (email, chat, social posts): a cover up to 600,000 pixels (600 × 900), a mockup up to 2.1 million (a 1080 × 1920 story; a flat or e-reader shot, whose shadow costs more, 1.3 million). A larger one is drawn smaller to fit; `scale` (above 0, up to 4) asks for a size, refused if it won't fit. Larger PNGs come from the app, which draws them in your browser. The server draws them with [open fonts](public/fonts/README.md) and lays the text out in their widths; they have Latin, Greek and Cyrillic letters, so a cover in another script (Chinese, Japanese, Arabic…) gets a `422`: ask for its SVG.
 
 The query takes the options' own names (`title`, `author`, `subtitle`, `series`, `credit`, `badge`, `style`, `palette`, `seed`, `genre`, `font`, `lang`, `width`, `height`) and the app's link parameters, so the part of an app link after `#` draws the same design (the server measures text with the widths of the fonts as macOS draws them, so on another system a line can break a little differently from the app's preview):
@@ -86,17 +88,21 @@ The query takes the options' own names (`title`, `author`, `subtitle`, `series`,
 | `palette`             | a palette id, or your own colours as `custom-0b132b-f8f9fa-ff6b6b` (background, text, accents) |
 | `bg`, `ink`, `accent` | your own colours, as hex (the `#` is optional; accents separated by commas)                    |
 
-A title breaks its line at `%0A`. A design's link from the app (Copy link: `https://covers.otsirh.dev/?title=…`) shows that design in link previews, as a social card drawn by `/api/mockup.png`. Anyone may embed the answers (CORS and `Cross-Origin-Resource-Policy` allow it), and the headers `X-Cover-Style`, `X-Cover-Palette` and `X-Cover-Version` say what was drawn. The same URL always draws the same cover in a version of the library, so answers are cached for a day. Options the library rejects get a `400` with the reason as plain text.
+A title breaks its line at `%0A`. A design's link from the app (Copy link: `https://covers.otsirh.dev/?title=…`) shows that design in link previews, as a social card drawn by `/api/mockup.png`. Anyone may embed the answers (CORS and `Cross-Origin-Resource-Policy` allow it), and the headers `X-Cover-Style`, `X-Cover-Palette` and `X-Cover-Version` say what was drawn. The same URL always draws the same cover in a version of the library, so answers are cached for a day. Options the library rejects get a `400` with the reason as plain text. Add `download=1` to any image to get it as a file named after the title (or `download=my-cover` to name it).
+
+The API is free to use. PNGs not yet cached are limited to 240 a minute for each client, and MCP requests to 120 (`429` with `Retry-After` beyond that); SVGs aren't limited. If you need more, draw the covers in your own code with the library, or run your own copy: fork the repository, set your `account_id` and `routes` (or `"workers_dev": true`) in `wrangler.jsonc`, and run `npx wrangler deploy`.
 
 ## On any page: `<book-cover>`
 
 One script, then a cover wherever you write the element:
 
 ```html
-<script type="module" src="https://covers.otsirh.dev/src/element.js"></script>
+<script type="module" src="https://covers.otsirh.dev/element.js"></script>
 
 <book-cover cover-title="Dune" author="Frank Herbert" cover-style="retro" seed="1"></book-cover>
 ```
+
+(`/element.js` is the same as one minified file; `/src/element.js` loads the library's modules as they are.)
 
 Its attributes are the app's link parameters, except the title and the style, which are `cover-title` and `cover-style` (`title` and `style` are HTML's own): `cover-title`, `author`, `subtitle`, `series`, `credit`, `badge`, `cover-style`, `genre`, `palette`, `seed`, `format`, `font`, `case`, `variant`, `texture` (present: on) and `lang` (the language of the text, such as `zh-Hant`). Styles, palettes and fonts may be named as the app's menus name them. With `loading="lazy"`, as on an image, a cover draws only once it comes near the viewport (a page of many covers loads faster); until then it holds the cover's shape and is named for screen readers, and attributes changed meanwhile apply when it draws. The cover is 240 px wide unless you style the element's `width`; it draws again when an attribute changes, and fires `cover` (with the cover) or `cover-error` (with what's wrong). It is drawn in the page, measuring the text with the fonts installed there, and shown as an image, so a page with Trusted Types can show it (its CSP must allow `data:` images). An image can't use the page's web fonts: if the page loads one that a cover's font stack names (such as EB Garamond or Oswald), the text is measured in it but drawn in the system's font, and may fit less well. From npm: `import 'book-cover-generator/element'`.
 
@@ -122,7 +128,7 @@ Or to any client that takes a JSON configuration (Claude Desktop, Cursor and oth
 }
 ```
 
-The tools: `create_cover` (a title, and any of author, subtitle, style, genre, palette or your own colours, seed, format, font, pins), `create_mockup` (the same, as a 3D book, on an e-reader or on a social card), `list_styles` and `list_palettes`. Run locally, `create_cover` can also save the SVG to a file (`output`).
+The tools: `create_cover` (a title, and any of author, subtitle, style, genre, palette or your own colours, seed, format, font, pins), `create_mockup` (the same, as a 3D book, on an e-reader or on a social card), `list_styles` and `list_palettes`. Each cover comes with links to its SVG, its PNG and the app; the hosted server also answers with the picture itself, so the assistant can see what it made and your client can show it. Run locally, `create_cover` can also save the SVG to a file (`output`, a path ending in `.svg`).
 
 ## Library usage
 
@@ -391,7 +397,7 @@ scripts/        build, dev server and asset generation
 worker/         the HTTP API (the site's Worker)
 ```
 
-The site is a [Cloudflare Workers](https://developers.cloudflare.com/workers/static-assets/) deployment configured in `wrangler.jsonc`: static assets, with security headers in `public/_headers`, and a Worker (`worker/index.js`) that answers `/api/*`. The dev server answers `/api/*` the same way.
+The site is a [Cloudflare Workers](https://developers.cloudflare.com/workers/static-assets/) deployment configured in `wrangler.jsonc`: static assets, with security headers in `public/_headers`, and a Worker (`worker/index.js`) that answers `/api/*`, `/mcp` and a design's link (`/?title=…`). The dev server answers them the same way.
 
 ## Contributing
 

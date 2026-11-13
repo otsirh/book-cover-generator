@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { parseArgs } from 'node:util';
@@ -13,9 +13,24 @@ import {
   optionsForBook,
   genres,
 } from '../src/index.js';
-import { hex, slug } from '../src/shared.js';
+import { hex, slug, fontEntries } from '../src/shared.js';
 import { px, formatSize } from '../src/link.js';
 import { answerPayload } from '../src/mcp.js';
+
+/**
+ * Choices as the help lists them ("a, b or c"), wrapped under the options' descriptions.
+ * @param {string[]} ids
+ */
+function listed(ids) {
+  const words = ids.map((id, i) => (i === ids.length - 1 ? id : i === ids.length - 2 ? `${id} or` : `${id},`));
+  const lines = [''];
+  for (const word of words) {
+    const line = lines.at(-1) ?? '';
+    if (line && 24 + line.length + 1 + word.length > 80) lines.push(word);
+    else lines[lines.length - 1] = line ? `${line} ${word}` : word;
+  }
+  return lines.map((line) => `${' '.repeat(24)}${line}`).join('\n');
+}
 
 const HELP = `Usage: book-cover "<title>" ["<author>"] [options]
 
@@ -23,15 +38,14 @@ Options:
   -s, --style <id>      style id or "random" (default: random from seed)
   -p, --palette <id>    palette id or "random" (default: random from seed)
       --genre <id>      with a random style, one that suits this genre:
-                        literary, thriller, horror, romance, fantasy, children
-                        or nonfiction
+${listed(genres.map((g) => g.id))}
       --bg <hex>        your own colours instead of a palette: background,
       --ink <hex>       text,
       --accent <hex>    and accents (repeat it, or separate them with commas)
       --variant <n=v>   pin one of the style's choices, e.g. scene=forest
                         (repeat it; --list shows each style's)
-      --font <name>     the title's font: serif, didone, garamond, sans,
-                        geometric, humanist, condensed, display or mono
+      --font <name>     the title's font:
+${listed(fontEntries().map((f) => f.id))}
       --case <how>      the title in capitals (upper) or as typed (normal)
       --subtitle <text> a subtitle or tagline
       --series <text>   a series line above the title ("Book Two of …")
@@ -445,6 +459,19 @@ function run() {
   }
 }
 
+/** Whether a file is an SVG (a file, its start an SVG's), as a cover saved before is. @param {string} file */
+function isSvgFile(file) {
+  if (!statSync(file).isFile()) return false;
+  const fd = openSync(file, 'r');
+  try {
+    const start = Buffer.alloc(512);
+    const read = readSync(fd, start, 0, start.length, 0);
+    return /^\uFEFF?\s*(<\?xml[^>]*>\s*)?(<!--[\s\S]*?-->\s*)*<svg[\s>]/.test(start.subarray(0, read).toString('utf8'));
+  } finally {
+    closeSync(fd);
+  }
+}
+
 /**
  * Serve MCP over stdio: a JSON-RPC message per line in, an answer per line out (nothing else on
  * stdout). A cover can be saved to a file, at an absolute path (the host picks the folder it runs in).
@@ -456,6 +483,9 @@ function serveMcp() {
     // (A host starts the server in a folder of its own choosing: a relative path would land there.)
     if (!isAbsolute(path)) throw new Error(`output must be an absolute path, got "${path}"`);
     const file = resolve(path);
+    // Only an SVG, and never over a file of another kind (an assistant can be talked into a path).
+    if (!/\.svg$/i.test(file)) throw new Error(`output must name an .svg file, got "${path}"`);
+    if (existsSync(file) && !isSvgFile(file)) throw new Error(`${file} is there and isn't an SVG: not replaced`);
     mkdirSync(dirname(file), { recursive: true });
     writeFileSync(file, data);
     return file;
