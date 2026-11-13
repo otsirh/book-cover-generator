@@ -23,6 +23,11 @@ All notable changes to this project are documented here. The format follows [Kee
 - The HTTP API answers a HEAD from the cache, as its GET, and a parameter it doesn't read (`&utm_source=…`) no longer draws a cover again.
 - `parseBookList` reads only its own column names: a `constructor` or `__proto__` column is ignored like any other unknown one.
 - `create_mockup`'s image link holds its line as the mockup draws it (at most 80 characters).
+- The HTTP API takes one to three accents for your own colours, as a link's palette holds (four or more gave links that drew nothing), and the links `/api/cover.json` and the MCP server write keep the language a query gave (`lang=tr`), so they draw the same capitals.
+- On an iPhone or iPad, a size of your own too large for the device's canvas even at 1× exports as large as the device can draw, rather than failing.
+- A design's link from Copy link opens in its shape at once (an eBook or square no longer starts as a paperback), and leaves out pins its style doesn't have, which cost it its link preview.
+- `wrapText` no longer repeats a line when a long word's last letter is wider than the line by itself.
+- The dev server never serves a hidden file (`.git`, `node_modules`), however the URL spells its path.
 - Aurora's title and author keep 3:1 against what is drawn behind them: each colour field kept it alone, but blurred fields add up where they overlap (two covers in five had a fifth of a line's outline under 3:1, down to 1.7:1). Where they would, a soft field of the background goes under that text, only as strong as it needs.
 - Blueprint no longer shrinks its title to make room for a subtitle (from 54 to 29 px on a 600 × 900 cover): on tall and square covers the title block grows into the drawing's room instead, and for a long title too.
 - Aurora, Thriller and Ribbon blur only the cover and the blur's reach around it, so their PNGs take a third of the memory they did (Aurora's up to 32 MiB of resvg's, from 98) and draw faster. `svgUtils.blurFilter(id, std, { width, height })` gives a filter that region.

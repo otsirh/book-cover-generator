@@ -289,3 +289,16 @@ test('fitText keeps to maxLines, even for text typed on more lines', () => {
   assert.equal(fit.lines.length, 1);
   assert.ok(fit.truncated);
 });
+
+test('wrapText: a unit broken to the end, its last letter wider than the line, never repeats the line before it', async () => {
+  const { wrapText } = await import('../src/text.js');
+  // Every letter 10 px at 100 px, but W 1000 px: too wide for any line.
+  setTextMeasurer((text) => [...text].reduce((w, c) => w + (c === 'W' ? 1000 : 10), 0));
+  try {
+    const lines = wrapText('abc xyzW', 100, 60, { font: FONTS.sans });
+    assert.deepEqual(lines, ['abc', 'xyz', 'W']);
+    assert.deepEqual(wrapText('abc xyzW def', 100, 60, { font: FONTS.sans }), ['abc', 'xyz', 'W', 'def']);
+  } finally {
+    setTextMeasurer(null);
+  }
+});

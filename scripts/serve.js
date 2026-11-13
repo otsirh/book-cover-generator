@@ -74,6 +74,20 @@ async function isFile(file) {
   }
 }
 
+/**
+ * Whether a path is one never served: dotfiles (but .well-known), underscore files and
+ * node_modules, whatever the case or separator.
+ * @param {string} urlPath
+ */
+const hiddenPath = (urlPath) =>
+  urlPath
+    .toLowerCase()
+    .split(/[\\/]/)
+    .some(
+      (seg) =>
+        (seg.startsWith('.') && seg !== '.well-known' && seg !== '..') || seg.startsWith('_') || seg === 'node_modules',
+    );
+
 /** @param {string} urlPath */
 async function locate(urlPath) {
   for (const root of roots) {
@@ -104,7 +118,9 @@ for (const root of roots) {
 const workerEnv = {
   ASSETS: {
     async fetch(request) {
-      const file = await locate(decodeURIComponent(new URL(request.url).pathname));
+      // (As the static path serves files: never a hidden one, however its URL spells it.)
+      const path = decodeURIComponent(new URL(request.url).pathname);
+      const file = hiddenPath(path) ? null : await locate(path);
       if (!file) return new Response('Not found\n', { status: 404 });
       const type = TYPES[/** @type {keyof typeof TYPES} */ (extname(file))] ?? 'application/octet-stream';
       return new Response(await readFile(file), { headers: { 'Content-Type': type } });
@@ -149,14 +165,8 @@ async function handle(req, res) {
     res.end(Buffer.from(await answer.arrayBuffer()));
     return;
   }
-  // Never serve dotfiles (except .well-known), underscore files or node_modules, whatever the case or separator.
-  const hidden = urlPath
-    .toLowerCase()
-    .split(/[\\/]/)
-    .some(
-      (seg) =>
-        (seg.startsWith('.') && seg !== '.well-known' && seg !== '..') || seg.startsWith('_') || seg === 'node_modules',
-    );
+  // Never serve dotfiles (except .well-known), underscore files or node_modules.
+  const hidden = hiddenPath(urlPath);
   // A page the build writes, without its slash: sent to it, as production does (built or not).
   if (Object.hasOwn(PAGES, `${urlPath}/`)) {
     res.writeHead(307, { Location: `${urlPath}/${new URL(req.url ?? '/', 'http://localhost').search}` }).end();

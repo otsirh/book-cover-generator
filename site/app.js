@@ -202,7 +202,8 @@ function toHash(d) {
  * @param {Design} d
  */
 function shareLink(d) {
-  return new URL(`/?${writeLink(d)}`, location.href).href;
+  // (Only the pins its style has, as imageLink: the link preview draws it with the API.)
+  return new URL(`/?${writeLink({ ...d, variant: variantOf(pinsFor(d.variant, d.style)) })}`, location.href).href;
 }
 
 /**
@@ -1172,9 +1173,17 @@ const CANVAS_PIXELS =
   /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Mac/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
     ? 16_777_216
     : Infinity;
-/** The largest export scale for a cover this size: its long side within 10,000 px, and the image within what the device can draw. @param {number} w @param {number} hgt */
-const maxScaleOf = (w, hgt) =>
-  Math.max(1, Math.min(4, Math.floor(MAX_SIDE / Math.max(w, hgt)), Math.floor(Math.sqrt(CANVAS_PIXELS / (w * hgt)))));
+/**
+ * The largest export scale for a cover this size: its long side within 10,000 px, and the image
+ * within what the device can draw. A cover too large for an iPhone's canvas even at 1× is drawn
+ * as large as it can be (below 1×).
+ * @param {number} w @param {number} hgt
+ */
+const maxScaleOf = (w, hgt) => {
+  const fit = Math.sqrt(CANVAS_PIXELS / (w * hgt));
+  const most = Math.min(4, Math.floor(MAX_SIDE / Math.max(w, hgt)), Math.floor(fit));
+  return most >= 1 ? most : Math.floor(fit * 100) / 100;
+};
 /** The largest export scale for a format. @param {string} format */
 const maxScale = (format) => maxScaleOf(...sizeOf(format));
 /** The export scale chosen for a format (custom sizes have their own, 1× by default). @param {string} format */
@@ -1245,8 +1254,8 @@ function syncControls() {
     }
   }
   const [w, hgt] = sizeOf(design.format);
-  const pw = w * scale;
-  const ph = hgt * scale;
+  const pw = Math.round(w * scale);
+  const ph = Math.round(hgt * scale);
   $('png-size').textContent = `${pw} × ${ph} px`;
   $('size-hint').textContent = sizeHint(design.format, pw, ph);
   // The main download is the file the format is for; the other formats are under it.

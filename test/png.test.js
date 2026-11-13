@@ -150,38 +150,44 @@ test('prepare: a lone filled shape’s opacity is its fill’s; others keep thei
   assert.match(ready, /<g opacity="0.2">/);
 });
 
-test('a drawing that traps resvg isn’t freed (that would trap again), and the engine draws on', async () => {
+test('a drawing that traps resvg isn’t freed (that would trap again), and resvg draws no more', async () => {
   // A stand-in resvg whose drawing traps, as resvg 2.6 did on some designs.
   let frees = 0;
-  let draws = 0;
-  const trapping = {
+  const stand = () => ({
     initWasm: async () => {},
     Resvg: class {
       constructor(/** @type {string} */ svg) {
         if (svg.includes('early')) throw new WebAssembly.RuntimeError('unreachable');
       }
       render() {
-        draws++;
-        if (draws === 1) throw new WebAssembly.RuntimeError('unreachable');
-        return { asPng: () => new Uint8Array([1]), free: () => frees++ };
+        throw new WebAssembly.RuntimeError('unreachable');
       }
       free() {
         frees++;
       }
     },
-  };
+  });
   const fonts = FONT_FILES.slice(0, 1);
-  const drawer = await pngEngine(trapping, new Uint8Array(), async () => file(`public/fonts/${fonts[0]}`));
-  assert.throws(() => drawer.render('<svg xmlns="http://www.w3.org/2000/svg"/>'), /unreachable/);
+  const font = async () => file(`public/fonts/${fonts[0]}`);
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg"/>';
+  const resvgA = stand();
+  const drawer = await pngEngine(resvgA, new Uint8Array(), font);
+  assert.equal(drawer.trapped, false);
+  assert.throws(() => drawer.render(svg), /unreachable/);
   assert.equal(frees, 0);
+  assert.equal(drawer.trapped, true);
+  assert.throws(() => drawer.render(svg), /draws no more/);
+  // Another engine on the same resvg is no better: its WebAssembly is the one that trapped.
+  assert.equal((await pngEngine(resvgA, new Uint8Array(), font)).trapped, true);
   // (A trap as it starts, too.)
+  const resvgB = stand();
+  const early = await pngEngine(resvgB, new Uint8Array(), font);
   assert.throws(
-    () => drawer.render('<svg xmlns="http://www.w3.org/2000/svg"><title>early</title></svg>'),
+    () => early.render('<svg xmlns="http://www.w3.org/2000/svg"><title>early</title></svg>'),
     /unreachable/,
   );
+  assert.equal(early.trapped, true);
   assert.equal(frees, 0);
-  assert.deepEqual(drawer.render('<svg xmlns="http://www.w3.org/2000/svg"/>'), new Uint8Array([1]));
-  assert.equal(frees, 2);
 });
 
 test(

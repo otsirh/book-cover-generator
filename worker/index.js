@@ -325,6 +325,9 @@ export async function png(request, env) {
     console.error(err);
     return refusal(new Error('PNG covers are unavailable just now: ask for the SVG (cover.svg)'), 503);
   }
+  // (resvg trapped on an earlier drawing in this instance of the Worker: none until the next.)
+  if (drawer.trapped)
+    return refusal(new Error('PNG covers are unavailable just now: ask for the SVG (cover.svg)'), 503);
   try {
     const { cover, svg, width, height } = drawer.laidOut(() => drawn(kind, q));
     // At its size, or smaller to fit (a large cover, a story); a scale asked for that can't fit is
@@ -544,8 +547,9 @@ export async function mcp(request, env = {}, draw) {
 
 /** The most pictures one MCP answer holds (a batch can draw twenty covers). */
 const MCP_PICTURES = 4;
-/** How wide a picture in an MCP answer is at most, in px: enough to judge it, small to send. */
+/** How wide and tall a picture in an MCP answer is at most, in px: enough to judge it, small to send. */
 const MCP_PICTURE_WIDTH = 480;
+const MCP_PICTURE_HEIGHT = 960;
 
 /**
  * An MCP answer (JSON) with the picture added to each cover or mockup it drew (the first few), as
@@ -556,23 +560,27 @@ const MCP_PICTURE_WIDTH = 480;
  */
 async function withPictures(answer, origin, draw) {
   const parsed = JSON.parse(answer);
-  let added = 0;
-  for (const message of Array.isArray(parsed) ? parsed : [parsed]) {
-    const result = message?.result;
-    const found = result?.structuredContent;
-    if (added >= MCP_PICTURES || result?.isError || typeof found?.pngUrl !== 'string') continue;
-    const url = new URL(found.pngUrl);
-    if (url.origin !== origin) continue;
-    url.searchParams.set('scale', String(Math.min(1, MCP_PICTURE_WIDTH / found.width)));
-    const res = await draw(url);
-    if (!res.ok || res.headers.get('Content-Type') !== 'image/png') continue;
-    result.content.push({
-      type: 'image',
-      data: base64(new Uint8Array(await res.arrayBuffer())),
-      mimeType: 'image/png',
-    });
-    added++;
-  }
+  const results = (Array.isArray(parsed) ? parsed : [parsed])
+    .map((message) => message?.result)
+    .filter((result) => !result?.isError && typeof result?.structuredContent?.pngUrl === 'string')
+    .filter((result) => new URL(result.structuredContent.pngUrl).origin === origin)
+    .slice(0, MCP_PICTURES);
+  // (Drawn at once; a picture that fails is left out, never the answer.)
+  await Promise.all(
+    results.map(async (result) => {
+      const { pngUrl, width, height } = result.structuredContent;
+      const url = new URL(pngUrl);
+      url.searchParams.set('scale', String(Math.min(1, MCP_PICTURE_WIDTH / width, MCP_PICTURE_HEIGHT / height)));
+      try {
+        const res = await draw(url);
+        if (!res.ok || res.headers.get('Content-Type') !== 'image/png') return;
+        const data = base64(new Uint8Array(await res.arrayBuffer()));
+        result.content.push({ type: 'image', data, mimeType: 'image/png' });
+      } catch (err) {
+        console.error('An MCP picture:', err);
+      }
+    }),
+  );
   return JSON.stringify(parsed);
 }
 
@@ -600,7 +608,9 @@ async function handle(request, env, ctx) {
   const asked = head ? new Request(request.url, { method: 'GET', headers: request.headers }) : request;
   /** @param {Response} res */
   const told = (res) => (head ? new Response(null, res) : res);
-  const cache = asked.method === 'GET' ? /** @type {any} */ (globalThis).caches?.default : undefined;
+  // (Only what the API draws is kept: the page at / never is.)
+  const drawable = new URL(asked.url).pathname.startsWith('/api/');
+  const cache = asked.method === 'GET' && drawable ? /** @type {any} */ (globalThis).caches?.default : undefined;
   const key = cache ? cacheKey(asked, env.CF_VERSION_METADATA?.id ?? 'dev') : null;
   if (cache && key) {
     const hit = await cache.match(key);

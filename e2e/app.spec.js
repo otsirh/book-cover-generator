@@ -2555,3 +2555,16 @@ test('/element.js, the one-file <book-cover>, draws a cover on a page of its own
   });
   expect(drawn).toBe('retro');
 });
+
+test('the dev server never serves hidden files, however the URL spells the path', async ({ request }) => {
+  for (const path of [
+    '/.git/HEAD',
+    '/api/..%2f.git%2fHEAD',
+    '/api/..%2fnode_modules%2f.package-lock.json',
+    '/api/..%2f_headers',
+  ]) {
+    const res = await request.get(path);
+    expect(res.status(), path).toBe(404);
+    expect(await res.text(), path).not.toMatch(/ref: refs|"lockfileVersion"|Content-Security-Policy/);
+  }
+});

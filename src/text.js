@@ -636,6 +636,8 @@ export function wrapText(text, size, maxWidth, spec) {
     }
     let chars = graphemes(token.text);
     let lead = cur ? `${cur}${token.space ? ' ' : ''}` : '';
+    // (What the line held is the lead now: written out with the unit's first piece, or alone.)
+    cur = '';
     while (chars.length) {
       // The most characters that fit after what the line holds (by halves: a unit can be long).
       let lo = 0;

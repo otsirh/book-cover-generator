@@ -150,7 +150,7 @@ export function linkOf(options, cover) {
   }
   const own = options.palette && typeof options.palette === 'object' ? options.palette : null;
   const preset = Object.entries(formats).find(([, [w, h]]) => w === cover.width && h === cover.height);
-  return writeLink({
+  const link = writeLink({
     title: cover.title,
     author: cover.author,
     subtitle: options.subtitle ?? '',
@@ -167,6 +167,9 @@ export function linkOf(options, cover) {
     format: preset ? preset[0] : `${cover.width}x${cover.height}`,
     texture: options.texture === true,
   });
+  // (The language a link gave, which the app infers but the API takes: the same capitals and forms.)
+  if (options.lang && cover.lang) link.set('lang', cover.lang);
+  return link;
 }
 
 /**
@@ -299,14 +302,15 @@ export function optionsFromLink(q) {
   const [bg, ink, accent] = [given('bg'), given('ink'), given('accent')];
   if (bg || ink || accent) {
     if (!bg || !ink || !accent) throw new RangeError('Your own colours need bg, ink and accent');
-    o.palette = {
-      bg: hex(bg),
-      ink: hex(ink),
-      accents: accent
-        .split(',')
-        .filter((c) => c.trim())
-        .map(hex),
-    };
+    const accents = accent
+      .split(',')
+      .filter((c) => c.trim())
+      .map(hex);
+    // (As many as a link's palette holds: custom-… has one to three.)
+    if (accents.length < 1 || accents.length > 3) {
+      throw new RangeError(`accent is one to three colours, separated by commas; got ${accents.length}`);
+    }
+    o.palette = { bg: hex(bg), ink: hex(ink), accents };
   }
   return /** @type {import('./index.js').CoverOptions} */ (o);
 }

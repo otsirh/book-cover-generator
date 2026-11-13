@@ -106,6 +106,13 @@ function prepared(svg, fonts) {
 
 /** resvg's WebAssembly, started once per resvg (it refuses a second start). @type {WeakMap<object, Promise<void>>} */
 const started = new WeakMap();
+/**
+ * resvgs that trapped: a trapped WebAssembly instance is in no state to draw again (what it held
+ * is never freed, its stack is where the trap left it), and it can't be started anew, so every
+ * engine on it draws no more. The runtime's next instance of the Worker has a fresh one.
+ * @type {WeakSet<object>}
+ */
+const trapped = new WeakSet();
 
 /**
  * resvg, ready to draw with these fonts.
@@ -138,6 +145,10 @@ export async function pngEngine(resvg, wasm, fontFile) {
         setTextMeasurer(null);
       }
     },
+    /** Whether resvg trapped on an earlier drawing (it then draws no more). */
+    get trapped() {
+      return trapped.has(resvg);
+    },
     /** Whether the fonts draw all of this SVG's text (else it would show empty boxes). @param {string} svg */
     draws: (svg) => fonts.covers(drawnText(svg)),
     /**
@@ -146,6 +157,7 @@ export async function pngEngine(resvg, wasm, fontFile) {
      * @returns {Uint8Array}
      */
     render(svg, scale = 1) {
+      if (trapped.has(resvg)) throw new Error('resvg stopped on an earlier drawing: it draws no more here');
       const { svg: ready, whole } = prepared(svg, fonts);
       // Only the families it names (prepare names one on each line, which has every letter of it),
       // and the serif resvg falls back to: the fonts are copied into resvg's memory for each
@@ -156,7 +168,7 @@ export async function pngEngine(resvg, wasm, fontFile) {
       let r;
       /** @type {any} */
       let image;
-      let trapped = false;
+      let trap = false;
       try {
         r = new resvg.Resvg(ready, {
           fitTo: { mode: 'zoom', value: scale },
@@ -172,13 +184,13 @@ export async function pngEngine(resvg, wasm, fontFile) {
         image = r.render();
         return image.asPng();
       } catch (err) {
-        // resvg stopped (a WebAssembly trap): what it held isn't safe to free, and stays taken (its
-        // memory never shrinks; the runtime replaces an instance that runs out). An error it
-        // reports, such as a size of nothing, leaves it sound.
-        trapped = err instanceof WebAssembly.RuntimeError;
+        // resvg stopped (a WebAssembly trap): what it held isn't safe to free, and it draws no more
+        // (see `trapped`). An error it reports, such as a size of nothing, leaves it sound.
+        trap = err instanceof WebAssembly.RuntimeError;
+        if (trap) trapped.add(resvg);
         throw err;
       } finally {
-        if (!trapped) {
+        if (!trap) {
           image?.free?.();
           r?.free?.();
         }

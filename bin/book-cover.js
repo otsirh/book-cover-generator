@@ -372,24 +372,34 @@ function printCover(options) {
   else process.stdout.write(print.svg + '\n');
 }
 
+/**
+ * The cover options the command line gives every cover, the print cover's and a list's too: all
+ * but the title, author, seed and size.
+ */
+function designOptions() {
+  return {
+    subtitle: values.subtitle,
+    series: values.series,
+    credit: values.credit,
+    badge: values.badge,
+    texture: values.texture,
+    style: values.style,
+    genre: values.genre,
+    palette: palette(),
+    lang: values.lang,
+    variants: variants(),
+    font: values.font,
+    titleCase: /** @type {'upper' | 'normal' | undefined} */ (values.case),
+  };
+}
+
 function run() {
   try {
     if (values.print !== undefined) {
       printCover({
         title: positionals[0],
         author: positionals[1] ?? '',
-        subtitle: values.subtitle,
-        series: values.series,
-        credit: values.credit,
-        badge: values.badge,
-        texture: values.texture,
-        style: values.style,
-        genre: values.genre,
-        palette: palette(),
-        lang: values.lang,
-        variants: variants(),
-        font: values.font,
-        titleCase: /** @type {'upper' | 'normal' | undefined} */ (values.case),
+        ...designOptions(),
         seed: values.seed,
       });
       return;
@@ -401,18 +411,7 @@ function run() {
     }
     if (values.batch !== undefined) {
       batch({
-        subtitle: values.subtitle,
-        series: values.series,
-        credit: values.credit,
-        badge: values.badge,
-        texture: values.texture,
-        style: values.style,
-        genre: values.genre,
-        palette: palette(),
-        lang: values.lang,
-        variants: variants(),
-        font: values.font,
-        titleCase: /** @type {'upper' | 'normal' | undefined} */ (values.case),
+        ...designOptions(),
         ...dimensions(),
       });
       return;
@@ -421,18 +420,7 @@ function run() {
     const options = {
       title: positionals[0],
       author: positionals[1] ?? '',
-      subtitle: values.subtitle,
-      series: values.series,
-      credit: values.credit,
-      badge: values.badge,
-      texture: values.texture,
-      style: values.style,
-      genre: values.genre,
-      palette: palette(),
-      lang: values.lang,
-      variants: variants(),
-      font: values.font,
-      titleCase: /** @type {'upper' | 'normal' | undefined} */ (values.case),
+      ...designOptions(),
       ...dimensions(),
     };
     for (let n = 1; n <= total; n++) {

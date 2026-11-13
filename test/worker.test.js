@@ -350,6 +350,26 @@ test(
     const view = new DataView(Uint8Array.from(atob(picture.data), (c) => c.charCodeAt(0)).buffer);
     assert.deepEqual([view.getUint32(16), view.getUint32(20)], [480, 853]);
     assert.match(drawn.structuredContent.pngUrl, /^https:\/\/covers\.example\/api\/mockup\.png\?/);
+    // A cover taller than the picture's width allows is drawn within its height too.
+    const tall = await worker.fetch(
+      new Request('https://covers.example/mcp', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 2,
+          method: 'tools/call',
+          params: { name: 'create_cover', arguments: { title: 'Tall', format: '600x1800' } },
+        }),
+      }),
+      env,
+      ctx,
+    );
+    const tallPicture = (await tall.json()).result.content.find(
+      (/** @type {{ type: string }} */ c) => c.type === 'image',
+    );
+    const tallView = new DataView(Uint8Array.from(atob(tallPicture.data), (c) => c.charCodeAt(0)).buffer);
+    assert.deepEqual([tallView.getUint32(16), tallView.getUint32(20)], [320, 960]);
     const unwritten = await call('灯台守');
     assert.equal(unwritten.isError, undefined);
     assert.equal(unwritten.content.filter((/** @type {{ type: string }} */ c) => c.type === 'image').length, 0);
@@ -441,6 +461,17 @@ test('the API describes itself: what a query draws, the catalog, and OpenAPI', a
   assert.equal(body.version, version);
   // A seed from the title stays one.
   assert.equal((await ask('/api/cover.json?title=Dune')).body.seed, null);
+  // Its links draw the cover it describes, in the language the query gave (Turkish capitals).
+  const turkish = (await ask('/api/cover.json?title=istanbul&lang=tr&style=bigtype&case=upper&seed=t')).body;
+  assert.equal(new URLSearchParams(turkish.link).get('lang'), 'tr');
+  const direct = /** @type {Response} */ (get('/api/cover.svg?title=istanbul&lang=tr&style=bigtype&case=upper&seed=t'));
+  const linked = /** @type {Response} */ (get(new URL(turkish.urls.svg).pathname + new URL(turkish.urls.svg).search));
+  assert.equal(await linked.text(), await direct.text());
+  // Your own colours: one to three accents, as a link's palette holds.
+  assert.equal((await ask('/api/cover.json?title=A&bg=000&ink=fff&accent=f00,0f0,00f')).res.status, 200);
+  const four = await ask('/api/cover.json?title=A&bg=000&ink=fff&accent=f00,0f0,00f,ff0');
+  assert.equal(four.res.status, 400);
+  assert.match(four.body, /accent is one to three colours/);
   assert.equal((await ask('/api/cover.json?style=nope')).res.status, 400);
   assert.equal((await ask('/api/cover.json?title=x', 'HEAD')).body, '');
 
