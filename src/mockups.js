@@ -73,9 +73,10 @@ export function createMockup(cover, { kind: named = 'book', background: given, t
     typeof cover.title !== 'string' ||
     typeof cover.svg !== 'string' ||
     !cover.colors ||
-    typeof cover.colors.bg !== 'string' ||
-    typeof cover.colors.ink !== 'string' ||
-    !Array.isArray(cover.colors.accents)
+    !isHex(cover.colors.bg) ||
+    !isHex(cover.colors.ink) ||
+    !Array.isArray(cover.colors.accents) ||
+    !cover.colors.accents.every(isHex)
   ) {
     throw new TypeError('createMockup: pass a cover from createCover');
   }

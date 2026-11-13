@@ -84,9 +84,6 @@ export function customColors(palette) {
     : null;
 }
 
-/** A colour as typed, with its # (it starts a comment in a shell and a fragment in a URL). @param {string} c */
-export const hex = (c) => (c.trim().startsWith('#') ? c.trim() : `#${c.trim()}`);
-
 /**
  * A file name for a title: lower case, accents dropped from Latin letters, anything else that
  * isn't a letter or a digit as "-", and at most 60 characters.

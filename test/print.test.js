@@ -402,3 +402,16 @@ test('the blurb’s budget counts characters as cleanText does: emoji first don�
   );
   assert.match(print.svg, /The second paragraph/);
 });
+
+test('the spine’s title has all the room the author leaves: the whole title, where it fits at 6 pt', () => {
+  const title = 'The Extraordinary and Entirely True Account of the Lighthouse Keeper of Wimbledon Common';
+  for (const [author, pages] of [
+    ['Bartholomew Featherstonehaugh', 90],
+    ['Ann Lee', 200],
+  ]) {
+    const print = createPrintCover({ title, author, seed: 's' }, { trim: '5x8', pages });
+    const spine = print.svg.slice(print.svg.indexOf('rotate(90)'));
+    assert.match(spine, /WIMBLEDON COMMON</, `${pages} pages: the whole title`);
+    assert.doesNotMatch(/<text[^>]*>([^<]*)</.exec(spine)?.[1] ?? '', /…/);
+  }
+});

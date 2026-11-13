@@ -864,7 +864,12 @@ test('createMockup says to pass a cover, of anything that isn’t a whole one', 
     /pass a cover from createCover/,
   );
   const cover = createCover({ title: 'Dune' });
-  for (const colors of [{ bg: '#ffffff' }, { bg: '#ffffff', ink: '#000000' }]) {
+  for (const colors of [
+    { bg: '#ffffff' },
+    { bg: '#ffffff', ink: '#000000' },
+    { bg: 'red', ink: '#000000', accents: ['#ff0000'] },
+    { bg: '#ffffff', ink: '#000000', accents: [1] },
+  ]) {
     assert.throws(
       () => createMockup(/** @type {any} */ ({ ...cover, colors }), { kind: 'card', text: 'Out now' }),
       /pass a cover from createCover/,

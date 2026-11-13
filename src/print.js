@@ -288,11 +288,33 @@ export function createPrintCover(coverOptions = {}, print = /** @type {any} */ (
   if (pages >= printLimits.spineTextPages && sizeMax >= 6 * PT) {
     const along = th * PX - 2 * 0.375 * PX;
     const spineInk = textColor(p, spineBg, [front.colors.bg, ink]);
+    // The author, when the spine is thick enough for them at 6 pt or more (that doesn't hang on
+    // the title), in up to a third of its length; the title in all the rest, else all of it.
+    const gap = along * 0.06;
+    const byCap = author ? Math.min(across / inkHeight(author, FONTS.sans), sizeMax * 0.8) : 0;
+    /** @param {number} most */
+    const byline = (most) =>
+      atLeast(
+        fitText(author, {
+          font: FONTS.sans,
+          weight: 500,
+          maxWidth: along * 0.32,
+          maxSize: most,
+          minSize: 6 * PT,
+          maxLines: 1,
+          letterSpacing: 0.08,
+        }),
+        author,
+        6 * PT,
+        along * 0.32,
+      );
+    let by = author && byCap >= 6 * PT ? byline(byCap) : null;
+    const room = by ? along - by.width - gap : along;
     const title = atLeast(
       fitText(spineTitle, {
         font: spineFont,
         weight: 700,
-        maxWidth: author ? along * 0.62 : along,
+        maxWidth: room,
         maxSize: sizeMax,
         minSize: 6 * PT,
         maxLines: 1,
@@ -300,27 +322,10 @@ export function createPrintCover(coverOptions = {}, print = /** @type {any} */ (
       }),
       spineTitle,
       6 * PT,
-      author ? along * 0.62 : along,
+      room,
     );
-    // The author too, when the spine is thick enough for them at 6 pt or more; else the title alone.
-    const byMax = Math.min(across / inkHeight(author, FONTS.sans), sizeMax * 0.8, title.size);
-    const by =
-      author && byMax >= 6 * PT
-        ? atLeast(
-            fitText(author, {
-              font: FONTS.sans,
-              weight: 500,
-              maxWidth: along * 0.32,
-              maxSize: byMax,
-              minSize: 6 * PT,
-              maxLines: 1,
-              letterSpacing: 0.08,
-            }),
-            author,
-            6 * PT,
-            along * 0.32,
-          )
-        : null;
+    // (Never larger than the title: smaller again if the title came out smaller.)
+    if (by && by.size > title.size + 0.01) by = byline(Math.max(title.size, 6 * PT));
     const cx = (backRight + spineRight) / 2;
     s += `<g transform="translate(${n(cx)} ${n(trimTop + 0.375 * PX)}) rotate(90)">`;
     s += spineLine(title, 0, 'start', spineInk);
