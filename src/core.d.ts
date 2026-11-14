@@ -133,6 +133,16 @@ export declare function grain(
   opts?: GrainOptions,
 ): { defs: string; layer: string };
 /**
+ * The film grain a cover's `texture` lays over it (and a print cover's back and spine): dark and
+ * light specks, from different noise, so it shows on any colour. Its `<defs>` and layers, as markup.
+ */
+export declare function filmGrain(c: {
+  id(name: string): string;
+  readonly u: number;
+  readonly W: number;
+  readonly H: number;
+}): string;
+/**
  * A soft drop-shadow `<filter>` with this id: the shape over its shadow, blurred by `blur` (a
  * standard deviation) and moved down by `dy`, both times `u`, at `opacity` (defaults 4, 2 and 0.35),
  * in a region `margin` of the shape's size larger on every side (default 0.2).

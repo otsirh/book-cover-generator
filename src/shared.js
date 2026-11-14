@@ -170,3 +170,21 @@ export const switchedOn = (value) => value != null && !/^(0|false)?$/i.test(valu
  * @param {string} raw
  */
 export const decimal = (raw) => (/^\s*[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?\s*$/i.test(raw) ? Number(raw) : NaN);
+
+/**
+ * A size as the library reads one: a number as it is, text in decimal (0x258 isn't 600).
+ * @param {unknown} value
+ */
+export const sizeValue = (value) => (typeof value === 'string' ? decimal(value) : Number(value));
+
+/**
+ * A shape's size at one side given: that side rounded (as the library rounds it), the other
+ * following the shape from it.
+ * @param {readonly [number, number]} shape [width, height] @param {number | undefined} width @param {number | undefined} height
+ * @returns {[number, number]}
+ */
+export function shapeAt([w, h], width, height) {
+  if (width !== undefined) return [Math.round(width), Math.round((Math.round(width) * h) / w)];
+  if (height !== undefined) return [Math.round((Math.round(height) * w) / h), Math.round(height)];
+  return [w, h];
+}

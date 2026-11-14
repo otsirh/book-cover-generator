@@ -103,7 +103,9 @@ export function contrast(a, b) {
 
 /** Pick the candidate colour with the best contrast against `bg`. */
 export function readable(bg, candidates = ['#ffffff', '#111111']) {
-  return candidates.reduce((best, c) => (contrast(bg, c) > contrast(bg, best) ? c : best));
+  // (None to choose from: white or near-black, as with none given.)
+  const from = candidates.length ? candidates : ['#ffffff', '#111111'];
+  return from.reduce((best, c) => (contrast(bg, c) > contrast(bg, best) ? c : best));
 }
 
 /**
@@ -236,6 +238,17 @@ export function grain(c, { opacity = 0.12, light = false, freq = 0.75, id: name 
     `<feColorMatrix type="matrix" values="0 0 0 0 ${v} 0 0 0 0 ${v} 0 0 0 0 ${v} 1.6 0 0 0 -0.55"/></filter>`;
   const layer = `<rect width="${c.W}" height="${c.H}" filter="url(#${id})" opacity="${opacity}"/>`;
   return { defs, layer };
+}
+
+/**
+ * The film grain a cover's `texture` lays over it (and a print cover's back and spine): dark and
+ * light specks, from different noise, so it shows on any colour.
+ * @param {{ id(name: string): string, u: number, W: number, H: number }} c
+ */
+export function filmGrain(c) {
+  const dark = grain(c, { opacity: 0.1, id: 'texture-dark', seed: 3 });
+  const light = grain(c, { opacity: 0.08, light: true, id: 'texture-light', seed: 11 });
+  return `<defs>${dark.defs}${light.defs}</defs>${dark.layer}${light.layer}`;
 }
 
 /** Soft drop shadow filter definition. */

@@ -3,7 +3,7 @@
 // on the spine only from 80 pages, and the barcode's box at the foot of the back cover. Other
 // printers' are close; `bleed` and `pageThickness` change the numbers.
 import { createCover } from './index.js';
-import { escapeXml, grain, hashString, isHex, n } from './core.js';
+import { escapeXml, filmGrain, hashString, isHex, n } from './core.js';
 import {
   FONTS,
   cleanText,
@@ -351,9 +351,7 @@ export function createPrintCover(coverOptions = {}, print = /** @type {any} */ (
       W: spineRight,
       H,
     };
-    const darkGrain = grain(c, { opacity: 0.1, id: 'texture-dark', seed: 3 });
-    const lightGrain = grain(c, { opacity: 0.08, light: true, id: 'texture-light', seed: 11 });
-    s += `<defs>${darkGrain.defs}${lightGrain.defs}</defs>${darkGrain.layer}${lightGrain.layer}`;
+    s += filmGrain(c);
   }
 
   // The front at the trim, its art carried into the bleed by mirror images of its edges: nothing

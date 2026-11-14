@@ -4,11 +4,11 @@
 //   import { generateCover } from 'book-cover-generator';
 //   const svg = generateCover({ title: 'Dune', author: 'Frank Herbert', style: 'retro' });
 
-import { createRng, hashString, isHex, luminance, escapeXml, grain } from './core.js';
+import { createRng, hashString, isHex, luminance, escapeXml, filmGrain } from './core.js';
 import { palettes } from './palettes.js';
 import { FONTS, cleanText, inLanguage, recordText } from './text.js';
 import { drawBadge } from './badge.js';
-import { idFor, fontEntries, reserved, STYLE_WORDS, PALETTE_WORDS, LANG_TAG, decimal } from './shared.js';
+import { idFor, fontEntries, reserved, STYLE_WORDS, PALETTE_WORDS, LANG_TAG, sizeValue, shapeAt } from './shared.js';
 import { styleList, genreList, builtInGenres } from './styles/index.js';
 
 export { palettes } from './palettes.js';
@@ -375,7 +375,7 @@ function dimension(value, fallback, name) {
     return Math.round(fallback);
   }
   // (Text in decimal, as links and the CLI read sizes: a list's 0x258 isn't 600.)
-  const v = typeof value === 'string' ? decimal(value) : Number(value);
+  const v = sizeValue(value);
   const { min, max } = sizeLimits;
   if (!Number.isFinite(v) || v < min || v > max) {
     throw new RangeError(
@@ -557,9 +557,7 @@ export function createCover(options = {}) {
   if (options.texture) {
     // Film grain over the whole cover. Styles paint their own backgrounds, so lay
     // dark and light specks (from different noise) to show on any colour.
-    const dark = grain(ctx, { opacity: 0.1, id: 'texture-dark', seed: 3 });
-    const light = grain(ctx, { opacity: 0.08, light: true, id: 'texture-light', seed: 11 });
-    body += `<defs>${dark.defs}${light.defs}</defs>${dark.layer}${light.layer}`;
+    body += filmGrain(ctx);
   }
   const label = escapeXml(
     `${title.replace(/\n/g, ' ')}${subtitle ? `: ${subtitle}` : ''}${author ? ` by ${author}` : ''}` +
@@ -640,19 +638,24 @@ export function optionsForBook(listed, defaults = {}) {
     variants = shared !== undefined ? {} : ownEntry ? pinnedVariants(variants, ownEntry, false) : variants;
   }
   // A book's own width or height alone sizes the shared shape (an ebook's, say), or the paperback's.
-  // (A side the book gives that isn't a size is left for createCover to say so, of that side.)
-  const [dw, dh] = [Number(defaults.width), Number(defaults.height)];
+  // (Sizes read as createCover reads them; a side the book gives that isn't a size, or a shared
+  // shape that isn't one, is left for createCover to say so, of that side.)
+  const { min, max } = sizeLimits;
+  const fits = (/** @type {number} */ v) => v >= min && v <= max;
+  const [dw, dh] = [sizeValue(defaults.width), sizeValue(defaults.height)];
   /** @type {{ width?: number, height?: number }} */
   let size = {};
-  if (book.width !== undefined || book.height !== undefined) {
+  // (Shared sizes given that aren't sizes stay, for createCover to refuse for every book alike.)
+  const sharedBad = [defaults.width, defaults.height].some((v) => !unsetSize(v) && !fits(Math.round(sizeValue(v))));
+  if ((book.width !== undefined || book.height !== undefined) && !sharedBad) {
     size = { width: undefined, height: undefined };
     const alone = book.width === undefined ? 'height' : book.height === undefined ? 'width' : null;
-    const value = alone ? Number(book[alone]) : NaN;
-    const { min, max } = sizeLimits;
-    if (alone && dw > 0 && dh > 0 && value >= min && value <= max) {
+    const value = alone ? sizeValue(book[alone]) : NaN;
+    if (alone && fits(dw) && fits(dh) && fits(Math.round(value))) {
       const other = alone === 'width' ? 'height' : 'width';
-      const derived = Math.round(alone === 'width' ? (value * dh) / dw : (value * dw) / dh);
-      if (derived < min || derived > max) {
+      const [w, h] = shapeAt([dw, dh], alone === 'width' ? value : undefined, alone === 'height' ? value : undefined);
+      const derived = other === 'height' ? h : w;
+      if (!fits(derived)) {
         throw new RangeError(
           `${alone} ${value} makes the list's ${dw} × ${dh} shape ${derived} px ${other === 'height' ? 'tall' : 'wide'}, outside ${min} to ${max}: give the ${other} too`,
         );

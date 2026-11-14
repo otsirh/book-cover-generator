@@ -17,6 +17,7 @@ import {
   LANG_TAG,
   customColors,
   decimal,
+  shapeAt,
 } from './shared.js';
 
 /** Line breaks as spaces (a single-line field: the cover spaces them). @param {unknown} v */
@@ -362,11 +363,8 @@ export function formatSize(format, width, height) {
   if (width !== undefined && height !== undefined) {
     throw new RangeError('A format sets the shape: give it a width or a height, not both');
   }
-  const [w, h] = size;
   // (The side given rounded first, as the library rounds it, so the other follows the shape.)
-  if (width !== undefined) return [Math.round(width), Math.round((Math.round(width) * h) / w)];
-  if (height !== undefined) return [Math.round((Math.round(height) * w) / h), Math.round(height)];
-  return [w, h];
+  return shapeAt(/** @type {[number, number]} */ (size), width, height);
 }
 
 /**

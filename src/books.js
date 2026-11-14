@@ -1,5 +1,6 @@
 // A list of books, as people paste or export it, read into cover options: CSV or TSV with a
 // header row, JSON lines, or one book per line ("Title | Author | Subtitle").
+import { sizeValue } from './shared.js';
 
 /** The columns a list may have, by the names it may give them, and how each is read. */
 const COLUMNS = /** @type {const} */ ({
@@ -95,7 +96,9 @@ function optionsFrom(named) {
     const value = typeof raw === 'number' && option !== 'title' ? raw : String(raw).trim();
     if (value === '') continue;
     // (A size that isn't a number is kept as written, so the error says what the list says.)
-    if (option === 'width' || option === 'height') out[option] = Number.isFinite(Number(value)) ? Number(value) : value;
+    // (In decimal, as createCover reads a size: 0x258 is kept as written, for it to refuse.)
+    if (option === 'width' || option === 'height')
+      out[option] = Number.isFinite(sizeValue(value)) ? sizeValue(value) : value;
     else out[option] = option === 'seed' ? value : String(value);
   }
   return /** @type {import('./index.js').CoverOptions} */ (out);

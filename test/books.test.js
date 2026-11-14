@@ -224,3 +224,30 @@ test('a plain list whose first book has a comma and the word Title is a list, no
     { title: 'Third', author: 'Cy' },
   ]);
 });
+
+test('a list’s sizes are read as createCover reads them: in decimal, a lone side from the shared shape rounded first', async () => {
+  const { optionsForBook, svgUtils } = await import('../src/index.js');
+  const [hexed] = parseBookList('title,width,height\nDune,0x258,0x384\n');
+  assert.throws(() => createCover(hexed), /width must be a number/);
+  const [jsonHexed] = parseBookList('{"title":"Dune","width":"0x258"}\n');
+  assert.throws(() => createCover(jsonHexed), /width must be a number/);
+  // A shared shape that isn't a size gives a book's lone side no shape: createCover says so.
+  assert.throws(
+    () =>
+      createCover(
+        optionsForBook(
+          { title: 'X', height: 2560 },
+          { width: /** @type {any} */ ('0x640'), height: /** @type {any} */ ('0xa00') },
+        ),
+      ),
+    /must be a number/,
+  );
+  // A shared width alone (the CLI's --width) is no shape: a book's lone height gets the paperback's.
+  const tall = createCover(optionsForBook({ title: 'X', height: 2560 }, { width: 600 }));
+  assert.equal(tall.height, 2560);
+  // The side rounded before the other follows the shape.
+  const kindle = createCover(optionsForBook({ title: 'X', width: 1600.4 }, { width: 1600, height: 2560 }));
+  assert.deepEqual([kindle.width, kindle.height], [1600, 2560]);
+  // svgUtils.readable with no candidates: white or near-black, not a TypeError.
+  assert.equal(svgUtils.readable('#000000', []), '#ffffff');
+});
