@@ -242,6 +242,11 @@ test('a list’s sizes are read as createCover reads them: in decimal, a lone si
       ),
     /must be a number/,
   );
+  // A shared size createCover would refuse (49.6) stays, refused for every book alike.
+  assert.throws(
+    () => createCover(optionsForBook({ title: 'X', height: 800 }, { width: 49.6, height: 900 })),
+    /width must be a number/,
+  );
   // A shared width alone (the CLI's --width) is no shape: a book's lone height gets the paperback's.
   const tall = createCover(optionsForBook({ title: 'X', height: 2560 }, { width: 600 }));
   assert.equal(tall.height, 2560);

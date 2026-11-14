@@ -352,9 +352,11 @@ export function ownColours(bg, ink, accents) {
  */
 export function formatSize(format, width, height) {
   const read = formatName(format);
+  // (A size of its own has sides of 2 to 5 digits; a shape a width or height scales, 5x8 say, any.)
+  const scaled = width !== undefined || height !== undefined;
   const size = Object.hasOwn(formats, read)
     ? formats[/** @type {keyof typeof formats} */ (read)]
-    : CUSTOM_SIZE.exec(read)?.slice(1).map(Number);
+    : (scaled ? /^([1-9]\d{0,4})x([1-9]\d{0,4})$/ : CUSTOM_SIZE).exec(read)?.slice(1).map(Number);
   if (!size) {
     throw new RangeError(
       `Unknown format "${format}". Use one of ${Object.keys(formats).join(', ')}, or a size such as 1600x2560`,

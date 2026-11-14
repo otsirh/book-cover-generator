@@ -4,8 +4,9 @@
 //   import { generateCover } from 'book-cover-generator';
 //   const svg = generateCover({ title: 'Dune', author: 'Frank Herbert', style: 'retro' });
 
-import { createRng, hashString, isHex, luminance, escapeXml, filmGrain } from './core.js';
+import { createRng, hashString, isHex, luminance, escapeXml, filmGrain, contrast, readable } from './core.js';
 import { palettes } from './palettes.js';
+import { TEXT_CONTRAST } from './styles/util.js';
 import { FONTS, cleanText, inLanguage, recordText } from './text.js';
 import { drawBadge } from './badge.js';
 import { idFor, fontEntries, reserved, STYLE_WORDS, PALETTE_WORDS, LANG_TAG, sizeValue, shapeAt } from './shared.js';
@@ -335,7 +336,9 @@ function normalizePalette(p) {
   const count = accents.length;
   while (accents.length < 3) accents.push(accents[accents.length % count]);
   const bg = p.bg.trim();
-  const ink = p.ink.trim();
+  // (Text that wouldn't show on the background, 3:1 or less, is set in black or white instead, as
+  // the app says: every style sets its title and author in the ink.)
+  const ink = contrast(bg, p.ink.trim()) >= TEXT_CONTRAST ? p.ink.trim() : readable(bg);
   if (p.dark != null && typeof p.dark !== 'boolean') {
     throw new TypeError(`A custom palette's dark is true or false, got ${JSON.stringify(p.dark)}`);
   }
@@ -646,12 +649,12 @@ export function optionsForBook(listed, defaults = {}) {
   /** @type {{ width?: number, height?: number }} */
   let size = {};
   // (Shared sizes given that aren't sizes stay, for createCover to refuse for every book alike.)
-  const sharedBad = [defaults.width, defaults.height].some((v) => !unsetSize(v) && !fits(Math.round(sizeValue(v))));
+  const sharedBad = [defaults.width, defaults.height].some((v) => !unsetSize(v) && !fits(sizeValue(v)));
   if ((book.width !== undefined || book.height !== undefined) && !sharedBad) {
     size = { width: undefined, height: undefined };
     const alone = book.width === undefined ? 'height' : book.height === undefined ? 'width' : null;
     const value = alone ? sizeValue(book[alone]) : NaN;
-    if (alone && fits(dw) && fits(dh) && fits(Math.round(value))) {
+    if (alone && fits(dw) && fits(dh) && fits(value)) {
       const other = alone === 'width' ? 'height' : 'width';
       const [w, h] = shapeAt([dw, dh], alone === 'width' ? value : undefined, alone === 'height' ? value : undefined);
       const derived = other === 'height' ? h : w;

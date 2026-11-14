@@ -931,3 +931,10 @@ test('a size in decimal everywhere: createCover’s and a list’s too; a format
   const ebook = createCover(optionsFromLink(new URLSearchParams('title=x&format=ebook&width=1600.4')));
   assert.deepEqual([ebook.width, ebook.height], [1600, 2560]);
 });
+
+test('a shape a width or height scales may have one-digit sides (5x8), as the help calls an ebook 5:8', () => {
+  assert.deepEqual(optionsFromLink(new URLSearchParams('format=5x8&width=1600')), { width: 1600, height: 2560 });
+  assert.deepEqual(optionsFromLink(new URLSearchParams('format=2x3&height=1200')), { width: 800, height: 1200 });
+  // (A size of its own still needs sides the library can make.)
+  assert.throws(() => optionsFromLink(new URLSearchParams('format=5x8')), /Unknown format/);
+});

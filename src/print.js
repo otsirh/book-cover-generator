@@ -291,14 +291,16 @@ export function createPrintCover(coverOptions = {}, print = /** @type {any} */ (
     // The author, when the spine is thick enough for them at 6 pt or more (that doesn't hang on
     // the title), in up to a third of its length; the title in all the rest, else all of it.
     const gap = along * 0.06;
-    const byCap = author ? Math.min(across / inkHeight(author, FONTS.sans), sizeMax * 0.8) : 0;
-    /** @param {number} most */
-    const byline = (most) =>
+    // (Smaller than the title's most where it can be, but at 6 pt whenever its own ink fits that.)
+    const byInk = author ? across / inkHeight(author, FONTS.sans) : 0;
+    const byCap = Math.max(Math.min(byInk, sizeMax * 0.8), Math.min(byInk, sizeMax, 6 * PT));
+    /** @param {number} most @param {number} [width] the room it may take */
+    const byline = (most, width = along * 0.32) =>
       atLeast(
         fitText(author, {
           font: FONTS.sans,
           weight: 500,
-          maxWidth: along * 0.32,
+          maxWidth: width,
           maxSize: most,
           minSize: 6 * PT,
           maxLines: 1,
@@ -306,7 +308,7 @@ export function createPrintCover(coverOptions = {}, print = /** @type {any} */ (
         }),
         author,
         6 * PT,
-        along * 0.32,
+        width,
       );
     let by = author && byCap >= 6 * PT ? byline(byCap) : null;
     /** The title in the room the byline leaves. @param {typeof by} beside */
@@ -333,6 +335,14 @@ export function createPrintCover(coverOptions = {}, print = /** @type {any} */ (
     if (by && by.size > title.size + 0.01) {
       by = byline(Math.max(title.size, 6 * PT));
       title = titled(by);
+    }
+    // (A byline cut short while the title leaves room: the whole of it, in all that room.)
+    if (by && by.truncated) by = byline(Math.min(by.size, title.size), along - title.width - gap);
+    // (The title matters more on a spine: one cut short beside the author, whole without them,
+    // goes without them.)
+    if (by && title.truncated) {
+      const alone = titled(null);
+      if (!alone.truncated) [title, by] = [alone, null];
     }
     const cx = (backRight + spineRight) / 2;
     s += `<g transform="translate(${n(cx)} ${n(trimTop + 0.375 * PX)}) rotate(90)">`;

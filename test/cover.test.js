@@ -1695,3 +1695,17 @@ test('a custom palette’s dark is true or false, not a string', () => {
     true,
   );
 });
+
+test('your own text colour that wouldn’t show on your background is set in black or white instead', () => {
+  const dim = { bg: '#0b132b', ink: '#1c2541', accents: ['#3a506b'] };
+  for (const style of ['minimal', 'typographic', 'swiss', 'bauhaus']) {
+    const cover = createCover({ title: 'Dune', author: 'Frank Herbert', style, palette: dim });
+    assert.equal(cover.colors.ink, '#ffffff', style);
+    assert.doesNotMatch(cover.svg, /fill="#1c2541"/, style);
+  }
+  // (One that shows is kept as given.)
+  assert.equal(
+    createCover({ title: 'x', palette: { bg: '#0b132b', ink: '#f8f9fa', accents: ['#ff6b6b'] } }).colors.ink,
+    '#f8f9fa',
+  );
+});

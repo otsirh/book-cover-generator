@@ -288,10 +288,11 @@ test('no type on the spine or the back under 6 pt: the author is left off a thin
     assert.ok(lines.length >= 1, JSON.stringify(print));
     for (const line of lines) assert.ok(line.pt >= 6 - 0.01, `${line.text} at ${line.pt.toFixed(2)} pt`);
   }
-  // Dune on 88 pages: the title alone; on 400, the author too.
+  // Dune on 88 pages: the author too, at 6 pt, as their own letters fit it (not dropped because the
+  // title's largest size was small).
   assert.deepEqual(
     spineLines({ title: 'Dune', author: 'Frank Herbert', style: 'minimal' }, { pages: 88 }).map((l) => l.text),
-    ['DUNE'],
+    ['DUNE', 'FRANK HERBERT'],
   );
   assert.deepEqual(
     spineLines(book, { pages: 400 }).map((l) => l.text),
@@ -429,4 +430,19 @@ test('the spine’s title takes back the room a byline gives when it shrinks to 
   const spine = print.svg.slice(print.svg.indexOf('rotate(90)'));
   const size = Number(/font-size="([\d.]+)"/.exec(spine)?.[1]);
   assert.ok(size > 12, `the title at ${size} px`);
+});
+
+test('the spine shows the author whenever their letters fit at 6 pt, and the whole of a long name where the title leaves room', () => {
+  /** @param {string} title @param {string} author @param {number} pages */
+  const spine = (title, author, pages) => {
+    const print = createPrintCover({ title, author, seed: 's' }, { trim: '6x9', pages });
+    return [...print.svg.slice(print.svg.indexOf('rotate(90)')).matchAll(/<text[^>]*>([^<]*)</g)]
+      .slice(0, 2)
+      .map((m) => m[1]);
+  };
+  assert.deepEqual(spine('ความลับของทะเล', 'Frank Herbert', 140), ['ความลับของทะเล', 'FRANK HERBERT']);
+  assert.deepEqual(spine('A', 'Bartholomew Featherstonehaugh-Cholmondeley Esq.', 400), [
+    'A',
+    'BARTHOLOMEW FEATHERSTONEHAUGH-CHOLMONDELEY ESQ.',
+  ]);
 });

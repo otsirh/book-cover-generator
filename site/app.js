@@ -545,8 +545,9 @@ const galleryLinks = /** @type {NodeListOf<HTMLAnchorElement>} */ (
  * in a new tab, copied or long-pressed carries it as a click does.
  */
 function linkGallery() {
+  const hash = toHash(design);
   for (const a of galleryLinks) {
-    const href = `${new URL(a.href).pathname}${toHash(design)}`;
+    const href = `${new URL(a.href).pathname}${hash}`;
     if (a.getAttribute('href') !== href) a.setAttribute('href', href);
   }
 }
