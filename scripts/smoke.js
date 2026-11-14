@@ -19,11 +19,23 @@ const seed = `smoke-${Date.now()}`;
 /** @type {string[]} */
 const failures = [];
 
+/** Whether version `a` is before `b` (as x.y.z). @param {string} a @param {string} b */
+const before = (a, b) => {
+  const [x, y] = [a, b].map((v) => v.split(/[.+-]/).slice(0, 3).map(Number));
+  const at = x.findIndex((part, i) => part !== y[i]);
+  return at >= 0 && x[at] < y[at];
+};
+
 /**
- * Fetch a path and check the answer; the response, or null when it failed (recorded).
- * @param {string} path @param {{ type: string, status?: number, init?: RequestInit, check?: (res: Response, body: Uint8Array) => string | void }} want
+ * Fetch a path and check the answer; the response, or null when it failed (recorded). A check
+ * `since` a version after the one expected is skipped: the site runs that version, which hasn't it.
+ * @param {string} path @param {{ type: string, status?: number, init?: RequestInit, since?: string, check?: (res: Response, body: Uint8Array) => string | void }} want
  */
-async function expect(path, { type, status = 200, init, check }) {
+async function expect(path, { type, status = 200, init, since, check }) {
+  if (since && before(expected, since)) {
+    console.log(`– ${init?.method ?? 'GET'} ${path}: skipped (since ${since}; the site is at ${expected})`);
+    return null;
+  }
   try {
     const res = await fetch(`${site}${path}`, { redirect: 'manual', ...init });
     const body = new Uint8Array(await res.arrayBuffer());
@@ -80,13 +92,15 @@ await expect(`/api/mockup.png?${design}&kind=card`, {
 });
 await expect(`/api/cover.json?${design}`, {
   type: 'application/json',
+  since: '1.13.0',
   check: (_, body) => (JSON.parse(text(body)).version === expected ? undefined : 'another version'),
 });
 await expect('/api/catalog.json', {
   type: 'application/json',
+  since: '1.13.0',
   check: (_, body) => (JSON.parse(text(body)).styles?.length > 0 ? undefined : 'no styles'),
 });
-await expect('/api/openapi.json', { type: 'application/json' });
+await expect('/api/openapi.json', { type: 'application/json', since: '1.13.0' });
 await expect('/mcp', {
   type: 'application/json',
   init: {
