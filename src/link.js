@@ -73,7 +73,8 @@ export const LINK = {
     const lower = t.trim().toLowerCase();
     return CUSTOM_PALETTE.test(lower) ? lower : idFor(t, palettes);
   },
-  seed: (/** @type {unknown} */ v) => clip(oneLine(v)?.trim(), 40),
+  // (Trimmed after the cut too, as createCover trims it: a cut after a space would give one cover two links.)
+  seed: (/** @type {unknown} */ v) => clip(oneLine(v)?.trim(), 40)?.trim(),
   /** A preset, or a size of your own the library can make, in any case (1600X2560, 1600 × 2560). @param {unknown} v */
   format: (v) =>
     oneOf(typeof v === 'string' ? formatName(v) : undefined, (f) => {

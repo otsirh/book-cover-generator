@@ -152,16 +152,14 @@ function tools(ctx) {
 }
 
 /** Whether the arguments give a seed (else the cover's comes from its title). @param {Record<string, unknown>} args */
-const seedGiven = (args) => {
-  // (Text or a number: any other seed would be set aside without a word, the cover drawn from its title.)
-  if (args.seed != null && typeof args.seed !== 'string' && typeof args.seed !== 'number') {
-    throw new TypeError('seed is text or a number');
-  }
-  return typeof args.seed === 'number' || (typeof args.seed === 'string' && args.seed.trim() !== '');
-};
+const seedGiven = (args) => typeof args.seed === 'number' || (typeof args.seed === 'string' && args.seed.trim() !== '');
 
 /** A tool's arguments as a link's query, read as the HTTP API reads one. @param {Record<string, unknown>} args */
 function queryFrom(args) {
+  // (A seed is text or a number: any other would be set aside without a word, the cover drawn from its title.)
+  if (args.seed != null && typeof args.seed !== 'string' && typeof args.seed !== 'number') {
+    throw new TypeError('seed is text or a number');
+  }
   const q = new URLSearchParams();
   if (seedGiven(args)) q.set('seed', String(args.seed).trim());
   for (const key of [

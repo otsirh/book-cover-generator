@@ -780,6 +780,11 @@ test('the cache key keeps every parameter the API reads (OpenAPI’s, at least)'
 test('a link names its language, and the app’s link reader takes it (and only a tag)', async () => {
   const { LINK, writeLink, LINK_FIELDS } = await import('../src/link.js');
   assert.equal(LINK.lang(' tr '), 'tr');
+  // A seed cut at its 40 characters just after a space is trimmed again, as createCover reads it:
+  // one cover, one link.
+  const seed = LINK.seed(`${'x'.repeat(39)} y`);
+  assert.equal(seed, 'x'.repeat(39));
+  assert.equal(createCover({ title: 'T', seed: `${'x'.repeat(39)} ` }).seed, seed);
   assert.equal(LINK.lang('zh-Hant'), 'zh-Hant');
   for (const bad of ['', 'turkish!', 'x', `en-${'a'.repeat(40)}`]) assert.equal(LINK.lang(bad), undefined, bad);
   const empty = Object.fromEntries(Object.entries(LINK_FIELDS).map(([k, f]) => [k, f.empty]));

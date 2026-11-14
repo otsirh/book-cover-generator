@@ -1657,9 +1657,13 @@ const stored = (k, withSvg = true) => (withSvg && k.svg ? { ...k.design, svg: k.
  */
 function saveKept(list) {
   const n = list.length;
+  // (Each design written out once with its SVG and once without, then joined for each try: a full
+  // tray isn't written out again for every try.)
+  const whole = list.map((k) => JSON.stringify(stored(k, true)));
+  const bare = list.map((k) => JSON.stringify(stored(k, false)));
   for (const withSvg of new Set([n, Math.ceil(n * 0.75), Math.ceil(n / 2), Math.ceil(n / 4), Math.min(n, 1), 0])) {
     try {
-      localStorage.setItem(KEEP_KEY, JSON.stringify(list.map((k, i) => stored(k, i < withSvg))));
+      localStorage.setItem(KEEP_KEY, `[${list.map((_, i) => (i < withSvg ? whole[i] : bare[i])).join(',')}]`);
     } catch {
       // Full (try with fewer SVGs) or blocked.
       continue;

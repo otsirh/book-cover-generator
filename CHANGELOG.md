@@ -23,6 +23,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 
+- A seed cut to its 40 characters just after a space is trimmed again, so a design and the API's link of it are the same design (a kept design showed as not kept).
+- Keeping or removing a design writes the tray out once, not again for each way of fitting a full storage.
 - A pin given with spaces (`forest`) is drawn and written in the cover's link alike, so the MCP server's links draw the cover it describes.
 - The MCP server takes a title given as a number (1984), reads `texture` and `svg` as links read on and off (true or false, 1 or 0), and refuses a seed, kind or line of another type instead of setting it aside.
 - A design's link page is checked again on every visit, as the app's page and scripts are, so a page kept from before a deploy never meets newer scripts.
