@@ -14,6 +14,7 @@ import {
   createPrintCover,
   trimSizes,
   printLimits,
+  pageRange,
 } from '../src/index.js';
 import {
   svgToDataUrl,
@@ -2102,6 +2103,11 @@ const scheduleMany = sliced(() => {
 
 /** The count and the first covers of the list, as they will come out. */
 function renderMany() {
+  // (Closed: nothing to draw, and the previews still queued are dropped. Opening draws them.)
+  if (!(/** @type {HTMLDetailsElement} */ ($('many')).open)) {
+    manyQueue = [];
+    return;
+  }
   const { books, error } = listedBooks();
   const extra = books.length > MAX_BOOKS ? ` (the first ${MAX_BOOKS} are made)` : '';
   $('many-count').textContent =
@@ -2241,13 +2247,18 @@ function savedPrint() {
     for (const key of PRINT_FIELDS) {
       if (typeof saved?.[key] === typeof PRINT_DEFAULTS[key]) /** @type {any} */ (out)[key] = saved[key];
     }
-    // (A page count the paper or the trim doesn't take, from an older version say: the default's.)
-    const paper = /** @type {keyof typeof printLimits.pages} */ (out.paper);
-    const [least, most] = printLimits.pages[paper] ?? [0, 0];
-    const trimMost = printLimits.trimPages[out.trim]?.[paper] ?? most;
-    if (!Number.isInteger(out.pages) || out.pages < least || out.pages > Math.min(most, trimMost)) {
-      out.pages = PRINT_DEFAULTS.pages;
-    }
+    // (A paper the trim isn't printed on, or a page count they don't take, from an older version
+    // say: the default's.)
+    const rangeOf = () => {
+      try {
+        return pageRange(out.trim, out.paper);
+      } catch {
+        return null;
+      }
+    };
+    if (!rangeOf()) out.paper = PRINT_DEFAULTS.paper;
+    const [least, most] = rangeOf() ?? [0, 0];
+    if (!Number.isInteger(out.pages) || out.pages < least || out.pages > most) out.pages = PRINT_DEFAULTS.pages;
   } catch {
     // Storage blocked, or something else there: the defaults.
   }
@@ -2353,14 +2364,10 @@ function renderPrint() {
   printColourMenus();
   const settings = printSettings();
   // The page count the paper takes (standard colour 72 to 600…), at most what the trim takes
-  // (8.5 × 11 in: 590 on white), for the field's arrows.
-  const paper = /** @type {keyof typeof printLimits.pages} */ (settings.paper);
-  const range = printLimits.pages[paper];
-  const most = printLimits.trimPages[settings.trim]?.[paper];
-  if (range) {
-    field('print-pages').min = String(range[0]);
-    field('print-pages').max = String(most ? Math.min(range[1], most) : range[1]);
-  }
+  // (8.5 × 11 in: 590 on white), for the field's arrows. (None for a paper the trim isn't printed
+  // on: the status line says so.)
+  const range = pageRange(settings.trim, settings.paper);
+  if (range) [field('print-pages').min, field('print-pages').max] = range.map(String);
   lastPrintKey = JSON.stringify({ design, settings });
   /** Keep the settings for the next visit (a page count it can't draw: the last that it could). @param {PrintSettings} kept */
   const keep = (kept) => {

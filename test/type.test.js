@@ -410,6 +410,12 @@ test('a stack keeps the lines a title was typed on', () => {
 test('a unit too wide for its line is never cut so that a closing mark starts a line, or a space ends one', async () => {
   const { wrapText } = await import('../src/text.js');
   assert.deepEqual(wrapText('! »', 8.6, 5, { font: FONTS.serif }), ['!', '»']);
+  // A word that fits whole stays whole: its mark starting the next line is the lesser fault than
+  // the word split with no hyphen. A web address still breaks after its dots and slashes.
+  assert.deepEqual(wrapText('Bonjour !', 12, 44, { font: FONTS.serif }), ['Bonjour', '!']);
+  assert.deepEqual(wrapText('« Bonjour »', 12, 54, { font: FONTS.serif }), ['« Bonjour', '»']);
+  for (const line of wrapText('www.example.com/a/long/path', 27, 174, { font: FONTS.serif }))
+    assert.doesNotMatch(line, /^[.]/, line);
   const fit = fitText('« Donaudampfschifffahrtsgesellschaftskapitänswitwenrentenversicherung »', {
     font: FONTS.serif,
     maxWidth: 146,

@@ -1710,6 +1710,20 @@ test('print settings kept from an older version that the trim no longer takes op
   await expect(page.locator('#print-pages')).not.toHaveAttribute('aria-invalid');
 });
 
+test('print settings kept with a paper the trim isn’t printed on open on white paper', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      'book-cover-generator:print',
+      JSON.stringify({ trim: '8.27x11.69', paper: 'color', pages: 300 }),
+    );
+  });
+  await page.goto('/#title=The%20Lighthouse%20Keeper&style=artdeco&seed=p');
+  await ready(page);
+  await page.locator('#print summary').click();
+  await expect(page.locator('#print-paper')).toHaveValue('white');
+  await expect(page.locator('#print-preview')).toHaveAttribute('src', /^data:image\/svg\+xml/);
+});
+
 test('a paperback for print: the whole cover, sized from the trim and pages, as a PDF', async ({ page }) => {
   await page.goto('/#title=The%20Lighthouse%20Keeper&author=Mara%20Ellison&style=artdeco&seed=p');
   await ready(page);

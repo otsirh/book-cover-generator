@@ -1,7 +1,7 @@
 // Print covers: sizes by KDP's rules, and the back's and spine's text where it may be.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createPrintCover, spineWidth, paperTypes, trimSizes, printLimits, styles } from '../src/index.js';
+import { createPrintCover, spineWidth, pageRange, paperTypes, trimSizes, printLimits, styles } from '../src/index.js';
 import { assertWellFormed } from './well-formed.js';
 import { extentOf, textBoxes } from './svg-text.js';
 import { markExtent, descentOf } from '../src/text.js';
@@ -24,6 +24,16 @@ test('the spine is the page count times the paper, as KDP figures it', () => {
   assert.equal(printLimits.trimPages['8.27x11.69'].color, null);
   for (const trim of Object.keys(printLimits.trimPages)) assert.ok(Object.hasOwn(trimSizes, trim), trim);
   assert.throws(() => createPrintCover({ title: 'x' }, { trim: '8.5x11', pages: 591 }), /at most 590 pages/);
+  // pageRange says the same, as one rule: the paper's range, capped by the trim; null where the
+  // paper isn't printed at the trim; a trim of your own held to the paper's range.
+  assert.deepEqual(pageRange('8.5x11', 'white'), [24, 590]);
+  assert.deepEqual(pageRange([8.5, 11], 'Premium Color'), [24, 590]);
+  assert.deepEqual(pageRange('6x9'), [24, 828]);
+  assert.deepEqual(pageRange('6x9', 'color'), [72, 600]);
+  assert.equal(pageRange('8.27x11.69', 'color'), null);
+  assert.deepEqual(pageRange('8.4x11', 'white'), [24, 828]);
+  assert.throws(() => pageRange('6x9', 'glossy'), /Unknown paper/);
+  assert.throws(() => pageRange('20x30'), /trim must be/);
   assert.deepEqual(Object.keys(paperTypes), ['white', 'cream', 'color', 'premium-color']);
   assert.throws(() => spineWidth(200, 'glossy'), /Unknown paper "glossy". Available: white, cream/);
   assert.throws(() => spineWidth(23), /pages must be a whole number from 24 to 828 on white paper, got 23/);

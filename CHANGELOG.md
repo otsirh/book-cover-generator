@@ -6,6 +6,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
+- `pageRange(trim, paper)`: the page counts a paperback can have at a trim on a paper (`[24, 590]` at 8.5 × 11 in on white), or null where the paper isn't printed at that trim, as `createPrintCover` checks them. The app's print panel reads it too.
 - Many covers saves JPEGs too, as KDP takes eBook covers.
 - `createCover`'s `palette` takes your own colours as a link writes them (`custom-0b132b-f8f9fa-ff6b6b`), so the CLI's `--palette` and a book list's palette column take a value copied from a link.
 - `printLimits.trimPages`: the most pages at the named trims that take fewer (8.5 × 11 in: 590 on white paper), by trim and paper, as `createPrintCover` checks them. The app's page-count field keeps to them. (KDP states no such limits for a trim of your own.)
@@ -22,7 +23,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 
-- A word too long for its line is never cut so that a closing mark (`?`, `»`) starts the next line or an opening one ends this one, and no line starts or ends with a space (the blurb, titles in narrow boxes).
+- Print settings kept with a paper the trim isn't printed on open on white paper, not on an error.
+- A word too long for its line is broken so that no line starts or ends with a space, and, inside a word already broken, a closing mark (`?`, `»`) stays with its word; a word that fits whole is never split for it, and a web address breaks after its dots and slashes.
 - Print settings kept from an older version with a page count the trim no longer takes open on the default count, not on an error. The page field is marked wrong only when the error is about pages.
 - An export scale on an iPhone is the largest that fits its canvas (it could come out a step smaller).
 - A link preview's fallback picture (the redirect to the site's own image) carries the API's usual headers, so a page on another site that fetches it follows it.

@@ -546,6 +546,31 @@ const mayCut = (chars, start, k) =>
   );
 
 /**
+ * Where to cut a unit too wide for its line, at `k` or before it (the piece on this line starting
+ * at `start`; `broken` when that piece starts inside a word cut on the line before): at `k` if
+ * mayCut allows it, else the last cut before it that does, but only inside a word already broken.
+ * Splitting a word that is whole so far, with no hyphen ("Bonjou / r !"), is worse than a mark
+ * starting the next line ("Bonjour / !"): then, and where nothing better is found, `k`.
+ * @param {string[]} chars @param {number} start @param {number} k @param {boolean} broken
+ */
+function cutAt(chars, start, k, broken) {
+  if (k >= chars.length || mayCut(chars, start, k)) return k;
+  for (let j = k - 1; j > start; j--) {
+    if (!mayCut(chars, start, j)) continue;
+    // (Between words, or after a / . - and the like, as a web address breaks: a fine cut.)
+    if (chars[j - 1] === ' ' || chars[j] === ' ' || URL_BREAK.test(chars[j - 1])) return j;
+    // (Inside a word: only the one the piece starts with, if it was broken already.)
+    let word = j;
+    while (word > start && chars[word - 1] !== ' ') word--;
+    if (word === start && broken) return j;
+  }
+  return k;
+}
+
+/** Where a web address (or another long unit) breaks best: after one of these. */
+const URL_BREAK = /[/\-.?&=_:,;)]/;
+
+/**
  * @param {Token[]} tokens
  * @param {number} maxWidth
  * @param {(s: string) => number} measure
@@ -640,8 +665,13 @@ function hardWrap(tokens, maxWidth, measure) {
       }
       const piece = (/** @type {number} */ end) =>
         chars.slice(start, end).join('') + (end < chars.length ? hyphen : '');
+      // The most characters that fit, one at least (by halves: a unit can be long).
       let end = start + 1;
-      while (end < chars.length && measure(piece(end + 1)) <= maxWidth) end++;
+      for (let hi = chars.length; end < hi;) {
+        const mid = Math.ceil((end + hi) / 2);
+        if (measure(piece(mid)) <= maxWidth) end = mid;
+        else hi = mid - 1;
+      }
       if (hyphen && end < chars.length) {
         for (let k = end; k >= Math.max(start + 2, end - 3); k--) {
           if (k <= chars.length - 2 && syllableBreak(chars, k)) {
@@ -650,13 +680,9 @@ function hardWrap(tokens, maxWidth, measure) {
           }
         }
       }
-      // (Never a closing mark starting the next piece, or an opening one ending this: cut earlier,
-      // if anywhere.)
-      if (end < chars.length && !mayCut(chars, start, end)) {
-        let k = end - 1;
-        while (k > start && !mayCut(chars, start, k)) k--;
-        if (k > start) end = k;
-      }
+      // (Never a closing mark starting the next piece, or an opening one ending this, where a cut
+      // inside a word already broken can keep it with its word.)
+      end = cutAt(chars, start, end, start > 0 && chars[start - 1] !== ' ');
       const text = piece(end).replace(/ +$/, '');
       // (A hyphen that doesn't fit after the one letter that does: the letter alone.)
       const fitting = measure(text) > maxWidth && text.endsWith(hyphen) && hyphen ? text.slice(0, -1) : text;
@@ -699,6 +725,8 @@ export function wrapText(text, size, maxWidth, spec) {
     let lead = cur ? `${cur}${token.space ? ' ' : ''}` : '';
     // (What the line held is the lead now: written out with the unit's first piece, or alone.)
     cur = '';
+    // (Whether what's left of the unit starts inside a word cut on the line before.)
+    let broken = false;
     while (chars.length) {
       // The most characters that fit after what the line holds (by halves: a unit can be long).
       let lo = 0;
@@ -720,20 +748,17 @@ export function wrapText(text, size, maxWidth, spec) {
       }
       let cut = Math.max(1, lo);
       for (let k = cut; k > cut / 2; k--) {
-        if (/[/\-.?&=_:,;)]/.test(chars[k - 1])) {
+        if (URL_BREAK.test(chars[k - 1])) {
           cut = k;
           break;
         }
       }
-      // (Never a closing mark starting the next line, or an opening one ending this: cut earlier,
-      // if anywhere. The space at the cut is the break's.)
-      if (!mayCut(chars, 0, cut)) {
-        let k = cut - 1;
-        while (k > 0 && !mayCut(chars, 0, k)) k--;
-        if (k > 0) cut = k;
-      }
+      // (Never a closing mark starting the next line, or an opening one ending this, where a cut
+      // inside a word already broken can keep it with its word. The space at the cut is the break's.)
+      cut = cutAt(chars, 0, cut, broken);
       lines.push((lead + chars.slice(0, cut).join('')).replace(/ +$/, ''));
       lead = '';
+      broken = chars[cut - 1] !== ' ' && chars[cut] !== undefined && chars[cut] !== ' ';
       chars = chars.slice(cut);
       while (chars[0] === ' ') chars = chars.slice(1);
     }

@@ -107,6 +107,22 @@ function paperOf(paper) {
   return /** @type {keyof typeof paperTypes} */ (id);
 }
 
+/**
+ * The page counts KDP prints a paperback with at a trim, on a paper: [least, most], the most
+ * capped by what the trim takes (8.5 × 11 in: 590 on white); null where the paper isn't printed
+ * at that trim. (A trim of your own is held to the paper's range: KDP states no other.)
+ * @param {string | readonly [number, number]} trim @param {string} [paper]
+ * @returns {[number, number] | null}
+ */
+export function pageRange(trim, paper = 'white') {
+  const [tw, th] = trimOf(trim);
+  const id = paperOf(paper);
+  const [least, most] = printLimits.pages[id];
+  const fewer = FEWER_PAGES[`${tw}x${th}`]?.[id];
+  if (fewer === null) return null;
+  return [least, fewer === undefined ? most : Math.min(most, fewer)];
+}
+
 /** @param {unknown} pages @param {string} paper */
 function checkPages(pages, paper) {
   const [min, most] = printLimits.pages[/** @type {keyof typeof paperTypes} */ (paper)];
@@ -198,10 +214,10 @@ export function createPrintCover(coverOptions = {}, print = /** @type {any} */ (
   const paper = paperOf(print.paper ?? 'white');
   const pages = checkPages(print.pages, paper);
   // (Some of the largest trims take fewer pages, or not every paper.)
-  const fewer = FEWER_PAGES[`${tw}x${th}`]?.[paper];
-  if (fewer === null) throw new RangeError(`${paper} paper isn't printed at ${tw} × ${th} in`);
-  if (fewer !== undefined && pages > fewer) {
-    throw new RangeError(`A ${tw} × ${th} in book on ${paper} paper has at most ${fewer} pages, got ${pages}`);
+  const range = pageRange([tw, th], paper);
+  if (!range) throw new RangeError(`${paper} paper isn't printed at ${tw} × ${th} in`);
+  if (pages > range[1]) {
+    throw new RangeError(`A ${tw} × ${th} in book on ${paper} paper has at most ${range[1]} pages, got ${pages}`);
   }
   const thickness = print.pageThickness == null ? paperTypes[paper] : positive(print.pageThickness, 'pageThickness');
   const bleed = print.bleed == null ? 0.125 : print.bleed === 0 ? 0 : positive(print.bleed, 'bleed');
@@ -539,15 +555,15 @@ function blurbText(paragraphs, x, y, width, height, fill) {
   };
   // The largest size, in quarter points, at which it all fits.
   const steps = Array.from({ length: 17 }, (_, i) => (12 - i * 0.25) * PT);
-  let size = steps[steps.length - 1];
-  let { wrapped } = layout(size);
+  // (Else the smallest, the last tried.)
+  let size = steps[0];
+  /** @type {string[][]} */
+  let wrapped = [];
   for (const step of steps) {
     const tried = layout(step);
-    if (tried.tall <= height) {
-      size = step;
-      wrapped = tried.wrapped;
-      break;
-    }
+    size = step;
+    wrapped = tried.wrapped;
+    if (tried.tall <= height) break;
   }
   // Too much even so: as many lines as fit, the last one ending in an ellipsis.
   /** @type {{ line: string, baseline: number }[]} */

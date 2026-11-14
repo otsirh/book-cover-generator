@@ -146,6 +146,16 @@ export declare const printLimits: Readonly<{
  * Throws for an unknown paper, or a page count outside `printLimits`.
  */
 export declare function spineWidth(pages: number, paper?: PaperType | (string & {})): number;
+/**
+ * The page counts a paperback can have at a trim (a name such as `'8.5x11'`, or `[width, height]`
+ * in inches) on a paper (default white): `[least, most]`, the most capped by what the trim takes
+ * (8.5 × 11 in: 590 on white paper), as `createPrintCover` checks it; `null` where the paper isn't
+ * printed at that trim. Throws for an unknown trim or paper.
+ */
+export declare function pageRange(
+  trim: string | readonly [number, number],
+  paper?: PaperType | (string & {}),
+): [number, number] | null;
 
 /** Options for `createPrintCover`: the book as printed, and its back cover. */
 export interface PrintOptions {
