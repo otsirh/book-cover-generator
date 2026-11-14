@@ -139,6 +139,15 @@ test('answers are kept at the edge, once per version', async () => {
     await worker.fetch(new Request('https://covers.example/api/cover.json?title=Head', { method: 'HEAD' }), env, ctx);
     await Promise.all(waiting);
     assert.equal(kept.size, 3);
+    // A repeated parameter is read by its last value, and kept so: the same answer.
+    const repeated = await worker.fetch(
+      new Request('https://covers.example/api/cover.svg?title=A&title=Kept'),
+      env,
+      ctx,
+    );
+    assert.equal(await repeated.text(), drawn);
+    await Promise.all(waiting);
+    assert.equal(kept.size, 3);
   } finally {
     delete (/** @type {any} */ (globalThis).caches);
   }
@@ -761,6 +770,10 @@ test('a link names its language, and the app’s link reader takes it (and only 
   assert.equal(writeLink({ ...empty, title: 'x', lang: 'tr' }).get('lang'), 'tr');
   // The API reads it as the app does: trimmed, and an error where the app would drop it.
   assert.equal(optionsFromLink(new URLSearchParams('title=x&lang=%20tr')).lang, 'tr');
+  // A blank choice is no choice, as the app reads it: the seed picks.
+  assert.deepEqual(optionsFromLink(new URLSearchParams('title=x&style=%20&font=%20&palette=%20&genre=%20&lang=%20')), {
+    title: 'x',
+  });
   assert.throws(
     () => optionsFromLink(new URLSearchParams(`title=x&lang=en-${'a'.repeat(40)}`)),
     /lang must be a language tag/,

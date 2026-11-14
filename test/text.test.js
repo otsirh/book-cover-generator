@@ -299,6 +299,12 @@ test('fitText keeps to maxLines, even for text typed on more lines: the surplus 
   assert.deepEqual(two.lines, ['One', 'Two Three']);
 });
 
+test('fitText takes maxLines as a whole number from 1', () => {
+  for (const maxLines of [0, -1, 1.5, NaN])
+    assert.throws(() => fitText('A\nB', { maxWidth: 200, maxSize: 40, maxLines }), /maxLines/, String(maxLines));
+  assert.equal(fitText('A\nB', { maxWidth: 200, maxSize: 40, maxLines: Infinity }).lines.length, 2);
+});
+
 test('a line cut short ends in one ellipsis, without the punctuation or hyphen before it', async () => {
   const { withEllipsis } = await import('../src/text.js');
   assert.equal(withEllipsis('Wait…'), 'Wait…');

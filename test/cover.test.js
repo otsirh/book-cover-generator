@@ -1443,6 +1443,25 @@ test('mockups: every kind is a well-formed SVG with the cover in it, at its size
   assert.throws(() => createMockup(cover, { background: 'red' }), /hex colour/);
   assert.throws(() => createMockup(/** @type {any} */ ({ svg: '' })), /a cover from createCover/);
   assert.match(createMockup(cover, { kind: 'flat', background: '#123456' }).svg, /fill="#123456"/);
+  // The social cards keep long text (a title, an author and a line of two lines each) inside
+  // their margins.
+  const long = createCover({
+    title: "The Extraordinarily Long Chronicles of the Lighthouse Keeper's Daughter",
+    author: 'Maximiliana Konstantinopoulou-Abernathy and Bartholomew Featherstonehaugh',
+    style: 'minimal',
+    seed: 's',
+  });
+  for (const kind of /** @type {const} */ (['card', 'square', 'story'])) {
+    const m = createMockup(long, { kind, text: 'Out now everywhere books are sold, in hardback, paperback and ebook' });
+    // (The card's own text: the cover's, nested in it, is the cover's business.)
+    const ofCover = new Set(textBoxes(long.svg).map((b) => `${b.text}@${b.y}`));
+    const lowest = Math.max(
+      ...textBoxes(m.svg)
+        .filter((b) => !ofCover.has(`${b.text}@${b.y}`))
+        .map((b) => b.y + b.size * 0.3),
+    );
+    assert.ok(lowest <= m.height - 60, `${kind}: text down to ${lowest.toFixed(0)} of ${m.height}`);
+  }
   // A kind as the app's menu names it.
   assert.equal(createMockup(cover, { kind: 'E-reader' }).kind, 'ereader');
   // A title typed on more lines than the card takes has its last lines joined, not cut off.

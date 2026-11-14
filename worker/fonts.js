@@ -214,7 +214,12 @@ export function fontSet(faces) {
     const names = stack.split(',').map((s) => s.trim().replace(/^['"]|['"]$/g, ''));
     const found = /** @type {Face[][]} */ (
       names
-        .map((n) => families.get((GENERIC[/** @type {keyof typeof GENERIC} */ (n)] ?? n).toLowerCase()))
+        // (Only GENERIC's own names: a family called `constructor` is that family.)
+        .map((n) =>
+          families.get(
+            (Object.hasOwn(GENERIC, n) ? GENERIC[/** @type {keyof typeof GENERIC} */ (n)] : n).toLowerCase(),
+          ),
+        )
         .filter(Boolean)
     );
     const serif = /** @type {Face[]} */ (families.get(GENERIC.serif.toLowerCase()));

@@ -75,6 +75,9 @@ test('text measured in the PNG fonts is as wide as resvg draws it', { skip }, ()
       `${family}: measured ${measured.toFixed(1)}, drawn ${ink.toFixed(1)}`,
     );
   }
+  // A family named as an Object's own member is a family like any other: the serif, not a crash.
+  for (const family of ['constructor', "toString, 'Noto Serif'"])
+    assert.ok(engine.laidOut(() => measureText('Keeper', 100, { font: { family } })) > 0, family);
   // laidOut puts back the measurer in force before it, a caller's own too.
   const own = () => 1;
   setTextMeasurer(own);

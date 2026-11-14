@@ -20,6 +20,17 @@ test('TSV with a header, and JSON lines', () => {
     { title: 'B', series: 'Two' },
   ]);
   assert.throws(() => parseBookList('{"title":"A"}\n{nope}'), /Line 2 is not valid JSON/);
+  // A cell is text or a number: an object or a list says so, with its line.
+  assert.throws(
+    () => parseBookList('{"title":"A"}\n{"title":{"en":"Dune"}}'),
+    /Line 2: title is text or a number, not an object/,
+  );
+  assert.throws(
+    () => parseBookList('{"title":"A","author":["X","Y"]}'),
+    /Line 1: author is text or a number, not a list/,
+  );
+  // (A column the list doesn't read may hold anything.)
+  assert.deepEqual(parseBookList('{"title":"A","tags":["x"]}'), [{ title: 'A' }]);
 });
 
 test('one book per line, with a bar, a dash or a tab between title, author and subtitle', () => {

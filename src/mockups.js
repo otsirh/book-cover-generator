@@ -241,6 +241,10 @@ export function createMockup(cover, { kind: named = 'book', background: given, t
     maxLines: 4,
     lineHeight: 1.08,
   });
+  const gap = kind === 'card' ? 22 : 18 * u;
+  // The author and the line share what the title leaves of the box (the author at most 45% of it,
+  // with a line to come), so the whole block stays inside it.
+  const left = Math.max(1, box.h - textBottom(title, 0) - (cover.author ? gap : 0) - (words ? gap * 1.6 : 0));
   const author = cover.author
     ? fitText(cover.author, {
         font: FONTS.sans,
@@ -249,6 +253,7 @@ export function createMockup(cover, { kind: named = 'book', background: given, t
         lang: cover.lang,
         letterSpacing: 0.12,
         maxWidth: box.w,
+        maxHeight: words ? left * 0.45 : left,
         maxSize: authorSize,
         maxLines: 2,
       })
@@ -258,11 +263,11 @@ export function createMockup(cover, { kind: named = 'book', background: given, t
         font: FONTS.sans,
         weight: 700,
         maxWidth: box.w,
+        maxHeight: Math.max(1, left - (author ? textBottom(author, 0) : 0)),
         maxSize: noteSize,
         maxLines: 2,
       })
     : null;
-  const gap = kind === 'card' ? 22 : 18 * u;
   const blockH =
     textBottom(title, 0) + (author ? gap + textBottom(author, 0) : 0) + (note ? gap * 1.6 + textBottom(note, 0) : 0);
   let y = kind === 'card' ? box.y + (box.h - blockH) / 2 : box.y + Math.max(0, (box.h - blockH) / 2);

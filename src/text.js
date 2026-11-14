@@ -720,11 +720,16 @@ export const BREAKING_SPACE = /[^\S\u00A0\u2007\u202F\uFEFF]+/g;
 
 /**
  * Reject a missing or non-numeric box, which would otherwise lay text out with NaN.
- * `maxWidth` is required; `maxHeight` may be left out (no limit) but not be NaN.
- * @param {string} fn @param {{ maxWidth: number, maxHeight?: number }} o
+ * `maxWidth` is required; `maxHeight` may be left out (no limit) but not be NaN; `maxLines`, if
+ * given, is a whole number from 1 (or Infinity).
+ * @param {string} fn @param {{ maxWidth: number, maxHeight?: number, maxLines?: number }} o
  */
 export function checkBox(fn, o) {
   if (!Number.isFinite(o.maxWidth)) throw new TypeError(`${fn}: \`maxWidth\` must be a number of pixels`);
+  // (Whole lines, one at least: a limit of 0 would be none.)
+  if (o.maxLines != null && !(o.maxLines === Infinity || (Number.isInteger(o.maxLines) && o.maxLines >= 1))) {
+    throw new RangeError(`${fn}: \`maxLines\` must be a whole number from 1, got ${o.maxLines}`);
+  }
   if (o.maxHeight != null && Number.isNaN(o.maxHeight)) {
     throw new TypeError(`${fn}: \`maxHeight\` must be a number of pixels`);
   }

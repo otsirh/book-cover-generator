@@ -352,7 +352,8 @@ function resolvePalette(palette, rng, style) {
     let pool = palettes;
     if (style.prefer === 'dark') pool = palettes.filter((p) => p.dark);
     if (style.prefer === 'light') pool = palettes.filter((p) => !p.dark);
-    return normalizePalette(rng.pick(pool));
+    // (None of the kind it prefers, with palettes registered: any.)
+    return normalizePalette(rng.pick(pool.length ? pool : palettes));
   }
   const id = idFor(palette, palettes);
   const found = palettes.find((p) => p.id === id);

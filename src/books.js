@@ -134,7 +134,17 @@ export function parseBookList(text) {
       } catch {
         throw new SyntaxError(`Line ${number} is not valid JSON`);
       }
-      return value && typeof value === 'object' ? optionsFrom(value) : {};
+      if (!value || typeof value !== 'object') return {};
+      // (A cell is text or a number: an object or a list would be drawn as "[object Object]".)
+      const nested = Object.entries(value).find(
+        ([key, cell]) => cell !== null && typeof cell === 'object' && Object.hasOwn(COLUMNS, key.trim().toLowerCase()),
+      );
+      if (nested) {
+        throw new TypeError(
+          `Line ${number}: ${nested[0]} is text or a number, not ${Array.isArray(nested[1]) ? 'a list' : 'an object'}`,
+        );
+      }
+      return optionsFrom(value);
     });
   } else {
     // A header row names a "title" column, separated by tabs, commas or semicolons (as

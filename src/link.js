@@ -390,7 +390,8 @@ export function formatSize(format, width, height) {
 export function optionsFromLink(q) {
   const v = lastValues(q);
   /** A parameter's value, if it has one. @param {string} key */
-  const given = (key) => (v[key] != null && v[key] !== '' ? v[key] : undefined);
+  // (Blank is not given, as the app reads a link: `style=%20` leaves the style to the seed.)
+  const given = (key) => (v[key] != null && v[key].trim() !== '' ? v[key] : undefined);
   /** @type {Record<string, unknown>} */
   const o = {};
   for (const key of /** @type {const} */ (['title', 'author', 'subtitle', 'series', 'credit', 'badge', 'seed'])) {

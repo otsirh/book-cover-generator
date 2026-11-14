@@ -19,6 +19,13 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 
+- A blank style, font, palette, genre or language in a link (`style=%20`) is left to the seed by the HTTP API too, as the app reads it, instead of a 400.
+- The square and story cards keep a long author and line inside their margins (they could run off the bottom).
+- `fitText` refuses a `maxLines` that isn't a whole number from 1 (0 meant no limit).
+- A book list in JSON lines says which line has an object or a list for a title, author or other cell, instead of drawing "[object Object]".
+- A style that prefers dark (or light) palettes, with none of that kind registered, picks from all of them instead of failing.
+- The PNG fonts measure a family named `constructor` or `toString` as any other family.
+- The edge cache keys an answer by the values the API reads: `title=A&title=Dune` is Dune's answer, drawn once.
 - Text cut short ends in a single ellipsis: a word that already ended in "…", a comma or a hyphen no longer shows "……", ",…" or "-…" (titles, card lines, the spine, the imprint and the back's blurb).
 - A blurb whose first paragraph filled its 3,000 characters no longer ends on a paragraph of "…" alone.
 - Mockups and paper are named as other choices are: `E-reader` is the e-reader mockup and `premiumcolor` the premium colour paper. `titleCase` takes spaces around it.

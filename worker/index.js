@@ -572,10 +572,11 @@ export const API_PARAMETERS = Object.freeze([
  */
 function cacheKey(request, deployment) {
   const url = new URL(request.url);
+  // (A repeated parameter's last value, as the API reads it: `title=A&title=Dune` is Dune's.)
   const read = new URLSearchParams(
-    [...url.searchParams].filter(([name]) => name !== 'v' && API_PARAMETERS.includes(name)),
+    Object.entries(lastValues(url.searchParams)).filter(([name]) => name !== 'v' && API_PARAMETERS.includes(name)),
   );
-  // (In any order, one design: sorted by name, the values of a repeated one in their order.)
+  // (In any order, one design: sorted by name.)
   read.sort();
   url.search = read.toString();
   url.searchParams.set('v', `${version}+${deployment}`);
