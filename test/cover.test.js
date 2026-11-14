@@ -80,6 +80,9 @@ test('custom palettes are accepted and validated', () => {
 
 test('unknown style or palette throws a helpful error', () => {
   assert.throws(() => createCover({ title: 'x', style: 'nope' }), /Unknown style "nope"/);
+  // A style's name is found typed without its spaces too.
+  assert.equal(createCover({ title: 'x', style: 'BigLetter' }).style, 'typographic');
+  assert.equal(createCover({ title: 'x', style: 'retrosun' }).style, 'retro');
   assert.throws(() => createCover({ title: 'x', palette: 'nope' }), /Unknown palette "nope"/);
 });
 
@@ -1438,6 +1441,11 @@ test('mockups: every kind is a well-formed SVG with the cover in it, at its size
   assert.throws(() => createMockup(cover, { background: 'red' }), /hex colour/);
   assert.throws(() => createMockup(/** @type {any} */ ({ svg: '' })), /a cover from createCover/);
   assert.match(createMockup(cover, { kind: 'flat', background: '#123456' }).svg, /fill="#123456"/);
+  // A title typed on more lines than the card takes has its last lines joined, not cut off.
+  const lines = createCover({ title: 'One\nTwo\nThree\nFour\nFive', style: 'minimal', seed: 's' });
+  const card = createMockup(lines, { kind: 'card' }).svg;
+  assert.match(card, />Four Five</);
+  assert.doesNotMatch(card, /…/);
 });
 
 test('mockups keep the cover’s language, have ids of their own per kind, and readable card text', async () => {

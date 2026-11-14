@@ -145,19 +145,35 @@ function trimOf(trim) {
  * @param {unknown} value @param {number} max
  */
 function paragraphsOf(value, max) {
+  /** @type {string[]} */
   const out = [];
   let room = max;
   for (const typed of String(value ?? '')
     .replace(/\r\n?|[\u2028\u2029]/g, '\n')
     .split(/\n\s*\n/)) {
-    if (room <= 0) break;
-    const para = cleanText(typed, room);
-    if (!para) continue;
+    if (!cleanText(typed, Infinity)) continue;
+    // (Text past the most it takes: the last of what's kept says so, "…", never a silent cut.)
+    if (room <= 0) {
+      if (out.length && !out[out.length - 1].endsWith('…')) out[out.length - 1] += '…';
+      break;
+    }
+    const para = clipped(typed, room);
     out.push(para);
+    if (para.endsWith('…') && !cleanText(typed, Infinity).endsWith('…')) break;
     // (In characters as cleanText counts them: an emoji is one.)
     room -= graphemes(para).length;
   }
   return out;
+}
+
+/**
+ * Text cleaned (cleanText) and cut to at most `max` characters, ending in "…" where it was cut.
+ * @param {unknown} value @param {number} max
+ */
+function clipped(value, max) {
+  const whole = cleanText(value, Infinity);
+  const kept = cleanText(value, max);
+  return kept.length < whole.length ? `${cleanText(value, Math.max(0, max - 1)).trimEnd()}…` : kept;
 }
 
 /**
@@ -205,7 +221,7 @@ export function createPrintCover(coverOptions = {}, print = /** @type {any} */ (
   const trimTop = b;
   const trimBottom = b + th * PX;
 
-  const hook = cleanText(print.hook, 200);
+  const hook = clipped(print.hook, 200);
   const blurb = paragraphsOf(print.blurb, 3000);
   const imprint = cleanText(print.imprint, 80);
   const uid = `pc${hashString(JSON.stringify([front.svg, tw, th, pages, thickness, bleed, hook, blurb, imprint, barcode])).toString(36)}`;

@@ -22,7 +22,7 @@ import {
   optionsForBook,
   genres,
 } from '../src/index.js';
-import { slug, fontEntries } from '../src/shared.js';
+import { slug, fontEntries, reserved, PALETTE_WORDS } from '../src/shared.js';
 import { px, formatSize, ownColours } from '../src/link.js';
 import { answerPayload } from '../src/mcp.js';
 
@@ -227,7 +227,8 @@ function dimensions() {
 function palette() {
   const custom = values.bg !== undefined || values.ink !== undefined || values.accent !== undefined;
   if (!custom) return values.palette;
-  if (values.palette !== undefined)
+  // (A palette left to the seed, auto or random, is no palette beside your own colours.)
+  if (values.palette !== undefined && !reserved(values.palette, PALETTE_WORDS))
     throw new Error('Use --palette or your own colours (--bg, --ink, --accent), not both');
   const accents = (values.accent ?? []).flatMap((a) => a.split(',')).filter((a) => a.trim());
   if (values.bg === undefined || values.ink === undefined || !accents.length) {

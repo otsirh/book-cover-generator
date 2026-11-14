@@ -75,6 +75,11 @@ const CANVAS_PIXELS =
   /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Mac/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
     ? 16_777_216
     : Infinity;
+/**
+ * The most pixels the PDF draws at a time: the canvas limit, and on desktops 64 million (a page
+ * strip of about 256 MB), so a big paperback is drawn in one go instead of in iPhone-sized strips.
+ */
+const PDF_PIXELS = Math.min(CANVAS_PIXELS, 67_108_864);
 /** Pixels per inch recorded in PNG and JPEG downloads, so print software sizes them right. */
 const DPI = 300;
 const STYLES = listStyles();
@@ -1373,10 +1378,10 @@ function syncCustomColors(colors) {
   });
   const ratio = contrast(five[0], five[1]);
   const note = $('contrast-note');
-  // Styles set text in black or white instead of a colour that reads badly (under 3:1).
+  // Covers draw in black or white ink instead of a colour that reads badly (under 3:1).
   note.textContent =
     ratio < 3
-      ? `Text on background: ${ratio.toFixed(1)}:1, too low. Covers use black or white text instead.`
+      ? `Text on background: ${ratio.toFixed(1)}:1, too low. Covers use black or white ink instead.`
       : `Text on background: ${ratio.toFixed(1)}:1${ratio < 4.5 ? ', fine for large text' : ''}.`;
   note.classList.toggle('warn', ratio < 3);
 }
@@ -2414,7 +2419,11 @@ function buildPrint() {
       try {
         const print = printCoverOf(d, settings, false);
         pdf.textContent = 'Drawing the PDF…';
-        const blob = await svgToPdf(print.svg, { bleed: print.inches.bleed, title: oneLine(d.title) });
+        const blob = await svgToPdf(print.svg, {
+          bleed: print.inches.bleed,
+          title: oneLine(d.title),
+          maxPixels: PDF_PIXELS,
+        });
         downloadBlob(blob, `${slug(d.title)}-paperback-${settings.trim}.pdf`);
         toast(
           `Saved the print PDF · ${print.inches.width.toFixed(3).replace(/\.?0+$/, '')} × ${print.inches.height} in at ${DPI} dpi`,

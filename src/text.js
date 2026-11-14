@@ -876,11 +876,12 @@ export function fitText(text, opts) {
   const minSize = defaultMinSize(maxSize, opts.minSize);
 
   // Line breaks in the text stay (the lines always break there); other whitespace is a space.
-  let str = String(text ?? '')
+  // (More typed lines than it may have: the last ones joined, as spaces, into the last it may.)
+  const given = String(text ?? '')
     .split(LINE_BREAK)
     .map((line) => line.replace(BREAKING_SPACE, ' ').trim())
-    .filter(Boolean)
-    .join('\n');
+    .filter(Boolean);
+  let str = [...given.slice(0, maxLines - 1), given.slice(maxLines - 1).join(' ')].filter(Boolean).join('\n');
   if (opts.upper) str = toUpper(str, opts.lang || undefined);
   const base = { ...spec, lineHeight, cap, above: 0, below: DESCENT };
   if (!str) return { ...base, lines: [], size: 0, width: 0, height: 0, truncated: false };

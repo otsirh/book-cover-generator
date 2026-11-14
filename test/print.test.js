@@ -163,6 +163,11 @@ test('a blurb too long for the back is cut with an ellipsis, at 8 pt', () => {
   assert.equal(body[0].size, 10.7, 'at 8 pt (10.7 px)');
   assert.match(body[body.length - 1].text, /…$/);
   assertBackText(print, 'long blurb');
+  // A hook past its 200 characters ends in an ellipsis too, not mid-word.
+  const hooked = textBoxes(createPrintCover(book, { pages: 100, hook: 'word '.repeat(60) }).svg).filter(
+    (b) => !b.moved,
+  );
+  assert.match(hooked.map((b) => b.text).join(' '), /word…/);
   // A short one is set at 12 pt, its paragraphs kept apart.
   const short = textBoxes(createPrintCover(book, { pages: 100, blurb: 'One.\n\n\nTwo.' }).svg).filter((b) => !b.moved);
   assert.deepEqual(

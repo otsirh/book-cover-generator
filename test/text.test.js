@@ -278,7 +278,7 @@ test('line breaks in the text always break lines, and typed lines stay whole whi
   assert.deepEqual(fitText('Salt and\nStatic', { ...opts, upper: true }).lines, ['SALT AND', 'STATIC']);
 });
 
-test('fitText keeps to maxLines, even for text typed on more lines', () => {
+test('fitText keeps to maxLines, even for text typed on more lines: the surplus lines are joined, not cut', () => {
   const fit = fitText('One\nTwo\nThree', {
     font: FONTS.serif,
     maxWidth: 400,
@@ -286,8 +286,17 @@ test('fitText keeps to maxLines, even for text typed on more lines', () => {
     maxHeight: 400,
     maxLines: 1,
   });
-  assert.equal(fit.lines.length, 1);
-  assert.ok(fit.truncated);
+  assert.deepEqual(fit.lines, ['One Two Three']);
+  assert.equal(fit.truncated, false);
+  // (The first lines keep their breaks; the last it may have takes the rest.)
+  const two = fitText('One\nTwo\nThree', {
+    font: FONTS.serif,
+    maxWidth: 400,
+    maxSize: 40,
+    maxHeight: 400,
+    maxLines: 2,
+  });
+  assert.deepEqual(two.lines, ['One', 'Two Three']);
 });
 
 test('wrapText: a unit broken to the end, its last letter wider than the line, never repeats the line before it', async () => {

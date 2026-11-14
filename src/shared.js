@@ -43,8 +43,14 @@ export function idFor(given, entries) {
   if (exact) return exact.id;
   const key = fold(given);
   if (!key) return undefined;
+  /** @param {string} k */
+  const joined = (k) => k.replaceAll(' ', '');
   return (
-    list.find((e) => fold(e.id) === key)?.id ?? list.find((e) => typeof e.name === 'string' && fold(e.name) === key)?.id
+    list.find((e) => fold(e.id) === key)?.id ??
+    list.find((e) => typeof e.name === 'string' && fold(e.name) === key)?.id ??
+    // (Or typed without its spaces: OldStyle, BigLetter.)
+    list.find((e) => joined(fold(e.id)) === joined(key))?.id ??
+    list.find((e) => typeof e.name === 'string' && joined(fold(e.name)) === joined(key))?.id
   );
 }
 

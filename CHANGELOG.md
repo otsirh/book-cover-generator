@@ -19,6 +19,12 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 
+- A title typed on more lines than a place takes has its last lines joined instead of shrunk and cut off (the card, square and story mockups, and their link-preview images, cut a fifth line).
+- A blurb or hook too long for its limit ends in an ellipsis, not silently mid-word.
+- `--palette auto` or `random` beside your own colours in the CLI is no longer refused as a conflict, as in links and MCP.
+- A style, palette, genre or font typed without its spaces (`BigLetter`, `retrosun`) is found everywhere.
+- The app's PDF export draws a big paperback in one go on desktops, instead of in the strips an iPhone needs.
+- The app's contrast note says a colour too faint for text is drawn in black or white ink, as it is.
 - Link previews of a design show its picture on X and other sites whose crawlers honour `robots.txt`, which kept them from the image.
 - A PNG cover that fits is drawn at its size, to the pixel (600 × 1000 came as 597 × 995), and a PNG mockup shows the cover as sharp as it's shown (a story's cover was drawn smaller and enlarged).
 - The HTTP API answers a HEAD from the cache, as its GET, and a parameter it doesn't read (`&utm_source=…`) no longer draws a cover again.

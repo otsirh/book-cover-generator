@@ -217,28 +217,38 @@ function optionsOf(args) {
 export function catalog() {
   return {
     version,
-    styles: listStyles().map(({ id, name, group, description, genres: suits, variants }) => ({
-      id,
-      name,
-      group,
-      description,
-      genres: suits,
-      variants: variants.map((v) => ({ name: v.name, values: v.values.map((x) => x.value) })),
-    })),
-    palettes: palettes.map(({ id, name, bg, ink, accents, dark }) => ({
-      id,
-      name,
-      bg,
-      ink,
-      accents: [...accents],
-      dark: !!dark,
-    })),
+    styles: styleList(),
+    palettes: paletteList(),
     genres: genres.map(({ id, name }) => ({ id, name })),
     fonts: fontEntries(),
     formats: Object.fromEntries(Object.entries(formats).map(([id, size]) => [id, [...size]])),
     sizeLimits: { ...sizeLimits },
     mockups: [...mockupKinds],
   };
+}
+
+/** The styles as the catalog lists them (with their genres and the pins they take). */
+function styleList() {
+  return listStyles().map(({ id, name, group, description, genres: suits, variants }) => ({
+    id,
+    name,
+    group,
+    description,
+    genres: suits,
+    variants: variants.map((v) => ({ name: v.name, values: v.values.map((x) => x.value) })),
+  }));
+}
+
+/** The palettes as the catalog lists them. */
+function paletteList() {
+  return palettes.map(({ id, name, bg, ink, accents, dark }) => ({
+    id,
+    name,
+    bg,
+    ink,
+    accents: [...accents],
+    dark: !!dark,
+  }));
 }
 
 /** Text for a tool's answer. @param {string} body */
@@ -256,7 +266,7 @@ function callTool(tool, args, ctx) {
       const genreId = genre ? idFor(genre, genres) : null;
       if (genre && !genreId)
         throw new RangeError(`Unknown genre "${genre}". Available: ${genres.map((g) => g.id).join(', ')}`);
-      const styles = catalog().styles.filter((s) => !genreId || s.genres.includes(genreId));
+      const styles = styleList().filter((s) => !genreId || s.genres.includes(genreId));
       const lines = styles.map((s) => {
         const pins = s.variants.map((v) => `${v.name}: ${v.values.join(', ')}`).join('; ');
         return `- ${s.id} (${s.name}, ${s.group}): ${s.description} Genres: ${s.genres.join(', ') || 'none'}.${pins ? ` Pins: ${pins}.` : ''}`;
@@ -264,7 +274,7 @@ function callTool(tool, args, ctx) {
       return { content: [text(`${styles.length} styles:\n${lines.join('\n')}`)], structuredContent: { styles } };
     }
     if (tool === 'list_palettes') {
-      const listed = catalog().palettes;
+      const listed = paletteList();
       const lines = listed.map(
         (p) =>
           `- ${p.id} (${p.name}, ${p.dark ? 'dark' : 'light'}): ${p.bg} background, ${p.ink} text, ${p.accents.join(' ')}`,

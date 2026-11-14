@@ -128,6 +128,22 @@ test('your own colours, a format and a size', async () => {
   );
   assert.equal(custom.code, 0);
   assert.match(custom.stdout, /fill="#0b132b"/);
+  // --palette auto or random beside your own colours is no conflict: your colours are used.
+  const random = await cli(
+    'Bright',
+    '--bg',
+    '0b132b',
+    '--ink',
+    'f8f9fa',
+    '--accent',
+    'ff6b6b',
+    '-p',
+    'random',
+    '-s',
+    'minimal',
+  );
+  assert.equal(random.code, 0, random.stderr);
+  assert.match(random.stdout, /fill="#0b132b"/);
   const ebook = await cli('T', '--format', 'ebook', '--width', '1600');
   assert.match(ebook.stdout, /^<svg[^>]*width="1600" height="2560"/);
   const square = await cli('T', '--format', 'square');
