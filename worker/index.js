@@ -52,8 +52,9 @@ const COMMON = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Expose-Headers': 'X-Cover-Style, X-Cover-Palette, X-Cover-Version',
   'Cross-Origin-Resource-Policy': 'cross-origin',
-  'X-Content-Type-Options': 'nosniff',
-  'Strict-Transport-Security': 'max-age=63072000; includeSubDomains; preload',
+  // (The site's own: one policy for every answer.)
+  'X-Content-Type-Options': SITE_HEADERS['X-Content-Type-Options'],
+  'Strict-Transport-Security': SITE_HEADERS['Strict-Transport-Security'],
 };
 
 /**
@@ -591,11 +592,11 @@ function cacheKey(request, deployment) {
 /** The largest body the MCP endpoint reads, in bytes. */
 const MCP_MAX_BODY = 1_000_000;
 
-/** Headers of the MCP endpoint's answers: any page or client may call it. */
+/** Headers of the MCP endpoint's answers (COMMON's, but for embedding): any page or client may call it. */
 const MCP_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'X-Content-Type-Options': 'nosniff',
-  'Strict-Transport-Security': 'max-age=63072000; includeSubDomains; preload',
+  'Access-Control-Allow-Origin': COMMON['Access-Control-Allow-Origin'],
+  'X-Content-Type-Options': COMMON['X-Content-Type-Options'],
+  'Strict-Transport-Security': COMMON['Strict-Transport-Security'],
 };
 
 /**

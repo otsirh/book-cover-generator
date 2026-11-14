@@ -55,7 +55,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - The app's contrast note says a colour too faint for text is drawn in black or white ink, as it is.
 - Link previews of a design show its picture on X and other sites whose crawlers honour `robots.txt`, which kept them from the image.
 - A PNG cover that fits is drawn at its size, to the pixel (600 × 1000 came as 597 × 995), and a PNG mockup shows the cover as sharp as it's shown (a story's cover was drawn smaller and enlarged).
-- The HTTP API answers a HEAD from the cache, as its GET, and a parameter it doesn't read (`&utm_source=…`) no longer draws a cover again.
+- The HTTP API answers a HEAD from the cache, as its GET, and a parameter that isn't one of the API's (`&utm_source=…`) no longer draws a cover again.
 - `parseBookList` reads only its own column names: a `constructor` or `__proto__` column is ignored like any other unknown one.
 - `create_mockup`'s image link holds its line as the mockup draws it (at most 80 characters).
 - The HTTP API takes one to three accents for your own colours, as a link's palette holds (four or more gave links that drew nothing), and the links `/api/cover.json` and the MCP server write keep the language a query gave (`lang=tr`), so they draw the same capitals.

@@ -914,6 +914,23 @@ export function fitText(text, opts) {
     return heightOf(lines, size, l) + (descent ? l.below * size : 0) <= maxHeight;
   };
 
+  /** The fit of these lines at this size, as every way of fitting returns it. */
+  const finish = (lines, size, truncated = false) => {
+    const measure = (s) => measureText(s, size, spec);
+    const l = layoutOf(lines);
+    return {
+      ...base,
+      lineHeight: l.pitch,
+      above: l.above,
+      below: l.below,
+      lines,
+      size,
+      width: Math.max(...lines.map(measure)),
+      height: heightOf(lines, size, l),
+      truncated,
+    };
+  };
+
   const tokens = tokenizeLines(str);
   // One long word that would come out smaller than `hyphenate` px: split it once, with a
   // hyphen near the middle, if that sets it clearly larger on two lines.
@@ -934,33 +951,8 @@ export function fitText(text, opts) {
     const l = layoutOf(lines);
     const size = Math.min(maxSize, maxWidth / perPx, maxHeight / (l.above + cap + l.pitch + (descent ? l.below : 0)));
     if (!(size > plain.size * 1.15)) return plain;
-    return {
-      ...base,
-      lineHeight: l.pitch,
-      above: l.above,
-      below: l.below,
-      lines,
-      size,
-      width: Math.max(...lines.map((line) => measureText(line, size, spec))),
-      height: heightOf(lines, size, l),
-      truncated: false,
-    };
+    return finish(lines, size);
   }
-  const finish = (lines, size, truncated = false) => {
-    const measure = (s) => measureText(s, size, spec);
-    const l = layoutOf(lines);
-    return {
-      ...base,
-      lineHeight: l.pitch,
-      above: l.above,
-      below: l.below,
-      lines,
-      size,
-      width: Math.max(...lines.map(measure)),
-      height: heightOf(lines, size, l),
-      truncated,
-    };
-  };
 
   // Text typed on several lines may keep those lines whole, shrinking rather than wrapping inside
   // one, while that costs little: at least TYPED_SHARE of the size wrapping gives. (Wrapping
