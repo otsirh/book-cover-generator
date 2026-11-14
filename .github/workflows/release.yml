@@ -146,6 +146,17 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/mcp-publisher
+      # (npm takes a while to show a version it has just taken, and the registry checks that npm has
+      # it: 1.13.0's first try was refused with a 404.)
+      - name: Wait until npm shows the version
+        run: |
+          version=$(jq -r .version server.json)
+          for _ in $(seq 1 30); do
+            [ "$(npm view "book-cover-generator@$version" version 2>/dev/null)" = "$version" ] && exit 0
+            sleep 10
+          done
+          echo "npm doesn't show book-cover-generator@$version after 5 minutes" >&2
+          exit 1
       - run: ./mcp-publisher login github-oidc
       - run: ./mcp-publisher publish server.json
 
