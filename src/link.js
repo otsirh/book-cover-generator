@@ -309,10 +309,18 @@ export function sixDigits(c) {
   return c;
 }
 
-/** A design's pins as a link holds them (sorted by name, so the same pins make the same link). @param {Record<string, string>} pins */
+/** A pin's name or value a link can hold: letters and digits, from a letter. */
+const PIN_PART = /^[a-z][a-z0-9]*$/i;
+
+/**
+ * A design's pins as a link holds them (sorted by name, so the same pins make the same link).
+ * (Only those it can hold: a registered style's "tone-x" would make the whole link unreadable.)
+ * @param {Record<string, string>} pins
+ */
 export const variantOf = (pins) =>
   Object.keys(pins)
     .sort()
+    .filter((name) => PIN_PART.test(name) && PIN_PART.test(pins[name]))
     .map((name) => `${name}.${pins[name]}`)
     .join('-');
 

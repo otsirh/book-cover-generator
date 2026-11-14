@@ -84,6 +84,12 @@ test('unknown style or palette throws a helpful error', () => {
   const own = createCover({ title: 'x', style: 'minimal', palette: ' Custom-0B132B-f8f9fa-ff6b6b ' });
   assert.deepEqual(own.colors.accents.slice(0, 1), ['#ff6b6b']);
   assert.equal(own.colors.bg, '#0b132b');
+  // A seed is trimmed, as a link reads it: the cover's link draws this very cover.
+  assert.equal(
+    createCover({ title: 'Dune', style: 'bigtype', seed: '  s ' }).svg,
+    createCover({ title: 'Dune', style: 'bigtype', seed: 's' }).svg,
+  );
+  assert.equal(createCover({ title: 'Dune', seed: '  s ' }).seed, 's');
   // A style's name is found typed without its spaces too.
   assert.equal(createCover({ title: 'x', style: 'BigLetter' }).style, 'typographic');
   assert.equal(createCover({ title: 'x', style: 'retrosun' }).style, 'retro');

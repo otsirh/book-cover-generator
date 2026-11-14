@@ -815,9 +815,13 @@ test('a pin of a registered style named in capitals stays in the link, as links 
     name: 'Camel test',
     group: 'Test',
     description: 'A test style.',
-    variants: { bigSky: { values: { yes: 'Yes', noWay: 'No way' } } },
+    variants: {
+      bigSky: { values: { yes: 'Yes', noWay: 'No way' } },
+      'tone-x': { values: { 'a-b': 'A-B', c: 'C' } },
+    },
     render: (/** @type {any} */ c) =>
-      `<rect width="${c.W}" height="${c.H}" fill="${c.choose('bigSky', ['yes', 'noWay']) === 'yes' ? c.p.bg : c.p.ink}"/>`,
+      `<rect width="${c.W}" height="${c.H}" fill="${c.choose('bigSky', ['yes', 'noWay']) === 'yes' ? c.p.bg : c.p.ink}"/>` +
+      `<g data-tone="${c.choose('tone-x', ['a-b', 'c'])}"/>`,
   });
   try {
     const options = { title: 'T', style: 'camel-test', seed: 's', variants: { bigSky: 'noWay' } };
@@ -825,6 +829,11 @@ test('a pin of a registered style named in capitals stays in the link, as links 
     assert.equal(new URLSearchParams(linkOf(options, cover)).get('variant'), 'bigsky.noway');
     // …which draws that pin again.
     assert.deepEqual(createCover(optionsFromLink(linkOf(options, cover))).variants, cover.variants);
+    // A pin a link can't hold ("tone-x") is left out of it, and the link is still read.
+    const odd = { ...options, variants: { bigSky: 'noWay', 'tone-x': 'a-b' } };
+    const link = linkOf(odd, createCover(odd));
+    assert.equal(new URLSearchParams(link).get('variant'), 'bigsky.noway');
+    assert.doesNotThrow(() => optionsFromLink(new URLSearchParams(link)));
   } finally {
     unregisterStyle('camel-test');
   }

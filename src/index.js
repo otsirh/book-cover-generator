@@ -464,8 +464,9 @@ function resolveText(options) {
   const title = cleanText(options.title, 300, { breaks: true }) || 'Untitled';
   const author = cleanText(options.author, 200);
   // (A line break in the title doesn't change the seed it makes: same words, same artwork.)
-  const seed =
-    options.seed == null || options.seed === '' ? `${title.replace(/\n/g, ' ')}␟${author}` : String(options.seed);
+  // (A seed as a link reads it: trimmed, so the cover's link draws this very cover.)
+  const given = typeof options.seed === 'string' ? options.seed.trim() : options.seed;
+  const seed = given == null || given === '' ? `${title.replace(/\n/g, ' ')}␟${author}` : String(given);
   return { title, author, seed, styleId: resolveStyle(options.style, createRng(`${seed}|style`), options.genre) };
 }
 

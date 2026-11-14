@@ -335,7 +335,10 @@ export interface CoverOptions {
    * `'auto'` (default; picked from the seed).
    */
   palette?: PaletteId | 'random' | 'auto' | CustomPalette | (string & {});
-  /** Controls every random choice. Defaults to the title and author (`Cover.seed` says which seed was used). */
+  /**
+   * Controls every random choice (text is trimmed, as a link reads it). Defaults to the title and
+   * author (`Cover.seed` says which seed was used).
+   */
   seed?: string | number;
   /** Width in px, 50–10000. Default 600, or `height ÷ 1.5` when only a height is given (the paperback's 2:3). */
   width?: number;
@@ -495,7 +498,8 @@ export interface CoverStyle {
   genres?: readonly string[];
   /**
    * The choices `render` makes with `ctx.choose(name, values)` that people can pin, with labels:
-   * `{ scene: { label: 'Scene', values: { city: 'City', forest: 'Forest' } } }`.
+   * `{ scene: { label: 'Scene', values: { city: 'City', forest: 'Forest' } } }`. A link carries
+   * a pin whose name and value are letters and digits, starting with a letter (`scene`, `forest2`).
    */
   variants?: Readonly<Record<string, { label?: string; values: Readonly<Record<string, string>> }>>;
   /** Return SVG markup without the outer `<svg>` element. */

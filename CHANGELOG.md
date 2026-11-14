@@ -23,6 +23,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 
+- A seed is trimmed, as a link reads it, so a cover's link draws that very cover (`seed: '  s '` is `s`).
+- A link leaves out a registered style's pin it can't hold (a name or value other than letters and digits) instead of becoming unreadable.
 - Print settings kept with a paper the trim isn't printed on open on white paper, not on an error.
 - A word too long for its line is broken so that no line starts or ends with a space, and, inside a word already broken, a closing mark (`?`, `»`) stays with its word; a word that fits whole is never split for it, and a web address breaks after its dots and slashes.
 - Print settings kept from an older version with a page count the trim no longer takes open on the default count, not on an error. The page field is marked wrong only when the error is about pages.
