@@ -123,12 +123,15 @@ export function pageRange(trim, paper = 'white') {
   return [least, fewer === undefined ? most : Math.min(most, fewer)];
 }
 
-/** @param {unknown} pages @param {string} paper */
-function checkPages(pages, paper) {
-  const [min, most] = printLimits.pages[/** @type {keyof typeof paperTypes} */ (paper)];
+/**
+ * The page count, if it's one the paper takes (or `range`, a trim's on it, which `at` names).
+ * @param {unknown} pages @param {string} paper @param {readonly [number, number]} [range] @param {string} [at]
+ */
+function checkPages(pages, paper, range, at = '') {
+  const [min, most] = range ?? printLimits.pages[/** @type {keyof typeof paperTypes} */ (paper)];
   if (typeof pages !== 'number' || !Number.isInteger(pages) || pages < min || pages > most) {
     throw new RangeError(
-      `pages must be a whole number from ${min} to ${most} on ${paper} paper, got ${JSON.stringify(pages)}`,
+      `pages must be a whole number from ${min} to ${most} on ${paper} paper${at}, got ${JSON.stringify(pages)}`,
     );
   }
   return pages;
@@ -212,13 +215,19 @@ export function createPrintCover(coverOptions = {}, print = /** @type {any} */ (
   if (!print || typeof print !== 'object') throw new TypeError('createPrintCover: pass the print options, with pages');
   const [tw, th] = trimOf(print.trim ?? '6x9');
   const paper = paperOf(print.paper ?? 'white');
-  const pages = checkPages(print.pages, paper);
-  // (Some of the largest trims take fewer pages, or not every paper.)
+  // (Some of the largest trims take fewer pages, or not every paper: the trim's range is the one
+  // a count is checked against, and named.)
   const range = pageRange([tw, th], paper);
   if (!range) throw new RangeError(`${paper} paper isn't printed at ${tw} × ${th} in`);
-  if (pages > range[1]) {
-    throw new RangeError(`A ${tw} × ${th} in book on ${paper} paper has at most ${range[1]} pages, got ${pages}`);
+  const capped = range[1] < printLimits.pages[paper][1];
+  if (capped && Number.isInteger(print.pages) && /** @type {number} */ (print.pages) > range[1]) {
+    // ("An 8.5 × 11 in book": a or an, as the number is read.)
+    const article = /^(8|11|18)/.test(String(tw)) ? 'An' : 'A';
+    throw new RangeError(
+      `${article} ${tw} × ${th} in book on ${paper} paper has at most ${range[1]} pages, got ${print.pages}`,
+    );
   }
+  const pages = checkPages(print.pages, paper, range, capped ? ` at ${tw} × ${th} in` : '');
   const thickness = print.pageThickness == null ? paperTypes[paper] : positive(print.pageThickness, 'pageThickness');
   const bleed = print.bleed == null ? 0.125 : print.bleed === 0 ? 0 : positive(print.bleed, 'bleed');
   if (bleed > 0.5) throw new RangeError(`bleed must be at most 0.5 in, got ${bleed}`);

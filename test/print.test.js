@@ -429,8 +429,15 @@ test('KDP’s trims, and the largest of them take fewer pages (and not every pap
   assert.ok(createPrintCover(big, { trim: '8.5x11', pages: 590 }));
   assert.throws(
     () => createPrintCover(big, { trim: '8.5x11', pages: 591 }),
-    /8\.5 × 11 in book on white paper has at most 590 pages/,
+    /^RangeError: An 8\.5 × 11 in book on white paper has at most 590 pages/,
   );
+  // The trim's range is the one named, whatever the count: 900 is past it too, not just the paper's.
+  assert.throws(() => createPrintCover(big, { trim: '8.5x11', pages: 900 }), /has at most 590 pages, got 900/);
+  assert.throws(
+    () => createPrintCover(big, { trim: '8.5x11', pages: 10 }),
+    /from 24 to 590 on white paper at 8\.5 × 11 in, got 10/,
+  );
+  assert.throws(() => createPrintCover(big, { trim: '8.27x11.69', paper: 'color', pages: 900 }), /isn't printed at/);
   assert.throws(() => createPrintCover(big, { trim: [8.5, 8.5], pages: 560, paper: 'cream' }), /at most 550/);
   assert.throws(
     () => createPrintCover(big, { trim: '8.27x11.69', pages: 100, paper: 'color' }),

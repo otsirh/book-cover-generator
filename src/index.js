@@ -159,14 +159,18 @@ function pinnedVariants(given, style, strict = true) {
 }
 
 /**
- * Pins by lower-cased name, with values as strings (empty ones left out).
+ * Pins by lower-cased name, with values as strings, both trimmed (empty ones left out).
  * @param {object} given
+ * @returns {Map<string, string>}
  */
 const pinsByName = (given) =>
   new Map(
     Object.entries(given)
-      .filter(([, value]) => value != null && value !== '')
-      .map(([name, value]) => [name.toLowerCase(), String(value)]),
+      .map(
+        ([name, value]) =>
+          /** @type {[string, string]} */ ([name.trim().toLowerCase(), value == null ? '' : String(value).trim()]),
+      )
+      .filter(([, value]) => value !== ''),
   );
 
 /**
@@ -442,12 +446,14 @@ const HANGUL = /\p{Script=Hangul}/u;
 /**
  * The cover's language: the one given, else Japanese for text with kana and Korean for text
  * with Hangul (so shared Chinese characters get those countries' glyphs), else none.
- * @param {unknown} lang @param {string} text
+ * @param {unknown} given @param {string} text
  */
-function resolveLang(lang, text) {
+function resolveLang(given, text) {
+  // (Trimmed, as a link reads it.)
+  const lang = typeof given === 'string' ? given.trim() : given;
   if (lang != null && lang !== '') {
     if (typeof lang !== 'string' || !LANG_TAG.test(lang)) {
-      throw new RangeError(`lang must be a language tag such as "ja" or "zh-Hant", got ${JSON.stringify(lang)}`);
+      throw new RangeError(`lang must be a language tag such as "ja" or "zh-Hant", got ${JSON.stringify(given)}`);
     }
     return lang;
   }

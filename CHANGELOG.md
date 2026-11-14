@@ -23,6 +23,9 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 
+- A page count past what the trim takes names the trim's limit first time (8.5 × 11 in: 900 pages says "at most 590", not "up to 828"), and "An 8.5 × 11 in book" reads right.
+- The MCP server refuses an object or a list given as a text argument instead of drawing "[object Object]", reads `texture` written as text ("true", "1") as links do, and takes a blank genre in `list_styles` as none.
+- A pin of a registered style named in capitals survives a link (it's read back in any case), and pin values and language tags are trimmed, as links read them.
 - A seed is trimmed, as a link reads it, so a cover's link draws that very cover (`seed: '  s '` is `s`).
 - A link leaves out a registered style's pin it can't hold (a name or value other than letters and digits) instead of becoming unreadable.
 - Print settings kept with a paper the trim isn't printed on open on white paper, not on an error.

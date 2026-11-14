@@ -158,8 +158,11 @@ export function pinsOf(variant, offered) {
   /** @type {Record<string, string>} */
   const pins = {};
   for (const pair of variant ? variant.split('-') : []) {
-    const [name, value] = pair.split('.');
-    if (offered.some((v) => v.name === name && v.values.some((x) => x.value === value))) pins[name] = value;
+    const [name, value] = pair.split('.').map((part) => part.toLowerCase());
+    // (In any case, as a link writes it: a registered style's Tone.Cool is read as tone.cool.)
+    const own = offered.find((v) => v.name.toLowerCase() === name);
+    const pick = own?.values.find((x) => x.value.toLowerCase() === value);
+    if (own && pick) pins[own.name] = pick.value;
   }
   return pins;
 }

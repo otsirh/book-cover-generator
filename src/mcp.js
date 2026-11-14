@@ -174,9 +174,18 @@ function queryFrom(args) {
     'lang',
   ]) {
     const value = args[key];
+    // (Text or a number: an object or a list would be drawn as "[object Object]" or "A,B".)
+    if (value !== null && typeof value === 'object') {
+      throw new TypeError(`${key} is text, not ${Array.isArray(value) ? 'a list' : 'an object'}`);
+    }
     if (value != null && value !== '') q.set(key, String(value));
   }
-  if (typeof args.texture === 'boolean') q.set('texture', args.texture ? '1' : '0');
+  // (true or false, or written so: "true", "1", "on" and the like, as links and lists take it.)
+  const texture = typeof args.texture === 'string' ? args.texture.trim().toLowerCase() : args.texture;
+  if (texture === true || ['true', '1', 'on', 'yes'].includes(/** @type {string} */ (texture))) q.set('texture', '1');
+  else if (texture === false || ['false', '0', 'off', 'no'].includes(/** @type {string} */ (texture))) {
+    q.set('texture', '0');
+  } else if (texture != null && texture !== '') throw new TypeError('texture is true or false');
   return q;
 }
 
@@ -262,7 +271,8 @@ function callTool(tool, args, ctx) {
   const base = ctx.base ?? SITE;
   try {
     if (tool === 'list_styles') {
-      const genre = typeof args.genre === 'string' && args.genre ? args.genre : null;
+      // (A blank genre is none, as everywhere: every style.)
+      const genre = typeof args.genre === 'string' && args.genre.trim() ? args.genre : null;
       const genreId = genre ? idFor(genre, genres) : null;
       if (genre && !genreId)
         throw new RangeError(`Unknown genre "${genre}". Available: ${genres.map((g) => g.id).join(', ')}`);

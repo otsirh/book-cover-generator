@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { handleMessage } from '../src/mcp.js';
 import { optionsFromLink } from '../src/link.js';
-import { createCover, createMockup, version } from '../src/index.js';
+import { createCover, createMockup, listStyles, version } from '../src/index.js';
 import worker from '../worker/index.js';
 
 /** @param {string} method @param {unknown} [params] @param {object} [ctx] */
@@ -144,6 +144,22 @@ test('create_mockup, the lists, and errors the assistant can fix', () => {
   for (const genre of ["children's", 'Childrens', 'thriller and crime']) {
     assert.equal(call('tools/call', { name: 'list_styles', arguments: { genre } }).result.isError, undefined, genre);
   }
+  // A blank genre is none: every style.
+  const all = call('tools/call', { name: 'list_styles', arguments: { genre: ' ' } }).result;
+  assert.equal(all.isError, undefined);
+  assert.equal(all.structuredContent.styles.length, listStyles().length);
+  // Text arguments are text: an object or a list is refused, not drawn as "[object Object]".
+  for (const author of [{ first: 'Frank' }, ['A', 'B']]) {
+    const refused = call('tools/call', { name: 'create_cover', arguments: { title: 'Dune', author } }).result;
+    assert.equal(refused.isError, true);
+    assert.match(refused.content[0].text, /author is text, not an? (object|list)/);
+  }
+  // texture written as text is read as links read it; anything else is refused.
+  const grain = (/** @type {unknown} */ texture) =>
+    call('tools/call', { name: 'create_cover', arguments: { title: 'Dune', seed: 's', texture } }).result;
+  assert.match(grain('true').structuredContent.editUrl, /texture=1/);
+  assert.match(grain('0').structuredContent.editUrl, /texture=0/);
+  assert.equal(grain('maybe').isError, true);
   const styles = call('tools/call', { name: 'list_styles', arguments: { genre: 'Horror' } }).result;
   assert.deepEqual(
     styles.structuredContent.styles.map((/** @type {any} */ s) => s.id),

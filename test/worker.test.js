@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import worker, { api } from '../worker/index.js';
 import { handleMessage } from '../src/mcp.js';
 import { optionsFromLink } from '../src/link.js';
-import { createCover, createMockup, version } from '../src/index.js';
+import { createCover, createMockup, listStyles, version } from '../src/index.js';
 
 const get = (/** @type {string} */ path, method = 'GET') =>
   api(new Request(`https://covers.example${path}`, { method }));
@@ -485,7 +485,6 @@ test('a design’s link (/?title=…) gets its own link preview; the site’s he
   // A link with pins but no style: the style the seed picks, with the pins it takes, as the app
   // opens it (and its card says that style).
   const { wholeDesign, readDesign, designOptions, lastValues } = await import('../src/link.js');
-  const { listStyles } = await import('../src/index.js');
   for (const seed of ['a', 'b', 'c', 'd', 'e']) {
     const query = `title=A&variant=letter.outline&seed=${seed}`;
     const design = wholeDesign(readDesign(lastValues(new URLSearchParams(query))));
@@ -605,7 +604,7 @@ test('the API describes itself: what a query draws, the catalog, and OpenAPI', a
   assert.equal((await ask('/api/cover.json?title=x', 'HEAD')).body, '');
 
   const catalog = (await ask('/api/catalog.json')).body;
-  const { listStyles, palettes, genres, mockupKinds } = await import('../src/index.js');
+  const { palettes, genres, mockupKinds } = await import('../src/index.js');
   assert.deepEqual(
     catalog.styles.map((/** @type {{ id: string }} */ s) => s.id),
     listStyles().map((s) => s.id),
@@ -829,6 +828,10 @@ test('a pin of a registered style named in capitals stays in the link, as links 
     assert.equal(new URLSearchParams(linkOf(options, cover)).get('variant'), 'bigsky.noway');
     // …which draws that pin again.
     assert.deepEqual(createCover(optionsFromLink(linkOf(options, cover))).variants, cover.variants);
+    // A pin named in capitals is read back in any case, as the style names it.
+    const { pinsOf } = await import('../src/link.js');
+    const offered = listStyles().find((s) => s.id === 'camel-test')?.variants ?? [];
+    assert.deepEqual(pinsOf('BigSky.NoWay', offered), { bigSky: 'noWay' });
     // A pin a link can't hold ("tone-x") is left out of it, and the link is still read.
     const odd = { ...options, variants: { bigSky: 'noWay', 'tone-x': 'a-b' } };
     const link = linkOf(odd, createCover(odd));

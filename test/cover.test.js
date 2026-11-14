@@ -84,6 +84,12 @@ test('unknown style or palette throws a helpful error', () => {
   const own = createCover({ title: 'x', style: 'minimal', palette: ' Custom-0B132B-f8f9fa-ff6b6b ' });
   assert.deepEqual(own.colors.accents.slice(0, 1), ['#ff6b6b']);
   assert.equal(own.colors.bg, '#0b132b');
+  // A language tag and a pin's value are trimmed too, as a link reads them.
+  assert.equal(createCover({ title: 'x', lang: ' tr ' }).lang, 'tr');
+  assert.equal(
+    createCover({ title: 'x', style: 'silhouette', variants: { scene: ' forest ' } }).variants.scene,
+    'forest',
+  );
   // A seed is trimmed, as a link reads it: the cover's link draws this very cover.
   assert.equal(
     createCover({ title: 'Dune', style: 'bigtype', seed: '  s ' }).svg,
