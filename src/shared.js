@@ -165,6 +165,8 @@ export function scaleWithin(w, h, most, wanted, { round = Math.round, step = 0 }
     const at = (/** @type {number} */ k) => Number((k * step).toFixed(places));
     let k = Math.floor(best / step + 1e-9);
     while (k > 0 && !fits(at(k))) k--;
+    // (Sides rounded down can take a step past the square root: the largest that fits, then.)
+    while (at(k + 1) <= wanted && fits(at(k + 1))) k++;
     return Math.max(at(k), 0);
   }
   let s = best;

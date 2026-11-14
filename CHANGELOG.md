@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
+- Many covers saves JPEGs too, as KDP takes eBook covers.
+- `createCover`'s `palette` takes your own colours as a link writes them (`custom-0b132b-f8f9fa-ff6b6b`), so the CLI's `--palette` and a book list's palette column take a value copied from a link.
 - `printLimits.trimPages`: the most pages at the named trims that take fewer (8.5 × 11 in: 590 on white paper), by trim and paper, as `createPrintCover` checks them. The app's page-count field keeps to them. (KDP states no such limits for a trim of your own.)
 - **The HTTP API describes itself**: `/api/cover.json` says what a query draws (the style, palette, colours, seed, size and pins it came to, its link with every choice written out, and its SVG, PNG, edit and share URLs), `/api/catalog.json` lists every style, palette, genre, font, format and mockup, and `/api/openapi.json` describes the API as OpenAPI 3.1.
 - **The MCP server shows what it drew**: the hosted server (`/mcp`) answers `create_cover` and `create_mockup` with the picture (a PNG up to 480 px wide), so the assistant can see the cover and your client can show it; every server adds a link to the PNG (`pngUrl`).
@@ -20,6 +22,9 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 
+- A word too long for its line is never cut so that a closing mark (`?`, `»`) starts the next line or an opening one ends this one, and no line starts or ends with a space (the blurb, titles in narrow boxes).
+- Print settings kept from an older version with a page count the trim no longer takes open on the default count, not on an error. The page field is marked wrong only when the error is about pages.
+- An export scale on an iPhone is the largest that fits its canvas (it could come out a step smaller).
 - A link preview's fallback picture (the redirect to the site's own image) carries the API's usual headers, so a page on another site that fetches it follows it.
 - The app's contrast note shows the ratio rounded down, so a colour just under the 3:1 limit never reads "3.0:1, too low".
 - `registerPalette` refuses an id a link reads as your own colours (`custom-rrggbb-…`), which no link could choose.

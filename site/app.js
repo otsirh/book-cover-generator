@@ -2162,7 +2162,9 @@ async function downloadMany() {
         else {
           // The chosen scale, within what this book's own size allows (10,000 px, the device's canvas).
           const scale = Math.min(chosen, maxScaleOf(cover.width, cover.height));
-          const blob = await rasterize(cover.svg, { scale, dpi: DPI });
+          // (JPEG as the main download makes it for KDP's eBooks.)
+          const type = format === 'jpeg' ? 'image/jpeg' : 'image/png';
+          const blob = await rasterize(cover.svg, { scale, dpi: DPI, type, quality: 0.93 });
           files.push({ name: uniqueName(base, extensionOf(blob) ?? 'png', taken), data: blob });
         }
       } catch (err) {
@@ -2239,9 +2241,13 @@ function savedPrint() {
     for (const key of PRINT_FIELDS) {
       if (typeof saved?.[key] === typeof PRINT_DEFAULTS[key]) /** @type {any} */ (out)[key] = saved[key];
     }
-    // (A page count the paper doesn't take, from an older version say: the default's.)
-    const [least, most] = printLimits.pages[/** @type {keyof typeof printLimits.pages} */ (out.paper)] ?? [0, 0];
-    if (!Number.isInteger(out.pages) || out.pages < least || out.pages > most) out.pages = PRINT_DEFAULTS.pages;
+    // (A page count the paper or the trim doesn't take, from an older version say: the default's.)
+    const paper = /** @type {keyof typeof printLimits.pages} */ (out.paper);
+    const [least, most] = printLimits.pages[paper] ?? [0, 0];
+    const trimMost = printLimits.trimPages[out.trim]?.[paper] ?? most;
+    if (!Number.isInteger(out.pages) || out.pages < least || out.pages > Math.min(most, trimMost)) {
+      out.pages = PRINT_DEFAULTS.pages;
+    }
   } catch {
     // Storage blocked, or something else there: the defaults.
   }
@@ -2381,8 +2387,9 @@ function renderPrint() {
     // (Settings it can't draw are never kept: the next visit opens on the last that it could.)
     preview.removeAttribute('src');
     $('print-size').textContent = err instanceof Error ? err.message : String(err);
-    // (The field says what's wrong: the status line under it describes it.)
+    // (The field says what's wrong, when it's the page count: the status line describes it.)
     if (/pages/.test(String(err))) field('print-pages').setAttribute('aria-invalid', 'true');
+    else field('print-pages').removeAttribute('aria-invalid');
   }
 }
 

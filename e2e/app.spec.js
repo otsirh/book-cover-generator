@@ -1673,10 +1673,41 @@ test('many covers: a list in, a preview, and a ZIP of one design for every book'
   expect([...unzip(await readFile(/** @type {string} */ (await partial.path()))).keys()]).toEqual(['1-good.svg']);
   await expect(page.locator('#toast')).toContainText('1 couldn’t be made');
   await expect(page.locator('#many-failed-list li')).toHaveText([/^2\. Bad: .*nope/]);
+  // JPEG too, as KDP takes eBook covers.
+  await page.locator('#many-list').fill('Dune\nEmma');
+  await page.locator('#many-format').selectOption('jpeg');
+  const [jpegs] = await Promise.all([page.waitForEvent('download'), page.locator('#many-download').click()]);
+  const pictures = unzip(await readFile(/** @type {string} */ (await jpegs.path())));
+  expect([...pictures.keys()]).toEqual(['1-dune.jpg', '2-emma.jpg']);
+  for (const jpeg of pictures.values()) expect([...jpeg.subarray(0, 3)]).toEqual([0xff, 0xd8, 0xff]);
   // None: no file, and an alert says so.
   await page.locator('#many-list').fill('title,style\nBad,nope');
   await page.locator('#many-download').click();
   await expect(page.locator('#alert-text')).toContainText('None of the books could be made');
+});
+
+test('print settings kept from an older version that the trim no longer takes open on the default count', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('book-cover-generator:print', JSON.stringify({ trim: '8.5x11', paper: 'white', pages: 700 }));
+  });
+  await page.goto('/#title=The%20Lighthouse%20Keeper&style=artdeco&seed=p');
+  await ready(page);
+  await page.locator('#print summary').click();
+  await expect(page.locator('#print-trim')).toHaveValue('8.5x11');
+  await expect(page.locator('#print-pages')).not.toHaveValue('700');
+  await expect(page.locator('#print-preview')).toHaveAttribute('src', /^data:image\/svg\+xml/);
+  await expect(page.locator('#print-pages')).not.toHaveAttribute('aria-invalid');
+  // A count the trim doesn't take marks the field; another kind of error, made by a paper the
+  // trim isn't printed on, doesn't.
+  await page.locator('#print-trim').selectOption('8.27x11.69');
+  await page.locator('#print-paper').selectOption('premium-color');
+  await page.locator('#print-pages').fill('600');
+  await expect(page.locator('#print-pages')).toHaveAttribute('aria-invalid', 'true');
+  await page.locator('#print-paper').selectOption('color');
+  await expect(page.locator('#print-size')).toContainText("isn't printed at");
+  await expect(page.locator('#print-pages')).not.toHaveAttribute('aria-invalid');
 });
 
 test('a paperback for print: the whole cover, sized from the trim and pages, as a PDF', async ({ page }) => {

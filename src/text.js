@@ -525,6 +525,27 @@ function addToken(tokens, text, space) {
 const append = (line, token) => (line ? line + (token.space ? ' ' : '') + token.text : token.text);
 
 /**
+ * Whether a unit too wide for its line may be cut before `chars[k]` (the piece on this line
+ * starting at `start`): never so that closing punctuation starts the next line, or opening
+ * punctuation ends this one (a unit is joined across a space just to keep them with their word:
+ * « … », Quoi ?). The space at a cut is the break's.
+ * @param {string[]} chars @param {number} start @param {number} k
+ */
+const mayCut = (chars, start, k) =>
+  !NO_BREAK_BEFORE.test(
+    chars
+      .slice(k, k + 2)
+      .join('')
+      .replace(/^ +/, ''),
+  ) &&
+  !NO_BREAK_AFTER.test(
+    chars
+      .slice(Math.max(start, k - 2), k)
+      .join('')
+      .replace(/ +$/, ''),
+  );
+
+/**
  * @param {Token[]} tokens
  * @param {number} maxWidth
  * @param {(s: string) => number} measure
@@ -611,6 +632,12 @@ function hardWrap(tokens, maxWidth, measure) {
     const hyphen = HYPHENABLE.test(token.text) ? '-' : '';
     let space = token.space;
     for (let start = 0; start < chars.length;) {
+      // (A space in a unit joined across one, « … » say, is a break between pieces, never a line.)
+      if (chars[start] === ' ') {
+        space = true;
+        start++;
+        continue;
+      }
       const piece = (/** @type {number} */ end) =>
         chars.slice(start, end).join('') + (end < chars.length ? hyphen : '');
       let end = start + 1;
@@ -623,13 +650,14 @@ function hardWrap(tokens, maxWidth, measure) {
           }
         }
       }
-      const text = piece(end);
-      if (!text.trim()) {
-        // (A space in a unit joined across one, « … » say, is a break between pieces, never a line.)
-        space = true;
-        start = end;
-        continue;
+      // (Never a closing mark starting the next piece, or an opening one ending this: cut earlier,
+      // if anywhere.)
+      if (end < chars.length && !mayCut(chars, start, end)) {
+        let k = end - 1;
+        while (k > start && !mayCut(chars, start, k)) k--;
+        if (k > start) end = k;
       }
+      const text = piece(end).replace(/ +$/, '');
       // (A hyphen that doesn't fit after the one letter that does: the letter alone.)
       const fitting = measure(text) > maxWidth && text.endsWith(hyphen) && hyphen ? text.slice(0, -1) : text;
       pieces.push({ text: fitting, space, hard });
@@ -697,9 +725,17 @@ export function wrapText(text, size, maxWidth, spec) {
           break;
         }
       }
-      lines.push(lead + chars.slice(0, cut).join(''));
+      // (Never a closing mark starting the next line, or an opening one ending this: cut earlier,
+      // if anywhere. The space at the cut is the break's.)
+      if (!mayCut(chars, 0, cut)) {
+        let k = cut - 1;
+        while (k > 0 && !mayCut(chars, 0, k)) k--;
+        if (k > 0) cut = k;
+      }
+      lines.push((lead + chars.slice(0, cut).join('')).replace(/ +$/, ''));
       lead = '';
       chars = chars.slice(cut);
+      while (chars[0] === ' ') chars = chars.slice(1);
     }
   }
   if (cur) lines.push(cur);

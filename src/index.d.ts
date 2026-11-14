@@ -319,7 +319,11 @@ export interface CoverOptions {
   style?: StyleId | 'random' | (string & {});
   /** With a random style, pick one that suits this genre (see `genres`). */
   genre?: GenreId | (string & {});
-  /** A palette id, a custom palette, or `'random'` / `'auto'` (default; picked from the seed). */
+  /**
+   * A palette id, a custom palette, your own colours as a link writes them
+   * (`'custom-0b132b-f8f9fa-ff6b6b'`: background, ink and one to three accents), or `'random'` /
+   * `'auto'` (default; picked from the seed).
+   */
   palette?: PaletteId | 'random' | 'auto' | CustomPalette | (string & {});
   /** Controls every random choice. Defaults to the title and author (`Cover.seed` says which seed was used). */
   seed?: string | number;

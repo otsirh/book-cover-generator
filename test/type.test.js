@@ -407,6 +407,23 @@ test('a stack keeps the lines a title was typed on', () => {
   assert.deepEqual(stackLines('Salt and Static'), ['Salt', 'and Static']);
   assert.deepEqual(stackLines('A Map of\nQuiet  Places'), ['A Map of', 'Quiet Places']);
 });
+test('a unit too wide for its line is never cut so that a closing mark starts a line, or a space ends one', async () => {
+  const { wrapText } = await import('../src/text.js');
+  assert.deepEqual(wrapText('! »', 8.6, 5, { font: FONTS.serif }), ['!', '»']);
+  const fit = fitText('« Donaudampfschifffahrtsgesellschaftskapitänswitwenrentenversicherung »', {
+    font: FONTS.serif,
+    maxWidth: 146,
+    maxSize: 40,
+    maxLines: 3,
+    maxHeight: 240,
+  });
+  for (const line of fit.lines) assert.doesNotMatch(line, /^[ »]|[ «]$/, line);
+  const blurb = wrapText('Wer kennt Rindfleischetikettierungsüberwachungsaufgabenübertragungsgesetz ?', 10.7, 260, {
+    font: FONTS.serif,
+  });
+  for (const line of blurb) assert.doesNotMatch(line, /^[ ?]|[ ]$/, line);
+});
+
 test('fitText in a box narrower than a letter at its smallest size sets one per line, cutting nothing that fits', () => {
   const fit = fitText('WWWW', { font: FONTS.serif, maxWidth: 8, maxHeight: 40, maxSize: 100 });
   assert.deepEqual(fit.lines, ['W', 'W', 'W', 'W']);

@@ -850,6 +850,10 @@ test('sizeOfFormat reads a format as links do: one they refuse is the paperback;
 
 test('scaleWithin: a scale whose rounded sides stay within the pixels, and the PNG’s suggestion is one it takes', async () => {
   const { scaleWithin } = await import('../src/shared.js');
+  // Sides rounded down can take a step past the square root: the largest that fits is found.
+  const up = scaleWithin(1203, 8685, 11_299_495, 1.72, { step: 0.01 });
+  assert.equal(up, 1.04);
+  assert.ok(Math.round(1203 * up) * Math.round(8685 * up) <= 11_299_495);
   const flat = scaleWithin(2048, 3008, 16_777_216, 2);
   assert.ok(Math.round(2048 * flat) * Math.round(3008 * flat) <= 16_777_216);
   const tall = scaleWithin(2413, 7239, 16_777_216, 1, { step: 0.01 });

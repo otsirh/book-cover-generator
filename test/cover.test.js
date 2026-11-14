@@ -80,6 +80,10 @@ test('custom palettes are accepted and validated', () => {
 
 test('unknown style or palette throws a helpful error', () => {
   assert.throws(() => createCover({ title: 'x', style: 'nope' }), /Unknown style "nope"/);
+  // Your own colours as a link writes them, as a CLI flag or a list's cell may carry them.
+  const own = createCover({ title: 'x', style: 'minimal', palette: ' Custom-0B132B-f8f9fa-ff6b6b ' });
+  assert.deepEqual(own.colors.accents.slice(0, 1), ['#ff6b6b']);
+  assert.equal(own.colors.bg, '#0b132b');
   // A style's name is found typed without its spaces too.
   assert.equal(createCover({ title: 'x', style: 'BigLetter' }).style, 'typographic');
   assert.equal(createCover({ title: 'x', style: 'retrosun' }).style, 'retro');

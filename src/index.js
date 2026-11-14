@@ -16,6 +16,7 @@ import {
   STYLE_WORDS,
   PALETTE_WORDS,
   CUSTOM_PALETTE,
+  customColors,
   LANG_TAG,
   sizeValue,
   shapeAt,
@@ -368,6 +369,10 @@ function resolvePalette(palette, rng, style) {
     // (None of the kind it prefers, with palettes registered: any.)
     return normalizePalette(rng.pick(pool.length ? pool : palettes));
   }
+  // (Your own colours as a link writes them, custom-rrggbb-…: a CLI flag or a list's cell may
+  // carry one copied from a link.)
+  const own = typeof palette === 'string' ? customColors(palette.trim().toLowerCase()) : null;
+  if (own) return normalizePalette({ bg: own[0], ink: own[1], accents: own.slice(2) });
   const id = idFor(palette, palettes);
   const found = palettes.find((p) => p.id === id);
   if (!found) throw new Error(`Unknown palette "${palette}". Available: ${palettes.map((p) => p.id).join(', ')}`);
