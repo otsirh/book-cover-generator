@@ -228,6 +228,15 @@ test('a quoted field may follow the space people type after a comma', () => {
   ]);
 });
 
+test('a first book named Title is a book, not a header', () => {
+  assert.deepEqual(parseBookList('Title\tAnn Lee\nDune\tFrank Herbert'), [
+    { title: 'Title', author: 'Ann Lee' },
+    { title: 'Dune', author: 'Frank Herbert' },
+  ]);
+  // (An export's header, of many columns most of which a list doesn't read, is still one.)
+  assert.deepEqual(parseBookList('Title,Authors,Contributors,ISBN/UID\nDune,Frank Herbert,,123'), [{ title: 'Dune' }]);
+});
+
 test('a plain list line of more than three parts keeps the rest in the subtitle', () => {
   assert.deepEqual(parseBookList('Dune | Frank Herbert | A Novel | Book One\nEmma\n'), [
     { title: 'Dune', author: 'Frank Herbert', subtitle: 'A Novel | Book One' },

@@ -2344,9 +2344,15 @@ function renderPrint() {
   if (!(/** @type {HTMLDetailsElement} */ ($('print')).open)) return;
   printColourMenus();
   const settings = printSettings();
-  // The page count the paper takes (standard colour 72 to 600…), for the field's arrows.
-  const range = printLimits.pages[/** @type {keyof typeof printLimits.pages} */ (settings.paper)];
-  if (range) [field('print-pages').min, field('print-pages').max] = range.map(String);
+  // The page count the paper takes (standard colour 72 to 600…), at most what the trim takes
+  // (8.5 × 11 in: 590 on white), for the field's arrows.
+  const paper = /** @type {keyof typeof printLimits.pages} */ (settings.paper);
+  const range = printLimits.pages[paper];
+  const most = printLimits.trimPages[settings.trim]?.[paper];
+  if (range) {
+    field('print-pages').min = String(range[0]);
+    field('print-pages').max = String(most ? Math.min(range[1], most) : range[1]);
+  }
   lastPrintKey = JSON.stringify({ design, settings });
   /** Keep the settings for the next visit (a page count it can't draw: the last that it could). @param {PrintSettings} kept */
   const keep = (kept) => {

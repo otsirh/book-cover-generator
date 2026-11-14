@@ -1716,6 +1716,12 @@ test('a paperback for print: the whole cover, sized from the trim and pages, as 
   await page.locator('#print-paper').selectOption('color');
   await expect(page.locator('#print-pages')).toHaveAttribute('min', '72');
   await expect(page.locator('#print-pages')).toHaveAttribute('max', '600');
+  // ...and the trim: 8.5 × 11 in takes at most 590 pages on white paper.
+  await page.locator('#print-paper').selectOption('white');
+  await page.locator('#print-trim').selectOption('8.5x11');
+  await expect(page.locator('#print-pages')).toHaveAttribute('max', '590');
+  await page.locator('#print-trim').selectOption('5.5x8.5');
+  await expect(page.locator('#print-pages')).toHaveAttribute('max', '828');
   await page.locator('#print-paper').selectOption('cream');
   await page.locator('#print-pages').fill('240');
   await expect(page.locator('#print-pages')).not.toHaveAttribute('aria-invalid');

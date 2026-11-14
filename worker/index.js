@@ -574,9 +574,10 @@ export const API_PARAMETERS = Object.freeze([
  */
 function cacheKey(request, deployment) {
   const url = new URL(request.url);
-  // (A repeated parameter's last value, as the API reads it: `title=A&title=Dune` is Dune's.)
+  // (Each parameter's last value, blanks left out, as the API reads them: `title=A&title=Dune` is
+  // Dune's answer, and `style=` is the answer without it.)
   const read = new URLSearchParams(
-    Object.entries(lastValues(url.searchParams)).filter(([name]) => name !== 'v' && API_PARAMETERS.includes(name)),
+    Object.entries(givenValues(url.searchParams)).filter(([name]) => name !== 'v' && API_PARAMETERS.includes(name)),
   );
   // (In any order, one design: sorted by name.)
   read.sort();

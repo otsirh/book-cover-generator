@@ -132,6 +132,11 @@ export declare const printLimits: Readonly<{
    * 8.25 × 8.25 and 8.27 × 11.69 a little fewer), which `createPrintCover` checks.
    */
   pages: Readonly<Record<PaperType, readonly [number, number]>>;
+  /**
+   * The most pages at the trims that take fewer than `pages` says, by trim (as `trimSizes` names
+   * it, such as `'8.5x11'`) and paper; `null` where the paper isn't offered at that trim.
+   */
+  trimPages: Readonly<Record<string, Readonly<Record<PaperType, number | null>>>>;
   /** A book with fewer pages has no text on its spine. */
   spineTextPages: number;
 }>;

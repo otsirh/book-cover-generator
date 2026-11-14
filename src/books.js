@@ -152,11 +152,17 @@ export function parseBookList(text) {
     // (Not a plain list's line: "Title, Volume One | Ann Lee" is a book, not a header.)
     const first = lines[0].line;
     const plain = LINE_SEPARATORS.some((sep) => sep !== '\t' && first.includes(sep));
+    // (A header names "title" and another column the list reads, or is a lone column, or names
+    // many (an export's: Goodreads, StoryGraph): "Title<tab>Ann Lee" is a book named Title.)
     const delimiter = plain
       ? undefined
-      : ['\t', ',', ';'].find((d) =>
-          (csvRows(first, d)[0] ?? []).some((name) => name.trim().toLowerCase() === 'title'),
-        );
+      : ['\t', ',', ';'].find((d) => {
+          const names = (csvRows(first, d)[0] ?? []).map((name) => name.trim().toLowerCase());
+          return (
+            names.includes('title') &&
+            (names.length === 1 || names.length >= 4 || names.some((n) => n !== 'title' && Object.hasOwn(COLUMNS, n)))
+          );
+        });
     if (delimiter) {
       const [names, ...rows] = csvRows(src, delimiter);
       books = rows.map((row) => optionsFrom(Object.fromEntries(names.map((name, i) => [name, row[i] ?? '']))));

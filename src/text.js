@@ -1015,14 +1015,20 @@ export function fitText(text, opts) {
   const widest = Math.max(...tokens.map((token) => measureText(token.text, size, spec)));
   const wordFits = (size * maxWidth) / widest;
   if (widest > maxWidth && wordFits >= size * WORD_FLOOR) size = wordFits * (1 - 1e-9);
+  // Even one character (or the ellipsis) wider than the box, a box far narrower than maxSize:
+  // smaller still, before the lines are broken and counted, so each fits it.
+  const widestChar = Math.max(
+    measureText('…', size, spec),
+    ...[...new Set(graphemes(str.replace(/\s+/g, '')))].map((ch) => measureText(ch, size, spec)),
+  );
+  if (widestChar > maxWidth) size = ((size * maxWidth) / widestChar) * (1 - 1e-9);
   const measure = (s) => measureText(s, size, spec);
   let lines = hardWrap(tokens, maxWidth, measure);
   const fitCount = Math.max(
     1,
     Math.min(maxLines, Math.floor((maxHeight / size - marks.above - cap - depth) / pitch + 1e-9) + 1),
   );
-  // (Even one character wider than the box at this size, a box far narrower than maxSize: smaller
-  // still, so every line fits it. Widths scale with the size.)
+  // (A last guard, as widths scale with the size: a line still over the box is drawn to fit it.)
   /** @param {string[]} set */
   const within = (set) => {
     const over = Math.max(...set.map(measure)) / maxWidth;

@@ -146,6 +146,13 @@ test('answers are kept at the edge, once per version', async () => {
       ctx,
     );
     assert.equal(await repeated.text(), drawn);
+    // So is one with a blank parameter, which the API reads as not given.
+    const blank = await worker.fetch(
+      new Request('https://covers.example/api/cover.svg?title=Kept&style=&font=%20'),
+      env,
+      ctx,
+    );
+    assert.equal(await blank.text(), drawn);
     await Promise.all(waiting);
     assert.equal(kept.size, 3);
   } finally {

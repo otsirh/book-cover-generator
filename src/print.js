@@ -74,6 +74,11 @@ export const printLimits = Object.freeze({
     color: Object.freeze([72, 600]),
     'premium-color': Object.freeze([24, 828]),
   }),
+  /**
+   * The most pages at the trims that take fewer than `pages` says (the widest and the A4), by trim
+   * (as `trimSizes` names it) and paper; null where the paper isn't offered at that trim.
+   */
+  trimPages: FEWER_PAGES,
   /** Below this many pages, the spine stays blank. */
   spineTextPages: 80,
 });

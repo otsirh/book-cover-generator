@@ -407,3 +407,9 @@ test('a stack keeps the lines a title was typed on', () => {
   assert.deepEqual(stackLines('Salt and Static'), ['Salt', 'and Static']);
   assert.deepEqual(stackLines('A Map of\nQuiet  Places'), ['A Map of', 'Quiet Places']);
 });
+test('fitText in a box narrower than a letter at its smallest size sets one per line, cutting nothing that fits', () => {
+  const fit = fitText('WWWW', { font: FONTS.serif, maxWidth: 8, maxHeight: 40, maxSize: 100 });
+  assert.deepEqual(fit.lines, ['W', 'W', 'W', 'W']);
+  assert.equal(fit.truncated, false);
+  assert.ok(fit.width <= 8 && fit.height <= 40, `${fit.width} × ${fit.height}`);
+});

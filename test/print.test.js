@@ -19,6 +19,11 @@ test('the spine is the page count times the paper, as KDP figures it', () => {
   assert.equal(spineWidth(320, 'cream'), 0.8);
   assert.equal(spineWidth(100, 'Premium Color'), 0.2347);
   assert.equal(spineWidth(100, 'premiumcolor'), 0.2347);
+  // The largest trims take fewer pages, as printLimits.trimPages says and createPrintCover checks.
+  assert.equal(printLimits.trimPages['8.5x11'].white, 590);
+  assert.equal(printLimits.trimPages['8.27x11.69'].color, null);
+  for (const trim of Object.keys(printLimits.trimPages)) assert.ok(Object.hasOwn(trimSizes, trim), trim);
+  assert.throws(() => createPrintCover({ title: 'x' }, { trim: '8.5x11', pages: 591 }), /at most 590 pages/);
   assert.deepEqual(Object.keys(paperTypes), ['white', 'cream', 'color', 'premium-color']);
   assert.throws(() => spineWidth(200, 'glossy'), /Unknown paper "glossy". Available: white, cream/);
   assert.throws(() => spineWidth(23), /pages must be a whole number from 24 to 828 on white paper, got 23/);
