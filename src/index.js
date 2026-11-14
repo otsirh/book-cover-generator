@@ -17,6 +17,7 @@ import {
   PALETTE_WORDS,
   CUSTOM_PALETTE,
   customColors,
+  pinKey,
   LANG_TAG,
   sizeValue,
   shapeAt,
@@ -167,8 +168,7 @@ const pinsByName = (given) =>
   new Map(
     Object.entries(given)
       .map(
-        ([name, value]) =>
-          /** @type {[string, string]} */ ([name.trim().toLowerCase(), value == null ? '' : String(value).trim()]),
+        ([name, value]) => /** @type {[string, string]} */ ([pinKey(name), value == null ? '' : String(value).trim()]),
       )
       .filter(([, value]) => value !== ''),
   );

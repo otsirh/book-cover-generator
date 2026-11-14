@@ -160,6 +160,25 @@ test('create_mockup, the lists, and errors the assistant can fix', () => {
   assert.match(grain('true').structuredContent.editUrl, /texture=1/);
   assert.match(grain('0').structuredContent.editUrl, /texture=0/);
   assert.equal(grain('maybe').isError, true);
+  assert.match(grain(1).structuredContent.editUrl, /texture=1/);
+  // A pin given with spaces is drawn and linked alike: the link draws the very cover described.
+  const pinned = call('tools/call', {
+    name: 'create_cover',
+    arguments: { title: 'Dune', style: 'silhouette', seed: 'x', variants: { ' scene': ' forest ' } },
+  }).result;
+  assert.deepEqual(pinned.structuredContent.variants, { scene: 'forest' });
+  assert.match(pinned.structuredContent.editUrl, /variant=scene\.forest/);
+  // A title of a number is a title; a seed, kind or line of another type is refused, not set aside.
+  assert.equal(call('tools/call', { name: 'create_cover', arguments: { title: 1984 } }).result.isError, undefined);
+  for (const [tool, args, message] of /** @type {const} */ ([
+    ['create_cover', { title: 'Dune', seed: { value: 'abc' } }, /seed is text or a number/],
+    ['create_mockup', { title: 'Dune', kind: ['card'] }, /kind is text/],
+    ['create_mockup', { title: 'Dune', text: { line: 'Out now' } }, /text is text/],
+  ]))
+    assert.match(call('tools/call', { name: tool, arguments: args }).result.content[0].text, message);
+  // svg written as text, as texture is.
+  const withSvg = call('tools/call', { name: 'create_cover', arguments: { title: 'Dune', svg: 'true' } }).result;
+  assert.match(withSvg.content.at(-1).text, /^<svg /);
   const styles = call('tools/call', { name: 'list_styles', arguments: { genre: 'Horror' } }).result;
   assert.deepEqual(
     styles.structuredContent.styles.map((/** @type {any} */ s) => s.id),

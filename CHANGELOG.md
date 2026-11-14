@@ -23,6 +23,9 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 
+- A pin given with spaces (`forest`) is drawn and written in the cover's link alike, so the MCP server's links draw the cover it describes.
+- The MCP server takes a title given as a number (1984), reads `texture` and `svg` as links read on and off (true or false, 1 or 0), and refuses a seed, kind or line of another type instead of setting it aside.
+- A design's link page is checked again on every visit, as the app's page and scripts are, so a page kept from before a deploy never meets newer scripts.
 - A page count past what the trim takes names the trim's limit first time (8.5 × 11 in: 900 pages says "at most 590", not "up to 828"), and "An 8.5 × 11 in book" reads right.
 - The MCP server refuses an object or a list given as a text argument instead of drawing "[object Object]", reads `texture` written as text ("true", "1") as links do, and takes a blank genre in `list_styles` as none.
 - A pin of a registered style named in capitals survives a link (it's read back in any case), and pin values and language tags are trimmed, as links read them.

@@ -18,6 +18,8 @@ import {
   customColors,
   decimal,
   shapeAt,
+  onOff,
+  pinKey,
 } from './shared.js';
 
 /** Line breaks as spaces (a single-line field: the cover spaces them). @param {unknown} v */
@@ -81,13 +83,8 @@ export const LINK = {
     }),
   /** The text's language, a tag such as tr or zh-Hant. @param {unknown} v */
   lang: (v) => oneOf(oneLine(v)?.trim(), (t) => t.length <= 35 && LANG_TAG.test(t)),
-  /** On or off: 1, 0, true or false, in any case. @param {unknown} v */
-  texture: (v) => {
-    const t = typeof v === 'string' ? v.trim().toLowerCase() : v;
-    if (t === true || t === '1' || t === 'true') return true;
-    if (t === false || t === '0' || t === 'false') return false;
-    return undefined;
-  },
+  /** On or off: 1, 0, true or false, in any case. */
+  texture: onOff,
 };
 
 /**
@@ -158,10 +155,10 @@ export function pinsOf(variant, offered) {
   /** @type {Record<string, string>} */
   const pins = {};
   for (const pair of variant ? variant.split('-') : []) {
-    const [name, value] = pair.split('.').map((part) => part.toLowerCase());
+    const [name, value] = pair.split('.').map(pinKey);
     // (In any case, as a link writes it: a registered style's Tone.Cool is read as tone.cool.)
-    const own = offered.find((v) => v.name.toLowerCase() === name);
-    const pick = own?.values.find((x) => x.value.toLowerCase() === value);
+    const own = offered.find((v) => pinKey(v.name) === name);
+    const pick = own?.values.find((x) => pinKey(x.value) === value);
     if (own && pick) pins[own.name] = pick.value;
   }
   return pins;
@@ -263,11 +260,12 @@ export function linkOf(options, cover) {
   const pinned = {};
   // (Names and values in lower case, as links hold them: the library reads them in any case.
   // Only a pin the cover took: a style the seed picked may not offer it, and then drew its own.)
+  // (Compared as createCover reads them, trimmed and in any case: pinKey.)
   for (const [given, value] of Object.entries(options.variants ?? {})) {
-    const name = given.toLowerCase();
-    const key = Object.keys(cover.variants).find((k) => k.toLowerCase() === name);
-    const drawn = key === undefined ? undefined : String(cover.variants[key]).toLowerCase();
-    if (drawn !== undefined && drawn === String(value).toLowerCase()) pinned[name] = drawn;
+    const name = pinKey(given);
+    const key = Object.keys(cover.variants).find((k) => pinKey(k) === name);
+    const drawn = key === undefined ? undefined : pinKey(cover.variants[key]);
+    if (drawn !== undefined && drawn === pinKey(value)) pinned[name] = drawn;
   }
   const own = options.palette && typeof options.palette === 'object' ? options.palette : null;
   const preset = Object.entries(formats).find(([, [w, h]]) => w === cover.width && h === cover.height);

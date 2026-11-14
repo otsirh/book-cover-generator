@@ -15,7 +15,7 @@ import {
 } from './index.js';
 import { optionsFromLink, linkOf, ownColours, namesPalette } from './link.js';
 import { mockupText } from './mockups.js';
-import { idFor, fontEntries } from './shared.js';
+import { idFor, fontEntries, onOff } from './shared.js';
 
 /** The site that draws covers from links, and edits them. */
 export const SITE = 'https://covers.otsirh.dev';
@@ -152,7 +152,13 @@ function tools(ctx) {
 }
 
 /** Whether the arguments give a seed (else the cover's comes from its title). @param {Record<string, unknown>} args */
-const seedGiven = (args) => typeof args.seed === 'number' || (typeof args.seed === 'string' && args.seed.trim() !== '');
+const seedGiven = (args) => {
+  // (Text or a number: any other seed would be set aside without a word, the cover drawn from its title.)
+  if (args.seed != null && typeof args.seed !== 'string' && typeof args.seed !== 'number') {
+    throw new TypeError('seed is text or a number');
+  }
+  return typeof args.seed === 'number' || (typeof args.seed === 'string' && args.seed.trim() !== '');
+};
 
 /** A tool's arguments as a link's query, read as the HTTP API reads one. @param {Record<string, unknown>} args */
 function queryFrom(args) {
@@ -180,12 +186,12 @@ function queryFrom(args) {
     }
     if (value != null && value !== '') q.set(key, String(value));
   }
-  // (true or false, or written so: "true", "1", "on" and the like, as links and lists take it.)
-  const texture = typeof args.texture === 'string' ? args.texture.trim().toLowerCase() : args.texture;
-  if (texture === true || ['true', '1', 'on', 'yes'].includes(/** @type {string} */ (texture))) q.set('texture', '1');
-  else if (texture === false || ['false', '0', 'off', 'no'].includes(/** @type {string} */ (texture))) {
-    q.set('texture', '0');
-  } else if (texture != null && texture !== '') throw new TypeError('texture is true or false');
+  // (On or off as links read it: true or false, 1 or 0, or written so.)
+  if (args.texture != null && args.texture !== '') {
+    const texture = onOff(args.texture);
+    if (texture === undefined) throw new TypeError('texture is true or false');
+    q.set('texture', texture ? '1' : '0');
+  }
   return q;
 }
 
@@ -295,7 +301,10 @@ function callTool(tool, args, ctx) {
       };
     }
     if (tool !== 'create_cover' && tool !== 'create_mockup') return null;
-    if (typeof args.title !== 'string' || !args.title.trim()) throw new TypeError('A cover needs a title');
+    // (A number is a title too: 1984.)
+    if (!((typeof args.title === 'string' && args.title.trim()) || typeof args.title === 'number')) {
+      throw new TypeError('A cover needs a title');
+    }
     const options = optionsOf(args);
     const cover = createCover(options);
     const link = linkOf(options, cover);
@@ -305,6 +314,10 @@ function callTool(tool, args, ctx) {
     let svg = cover.svg;
     let what = `"${cover.title.replace(/\n/g, ' ')}"${cover.author ? ` by ${cover.author}` : ''}`;
     if (tool === 'create_mockup') {
+      // (Text, or left out: any other kind or line would be set aside without a word.)
+      for (const key of ['kind', 'text']) {
+        if (args[key] != null && typeof args[key] !== 'string') throw new TypeError(`${key} is text`);
+      }
       const kind = typeof args.kind === 'string' && args.kind ? args.kind : 'book';
       // (As the mockup draws it, so its link is no longer than its picture's line.)
       const line = typeof args.text === 'string' ? mockupText(args.text) : '';
@@ -328,7 +341,7 @@ function callTool(tool, args, ctx) {
           (saved ? `\nSaved to ${saved}` : ''),
       ),
     ];
-    if (args.svg === true) content.push(text(svg));
+    if (onOff(args.svg) === true) content.push(text(svg));
     return {
       content,
       structuredContent: {

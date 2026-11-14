@@ -62,6 +62,24 @@ export function idFor(given, entries) {
 }
 
 /**
+ * On or off, as links and the MCP server read it: true or false, 1 or 0, or written so ("1",
+ * "true"), in any case; undefined for anything else. (Book lists read their cells more leniently.)
+ * @param {unknown} value
+ */
+export function onOff(value) {
+  const v = typeof value === 'string' ? value.trim().toLowerCase() : value;
+  if (v === true || v === 1 || v === '1' || v === 'true') return true;
+  if (v === false || v === 0 || v === '0' || v === 'false') return false;
+  return undefined;
+}
+
+/** A pin's name or value as every reader compares it: trimmed, in lower case. @param {unknown} v */
+export const pinKey = (v) =>
+  String(v ?? '')
+    .trim()
+    .toLowerCase();
+
+/**
  * The words that leave a choice to the seed, in any case and with spaces around: 'random' for a
  * style, and 'random' or 'auto' for a palette. Registering refuses them as ids, so every id stays
  * one that can be chosen.

@@ -552,7 +552,9 @@ export async function preview(request, env) {
   }
   const headers = new Headers(page.headers);
   for (const [k, v] of Object.entries(SITE_HEADERS)) if (!headers.has(k)) headers.set(k, v);
-  headers.set('Cache-Control', 'public, max-age=300');
+  // (Checked again on every visit, as the app's page and scripts are: a page kept from before a
+  // deploy would pair old markup with new scripts.)
+  headers.set('Cache-Control', 'no-cache');
   // (The page's own length, tag and cache state don't describe the page rewritten.)
   for (const header of ['Content-Length', 'ETag', 'Last-Modified', 'CF-Cache-Status']) headers.delete(header);
   return new Response(request.method === 'HEAD' ? null : html, { status: 200, headers });

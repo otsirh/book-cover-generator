@@ -456,6 +456,8 @@ test('a design’s link (/?title=…) gets its own link preview; the site’s he
     { waitUntil() {} },
   );
   assert.equal(res.status, 200);
+  // (Checked again on every visit, as the app's page and scripts are.)
+  assert.equal(res.headers.get('cache-control'), 'no-cache');
   const html = await res.text();
   // (The page's own title stays the app's: the design changes as soon as it opens.)
   assert.match(html, /<title>Book Cover Generator: covers from a title and an author<\/title>/);
