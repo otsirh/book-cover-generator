@@ -377,6 +377,9 @@ test(
     const fallback = await fetchPath(`/api/mockup.png?kind=card&preview=1&title=${encodeURIComponent('灯台守')}`);
     assert.equal(fallback.status, 302);
     assert.equal(fallback.headers.get('location'), 'https://covers.example/og.png');
+    // (With the headers every answer has: a page on another site fetching it follows it.)
+    assert.equal(fallback.headers.get('access-control-allow-origin'), '*');
+    assert.equal(fallback.headers.get('x-content-type-options'), 'nosniff');
     // (Kept, as the 422 is: the design's text won't draw any better next time.)
     assert.match(fallback.headers.get('cache-control') ?? '', /public/);
     // preview=0 (or empty) is off, as the API's other switches are: the refusal itself.

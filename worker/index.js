@@ -369,9 +369,11 @@ export async function png(request, env) {
   // (On as the API's other switches are: given, and not 0 or false.)
   if (!answer.ok && answer.status !== 405 && switchedOn(lastValues(url.searchParams).preview)) {
     // (Kept, as the 422 is, when the design's text can't be drawn: that answer won't change.)
+    // (With the headers every answer has: a page fetching it from another site follows it.)
     return new Response(null, {
       status: 302,
       headers: {
+        ...COMMON,
         Location: new URL('/og.png', url).href,
         ...(answer.status === 422 ? { 'Cache-Control': 'public, max-age=86400' } : {}),
       },

@@ -231,7 +231,8 @@ export function createPrintCover(coverOptions = {}, print = /** @type {any} */ (
 
   const hook = clipped(print.hook, 200).text;
   const blurb = paragraphsOf(print.blurb, 3000);
-  const imprint = cleanText(print.imprint, 80);
+  // (Cut as the hook and the blurb are, to its 80 characters, ending in "…".)
+  const imprint = clipped(print.imprint, 80).text;
   const uid = `pc${hashString(JSON.stringify([front.svg, tw, th, pages, thickness, bleed, hook, blurb, imprint, barcode])).toString(36)}`;
 
   // (The colour helpers read only the palette's colours.)

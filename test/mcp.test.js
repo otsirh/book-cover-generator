@@ -225,10 +225,10 @@ test('book-cover --mcp saves only an .svg, and never over a file of another kind
     await writeFile(join(dir, 'empty.svg'), '');
     // (Many comments and no SVG: read one by one, at once, not by a pattern that tries every split.)
     await writeFile(join(dir, 'comments.svg'), '<!---->'.repeat(73));
-    // An editor's SVG: a generator's comment, a DOCTYPE, and a licence longer than 512 bytes.
+    // An editor's SVG: a generator's comment, a DOCTYPE, and a licence running past its first 16 KB.
     await writeFile(
       join(dir, 'drawn.svg'),
-      `<?xml version="1.0"?>\n<!-- Generator: Adobe Illustrator -->\n<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd" [<!ENTITY ns "x">]>\n<!-- ${'licence '.repeat(100)} -->\n<svg xmlns="http://www.w3.org/2000/svg"/>`,
+      `<?xml version="1.0"?>\n<!-- Generator: Adobe Illustrator -->\n<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd" [<!ENTITY ns "x">]>\n<!-- ${'licence '.repeat(3000)} -->\n<svg xmlns="http://www.w3.org/2000/svg"/>`,
     );
     const child = spawn(process.execPath, [fileURLToPath(new URL('../bin/book-cover.js', import.meta.url)), '--mcp'], {
       cwd: dir,

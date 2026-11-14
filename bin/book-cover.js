@@ -472,7 +472,8 @@ function isSvgFile(file) {
   if (stat.size === 0) return true;
   const fd = openSync(file, 'r');
   try {
-    const start = Buffer.alloc(16384);
+    // (Its first MiB: an editor's licence comment or metadata before <svg> can run long.)
+    const start = Buffer.alloc(Math.min(stat.size, 1 << 20));
     const read = readSync(fd, start, 0, start.length, 0);
     // Past a byte order mark, then the XML declaration, processing instructions, comments and a
     // DOCTYPE (as editors write them), one by one: a pattern that tried every way to split a run of

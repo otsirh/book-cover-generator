@@ -1378,11 +1378,13 @@ function syncCustomColors(colors) {
   });
   const ratio = contrast(five[0], five[1]);
   const note = $('contrast-note');
-  // Covers draw in black or white ink instead of a colour that reads badly (under 3:1).
+  // Covers draw in black or white ink instead of a colour that reads badly (under 3:1). (The ratio
+  // shown rounded down, so it never reads as the limit it falls short of: 2.96 is 2.9, not 3.0.)
+  const shown = (Math.floor(ratio * 10) / 10).toFixed(1);
   note.textContent =
     ratio < 3
-      ? `Text on background: ${ratio.toFixed(1)}:1, too low. Covers use black or white ink instead.`
-      : `Text on background: ${ratio.toFixed(1)}:1${ratio < 4.5 ? ', fine for large text' : ''}.`;
+      ? `Text on background: ${shown}:1, too low. Covers use black or white ink instead.`
+      : `Text on background: ${shown}:1${ratio < 4.5 ? ', fine for large text' : ''}.`;
   note.classList.toggle('warn', ratio < 3);
 }
 
@@ -2372,7 +2374,9 @@ function renderPrint() {
     const inches = (/** @type {number} */ v) => v.toFixed(3).replace(/\.?0+$/, '');
     $('print-size').textContent =
       `Whole cover ${inches(width)} × ${inches(height)} in, spine ${inches(spine)} in` +
-      (print.spineText ? '' : ` (no spine text: ${settings.pages < 80 ? 'under 80 pages' : 'too thin to read'})`);
+      (print.spineText
+        ? ''
+        : ` (no spine text: ${settings.pages < printLimits.spineTextPages ? `under ${printLimits.spineTextPages} pages` : 'too thin to read'})`);
   } catch (err) {
     // (Settings it can't draw are never kept: the next visit opens on the last that it could.)
     preview.removeAttribute('src');

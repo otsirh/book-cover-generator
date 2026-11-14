@@ -186,6 +186,14 @@ test('a blurb too long for the back is cut with an ellipsis, at 8 pt', () => {
     imprint.map((b) => b.text),
     ['Hello…'],
   );
+  // So does an imprint past its 80 characters, on a back wide enough to show them all.
+  const longImprint =
+    'Lighthouse Press · an imprint of Very Long Publishing Group International, www.example-publisher.com/books';
+  const foot = textBoxes(
+    createPrintCover(book, { trim: '8.5x11', pages: 100, barcode: false, imprint: longImprint }).svg,
+  ).filter((b) => /Lighthouse/.test(b.text));
+  assert.equal(foot.length, 1);
+  assert.match(foot[0].text, /…$/);
   // A hook past its 200 characters ends in an ellipsis too, not mid-word.
   const hooked = textBoxes(createPrintCover(book, { pages: 100, hook: 'word '.repeat(60) }).svg).filter(
     (b) => !b.moved,

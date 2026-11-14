@@ -20,6 +20,12 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 
+- A link preview's fallback picture (the redirect to the site's own image) carries the API's usual headers, so a page on another site that fetches it follows it.
+- The app's contrast note shows the ratio rounded down, so a colour just under the 3:1 limit never reads "3.0:1, too low".
+- `registerPalette` refuses an id a link reads as your own colours (`custom-rrggbb-…`), which no link could choose.
+- A print cover's imprint past its 80 characters ends in "…", as the hook and the blurb do.
+- The local MCP server recognises an SVG whose comments or metadata run past its first 16 KB, and replaces it as asked.
+- The app's print panel says why the spine is blank from the library's own page limit.
 - Typewriter's rubber stamp never lands on the typed text: on a square or wide cover with a long block it goes below it, or is left off when there's no room.
 - The book mockup of a wide cover keeps its floor shadow on the picture (it was cut at the right edge).
 - A blank mockup kind is the book everywhere: in the library, MCP and the HTTP API.

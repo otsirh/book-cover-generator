@@ -123,7 +123,8 @@ test('palettes can be registered by id, and built-ins replaced only when asked',
   registerPalette({ id: 'nameless', bg: '#000000', ink: '#ffffff', accents: ['#ff0000'] });
   assert.equal(palettes.find((p) => p.id === 'nameless')?.name, 'nameless');
   assert.equal(unregisterPalette('nameless'), true);
-  for (const id of ['random', 'auto', 'custom', ' ', ' brand']) {
+  // (And an id a link reads as your own colours: one a link names could never be chosen.)
+  for (const id of ['random', 'auto', 'custom', ' ', ' brand', 'custom-0b132b-f8f9fa-ff6b6b']) {
     assert.throws(() => registerPalette({ id, bg: '#000', ink: '#fff', accents: ['#f00'] }), TypeError);
   }
   assert.throws(() => registerPalette({ id: 'bad', bg: 'black', ink: '#fff', accents: ['#f00'] }), /hex/);

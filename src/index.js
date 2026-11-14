@@ -9,7 +9,17 @@ import { palettes } from './palettes.js';
 import { TEXT_CONTRAST } from './styles/util.js';
 import { FONTS, cleanText, inLanguage, recordText } from './text.js';
 import { drawBadge } from './badge.js';
-import { idFor, fontEntries, reserved, STYLE_WORDS, PALETTE_WORDS, LANG_TAG, sizeValue, shapeAt } from './shared.js';
+import {
+  idFor,
+  fontEntries,
+  reserved,
+  STYLE_WORDS,
+  PALETTE_WORDS,
+  CUSTOM_PALETTE,
+  LANG_TAG,
+  sizeValue,
+  shapeAt,
+} from './shared.js';
 import { styleList, genreList, builtInGenres } from './styles/index.js';
 
 export { palettes } from './palettes.js';
@@ -268,8 +278,11 @@ export function registerPalette(palette, { replace = false } = {}) {
     throw new TypeError('registerPalette: a palette needs an `id` (a string without spaces at either end)');
   }
   const id = palette.id;
-  // ("custom" too: the app's links write your own colours as custom-….)
-  if (reserved(id, [...PALETTE_WORDS, 'custom'])) throw new TypeError(`registerPalette: "${id}" is reserved`);
+  // ("custom" too, and any id a link reads as your own colours, custom-rrggbb-…: one a link names
+  // could never be chosen.)
+  if (reserved(id, [...PALETTE_WORDS, 'custom']) || CUSTOM_PALETTE.test(id.trim().toLowerCase())) {
+    throw new TypeError(`registerPalette: "${id}" is reserved`);
+  }
   if (builtInPalettes.has(id) && !replace) {
     throw new Error(`registerPalette: "${id}" is a built-in palette; pass { replace: true } to replace it`);
   }
