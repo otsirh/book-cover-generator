@@ -299,6 +299,25 @@ test('fitText keeps to maxLines, even for text typed on more lines: the surplus 
   assert.deepEqual(two.lines, ['One', 'Two Three']);
 });
 
+test('fitText keeps to a box far narrower than its largest size, every line within the width', () => {
+  for (const [text, maxWidth] of /** @type {const} */ ([
+    ['INTERNATIONALIZATION « —', 20],
+    ['WWWWWWWW MMMMMMMM', 12],
+    ['漢字', 5],
+  ])) {
+    const fit = fitText(text, {
+      font: FONTS.garamond,
+      weight: 700,
+      maxWidth,
+      maxHeight: 73.6,
+      maxSize: 112.7,
+      maxLines: 3,
+    });
+    assert.ok(fit.width <= maxWidth + 1e-6, `${text}: ${fit.width} in ${maxWidth}`);
+    for (const line of fit.lines) assert.ok(measureText(line, fit.size, fit) <= maxWidth + 1e-6, `${text}: ${line}`);
+  }
+});
+
 test('fitText takes maxLines as a whole number from 1', () => {
   for (const maxLines of [0, -1, 1.5, NaN])
     assert.throws(() => fitText('A\nB', { maxWidth: 200, maxSize: 40, maxLines }), /maxLines/, String(maxLines));

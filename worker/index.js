@@ -20,6 +20,7 @@ import {
   wholeDesign,
   designOptions,
   lastValues,
+  givenValues,
   writeLink,
   variantOf,
   pinsOf,
@@ -160,7 +161,8 @@ function drawn(kind, q) {
 
 /** A mockup's options from a query: kind, text and background. @param {URLSearchParams} q */
 function mockupOptions(q) {
-  const read = lastValues(q);
+  // (A blank kind is no kind: the book, as a link's other blank choices are the default.)
+  const read = givenValues(q);
   const background = read.background?.trim();
   return {
     kind: /** @type {import('../src/index.js').MockupKind} */ (read.kind || 'book'),
@@ -464,8 +466,8 @@ async function drawPng(request, env, url, kind) {
  */
 function pngPlan(kind, q) {
   // (The last given, as links are read; in decimal, as sizes are: 0x1 isn't 1.)
-  const asked = lastValues(q).scale;
-  const given = asked === undefined || asked === '' ? null : decimal(asked);
+  const asked = givenValues(q).scale;
+  const given = asked === undefined ? null : decimal(asked);
   if (given !== null && !(given > 0 && given <= 4)) {
     throw new RangeError(`scale must be a number above 0, at most 4, got "${asked}"`);
   }

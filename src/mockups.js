@@ -2,7 +2,7 @@
 // for listings and cover reveals. Each is an SVG with the cover nested in it.
 
 import { n, mix, escapeXml, hashString, contrast, readable, isHex, shadowFilter, blurFilter } from './core.js';
-import { FONTS, fitText, drawText, textBottom, clipGraphemes } from './text.js';
+import { FONTS, fitText, drawText, textBottom, cleanText } from './text.js';
 import { idFor } from './shared.js';
 
 /** The kinds of mockup, with the size of each (or how it follows the cover's). */
@@ -38,17 +38,12 @@ const nest = (cover, x, y, w, h) =>
 const shadow = (id, blur, dy, opacity) => shadowFilter(id, 1, { blur, dy, opacity, margin: 0.3 });
 
 /**
- * A mockup's line as it draws it: on one line, at most 80 characters (cut between whole
- * characters: an emoji or accented letter is never split).
+ * A mockup's line as it draws it: cleaned as all the cover's text is (cleanText: on one line,
+ * control characters and what XML can't hold dropped, no-break spaces kept), at most 80
+ * characters, cut between whole characters.
  * @param {unknown} text
  */
-export const mockupText = (text) =>
-  clipGraphemes(
-    String(text ?? '')
-      .replace(/\s+/g, ' ')
-      .trim(),
-    80,
-  ).trim();
+export const mockupText = (text) => cleanText(text, 80);
 
 /**
  * The cover as a product or a social card.

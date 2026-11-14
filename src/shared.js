@@ -180,9 +180,11 @@ export const switchedOn = (value) => value != null && !/^(0|false)?$/i.test(valu
 
 /**
  * A number written in decimal (600, 1.5, 1e3), or NaN: not hex, binary or octal (0x258 isn't 600).
+ * (The pattern reads a run of digits one way only, so a long one that fails fails at once: it
+ * reads query values, before any rate limit.)
  * @param {string} raw
  */
-export const decimal = (raw) => (/^\s*[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?\s*$/i.test(raw) ? Number(raw) : NaN);
+export const decimal = (raw) => (/^\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?\s*$/i.test(raw) ? Number(raw) : NaN);
 
 /**
  * A size as the library reads one: a number as it is, text in decimal (0x258 isn't 600).

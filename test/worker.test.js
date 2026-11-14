@@ -156,6 +156,10 @@ test('answers are kept at the edge, once per version', async () => {
 test('mockups, errors, other methods, and what isn’t the API', async () => {
   const mock = /** @type {Response} */ (get('/api/mockup.svg?title=Dune&seed=s&kind=card&text=Out+now'));
   assert.equal(mock.status, 200);
+  // A blank kind is the default, the book, as a link's other blank choices are.
+  const blank = /** @type {Response} */ (get('/api/mockup.svg?title=Dune&seed=s&kind=%20'));
+  assert.equal(blank.status, 200);
+  assert.equal(await blank.text(), createMockup(createCover({ title: 'Dune', seed: 's' })).svg);
   assert.equal(
     await mock.text(),
     createMockup(createCover({ title: 'Dune', seed: 's' }), { kind: 'card', text: 'Out now' }).svg,
@@ -309,6 +313,8 @@ test(
     assert.equal(cover.headers.get('access-control-allow-origin'), '*');
     assert.deepEqual(await size(cover), [600, 900]);
     assert.deepEqual(await size(await fetchPath('/api/cover.png?title=Dune&scale=1.2&format=square')), [720, 720]);
+    // A blank scale is no scale: the cover at its size.
+    assert.deepEqual(await size(await fetchPath('/api/cover.png?title=Dune&scale=%20')), [600, 900]);
     // A cover that fits is drawn at its size, to the pixel.
     assert.deepEqual(await size(await fetchPath('/api/cover.png?title=Dune&width=600&height=1000')), [600, 1000]);
     assert.deepEqual(await size(await fetchPath('/api/mockup.png?title=Dune&kind=card')), [1200, 630]);
@@ -912,6 +918,21 @@ test('sizes and scales are read in decimal, as written (0x258 isn’t 600)', asy
     assert.throws(() => px('width', odd), /width must be a number/, odd);
   assert.ok(Number.isNaN(decimal('0x1')));
   assert.equal(/** @type {Response} */ (get('/api/cover.svg?title=Dune&width=0x258')).status, 400);
+  // Read in one pass: a long run of digits that isn't a number is refused at once (it was
+  // quadratic: 16,000 digits took a third of a second of the Worker's time).
+  for (const long of ['1'.repeat(20000) + 'x', `1.${'1'.repeat(20000)}x`, `1e${'1'.repeat(20000)}x`]) {
+    const start = performance.now();
+    assert.ok(Number.isNaN(decimal(long)));
+    assert.ok(performance.now() - start < 30, `${long.slice(0, 4)}…: ${(performance.now() - start).toFixed(0)} ms`);
+  }
+  for (const [raw, value] of /** @type {const} */ ([
+    ['1.', 1],
+    ['.5', 0.5],
+    ['-2.5E-1', -0.25],
+    [' 7 ', 7],
+  ]))
+    assert.equal(decimal(raw), value, raw);
+  for (const odd of ['.', '1e', 'e3', '1.2.3', '+']) assert.ok(Number.isNaN(decimal(odd)), odd);
 });
 
 test('the MCP server takes pins and colours as given, and says what’s wrong in the library’s terms', () => {

@@ -228,6 +228,13 @@ test('a quoted field may follow the space people type after a comma', () => {
   ]);
 });
 
+test('a plain list line of more than three parts keeps the rest in the subtitle', () => {
+  assert.deepEqual(parseBookList('Dune | Frank Herbert | A Novel | Book One\nEmma\n'), [
+    { title: 'Dune', author: 'Frank Herbert', subtitle: 'A Novel | Book One' },
+    { title: 'Emma' },
+  ]);
+});
+
 test('a plain list whose first book has a comma and the word Title is a list, not a header', () => {
   assert.deepEqual(parseBookList('Title, Volume One | Ann Lee\nSecond Book | Bo Ray\nThird | Cy\n'), [
     { title: 'Title, Volume One', author: 'Ann Lee' },

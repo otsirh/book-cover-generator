@@ -19,6 +19,11 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 
+- A blank mockup `kind` or PNG `scale` in the HTTP API is the default, as a link's other blank choices are, instead of a 400.
+- `fitText` keeps every line within the width even in a box far narrower than its largest size (a single letter could overflow it).
+- A plain book list's line of more than three parts keeps the rest in the subtitle instead of dropping it.
+- A mockup's line is cleaned as the cover's text is: a control character is a space, a no-break space stays.
+- A very long blurb or hook is cut without first splitting the whole of it into characters.
 - A blank style, font, palette, genre or language in a link (`style=%20`) is left to the seed by the HTTP API too, as the app reads it, instead of a 400.
 - The square and story cards keep a long author and line inside their margins (they could run off the bottom).
 - `fitText` refuses a `maxLines` that isn't a whole number from 1 (0 meant no limit).
@@ -89,6 +94,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Security
 
+- The HTTP API reads a number (`width`, `height`, `scale`) in one pass: a long run of digits that wasn't one took time that grew with its square (16,000 digits cost a third of a second of the server's time, before any rate limit).
 - The MCP server run locally (`book-cover --mcp`) saves a cover (`output`) only as an `.svg` file, never over a file that isn't an SVG and never through a link, so an assistant talked into a path can't replace or make other files.
 - Releases: the job that publishes to npm runs none of the repository's code; it publishes the package the checks passed, which is the one the GitHub release signs. JSR is checked and published with a pinned Deno instead of a package fetched at run time.
 

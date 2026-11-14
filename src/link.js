@@ -323,6 +323,14 @@ export const variantOf = (pins) =>
  */
 export const lastValues = (q) => /** @type {Record<string, string>} */ (Object.fromEntries(q));
 
+/**
+ * A query's values as the HTTP API reads them: each parameter's last, and a blank one (`kind=%20`)
+ * left out, as not given (as the app reads a link: the seed or the default chooses).
+ * @param {URLSearchParams} q
+ * @returns {Record<string, string>}
+ */
+export const givenValues = (q) => Object.fromEntries(Object.entries(lastValues(q)).filter(([, v]) => v.trim() !== ''));
+
 /** A size in px, as the CLI reads one (the library checks its range), else an error naming the parameter. @param {string} key @param {string} raw */
 export function px(key, raw) {
   const value = decimal(raw);
@@ -388,10 +396,10 @@ export function formatSize(format, width, height) {
  * @returns {import('./index.js').CoverOptions}
  */
 export function optionsFromLink(q) {
-  const v = lastValues(q);
-  /** A parameter's value, if it has one. @param {string} key */
   // (Blank is not given, as the app reads a link: `style=%20` leaves the style to the seed.)
-  const given = (key) => (v[key] != null && v[key].trim() !== '' ? v[key] : undefined);
+  const v = givenValues(q);
+  /** A parameter's value, if it has one. @param {string} key */
+  const given = (key) => (Object.hasOwn(v, key) ? v[key] : undefined);
   /** @type {Record<string, unknown>} */
   const o = {};
   for (const key of /** @type {const} */ (['title', 'author', 'subtitle', 'series', 'credit', 'badge', 'seed'])) {

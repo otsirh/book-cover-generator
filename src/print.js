@@ -7,6 +7,7 @@ import { escapeXml, filmGrain, hashString, isHex, n } from './core.js';
 import {
   FONTS,
   cleanText,
+  clipGraphemes,
   descentOf,
   withEllipsis,
   drawText,
@@ -172,10 +173,9 @@ function paragraphsOf(value, max) {
  */
 function clipped(value, max) {
   const whole = cleanText(value, Infinity);
-  if (whole.length <= max) return { text: whole, cut: false };
-  const chars = graphemes(whole);
-  if (chars.length <= max) return { text: whole, cut: false };
-  return { text: withEllipsis(chars.slice(0, Math.max(0, max - 1)).join('')), cut: true };
+  // (Segmented only as far as it's kept: a long file's blurb isn't split into characters whole.)
+  if (whole.length <= max || clipGraphemes(whole, max).length === whole.length) return { text: whole, cut: false };
+  return { text: withEllipsis(clipGraphemes(whole, Math.max(0, max - 1))), cut: true };
 }
 
 /**

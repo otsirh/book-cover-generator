@@ -1462,6 +1462,8 @@ test('mockups: every kind is a well-formed SVG with the cover in it, at its size
     );
     assert.ok(lowest <= m.height - 60, `${kind}: text down to ${lowest.toFixed(0)} of ${m.height}`);
   }
+  // The card's line is cleaned as the cover's text is: a control character is a space.
+  assert.match(createMockup(cover, { kind: 'card', text: 'Out\u0085now' }).svg, />Out now</);
   // A kind as the app's menu names it.
   assert.equal(createMockup(cover, { kind: 'E-reader' }).kind, 'ereader');
   // A title typed on more lines than the card takes has its last lines joined, not cut off.

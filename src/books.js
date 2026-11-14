@@ -163,8 +163,9 @@ export function parseBookList(text) {
     } else {
       books = lines.map(({ line }) => {
         const separator = LINE_SEPARATORS.find((sep) => line.includes(sep));
-        const [title, author, subtitle] = separator ? line.split(separator) : [line];
-        return optionsFrom({ title, author, subtitle });
+        const [title, author, ...rest] = separator ? line.split(separator) : [line];
+        // (Past the third part, the rest stays with the subtitle, as typed: never dropped.)
+        return optionsFrom({ title, author, subtitle: rest.join(separator) });
       });
     }
   }

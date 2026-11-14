@@ -1021,10 +1021,18 @@ export function fitText(text, opts) {
     1,
     Math.min(maxLines, Math.floor((maxHeight / size - marks.above - cap - depth) / pitch + 1e-9) + 1),
   );
+  // (Even one character wider than the box at this size, a box far narrower than maxSize: smaller
+  // still, so every line fits it. Widths scale with the size.)
+  /** @param {string[]} set */
+  const within = (set) => {
+    const over = Math.max(...set.map(measure)) / maxWidth;
+    return over > 1 ? (size / over) * (1 - 1e-9) : size;
+  };
   if (lines.length <= fitCount) {
     const whole = lines.length > 1 && opts.balance !== false && wrapGreedy(tokens, maxWidth, measure);
     const even = whole && balance(tokens, lines.length, maxWidth, measure);
-    return finish(even && fitsHeight(even, size) ? even : lines, size);
+    const set = even && fitsHeight(even, size) ? even : lines;
+    return finish(set, within(set));
   }
   lines = lines.slice(0, fitCount);
   const chars = graphemes(lines[fitCount - 1]);
@@ -1032,7 +1040,7 @@ export function fitText(text, opts) {
   const kept = withEllipsis(chars.join(''));
   // (Not even one letter and the ellipsis fit: the ellipsis alone.)
   lines[fitCount - 1] = measure(kept) <= maxWidth ? kept : '…';
-  return finish(lines, size, true);
+  return finish(lines, within(lines), true);
 }
 
 /**
