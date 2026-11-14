@@ -23,6 +23,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 
+- A page on another site can read the HTTP API's and the MCP endpoint's `Retry-After` after a 429, and a download's name, and the OpenAPI description of `/mcp` says it takes a batch and answers 400 and 405.
 - A seed cut to its 40 characters just after a space is trimmed again, so a design and the API's link of it are the same design (a kept design showed as not kept).
 - Keeping or removing a design writes the tray out once, not again for each way of fitting a full storage.
 - A pin given with spaces (`forest`) is drawn and written in the cover's link alike, so the MCP server's links draw the cover it describes.

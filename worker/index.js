@@ -50,7 +50,9 @@ export const SITE_HEADERS = {
 /** Headers every answer has: anyone may embed it, and it's never taken for anything but what it is. */
 const COMMON = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Expose-Headers': 'X-Cover-Style, X-Cover-Palette, X-Cover-Version',
+  // (What a page on another site may read: what was drawn, how long to wait after a 429, and a
+  // download's name.)
+  'Access-Control-Expose-Headers': 'X-Cover-Style, X-Cover-Palette, X-Cover-Version, Retry-After, Content-Disposition',
   'Cross-Origin-Resource-Policy': 'cross-origin',
   // (The site's own: one policy for every answer.)
   'X-Content-Type-Options': SITE_HEADERS['X-Content-Type-Options'],
@@ -597,6 +599,7 @@ const MCP_MAX_BODY = 1_000_000;
 /** Headers of the MCP endpoint's answers (COMMON's, but for embedding): any page or client may call it. */
 const MCP_HEADERS = {
   'Access-Control-Allow-Origin': COMMON['Access-Control-Allow-Origin'],
+  'Access-Control-Expose-Headers': 'Retry-After',
   'X-Content-Type-Options': COMMON['X-Content-Type-Options'],
   'Strict-Transport-Security': COMMON['Strict-Transport-Security'],
 };

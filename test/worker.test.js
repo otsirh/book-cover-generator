@@ -16,6 +16,9 @@ test('a cover from the query string: the same as the library draws', async () =>
   assert.equal(res.status, 200);
   assert.equal(res.headers.get('content-type'), 'image/svg+xml; charset=utf-8');
   assert.equal(res.headers.get('access-control-allow-origin'), '*');
+  // (A page on another site may read what was drawn, how long to wait after a 429, and a download's name.)
+  for (const name of ['X-Cover-Style', 'Retry-After', 'Content-Disposition'])
+    assert.ok(res.headers.get('access-control-expose-headers')?.includes(name), name);
   assert.equal(res.headers.get('x-cover-style'), 'retro');
   assert.match(res.headers.get('cache-control') ?? '', /max-age=86400/);
   const svg = await res.text();
@@ -618,6 +621,13 @@ test('the API describes itself: what a query draws, the catalog, and OpenAPI', a
 
   const spec = (await ask('/api/openapi.json')).body;
   assert.equal(spec.openapi, '3.1.0');
+  // The MCP endpoint as it answers: a message or a batch; a body that isn't JSON, another method.
+  const mcpPost = spec.paths['/mcp'].post;
+  assert.deepEqual(mcpPost.requestBody.content['application/json'].schema.oneOf, [
+    { type: 'object' },
+    { type: 'array' },
+  ]);
+  for (const status of ['200', '202', '400', '405', '413', '429']) assert.ok(mcpPost.responses[status], status);
   assert.equal(spec.info.version, version);
   assert.deepEqual(spec.servers, [{ url: 'https://covers.example' }]);
   for (const path of ['/api/cover.svg', '/api/cover.png', '/api/mockup.svg', '/api/mockup.png', '/api/cover.json'])

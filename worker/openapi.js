@@ -173,12 +173,18 @@ export function openapi(base) {
       '/mcp': {
         post: {
           summary: 'The Model Context Protocol server (Streamable HTTP, JSON answers, no sessions)',
-          requestBody: { required: true, content: { 'application/json': { schema: { type: 'object' } } } },
+          requestBody: {
+            required: true,
+            description: 'A JSON-RPC message, or a batch of them.',
+            content: { 'application/json': { schema: { oneOf: [{ type: 'object' }, { type: 'array' }] } } },
+          },
           responses: {
-            200: json('The JSON-RPC answer.'),
+            200: json('The JSON-RPC answer (a list of them, for a batch).'),
             202: { description: 'A notification, accepted.' },
+            400: json("A body that isn't JSON: a JSON-RPC parse error."),
+            405: refused('Only POST (and OPTIONS) is answered.'),
             413: json('The body is over 1 MB.'),
-            429: json('Too many requests this minute.'),
+            429: json('Too many requests this minute: wait (Retry-After).'),
           },
         },
       },
