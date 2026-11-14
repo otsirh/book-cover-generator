@@ -76,7 +76,8 @@ export const printLimits = Object.freeze({
   }),
   /**
    * The most pages at the trims that take fewer than `pages` says (the widest and the A4), by trim
-   * (as `trimSizes` names it) and paper; null where the paper isn't offered at that trim.
+   * (as `trimSizes` names it) and paper; null where the paper isn't offered at that trim. KDP
+   * states these for its named trims only: a trim of your own is held to `pages`.
    */
   trimPages: FEWER_PAGES,
   /** Below this many pages, the spine stays blank. */

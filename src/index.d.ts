@@ -134,7 +134,8 @@ export declare const printLimits: Readonly<{
   pages: Readonly<Record<PaperType, readonly [number, number]>>;
   /**
    * The most pages at the trims that take fewer than `pages` says, by trim (as `trimSizes` names
-   * it, such as `'8.5x11'`) and paper; `null` where the paper isn't offered at that trim.
+   * it, such as `'8.5x11'`) and paper; `null` where the paper isn't offered at that trim. KDP
+   * states these for its named trims only: a trim of your own is held to `pages`.
    */
   trimPages: Readonly<Record<string, Readonly<Record<PaperType, number | null>>>>;
   /** A book with fewer pages has no text on its spine. */

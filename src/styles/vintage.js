@@ -462,8 +462,15 @@ export const typewriter = {
     const sw = st.width + sp * 2;
     const shh = st.height + sp * 2;
     const scx = W * rng.float(0.5, 0.64);
-    const scy = H * rng.float(0.7, 0.78);
+    let scy = H * rng.float(0.7, 0.78);
     const ang = rng.float(-16, -6);
+    // Below the typed block, which runs long on a square or wide cover (never over the byline),
+    // and clear of the page number; with no room between them, no stamp.
+    const tilt = (Math.abs(ang) * Math.PI) / 180;
+    const half = (sw * Math.sin(tilt) + shh * Math.cos(tilt)) / 2 + 4 * u;
+    const clear = m * 0.25;
+    scy = Math.max(scy, y + clear + half);
+    if (scy + half > H - m * 1.2 - clear) return s;
     let stamp = rect(
       scx - sw / 2,
       scy - shh / 2,

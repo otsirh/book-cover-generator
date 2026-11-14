@@ -59,8 +59,12 @@ export const mockupText = (text) => cleanText(text, 80);
  * @returns {{ svg: string, width: number, height: number, coverScale: number, kind: MockupKind }}
  */
 export function createMockup(cover, { kind: named = 'book', background: given, text = '' } = {}) {
-  // (A kind in any case and spacing, as the library's other names: "E-reader" is ereader.)
-  const kind = idFor(named, KINDS) ?? (typeof named === 'string' ? named.trim() : named);
+  // (A kind in any case and spacing, as the library's other names: "E-reader" is ereader. A blank
+  // one is the default, as a blank choice is everywhere: the book.)
+  const kind =
+    typeof named === 'string' && !named.trim()
+      ? 'book'
+      : (idFor(named, KINDS) ?? (typeof named === 'string' ? named.trim() : named));
   // (All it reads of one: its picture, size, title, colours and SVG.)
   if (
     !cover ||
@@ -139,13 +143,12 @@ export function createMockup(cover, { kind: named = 'book', background: given, t
     const y0 = pad + CW * rise;
     const u = Math.min(CW, CH) / 600;
     const spineFill = mix(colors.bg, '#000000', 0.32);
-    /** The shadow on the floor, under the book. */
-    const floor = {
-      cx: x0 + (CW * turn) / 2,
-      cy: y0 + CH - CW * rise * 0.3,
-      rx: (CW * turn) / 2 + spine,
-      ry: CW * 0.035,
-    };
+    // The shadow on the floor, under the book: from the spine's edge to a little past the front's
+    // (a spine's width, but no more than half the margin, so a wide cover's stays on the picture
+    // with its blur).
+    const left = x0 - spine;
+    const right = x0 + CW * turn + Math.min(spine, pad / 2);
+    const floor = { cx: (left + right) / 2, cy: y0 + CH - CW * rise * 0.3, rx: (right - left) / 2, ry: CW * 0.035 };
     const sag = spine * 0.32;
     return wrap(
       W,

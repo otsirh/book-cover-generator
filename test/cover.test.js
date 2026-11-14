@@ -1411,6 +1411,46 @@ test('a badge goes in the first corner clear of the text, in every style', async
   );
 });
 
+test('Typewriter’s stamp never lands on the typed text: below it, or left off', () => {
+  for (const [width, height] of [
+    [600, 600],
+    [900, 600],
+    [1200, 600],
+    [600, 900],
+  ])
+    for (const seed of ['z', 'a', 'b']) {
+      const { svg } = createCover({
+        title: 'The Lighthouse Keeper of Wimbledon and Other Very Long Stories',
+        author: 'Mara Ellison',
+        subtitle: 'A Novel of the Deep Future',
+        series: 'Book Two of the Ember Cycle',
+        credit: 'Translated by Ann Lee',
+        style: 'typewriter',
+        width,
+        height,
+        seed,
+      });
+      const stamp = /<g transform="rotate\(([-\d.]+) ([\d.]+) ([\d.]+)\)" filter/.exec(svg);
+      if (!stamp) continue;
+      const [angle, , cy] = stamp.slice(1).map(Number);
+      const rect = /<rect x="[\d.-]+" y="[\d.-]+" width="([\d.]+)" height="([\d.]+)"/.exec(svg.slice(stamp.index));
+      const [w, h] = [Number(rect?.[1]), Number(rect?.[2])];
+      const tilt = (Math.abs(angle) * Math.PI) / 180;
+      const top = cy - (w * Math.sin(tilt) + h * Math.cos(tilt)) / 2;
+      // Every typed letter before the stamp, down to its descenders.
+      let lowest = -Infinity;
+      for (const [, attrs, body] of svg.slice(0, stamp.index).matchAll(/<text\b([^>]*)>(.*?)<\/text>/g)) {
+        const size = Number(/font-size="([\d.]+)"/.exec(attrs)?.[1] ?? 0);
+        for (const [, y] of [...attrs.matchAll(/\by="([\d.]+)"/g), ...body.matchAll(/\by="([\d.]+)"/g)])
+          if (Number(y) < cy && Number(y) < height * 0.9) lowest = Math.max(lowest, Number(y) + size * 0.25);
+      }
+      assert.ok(
+        top >= lowest,
+        `${width}x${height} ${seed}: stamp from ${top.toFixed(0)}, text to ${lowest.toFixed(0)}`,
+      );
+    }
+});
+
 test('mockups: every kind is a well-formed SVG with the cover in it, at its size', async () => {
   const { createMockup, mockupKinds } = await import('../src/index.js');
   const cover = createCover({ title: 'Fish & Chips\nTonight', author: "O'Brien & Sons", style: 'aurora', seed: 'm' });
@@ -1464,6 +1504,14 @@ test('mockups: every kind is a well-formed SVG with the cover in it, at its size
   }
   // The card's line is cleaned as the cover's text is: a control character is a space.
   assert.match(createMockup(cover, { kind: 'card', text: 'Out\u0085now' }).svg, />Out now</);
+  // A blank kind is the default, the book.
+  for (const blank of ['', '  ']) assert.equal(createMockup(cover, { kind: blank }).kind, 'book');
+  // A wide cover's book keeps its floor shadow (and the blur's reach) on the picture.
+  const wide = createMockup(createCover({ title: 'Dune', style: 'minimal', seed: 's', width: 1800, height: 600 }), {
+    kind: 'book',
+  });
+  const floor = /<ellipse cx="([\d.]+)" cy="[\d.]+" rx="([\d.]+)"/.exec(wide.svg);
+  assert.ok(Number(floor?.[1]) + Number(floor?.[2]) + 48 <= wide.width + 0.5, 'the shadow stays on the picture');
   // A kind as the app's menu names it.
   assert.equal(createMockup(cover, { kind: 'E-reader' }).kind, 'ereader');
   // A title typed on more lines than the card takes has its last lines joined, not cut off.

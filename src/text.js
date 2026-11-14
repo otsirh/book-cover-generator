@@ -1015,19 +1015,26 @@ export function fitText(text, opts) {
   const widest = Math.max(...tokens.map((token) => measureText(token.text, size, spec)));
   const wordFits = (size * maxWidth) / widest;
   if (widest > maxWidth && wordFits >= size * WORD_FLOOR) size = wordFits * (1 - 1e-9);
-  // Even one character (or the ellipsis) wider than the box, a box far narrower than maxSize:
-  // smaller still, before the lines are broken and counted, so each fits it.
+  // Even one character wider than the box, a box far narrower than maxSize: smaller still,
+  // before the lines are broken and counted, so each fits it.
   const widestChar = Math.max(
-    measureText('…', size, spec),
     ...[...new Set(graphemes(str.replace(/\s+/g, '')))].map((ch) => measureText(ch, size, spec)),
   );
   if (widestChar > maxWidth) size = ((size * maxWidth) / widestChar) * (1 - 1e-9);
   const measure = (s) => measureText(s, size, spec);
+  /** How many lines fit the height at `at`. @param {number} at */
+  const countAt = (at) =>
+    Math.max(1, Math.min(maxLines, Math.floor((maxHeight / at - marks.above - cap - depth) / pitch + 1e-9) + 1));
   let lines = hardWrap(tokens, maxWidth, measure);
-  const fitCount = Math.max(
-    1,
-    Math.min(maxLines, Math.floor((maxHeight / size - marks.above - cap - depth) / pitch + 1e-9) + 1),
-  );
+  let fitCount = countAt(size);
+  // Cut, its last line ends in an ellipsis: one wider than the box makes it smaller still, and
+  // the lines are broken anew (more may fit, or all).
+  const dots = measureText('…', size, spec);
+  if (lines.length > fitCount && dots > maxWidth) {
+    size = ((size * maxWidth) / dots) * (1 - 1e-9);
+    lines = hardWrap(tokens, maxWidth, measure);
+    fitCount = countAt(size);
+  }
   // (A last guard, as widths scale with the size: a line still over the box is drawn to fit it.)
   /** @param {string[]} set */
   const within = (set) => {

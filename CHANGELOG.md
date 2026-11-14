@@ -6,7 +6,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
-- `printLimits.trimPages`: the most pages at the trims that take fewer (8.5 × 11 in: 590 on white paper), by trim and paper, as `createPrintCover` checks them. The app's page-count field keeps to them.
+- `printLimits.trimPages`: the most pages at the named trims that take fewer (8.5 × 11 in: 590 on white paper), by trim and paper, as `createPrintCover` checks them. The app's page-count field keeps to them. (KDP states no such limits for a trim of your own.)
 - **The HTTP API describes itself**: `/api/cover.json` says what a query draws (the style, palette, colours, seed, size and pins it came to, its link with every choice written out, and its SVG, PNG, edit and share URLs), `/api/catalog.json` lists every style, palette, genre, font, format and mockup, and `/api/openapi.json` describes the API as OpenAPI 3.1.
 - **The MCP server shows what it drew**: the hosted server (`/mcp`) answers `create_cover` and `create_mockup` with the picture (a PNG up to 480 px wide), so the assistant can see the cover and your client can show it; every server adds a link to the PNG (`pngUrl`).
 - **All of KDP's paperback trims**: `trimSizes` (and the app's print panel) has the sixteen, from 5 × 8 to 8.5 × 11 with 5.06 × 7.81, 6.69 × 9.61, 7.44 × 9.69, 7.5 × 9.25, 8 × 10, 8.25 × 6, 8.25 × 8.25, 8.5 × 8.5 and A4 (8.27 × 11.69); `createPrintCover` holds the largest to the fewer pages KDP prints at them (8.5 × 11 at most 590 on white paper), and says when a paper isn't offered at a size.
@@ -20,7 +20,9 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 
-- A book list whose first book is named "Title" (`Title<tab>Ann Lee`) is a list, not a header that dropped that book and every author. A header names another column the list reads, or is a lone column, or has many (an export's).
+- Typewriter's rubber stamp never lands on the typed text: on a square or wide cover with a long block it goes below it, or is left off when there's no room.
+- The book mockup of a wide cover keeps its floor shadow on the picture (it was cut at the right edge).
+- A blank mockup kind is the book everywhere: in the library, MCP and the HTTP API.
 - The HTTP API's edge cache keeps one answer for a query with blank parameters and the same query without them.
 - A blank mockup `kind` or PNG `scale` in the HTTP API is the default, as a link's other blank choices are, instead of a 400.
 - `fitText` keeps every line within the width even in a box far narrower than its largest size (a single letter could overflow it): it sets the size first, then breaks the lines, so text that fits isn't cut.
