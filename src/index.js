@@ -406,7 +406,7 @@ function typeOptions(options) {
   if (fontGiven && fontId === undefined) {
     throw new RangeError(`Unknown font "${String(font)}". Available: ${Object.keys(FONTS).join(', ')}`);
   }
-  const caseId = typeof titleCase === 'string' ? titleCase.toLowerCase() : titleCase;
+  const caseId = typeof titleCase === 'string' ? titleCase.trim().toLowerCase() : titleCase;
   if (caseId != null && caseId !== '' && !TITLE_CASES.includes(/** @type {string} */ (caseId))) {
     throw new RangeError(`titleCase must be 'upper' or 'normal', got ${JSON.stringify(titleCase)}`);
   }

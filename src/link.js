@@ -331,6 +331,15 @@ export function px(key, raw) {
 }
 
 /**
+ * Whether `palette` names one, which can't be given beside your own colours: a palette left to
+ * the seed (auto, random) or none at all (empty) is no conflict. Links, the HTTP API, MCP and the
+ * CLI all read it so.
+ * @param {unknown} palette
+ */
+export const namesPalette = (palette) =>
+  typeof palette === 'string' && palette.trim() !== '' && !reserved(palette, PALETTE_WORDS);
+
+/**
  * Your own colours (background, text, one to three accents), each read as #rrggbb, as links,
  * the HTTP API, the MCP server and the CLI all take them.
  * @param {string} bg @param {string} ink @param {readonly string[]} accents
@@ -439,7 +448,7 @@ export function optionsFromLink(q) {
   if (bg || ink || accent) {
     if (!bg || !ink || !accent) throw new RangeError('Your own colours need bg, ink and accent');
     // (As the CLI says it: one or the other, never a palette quietly set aside.)
-    if (palette !== undefined && !reserved(palette, PALETTE_WORDS)) {
+    if (namesPalette(palette)) {
       throw new RangeError('Use palette or your own colours (bg, ink, accent), not both');
     }
     // (Each as #rrggbb, as a link writes it: the query and its link draw the same bytes.)

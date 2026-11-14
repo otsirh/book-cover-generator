@@ -66,9 +66,16 @@ test('robots.txt lets crawlers fetch a design’s link preview image, and nothin
     .filter((m) => m !== null)
     .map((m) => ({ allow: m[1] === 'Allow', path: m[2] }));
   /** As crawlers read it: the longest rule that matches wins. @param {string} path */
-  const allowed = (path) => {
+  const longest = (path) => {
     const hits = rules.filter((r) => path.startsWith(r.path)).sort((a, b) => b.path.length - a.path.length);
     return hits[0]?.allow ?? true;
+  };
+  /** As older crawlers (and Python's robotparser) read it: the first rule that matches wins. @param {string} path */
+  const first = (path) => rules.find((r) => path.startsWith(r.path))?.allow ?? true;
+  /** Both read it alike. @param {string} path */
+  const allowed = (path) => {
+    assert.equal(first(path), longest(path), path);
+    return longest(path);
   };
   // The image preview() puts in a design's page (worker/index.js).
   const { preview } = await import('../worker/index.js');

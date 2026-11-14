@@ -8,6 +8,7 @@ import {
   FONTS,
   cleanText,
   descentOf,
+  withEllipsis,
   drawText,
   fitText,
   graphemes,
@@ -87,16 +88,13 @@ const positive = (value, name) => {
   return value;
 };
 
+const PAPERS = Object.keys(paperTypes).map((id) => ({ id }));
+
 /** The paper's id, from a name in any case. @param {unknown} paper */
 function paperOf(paper) {
-  const id =
-    typeof paper === 'string'
-      ? paper
-          .trim()
-          .toLowerCase()
-          .replace(/[\s_]+/g, '-')
-      : paper;
-  if (typeof id !== 'string' || !Object.hasOwn(paperTypes, id)) {
+  // (In any case and spacing, as other names: "Premium color", premium_color, premiumcolor.)
+  const id = idFor(paper, PAPERS);
+  if (id === undefined) {
     throw new RangeError(`Unknown paper ${JSON.stringify(paper)}. Available: ${Object.keys(paperTypes).join(', ')}`);
   }
   return /** @type {keyof typeof paperTypes} */ (id);
@@ -151,17 +149,18 @@ function paragraphsOf(value, max) {
   for (const typed of String(value ?? '')
     .replace(/\r\n?|[\u2028\u2029]/g, '\n')
     .split(/\n\s*\n/)) {
-    if (!cleanText(typed, Infinity)) continue;
-    // (Text past the most it takes: the last of what's kept says so, "…", never a silent cut.)
-    if (room <= 0) {
-      if (out.length && !out[out.length - 1].endsWith('…')) out[out.length - 1] += '…';
+    const para = clipped(typed, room);
+    if (!para.text) continue;
+    // (Text past the most it takes: the last of what's kept says so, "…", never a silent cut. With
+    // no room for a letter of this one, the one before ends so.)
+    if (para.cut && para.text === '…' && out.length) {
+      out[out.length - 1] = withEllipsis(out[out.length - 1]);
       break;
     }
-    const para = clipped(typed, room);
-    out.push(para);
-    if (para.endsWith('…') && !cleanText(typed, Infinity).endsWith('…')) break;
+    out.push(para.text);
+    if (para.cut) break;
     // (In characters as cleanText counts them: an emoji is one.)
-    room -= graphemes(para).length;
+    room -= graphemes(para.text).length;
   }
   return out;
 }
@@ -169,11 +168,14 @@ function paragraphsOf(value, max) {
 /**
  * Text cleaned (cleanText) and cut to at most `max` characters, ending in "…" where it was cut.
  * @param {unknown} value @param {number} max
+ * @returns {{ text: string, cut: boolean }}
  */
 function clipped(value, max) {
   const whole = cleanText(value, Infinity);
-  const kept = cleanText(value, max);
-  return kept.length < whole.length ? `${cleanText(value, Math.max(0, max - 1)).trimEnd()}…` : kept;
+  if (whole.length <= max) return { text: whole, cut: false };
+  const chars = graphemes(whole);
+  if (chars.length <= max) return { text: whole, cut: false };
+  return { text: withEllipsis(chars.slice(0, Math.max(0, max - 1)).join('')), cut: true };
 }
 
 /**
@@ -221,7 +223,7 @@ export function createPrintCover(coverOptions = {}, print = /** @type {any} */ (
   const trimTop = b;
   const trimBottom = b + th * PX;
 
-  const hook = clipped(print.hook, 200);
+  const hook = clipped(print.hook, 200).text;
   const blurb = paragraphsOf(print.blurb, 3000);
   const imprint = cleanText(print.imprint, 80);
   const uid = `pc${hashString(JSON.stringify([front.svg, tw, th, pages, thickness, bleed, hook, blurb, imprint, barcode])).toString(36)}`;
@@ -452,7 +454,7 @@ function ellipsized(text, size, width, spec) {
   while (cut && measureText(`${cut}…`, size, spec) > width) {
     cut = /\s\S/.test(cut) ? cut.replace(/\s*\S+\s*$/, '') : graphemes(cut).slice(0, -1).join('');
   }
-  return `${cut.replace(/[\s,;:.·]+$/, '')}…`;
+  return withEllipsis(cut);
 }
 
 /**
@@ -560,7 +562,7 @@ function blurbText(paragraphs, x, y, width, height, fill) {
   if (cut && rows.length) {
     const last = rows[rows.length - 1];
     // (The row's own text, then an ellipsis: what follows it was cut.)
-    last.line = ellipsized(`${last.line.replace(/[\s,;:.]+$/, '')}…`, size, width, { font });
+    last.line = ellipsized(withEllipsis(last.line), size, width, { font });
   }
   const attrs = textGroupAttrs({ font, size, weight: 400, fill });
   return `<g ${attrs}>${rows.map((r) => `<text x="${n(x)}" y="${n(r.baseline)}">${escapeXml(r.line)}</text>`).join('')}</g>`;

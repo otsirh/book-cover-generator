@@ -3,9 +3,11 @@
 
 import { n, mix, escapeXml, hashString, contrast, readable, isHex, shadowFilter, blurFilter } from './core.js';
 import { FONTS, fitText, drawText, textBottom, clipGraphemes } from './text.js';
+import { idFor } from './shared.js';
 
 /** The kinds of mockup, with the size of each (or how it follows the cover's). */
 export const mockupKinds = Object.freeze(['flat', 'book', 'ereader', 'card', 'square', 'story']);
+const KINDS = mockupKinds.map((id) => ({ id }));
 
 /** @typedef {import('./index.js').MockupKind} MockupKind */
 
@@ -62,8 +64,8 @@ export const mockupText = (text) =>
  * @returns {{ svg: string, width: number, height: number, coverScale: number, kind: MockupKind }}
  */
 export function createMockup(cover, { kind: named = 'book', background: given, text = '' } = {}) {
-  // (A kind in any case, as the library's other names.)
-  const kind = typeof named === 'string' ? named.trim().toLowerCase() : named;
+  // (A kind in any case and spacing, as the library's other names: "E-reader" is ereader.)
+  const kind = idFor(named, KINDS) ?? (typeof named === 'string' ? named.trim() : named);
   // (All it reads of one: its picture, size, title, colours and SVG.)
   if (
     !cover ||

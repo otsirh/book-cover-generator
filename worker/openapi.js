@@ -116,7 +116,12 @@ export function openapi(base) {
       },
     },
   });
+  const preview = param(
+    'preview',
+    "For a link preview: on (1), a picture that can't be drawn answers with a 302 to the site's own image (/og.png) instead of an error.",
+  );
   const png = {
+    302: { description: "With preview on: the picture couldn't be drawn; the site's own image instead." },
     500: refused('resvg could not draw this design: ask for the SVG, or again later.'),
     422: refused('Text in a script the PNG fonts lack (they have Latin, Greek and Cyrillic): ask for the SVG.'),
     429: drawn[429],
@@ -142,14 +147,14 @@ export function openapi(base) {
       '/api/cover.png': draw(
         `A cover, as PNG (at most ${COVER_PIXELS.toLocaleString('en')} px: smaller to fit, or as scale asks)`,
         'image/png',
-        [...design, scale],
+        [...design, scale, preview],
         png,
       ),
       '/api/mockup.svg': draw('A mockup of a cover (3D book, e-reader, social card…), as SVG', 'image/svg+xml', [
         ...design,
         ...mockup,
       ]),
-      '/api/mockup.png': draw('A mockup of a cover, as PNG', 'image/png', [...design, ...mockup, scale], png),
+      '/api/mockup.png': draw('A mockup of a cover, as PNG', 'image/png', [...design, ...mockup, scale, preview], png),
       '/api/cover.json': {
         get: {
           summary:

@@ -97,6 +97,11 @@ export declare function clipGraphemes(str: string, max: number, options?: { unit
  * `breaks`, typed line breaks stay, as "\n" (empty lines dropped).
  */
 export declare function cleanText(value: unknown, max: number, options?: { breaks?: boolean }): string;
+/**
+ * `text` ended in one ellipsis, as text cut short is: what it ends in that would read badly
+ * before one (spaces, punctuation, a hyphen, an ellipsis of its own) is dropped first.
+ */
+export declare function withEllipsis(text: string): string;
 /** Text in capitals as `lang` writes them (default: the language of the cover being drawn). */
 export declare function toUpper(text: string, lang?: string): string;
 /** Run `draw` with `lang` as the language capitals are set in. */

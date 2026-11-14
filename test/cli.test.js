@@ -144,6 +144,21 @@ test('your own colours, a format and a size', async () => {
   );
   assert.equal(random.code, 0, random.stderr);
   assert.match(random.stdout, /fill="#0b132b"/);
+  // So is an empty --palette, as in links and MCP.
+  const none = await cli(
+    'Bright',
+    '--bg',
+    '0b132b',
+    '--ink',
+    'f8f9fa',
+    '--accent',
+    'ff6b6b',
+    '-p',
+    '',
+    '-s',
+    'minimal',
+  );
+  assert.equal(none.code, 0, none.stderr);
   const ebook = await cli('T', '--format', 'ebook', '--width', '1600');
   assert.match(ebook.stdout, /^<svg[^>]*width="1600" height="2560"/);
   const square = await cli('T', '--format', 'square');

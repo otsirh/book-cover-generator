@@ -83,6 +83,8 @@ test('unknown style or palette throws a helpful error', () => {
   // A style's name is found typed without its spaces too.
   assert.equal(createCover({ title: 'x', style: 'BigLetter' }).style, 'typographic');
   assert.equal(createCover({ title: 'x', style: 'retrosun' }).style, 'retro');
+  // The title's case with spaces around, as a list's cell may have it.
+  assert.match(createCover({ title: 'x', style: 'minimal', titleCase: ' upper ' }).svg, />X</);
   assert.throws(() => createCover({ title: 'x', palette: 'nope' }), /Unknown palette "nope"/);
 });
 
@@ -1441,6 +1443,8 @@ test('mockups: every kind is a well-formed SVG with the cover in it, at its size
   assert.throws(() => createMockup(cover, { background: 'red' }), /hex colour/);
   assert.throws(() => createMockup(/** @type {any} */ ({ svg: '' })), /a cover from createCover/);
   assert.match(createMockup(cover, { kind: 'flat', background: '#123456' }).svg, /fill="#123456"/);
+  // A kind as the app's menu names it.
+  assert.equal(createMockup(cover, { kind: 'E-reader' }).kind, 'ereader');
   // A title typed on more lines than the card takes has its last lines joined, not cut off.
   const lines = createCover({ title: 'One\nTwo\nThree\nFour\nFive', style: 'minimal', seed: 's' });
   const card = createMockup(lines, { kind: 'card' }).svg;

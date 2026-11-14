@@ -299,6 +299,24 @@ test('fitText keeps to maxLines, even for text typed on more lines: the surplus 
   assert.deepEqual(two.lines, ['One', 'Two Three']);
 });
 
+test('a line cut short ends in one ellipsis, without the punctuation or hyphen before it', async () => {
+  const { withEllipsis } = await import('../src/text.js');
+  assert.equal(withEllipsis('Wait…'), 'Wait…');
+  assert.equal(withEllipsis('Hello, '), 'Hello…');
+  assert.equal(withEllipsis('Inte-'), 'Inte…');
+  assert.equal(withEllipsis(''), '…');
+  const box = { font: FONTS.serif, maxWidth: 80, maxSize: 20, minSize: 18, maxLines: 1, maxHeight: 30 };
+  for (const text of [
+    'Wait… Supercalifragilistic expialidocious',
+    'Hello, my friend Supercalifragilistic',
+    'Internationalisation Supercalifragilistic',
+  ]) {
+    const [line] = fitText(text, { ...box, maxWidth: text.startsWith('Inter') ? 60 : 80 }).lines;
+    // (Measured here with this file's stand-in widths: cut or not, never "……", ",…" or "-…".)
+    assert.doesNotMatch(line, /[\s,;:.…-]…$/, text);
+  }
+});
+
 test('wrapText: a unit broken to the end, its last letter wider than the line, never repeats the line before it', async () => {
   const { wrapText } = await import('../src/text.js');
   // Every letter 10 px at 100 px, but W 1000 px: too wide for any line.

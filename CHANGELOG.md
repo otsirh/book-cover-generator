@@ -19,6 +19,11 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 
+- Text cut short ends in a single ellipsis: a word that already ended in "…", a comma or a hyphen no longer shows "……", ",…" or "-…" (titles, card lines, the spine, the imprint and the back's blurb).
+- A blurb whose first paragraph filled its 3,000 characters no longer ends on a paragraph of "…" alone.
+- Mockups and paper are named as other choices are: `E-reader` is the e-reader mockup and `premiumcolor` the premium colour paper. `titleCase` takes spaces around it.
+- An empty `--palette` beside your own colours is no conflict in the CLI, as in links and MCP (one rule for all three).
+- `robots.txt` keeps crawlers that take the first matching rule out of the API too.
 - A title typed on more lines than a place takes has its last lines joined instead of shrunk and cut off (the card, square and story mockups, and their link-preview images, cut a fifth line).
 - A blurb or hook too long for its limit ends in an ellipsis, not silently mid-word.
 - `--palette auto` or `random` beside your own colours in the CLI is no longer refused as a conflict, as in links and MCP.
@@ -82,6 +87,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Changed
 
+- The library's docs and the README say that an `ink` under 3:1 on its background is replaced with black or white. The OpenAPI description lists the PNG endpoints' `preview` parameter.
 - The site's PNGs not yet cached are limited to 240 a minute for each client, and MCP requests to 600 (`429` with `Retry-After`); SVGs aren't limited. The README says how to run your own copy. The site's Worker keeps its errors in Workers Logs, without query strings, and a daily check of the live site (pages, API, MCP, link previews and the version) runs in CI and after every deploy.
 - **Back leaves the site**: changes no longer add browser history entries (nine changes took ten Back presses to leave). Undo and Redo keep their steps in the page, and through a reload, even one right after typing; the URL still holds the design, and links work as before.
 - **Laptops**: from 1280 px the downloads are a column beside the cover, so every export is in view with it, and the whole preview stays in view as the controls scroll. From 1024 px the styles are beside the preview (they were 800 px below it), and Browse scrolls the styles, not the page.

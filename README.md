@@ -225,6 +225,8 @@ Same as `generateCover`, but also tells you which style and palette were chosen.
 | `font`      | `string`           | the style's                            | the title's font, one of `FONTS`                  |
 | `titleCase` | `string`           | the style's                            | `'upper'` (capitals) or `'normal'` (as typed)     |
 
+An `ink` that reads badly on its `bg` (under 3:1 contrast) is replaced with black or white, so the text is always readable; the cover's `colors` say which.
+
 Styles, palettes, genres and fonts may be given by id or by name, in any case: `'artdeco'`, `'Art Deco'` and `'ART DECO'` are the same style, and a book list or a link can name them as the app's menus do.
 
 `lang` is set on the cover so Chinese characters get the right glyphs for the language. Without it, text with kana is marked Japanese and text with Hangul Korean; pass `'zh-Hans'`, `'zh-Hant'` or `'ja'` for text in Chinese characters only.

@@ -1,8 +1,9 @@
 User-agent: *
-Allow: /
-Disallow: /api/
-# (A design's link preview shows its card: crawlers that honour this file may fetch it.)
+# (A design's link preview shows its card: crawlers that honour this file may fetch it. The
+# specific rules come first, for crawlers that take the first rule that matches.)
 Allow: /api/mockup.png
+Disallow: /api/
 Disallow: /mcp
+Allow: /
 
 Sitemap: https://covers.otsirh.dev/sitemap.xml

@@ -1024,10 +1024,19 @@ export function fitText(text, opts) {
   lines = lines.slice(0, fitCount);
   const chars = graphemes(lines[fitCount - 1]);
   while (chars.length > 1 && measure(chars.join('') + '…') > maxWidth) chars.pop();
-  const kept = `${chars.join('').trimEnd()}…`;
+  const kept = withEllipsis(chars.join(''));
   // (Not even one letter and the ellipsis fit: the ellipsis alone.)
   lines[fitCount - 1] = measure(kept) <= maxWidth ? kept : '…';
   return finish(lines, size, true);
+}
+
+/**
+ * `text` ended in one ellipsis, as text cut short is: what it ends in that would read badly before
+ * one (spaces, punctuation, a hyphen, an ellipsis of its own) is dropped first ("Wait…", not "Wait……").
+ * @param {string} text
+ */
+export function withEllipsis(text) {
+  return `${text.replace(/[\s,;:.·…\-\u2010\u2013\u2014]+$/u, '')}…`;
 }
 
 /**

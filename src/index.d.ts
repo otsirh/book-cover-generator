@@ -274,7 +274,11 @@ export type StyleGroup = 'Typographic' | 'Geometric' | 'Pattern' | 'Scenic' | 'V
 export interface CustomPalette {
   /** The background. */
   bg: string;
-  /** The text colour. */
+  /**
+   * The text colour, and that of the lines styles draw with it. One that reads badly on `bg`
+   * (under 3:1 contrast) is replaced with black or white (`#111111` or `#ffffff`), so text is
+   * always readable: a cover's `colors.ink`, and a palette `registerPalette` adds, hold that.
+   */
   ink: string;
   /** One or more accents; a cover repeats them to make three if there are fewer. */
   accents: readonly string[];

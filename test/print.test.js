@@ -18,6 +18,7 @@ test('the spine is the page count times the paper, as KDP figures it', () => {
   assert.equal(spineWidth(200, 'white'), 0.4504);
   assert.equal(spineWidth(320, 'cream'), 0.8);
   assert.equal(spineWidth(100, 'Premium Color'), 0.2347);
+  assert.equal(spineWidth(100, 'premiumcolor'), 0.2347);
   assert.deepEqual(Object.keys(paperTypes), ['white', 'cream', 'color', 'premium-color']);
   assert.throws(() => spineWidth(200, 'glossy'), /Unknown paper "glossy". Available: white, cream/);
   assert.throws(() => spineWidth(23), /pages must be a whole number from 24 to 828 on white paper, got 23/);
@@ -163,6 +164,23 @@ test('a blurb too long for the back is cut with an ellipsis, at 8 pt', () => {
   assert.equal(body[0].size, 10.7, 'at 8 pt (10.7 px)');
   assert.match(body[body.length - 1].text, /…$/);
   assertBackText(print, 'long blurb');
+  // A blurb whose first paragraph takes all but a character of its 3,000 ends there, never on a
+  // paragraph of "…" alone; and a text's own "…" is never doubled where it's cut.
+  const full = createPrintCover(book, {
+    trim: '8.5x11',
+    pages: 300,
+    blurb: `${'word '.repeat(599)}end…\n\nSecond paragraph here.`,
+  });
+  const rows = textBoxes(full.svg).filter((b) => !b.moved);
+  assert.match(rows[rows.length - 1].text, /\bend…$/);
+  const imprint = textBoxes(
+    createPrintCover(book, { pages: 100, imprint: `Hello… ${'www.example.com/averyveryveryverylongpath/'.repeat(4)}` })
+      .svg,
+  ).filter((b) => /Hello/.test(b.text));
+  assert.deepEqual(
+    imprint.map((b) => b.text),
+    ['Hello…'],
+  );
   // A hook past its 200 characters ends in an ellipsis too, not mid-word.
   const hooked = textBoxes(createPrintCover(book, { pages: 100, hook: 'word '.repeat(60) }).svg).filter(
     (b) => !b.moved,

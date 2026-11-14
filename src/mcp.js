@@ -13,9 +13,9 @@ import {
   sizeLimits,
   version,
 } from './index.js';
-import { optionsFromLink, linkOf, ownColours } from './link.js';
+import { optionsFromLink, linkOf, ownColours, namesPalette } from './link.js';
 import { mockupText } from './mockups.js';
-import { idFor, fontEntries, reserved, PALETTE_WORDS } from './shared.js';
+import { idFor, fontEntries } from './shared.js';
 
 /** The site that draws covers from links, and edits them. */
 export const SITE = 'https://covers.otsirh.dev';
@@ -200,7 +200,7 @@ function optionsOf(args) {
     if (!Array.isArray(colors.accents) || colors.accents.length < 1 || colors.accents.length > 3) {
       throw new RangeError('colors.accents is a list of one to three colours');
     }
-    if (typeof args.palette === 'string' && args.palette && !reserved(args.palette, PALETTE_WORDS)) {
+    if (namesPalette(args.palette)) {
       throw new RangeError('Use palette or your own colours (colors), not both');
     }
     // (Each as #rrggbb, as the cover's link writes it: the two draw the same bytes.)
