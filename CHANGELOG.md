@@ -4,12 +4,12 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [1.13.0] - 2026-11-14
+
+The HTTP API and the MCP server describe themselves, the MCP server is in the official registry, and print covers come in every KDP trim. Covers are drawn as in 1.12.0, except where text was cut short, overflowed or overlapped, which now reads right.
+
 ### Added
 
-- `pageRange(trim, paper)`: the page counts a paperback can have at a trim on a paper (`[24, 590]` at 8.5 × 11 in on white), or null where the paper isn't printed at that trim, as `createPrintCover` checks them. The app's print panel reads it too.
-- Many covers saves JPEGs too, as KDP takes eBook covers.
-- `createCover`'s `palette` takes your own colours as a link writes them (`custom-0b132b-f8f9fa-ff6b6b`), so the CLI's `--palette` and a book list's palette column take a value copied from a link.
-- `printLimits.trimPages`: the most pages at the named trims that take fewer (8.5 × 11 in: 590 on white paper), by trim and paper, as `createPrintCover` checks them. The app's page-count field keeps to them. (KDP states no such limits for a trim of your own.)
 - **The HTTP API describes itself**: `/api/cover.json` says what a query draws (the style, palette, colours, seed, size and pins it came to, its link with every choice written out, and its SVG, PNG, edit and share URLs), `/api/catalog.json` lists every style, palette, genre, font, format and mockup, and `/api/openapi.json` describes the API as OpenAPI 3.1.
 - **The MCP server shows what it drew**: the hosted server (`/mcp`) answers `create_cover` and `create_mockup` with the picture (a PNG up to 480 px wide), so the assistant can see the cover and your client can show it; every server adds a link to the PNG (`pngUrl`).
 - **All of KDP's paperback trims**: `trimSizes` (and the app's print panel) has the sixteen, from 5 × 8 to 8.5 × 11 with 5.06 × 7.81, 6.69 × 9.61, 7.44 × 9.69, 7.5 × 9.25, 8 × 10, 8.25 × 6, 8.25 × 8.25, 8.5 × 8.5 and A4 (8.27 × 11.69); `createPrintCover` holds the largest to the fewer pages KDP prints at them (8.5 × 11 at most 590 on white paper), and says when a paper isn't offered at a size.
@@ -20,6 +20,10 @@ All notable changes to this project are documented here. The format follows [Kee
 - `download=1` on any image of the HTTP API answers it as a file named after the title (`download=my-cover` names it, `my-cover.png` too; `download=0`, or empty, doesn't).
 - **Keep is a star on the preview**: it shows whether the design on show is kept, keeps it (or press K), and pressed again removes it. Removing a kept design, here or in the tray, offers Undo.
 - Undo and Redo with Ctrl or Cmd+Z too (Shift for Redo, or Ctrl+Y), outside text fields, and with single-key shortcuts off. On a phone, Undo and Keep are in the bar along the bottom, and the previous and next style beside the pinned preview.
+- `pageRange(trim, paper)`: the page counts a paperback can have at a trim on a paper (`[24, 590]` at 8.5 × 11 in on white), or null where the paper isn't printed at that trim, as `createPrintCover` checks them. The app's print panel reads it too.
+- Many covers saves JPEGs too, as KDP takes eBook covers.
+- `createCover`'s `palette` takes your own colours as a link writes them (`custom-0b132b-f8f9fa-ff6b6b`), so the CLI's `--palette` and a book list's palette column take a value copied from a link.
+- `printLimits.trimPages`: the most pages at the named trims that take fewer (8.5 × 11 in: 590 on white paper), by trim and paper, as `createPrintCover` checks them. The app's page-count field keeps to them. (KDP states no such limits for a trim of your own.)
 
 ### Fixed
 
@@ -489,7 +493,8 @@ A redesign of the covers and the app, based on a design review.
 
 - First release: 27 styles, 20 palettes, seeded randomizer, text fitting, CLI and the web app with SVG, PNG and JPEG export.
 
-[Unreleased]: https://github.com/otsirh/book-cover-generator/compare/v1.12.0...HEAD
+[Unreleased]: https://github.com/otsirh/book-cover-generator/compare/v1.13.0...HEAD
+[1.13.0]: https://github.com/otsirh/book-cover-generator/compare/v1.12.0...v1.13.0
 [1.12.0]: https://github.com/otsirh/book-cover-generator/compare/v1.11.0...v1.12.0
 [1.11.0]: https://github.com/otsirh/book-cover-generator/compare/v1.10.0...v1.11.0
 [1.10.0]: https://github.com/otsirh/book-cover-generator/compare/v1.9.2...v1.10.0

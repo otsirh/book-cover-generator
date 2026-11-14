@@ -8,13 +8,13 @@
     "url": "https://github.com/otsirh/book-cover-generator",
     "source": "github"
   },
-  "version": "1.12.0",
+  "version": "1.13.0",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "book-cover-generator",
-      "version": "1.12.0",
+      "version": "1.13.0",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"

@@ -46,7 +46,7 @@ export { createPrintCover, spineWidth, pageRange, paperTypes, trimSizes, printLi
 export { parseBookList } from './books.js';
 
 /** This version of the library (artwork for a seed can change between minor versions). */
-export const version = '1.12.0';
+export const version = '1.13.0';
 
 /** The sizes a cover can have: each side `min` to `max` px, and neither more than `ratio` times the other. */
 export const sizeLimits = Object.freeze({ min: 50, max: 10000, ratio: 3 });
